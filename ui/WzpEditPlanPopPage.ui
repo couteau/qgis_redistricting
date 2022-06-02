@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>wzpPopulation</class>
+    <widget class="QWizardPage" name="wzpPopulation">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>606</width>
+                <height>395</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Population</string>
+        </property>
+        <property name="title">
+            <string>Population</string>
+        </property>
+        <property name="subTitle">
+            <string>Configure population data source</string>
+        </property>
+        <layout class="QGridLayout" name="gridLayout">
+            <item row="2" column="1">
+                <widget class="QDoubleSpinBox" name="sbxMaxDeviation">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="prefix">
+                        <string>±</string>
+                    </property>
+                    <property name="suffix">
+                        <string>%</string>
+                    </property>
+                    <property name="singleStep">
+                        <double>0.100000000000000</double>
+                    </property>
+                </widget>
+            </item>
+            <item row="5" column="0" colspan="2">
+                <spacer name="verticalSpacer">
+                    <property name="orientation">
+                        <enum>Qt::Vertical</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                        <size>
+                            <width>20</width>
+                            <height>40</height>
+                        </size>
+                    </property>
+                </spacer>
+            </item>
+            <item row="1" column="0">
+                <widget class="QLabel" name="lblPopField">
+                    <property name="text">
+                        <string>Total Population Field</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="0" column="0" colspan="2">
+                <widget class="QGroupBox" name="gbxPopLayer">
+                    <property name="title">
+                        <string>Population Layer</string>
+                    </property>
+                    <layout class="QGridLayout" name="gridLayout_2">
+                        <item row="0" column="0" colspan="3">
+                            <widget class="QRadioButton" name="btnUseGeoLayer">
+                                <property name="text">
+                                    <string>Use the geography layer</string>
+                                </property>
+                                <property name="checked">
+                                    <bool>true</bool>
+                                </property>
+                            </widget>
+                        </item>
+                        <item row="1" column="0" colspan="3">
+                            <widget class="QRadioButton" name="btnOtherPopLayer">
+                                <property name="text">
+                                    <string>Use a separate population layer</string>
+                                </property>
+                            </widget>
+                        </item>
+                        <item row="2" column="0">
+                            <widget class="QLabel" name="lblPopLayer">
+                                <property name="enabled">
+                                    <bool>false</bool>
+                                </property>
+                                <property name="text">
+                                    <string>Layer</string>
+                                </property>
+                                <property name="alignment">
+                                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                                </property>
+                                <property name="indent">
+                                    <number>20</number>
+                                </property>
+                                <property name="buddy">
+                                    <cstring>cmbPopLayer</cstring>
+                                </property>
+                            </widget>
+                        </item>
+                        <item row="2" column="1">
+                            <widget class="RdsMapLayerComboBox" name="cmbPopLayer">
+                                <property name="enabled">
+                                    <bool>false</bool>
+                                </property>
+                                <property name="sizePolicy">
+                                    <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                                        <horstretch>0</horstretch>
+                                        <verstretch>0</verstretch>
+                                    </sizepolicy>
+                                </property>
+                                <property name="allowEmptyLayer">
+                                    <bool>true</bool>
+                                </property>
+                            </widget>
+                        </item>
+                        <item row="3" column="1">
+                            <widget class="QgsFieldComboBox" name="cmbJoinField">
+                                <property name="enabled">
+                                    <bool>false</bool>
+                                </property>
+                            </widget>
+                        </item>
+                        <item row="3" column="0">
+                            <widget class="QLabel" name="lblJoinField">
+                                <property name="enabled">
+                                    <bool>false</bool>
+                                </property>
+                                <property name="text">
+                                    <string>Join Field</string>
+                                </property>
+                                <property name="alignment">
+                                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                                </property>
+                                <property name="buddy">
+                                    <cstring>cmbJoinField</cstring>
+                                </property>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+            <item row="3" column="0">
+                <widget class="QLabel" name="lblVAPField">
+                    <property name="text">
+                        <string>Voting Age Population Field</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="1" column="1">
+                <widget class="RdsFieldComboBox" name="cmbPopField">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                </widget>
+            </item>
+            <item row="2" column="0">
+                <widget class="QLabel" name="lblMaxDeviation">
+                    <property name="text">
+                        <string>Maximum Deviation</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="3" column="1">
+                <widget class="RdsFieldComboBox" name="cmbVAPField">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="allowEmptyFieldName">
+                        <bool>true</bool>
+                    </property>
+                </widget>
+            </item>
+            <item row="4" column="0">
+                <widget class="QLabel" name="lblCVAPField">
+                    <property name="text">
+                        <string>Citizen VAP Field</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="4" column="1">
+                <widget class="RdsFieldComboBox" name="cmbCVAPField">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="allowEmptyFieldName">
+                        <bool>true</bool>
+                    </property>
+                </widget>
+            </item>
+        </layout>
+    </widget>
+    <customwidgets>
+        <customwidget>
+            <class>QgsFieldComboBox</class>
+            <extends>QComboBox</extends>
+            <header>qgsfieldcombobox.h</header>
+        </customwidget>
+        <customwidget>
+            <class>QgsMapLayerComboBox</class>
+            <extends>QComboBox</extends>
+            <header>qgsmaplayercombobox.h</header>
+        </customwidget>
+        <customwidget>
+            <class>RdsMapLayerComboBox</class>
+            <extends>QgsMapLayerComboBox</extends>
+            <header>.RedistrictingWidgets</header>
+        </customwidget>
+        <customwidget>
+            <class>RdsFieldComboBox</class>
+            <extends>QgsFieldComboBox</extends>
+            <header>.RedistrictingWidgets</header>
+        </customwidget>
+    </customwidgets>
+    <tabstops>
+        <tabstop>btnUseGeoLayer</tabstop>
+        <tabstop>btnOtherPopLayer</tabstop>
+        <tabstop>cmbPopField</tabstop>
+        <tabstop>sbxMaxDeviation</tabstop>
+        <tabstop>cmbVAPField</tabstop>
+    </tabstops>
+    <resources />
+    <connections>
+        <connection>
+            <sender>cmbPopLayer</sender>
+            <signal>layerChanged(QgsMapLayer*)</signal>
+            <receiver>cmbPopField</receiver>
+            <slot>setLayer(QgsMapLayer*)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>287</x>
+                    <y>54</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>287</x>
+                    <y>119</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>cmbPopLayer</sender>
+            <signal>layerChanged(QgsMapLayer*)</signal>
+            <receiver>cmbVAPField</receiver>
+            <slot>setLayer(QgsMapLayer*)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>287</x>
+                    <y>54</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>287</x>
+                    <y>244</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>cmbPopLayer</sender>
+            <signal>layerChanged(QgsMapLayer*)</signal>
+            <receiver>cmbCVAPField</receiver>
+            <slot>setLayer(QgsMapLayer*)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>255</x>
+                    <y>89</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>312</x>
+                    <y>249</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>cmbPopLayer</sender>
+            <signal>layerChanged(QgsMapLayer*)</signal>
+            <receiver>cmbJoinField</receiver>
+            <slot>setLayer(QgsMapLayer*)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>331</x>
+                    <y>89</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>331</x>
+                    <y>125</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>btnOtherPopLayer</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>cmbPopLayer</receiver>
+            <slot>setEnabled(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>301</x>
+                    <y>59</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>331</x>
+                    <y>89</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>btnOtherPopLayer</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>cmbJoinField</receiver>
+            <slot>setEnabled(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>301</x>
+                    <y>59</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>331</x>
+                    <y>125</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>btnOtherPopLayer</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>lblJoinField</receiver>
+            <slot>setEnabled(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>301</x>
+                    <y>59</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>55</x>
+                    <y>124</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>btnOtherPopLayer</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>lblPopLayer</receiver>
+            <slot>setEnabled(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>301</x>
+                    <y>59</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>55</x>
+                    <y>88</y>
+                </hint>
+            </hints>
+        </connection>
+    </connections>
+</ui>

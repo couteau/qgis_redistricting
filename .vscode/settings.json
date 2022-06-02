@@ -1,0 +1,4 @@
+{
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestPath": "/opt/miniforge3/envs/qgis_redist_plugin/bin/pytest",
+}

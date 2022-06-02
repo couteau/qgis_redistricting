@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>wzpImport</class>
+    <widget class="QWizardPage" name="wzpImport">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>544</width>
+                <height>467</height>
+            </rect>
+        </property>
+        <property name="windowTitle">
+            <string>Import Assignments</string>
+        </property>
+        <property name="title">
+            <string>Import Assignments</string>
+        </property>
+        <property name="subTitle">
+            <string>Import district assignments from a geogrpahic equivalency file</string>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_2">
+            <item row="5" column="0">
+                <widget class="QLabel" name="lblGeoCol">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="text">
+                        <string>&amp;Geography Column</string>
+                    </property>
+                    <property name="buddy">
+                        <cstring>sbxGeographyCol</cstring>
+                    </property>
+                </widget>
+            </item>
+            <item row="7" column="0">
+                <widget class="QLabel" name="lblDistrictCol">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="text">
+                        <string>&amp;District Column</string>
+                    </property>
+                    <property name="buddy">
+                        <cstring>sbxDistrictCol</cstring>
+                    </property>
+                </widget>
+            </item>
+            <item row="3" column="0" colspan="3">
+                <layout class="QHBoxLayout" name="horizontalLayout2">
+                    <item>
+                        <widget class="QGroupBox" name="gbDelimiter">
+                            <property name="toolTip">
+                                <string>Select or enter the field delimiter</string>
+                            </property>
+                            <property name="title">
+                                <string>Delimiter</string>
+                            </property>
+                            <layout class="QGridLayout" name="gridLayout2">
+                                <item row="3" column="0">
+                                    <widget class="QRadioButton" name="rbOther">
+                                        <property name="text">
+                                            <string>&amp;Other character</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="3" column="2">
+                                    <spacer name="horizontalSpacer1">
+                                        <property name="orientation">
+                                            <enum>Qt::Horizontal</enum>
+                                        </property>
+                                        <property name="sizeHint" stdset="0">
+                                            <size>
+                                                <width>40</width>
+                                                <height>20</height>
+                                            </size>
+                                        </property>
+                                    </spacer>
+                                </item>
+                                <item row="0" column="0">
+                                    <widget class="QRadioButton" name="rbComma">
+                                        <property name="text">
+                                            <string>&amp;Comma</string>
+                                        </property>
+                                        <property name="checked">
+                                            <bool>true</bool>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="3" column="1">
+                                    <widget class="QLineEdit" name="edOther">
+                                        <property name="enabled">
+                                            <bool>false</bool>
+                                        </property>
+                                        <property name="maxLength">
+                                            <number>1</number>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="2" column="0">
+                                    <widget class="QRadioButton" name="rbSpace">
+                                        <property name="text">
+                                            <string>&amp;Space</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="1" column="0">
+                                    <widget class="QRadioButton" name="rbTab">
+                                        <property name="text">
+                                            <string>&amp;Tab</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QGroupBox" name="gbQuote">
+                            <property name="toolTip">
+                                <string>Select or enter the quote character that will define field values</string>
+                            </property>
+                            <property name="title">
+                                <string>Text Qualifier</string>
+                            </property>
+                            <layout class="QGridLayout" name="gridLayout">
+                                <item row="1" column="0">
+                                    <widget class="QRadioButton" name="rbSingleQuote">
+                                        <property name="text">
+                                            <string>Single Quote</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="2" column="2">
+                                    <spacer name="horizontalSpacer2">
+                                        <property name="orientation">
+                                            <enum>Qt::Horizontal</enum>
+                                        </property>
+                                        <property name="sizeHint" stdset="0">
+                                            <size>
+                                                <width>40</width>
+                                                <height>20</height>
+                                            </size>
+                                        </property>
+                                    </spacer>
+                                </item>
+                                <item row="0" column="0">
+                                    <widget class="QRadioButton" name="rbDoubleQuote">
+                                        <property name="text">
+                                            <string>Double Quote</string>
+                                        </property>
+                                        <property name="checked">
+                                            <bool>true</bool>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="2" column="0">
+                                    <widget class="QRadioButton" name="rbOtherQuote">
+                                        <property name="text">
+                                            <string>Other character</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="2" column="1">
+                                    <widget class="QLineEdit" name="edOtherQuote">
+                                        <property name="enabled">
+                                            <bool>false</bool>
+                                        </property>
+                                        <property name="maxLength">
+                                            <number>1</number>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item row="3" column="0">
+                                    <spacer name="verticalSpacer1">
+                                        <property name="orientation">
+                                            <enum>Qt::Vertical</enum>
+                                        </property>
+                                        <property name="sizeHint" stdset="0">
+                                            <size>
+                                                <width>20</width>
+                                                <height>40</height>
+                                            </size>
+                                        </property>
+                                    </spacer>
+                                </item>
+                            </layout>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+            <item row="8" column="0" colspan="3">
+                <spacer name="verticalSpacer">
+                    <property name="orientation">
+                        <enum>Qt::Vertical</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                        <size>
+                            <width>20</width>
+                            <height>40</height>
+                        </size>
+                    </property>
+                </spacer>
+            </item>
+            <item row="2" column="0" colspan="3">
+                <widget class="QCheckBox" name="cbxHeaderRow">
+                    <property name="toolTip">
+                        <string>Check if the equivalency file includes a header row</string>
+                    </property>
+                    <property name="text">
+                        <string>File has &amp;header row</string>
+                    </property>
+                    <property name="checked">
+                        <bool>true</bool>
+                    </property>
+                </widget>
+            </item>
+            <item row="0" column="0">
+                <widget class="QLabel" name="lblImportAssignment">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="text">
+                        <string>&amp;Import From</string>
+                    </property>
+                    <property name="buddy">
+                        <cstring>fileImportFrom</cstring>
+                    </property>
+                </widget>
+            </item>
+            <item row="4" column="0" colspan="3">
+                <widget class="QGroupBox" name="gbPreview">
+                    <property name="title">
+                        <string>Preview</string>
+                    </property>
+                    <property name="flat">
+                        <bool>true</bool>
+                    </property>
+                    <layout class="QVBoxLayout" name="verticalLayout">
+                        <property name="leftMargin">
+                            <number>0</number>
+                        </property>
+                        <property name="topMargin">
+                            <number>0</number>
+                        </property>
+                        <property name="rightMargin">
+                            <number>0</number>
+                        </property>
+                        <property name="bottomMargin">
+                            <number>0</number>
+                        </property>
+                        <item>
+                            <widget class="QTableWidget" name="tbPreview">
+                                <property name="sizePolicy">
+                                    <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                                        <horstretch>0</horstretch>
+                                        <verstretch>0</verstretch>
+                                    </sizepolicy>
+                                </property>
+                                <property name="frameShape">
+                                    <enum>QFrame::NoFrame</enum>
+                                </property>
+                                <property name="frameShadow">
+                                    <enum>QFrame::Plain</enum>
+                                </property>
+                                <property name="selectionBehavior">
+                                    <enum>QAbstractItemView::SelectRows</enum>
+                                </property>
+                                <property name="rowCount">
+                                    <number>1</number>
+                                </property>
+                                <attribute name="horizontalHeaderMinimumSectionSize">
+                                    <number>200</number>
+                                </attribute>
+                                <attribute name="horizontalHeaderStretchLastSection">
+                                    <bool>true</bool>
+                                </attribute>
+                                <attribute name="verticalHeaderVisible">
+                                    <bool>false</bool>
+                                </attribute>
+                                <row />
+                                <column>
+                                    <property name="text">
+                                        <string>Geography ID</string>
+                                    </property>
+                                </column>
+                                <column>
+                                    <property name="text">
+                                        <string>District</string>
+                                    </property>
+                                </column>
+                            </widget>
+                        </item>
+                    </layout>
+                </widget>
+            </item>
+            <item row="1" column="0">
+                <widget class="QLabel" name="lblJoinField">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="toolTip">
+                        <string comment="redistricting">Geography field on which equivalency file will be joined to assignments layer</string>
+                    </property>
+                    <property name="text">
+                        <string>Assigment Geography</string>
+                    </property>
+                    <property name="buddy">
+                        <cstring>cmbJoinField</cstring>
+                    </property>
+                </widget>
+            </item>
+            <item row="1" column="1" colspan="2">
+                <widget class="RdsFieldComboBox" name="cmbJoinField">
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="toolTip">
+                        <string>Choose the geography field on which equivalency file will be joined to assignments layer</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="0" column="1" colspan="2">
+                <widget class="RdsFileWidget" name="fileImportFrom">
+                    <property name="enabled">
+                        <bool>true</bool>
+                    </property>
+                    <property name="sizePolicy">
+                        <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
+                            <horstretch>0</horstretch>
+                            <verstretch>0</verstretch>
+                        </sizepolicy>
+                    </property>
+                    <property name="toolTip">
+                        <string>Select the equivalency file from which assignments will be imported</string>
+                    </property>
+                    <property name="statusTip">
+                        <string>Choose an equivalency file to import</string>
+                    </property>
+                    <property name="dialogTitle">
+                        <string>Select Equivalency File</string>
+                    </property>
+                    <property name="filter">
+                        <string notr="true">*.csv;*.txt;*.xls;*.xlsx;*.ods</string>
+                    </property>
+                </widget>
+            </item>
+            <item row="5" column="1" colspan="2">
+                <layout class="QHBoxLayout" name="horizontalLayout_2">
+                    <item>
+                        <widget class="QSpinBox" name="sbxGeographyCol">
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="toolTip">
+                                <string>Choose the column that will be matched to the geography in the assignment layer</string>
+                            </property>
+                            <property name="minimum">
+                                <number>1</number>
+                            </property>
+                            <property name="maximum">
+                                <number>2</number>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="cmbGeographyCol">
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="toolTip">
+                                <string>Choose the column that will be matched to the geography in the assignment layer</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+            <item row="7" column="1" colspan="2">
+                <layout class="QHBoxLayout" name="horizontalLayout_3">
+                    <item>
+                        <widget class="QSpinBox" name="sbxDistrictCol">
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="toolTip">
+                                <string>Choose the column that will be imported as the district for the corresponding unit of geography</string>
+                            </property>
+                            <property name="minimum">
+                                <number>1</number>
+                            </property>
+                            <property name="maximum">
+                                <number>2</number>
+                            </property>
+                            <property name="value">
+                                <number>2</number>
+                            </property>
+                        </widget>
+                    </item>
+                    <item>
+                        <widget class="QComboBox" name="cmbDistrictCol">
+                            <property name="sizePolicy">
+                                <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+                                    <horstretch>0</horstretch>
+                                    <verstretch>0</verstretch>
+                                </sizepolicy>
+                            </property>
+                            <property name="toolTip">
+                                <string>Choose the column that will be imported as the district for the corresponding unit of geography</string>
+                            </property>
+                        </widget>
+                    </item>
+                </layout>
+            </item>
+        </layout>
+    </widget>
+    <customwidgets>
+        <customwidget>
+            <class>QgsFieldComboBox</class>
+            <extends>QComboBox</extends>
+            <header>qgsfieldcombobox.h</header>
+        </customwidget>
+        <customwidget>
+            <class>QgsFileWidget</class>
+            <extends>QWidget</extends>
+            <header>qgsfilewidget.h</header>
+        </customwidget>
+        <customwidget>
+            <class>RdsFileWidget</class>
+            <extends>QgsFileWidget</extends>
+            <header>.RedistrictingWidgets</header>
+        </customwidget>
+        <customwidget>
+            <class>RdsFieldComboBox</class>
+            <extends>QgsFieldComboBox</extends>
+            <header>.RedistrictingWidgets</header>
+        </customwidget>
+    </customwidgets>
+    <tabstops>
+        <tabstop>cbxHeaderRow</tabstop>
+        <tabstop>rbComma</tabstop>
+        <tabstop>rbTab</tabstop>
+        <tabstop>rbSpace</tabstop>
+        <tabstop>rbOther</tabstop>
+        <tabstop>edOther</tabstop>
+        <tabstop>rbDoubleQuote</tabstop>
+        <tabstop>rbSingleQuote</tabstop>
+        <tabstop>rbOtherQuote</tabstop>
+        <tabstop>edOtherQuote</tabstop>
+        <tabstop>sbxGeographyCol</tabstop>
+        <tabstop>cmbGeographyCol</tabstop>
+        <tabstop>sbxDistrictCol</tabstop>
+        <tabstop>cmbDistrictCol</tabstop>
+    </tabstops>
+    <resources />
+    <connections>
+        <connection>
+            <sender>rbOther</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>edOther</receiver>
+            <slot>setEnabled(bool)</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>85</x>
+                    <y>173</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>218</x>
+                    <y>173</y>
+                </hint>
+            </hints>
+        </connection>
+        <connection>
+            <sender>rbOther</sender>
+            <signal>toggled(bool)</signal>
+            <receiver>edOther</receiver>
+            <slot>setFocus()</slot>
+            <hints>
+                <hint type="sourcelabel">
+                    <x>85</x>
+                    <y>173</y>
+                </hint>
+                <hint type="destinationlabel">
+                    <x>218</x>
+                    <y>173</y>
+                </hint>
+            </hints>
+        </connection>
+    </connections>
+</ui>

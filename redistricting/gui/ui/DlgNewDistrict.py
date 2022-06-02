@@ -1,0 +1,76 @@
+# -*- coding: utf-8 -*-
+
+# Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/Ui_DlgNewDistrict.ui'
+#
+# Created by: PyQt5 UI code generator 5.12.3
+#
+# WARNING! All changes made in this file will be lost!
+
+
+from .RedistrictingWidgets import RdsDistrictSpinBox
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+
+class Ui_dlgNewDistrict(object):
+    def setupUi(self, dlgNewDistrict):
+        dlgNewDistrict.setObjectName("dlgNewDistrict")
+        dlgNewDistrict.resize(400, 300)
+        self.gridLayout = QtWidgets.QGridLayout(dlgNewDistrict)
+        self.gridLayout.setObjectName("gridLayout")
+        self.lblDistrictNo = QtWidgets.QLabel(dlgNewDistrict)
+        self.lblDistrictNo.setObjectName("lblDistrictNo")
+        self.gridLayout.addWidget(self.lblDistrictNo, 0, 0, 1, 1)
+        self.lblMembers = QtWidgets.QLabel(dlgNewDistrict)
+        self.lblMembers.setObjectName("lblMembers")
+        self.gridLayout.addWidget(self.lblMembers, 2, 0, 1, 1)
+        self.lblDescription = QtWidgets.QLabel(dlgNewDistrict)
+        self.lblDescription.setAlignment(QtCore.Qt.AlignLeading | QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        self.lblDescription.setObjectName("lblDescription")
+        self.gridLayout.addWidget(self.lblDescription, 3, 0, 1, 1)
+        self.txtDescription = QtWidgets.QPlainTextEdit(dlgNewDistrict)
+        self.txtDescription.setObjectName("txtDescription")
+        self.gridLayout.addWidget(self.txtDescription, 3, 2, 1, 1)
+        self.sbxMembers = QtWidgets.QSpinBox(dlgNewDistrict)
+        self.sbxMembers.setMinimum(1)
+        self.sbxMembers.setObjectName("sbxMembers")
+        self.gridLayout.addWidget(self.sbxMembers, 2, 2, 1, 1)
+        self.lblName = QtWidgets.QLabel(dlgNewDistrict)
+        self.lblName.setObjectName("lblName")
+        self.gridLayout.addWidget(self.lblName, 1, 0, 1, 1)
+        self.inpName = QtWidgets.QLineEdit(dlgNewDistrict)
+        self.inpName.setObjectName("inpName")
+        self.gridLayout.addWidget(self.inpName, 1, 2, 1, 1)
+        self.buttonBox = QtWidgets.QDialogButtonBox(dlgNewDistrict)
+        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setObjectName("buttonBox")
+        self.gridLayout.addWidget(self.buttonBox, 4, 0, 1, 3)
+        self.sbxDistrictNo = RdsDistrictSpinBox(dlgNewDistrict)
+        self.sbxDistrictNo.setMinimum(1)
+        self.sbxDistrictNo.setObjectName("sbxDistrictNo")
+        self.gridLayout.addWidget(self.sbxDistrictNo, 0, 2, 1, 1)
+        self.lblDistrictNo.setBuddy(self.sbxDistrictNo)
+        self.lblMembers.setBuddy(self.sbxMembers)
+        self.lblDescription.setBuddy(self.txtDescription)
+        self.lblName.setBuddy(self.inpName)
+
+        self.retranslateUi(dlgNewDistrict)
+        self.buttonBox.accepted.connect(dlgNewDistrict.accept)
+        self.buttonBox.rejected.connect(dlgNewDistrict.reject)
+        QtCore.QMetaObject.connectSlotsByName(dlgNewDistrict)
+        dlgNewDistrict.setTabOrder(self.sbxDistrictNo, self.inpName)
+        dlgNewDistrict.setTabOrder(self.inpName, self.sbxMembers)
+        dlgNewDistrict.setTabOrder(self.sbxMembers, self.txtDescription)
+
+    def retranslateUi(self, dlgNewDistrict):
+        _translate = QtCore.QCoreApplication.translate
+        dlgNewDistrict.setWindowTitle(_translate("dlgNewDistrict", "New District"))
+        self.lblDistrictNo.setStatusTip(_translate("dlgNewDistrict", "Number of the district"))
+        self.lblDistrictNo.setText(_translate("dlgNewDistrict", "District Number"))
+        self.lblMembers.setText(_translate("dlgNewDistrict", "Members"))
+        self.lblDescription.setText(_translate("dlgNewDistrict", "Description"))
+        self.txtDescription.setToolTip(_translate("dlgNewDistrict", "Description of the district"))
+        self.sbxMembers.setToolTip(_translate("dlgNewDistrict", "Number of members elected from the district"))
+        self.lblName.setText(_translate("dlgNewDistrict", "District Name"))
+        self.inpName.setToolTip(_translate("dlgNewDistrict", "Name of the district"))
+        self.sbxDistrictNo.setToolTip(_translate("dlgNewDistrict", "Number of the district"))

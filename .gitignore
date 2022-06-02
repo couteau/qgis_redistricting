@@ -1,0 +1,8 @@
+__pycache__
+.qt_for_python
+.pytest_cache
+.DS_Store
+*.pyc
+tests/*.gpkg-shm
+tests/*.gpkg-wal
+redistricting/vendor

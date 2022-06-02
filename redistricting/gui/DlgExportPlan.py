@@ -1,0 +1,89 @@
+# -*- coding: utf-8 -*-
+"""
+/***************************************************************************
+ DlgEditPlan
+        QGIS Redistricting Plugin - Export Plan Dialog
+                              -------------------
+        begin                : 2022-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+ ***************************************************************************/
+
+/***************************************************************************
+ * *
+ *   This program is free software; you can redistribute it and / or modify *
+ *   it under the terms of the GNU General Public License as published by *
+ *   the Free Software Foundation; either version 2 of the License, or *
+ *   (at your option) any later version. *
+ * *
+ ***************************************************************************/
+"""
+from typing import Optional, Union
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from .ui.DlgExportPlan import Ui_dlgExportPlan
+from ..core import RedistrictingPlan, GeoFieldsModel
+
+
+class DlgExportPlan(Ui_dlgExportPlan, QDialog):
+    def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+        super().__init__(parent, flags)
+        self.setupUi(self)
+
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+        self.fwEquivalency.lineEdit().setEnabled(False)
+        self.fwShape.lineEdit().setEnabled(False)
+
+        self.cbxExportEquivalency.toggled.connect(self.updateButton)
+        self.fwEquivalency.fileChanged.connect(self.updateButton)
+        self.cbxExportShape.toggled.connect(self.updateButton)
+        self.fwShape.fileChanged.connect(self.updateButton)
+
+        self.cmbGeography.setModel(GeoFieldsModel(plan, self))
+
+    def updateButton(self):
+        self.cbxExportEquivalency.setChecked(
+            self.cbxExportEquivalency.isChecked() or bool(self.fwEquivalency.filePath())
+        )
+        self.cbxExportShape.setChecked(
+            bool(self.cbxExportShape.isChecked() or self.fwShape.filePath()))
+        self.fwEquivalency.lineEdit().setEnabled(self.cbxExportEquivalency.isChecked())
+        self.fwShape.lineEdit().setEnabled(self.cbxExportShape.isChecked())
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+            bool((self.exportEquivalency and self.equivalencyFileName) or
+                 (self.exportShapefile and self.shapefileFileName))
+        )
+
+    @property
+    def exportEquivalency(self):
+        return self.cbxExportEquivalency.isChecked()
+
+    @property
+    def equivalencyFileName(self):
+        return self.fwEquivalency.filePath()
+
+    @property
+    def equivalencyGeography(self):
+        m = self.cmbGeography.model()
+        return m.fields[self.cmbGeography.currentIndex()]
+
+    @property
+    def exportShapefile(self):
+        return self.cbxExportShape.isChecked()
+
+    @property
+    def shapefileFileName(self):
+        return self.fwShape.filePath()
+
+    @property
+    def includeUnassigned(self):
+        return self.cbxIncludeUnassigned.isChecked()
+
+    @property
+    def includeDemographics(self):
+        return self.cbxDemographics.isChecked()
+
+    @property
+    def includeMetrics(self):
+        return self.cbxMetrics.isChecked()

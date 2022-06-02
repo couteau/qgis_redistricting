@@ -1,0 +1,70 @@
+# -*- coding: utf-8 -*-
+"""
+/***************************************************************************
+ DlgCopyPlan
+        QGIS Redistricting Plugin - Copy Plan Dialog
+                              -------------------
+        begin                : 2022-03-18
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+ ***************************************************************************/
+
+/***************************************************************************
+ * *
+ *   This program is free software; you can redistribute it and / or modify *
+ *   it under the terms of the GNU General Public License as published by *
+ *   the Free Software Foundation; either version 2 of the License, or *
+ *   (at your option) any later version. *
+ * *
+ ***************************************************************************/
+"""
+import os
+import re
+from typing import Optional, Union
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from qgis.core import QgsProject
+from .ui.DlgCopyPlan import Ui_dlgCopyPlan
+from ..core import RedistrictingPlan, tr
+
+
+class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
+    def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+        super().__init__(parent, flags)
+        self.setupUi(self)
+
+        self.setTabOrder(self.inpPlanName, self.fwGeoPackage.lineEdit())
+
+        self.lblSourcePlan.setText(tr('Copy from <b>{plan}</b>').format(plan=plan.name))
+        self.cbxCopyAssignments.setText(tr('Copy {geography} assignments').format(geography=plan.geoDisplay.lower()))
+        self.inpPlanName.editingFinished.connect(self.planNameChanged)
+        self.inpPlanName.textChanged.connect(self.updateButtonBox)
+        self.fwGeoPackage.fileChanged.connect(self.updateButtonBox)
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+
+    @property
+    def planName(self) -> str:
+        return self.inpPlanName.text()
+
+    @property
+    def geoPackagePath(self) -> str:
+        return self.fwGeoPackage.filePath()
+
+    @property
+    def copyAssignments(self) -> bool:
+        return self.cbxCopyAssignments.isChecked()
+
+    def planNameChanged(self):
+        if self.planName and not self.fwGeoPackage.path and QgsProject.instance().absolutePath() != ' ':
+            self.fwGeoPackage.setFilePath(
+                os.path.join(
+                    QgsProject.instance().absolutePath(),
+                    re.sub(r'[^\w]+', '_', self.planName) + '.gpkg'
+                )
+            )
+
+    def updateButtonBox(self):
+        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+            bool(self.planName) and bool(self.fwGeoPackage.filePath())
+        )
