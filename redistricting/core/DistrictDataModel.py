@@ -25,6 +25,7 @@ from qgis.PyQt.QtCore import Qt, QVariant, QObject, QAbstractTableModel, QModelI
 from qgis.PyQt.QtGui import QBrush, QColor
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
+from .Utils import tr, makeFieldName
 
 
 class DistrictDataModel(QAbstractTableModel):
@@ -32,6 +33,8 @@ class DistrictDataModel(QAbstractTableModel):
 
     def __init__(self, plan: RedistrictingPlan = None, parent: QObject = None):
         super().__init__(parent)
+        self._keys = []
+        self._headings = []
         self._districts: DistrictList = None
         self.plan = plan
 
@@ -55,14 +58,52 @@ class DistrictDataModel(QAbstractTableModel):
         self._districts = self._plan.districts if self._plan else None
 
         if self._districts is not None:
+            self.updateColumnKeys()
             self._districts.districtAdded.connect(self.districtAdded)
             self._districts.districtRemoved.connect(self.districtRemoved)
             self._districts.updating.connect(self.beginResetModel)
             self._districts.updateComplete.connect(self.endResetModel)
             self._districts.updateTerminated.connect(self.endResetModel)
             self._plan.planChanged.connect(self.planChanged)
+        else:
+            self._headings = []
+            self._keys = []
 
         self.endResetModel()
+
+    def updateColumnKeys(self):
+        self._keys = ['district', 'name',
+                      self._plan.popField, 'deviation', 'pct_deviation']
+
+        self._headings = [
+            tr('District'),
+            tr('Name'),
+            tr('Population'),
+            tr('Deviation'),
+            tr('%Deviation')
+        ]
+
+        if self._plan.vapField:
+            self._keys.append(self._plan.vapField)
+            self._headings.append(tr('VAP'))
+
+        if self._plan.cvapField:
+            self._keys.append(self._plan.cvapField)
+            self._headings.append(tr('CVAP'))
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            if field.sum:
+                self._keys.append(fn)
+                self._headings.append(field.caption)
+            if field.pctbase:
+                self._keys.append(f'pct_{fn}')
+                self._headings.append(f'%{field.caption}')
+        self._keys += ['polsbyPopper', 'reock', 'convexHull']
+        self._headings += [
+            tr('Polsby-Popper'),
+            tr('Reock'),
+            tr('Convex Hull'),
+        ]
 
     def districtAdded(self, plan, dist, index):  # pylint: disable=unused-argument
         if plan != self._plan:
@@ -81,23 +122,27 @@ class DistrictDataModel(QAbstractTableModel):
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
         if prop in ('data-fields', 'pop-field', 'vap-field', 'cvap-field'):
             self.beginResetModel()
+            self.updateColumnKeys()
             self.endResetModel()
         elif prop == 'deviation':
             self.dataChanged(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
 
-    def rowCount(self, parent: QModelIndex = None) -> int:  # pylint: disable=unused-argument
-        return len(self._districts) if self._districts else 0
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return len(self._districts) if self._districts and not parent.isValid() else 0
 
-    def columnCount(self, index: QModelIndex = QModelIndex()) -> int:  # pylint: disable=unused-argument
-        return len(self._districts.headings) if self._plan else 0
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        return len(self._headings) if not parent.isValid() else 0
+
+    def getDistData(self, dist, key):
+        return getattr(dist, key)
 
     def data(self, index, role=Qt.DisplayRole):
         if role in (Qt.DisplayRole, Qt.EditRole):
             row = index.row()
             column = index.column()
 
-            key = self._districts.columnKeys[column]
-            value = self._districts[row, column]
+            key = self._keys[column]
+            value = self.getDistData(self._districts[row], key)
 
             if value is None:
                 return QVariant()
@@ -140,7 +185,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._districts.headings[section]
+            return self._headings[section]
 
         return None
 
@@ -149,4 +194,4 @@ class DistrictDataModel(QAbstractTableModel):
         if index.column() == 1 and index.row() != 0:
             f |= Qt.ItemIsEditable
 
-        return f | Qt.ItemIsEnabled
+        return f

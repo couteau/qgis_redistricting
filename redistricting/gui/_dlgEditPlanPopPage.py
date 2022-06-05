@@ -71,6 +71,10 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.cmbCVAPField.setLayer(popLayer)
         self.setPopLayer(popLayer)
         self.cmbPopField.setFocus()
+        self.setFinalPage(self.parent().isComplete())
+
+    def cleanupPage(self):
+        ...
 
     def updatePopLayer(self):
         if self.btnUseGeoLayer.isChecked():

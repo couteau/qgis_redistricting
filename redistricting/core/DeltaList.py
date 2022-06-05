@@ -21,15 +21,13 @@
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Dict, Iterator, List
+from typing import TYPE_CHECKING, Iterator, List
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.core import QgsApplication
 import pandas as pd
 
 from .Delta import Delta
-from .Utils import makeFieldName, tr
 from .Tasks import AggregatePendingChangesTask
-from .Field import DataField
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -50,32 +48,19 @@ class DeltaList(QObject):
         self._plan.assignLayer.afterCommitChanges.connect(self.update)
         self._plan.assignLayer.afterRollBack.connect(self.update)
         self._pendingTask = None
-        self.updateFields()
 
     def __getitem__(self, index) -> Delta:
         if self._districts.update():
             return None
 
-        if isinstance(index, tuple):
-            row, col = index
-        else:
-            row, col = index, None
+        if isinstance(index, str) and index.isnumeric():
+            if index in self._districts:
+                return self._districts[index].delta
 
-        if col is None:
-            if isinstance(row, str) and row.isnumeric():
-                if row in self._districts:
-                    return self._districts[row].delta
-
-                if 0 <= int(row) <= self._plan.numDistricts:
-                    return None
-            elif isinstance(row, int):
-                return self.items[row]
-        else:
-            items = self.items
-            if 0 <= col < len(items) and 0 <= row < len(self._fields):
-                dist = items[col]
-                value = dist[self._fields[row]['name']]
-                return self._fields[row]['format'].format(value) if value is not None else None
+            if 0 <= int(index) <= self._plan.numDistricts:
+                return None
+        elif isinstance(index, int):
+            return self.items[index]
 
         raise IndexError()
 
@@ -92,92 +77,6 @@ class DeltaList(QObject):
     @property
     def items(self) -> List[Delta]:
         return [d.delta for d in self._districts if d.delta is not None]
-
-    def fieldCount(self) -> int:
-        return len(self._fields)
-
-    @property
-    def fields(self) -> List[Dict[str, str]]:
-        return self._fields
-
-    def updateFields(self):
-        self._fields = [
-            {
-                'name': f'new_{self._plan.popField}',
-                'caption': tr('Population'),
-                'format': '{:,}'
-            },
-            {
-                'name': self._plan.popField,
-                'caption': tr('Population') + ' - ' + tr('Change'),
-                'format': '{:+,}'
-            },
-            {
-                'name': 'deviation',
-                'caption': tr('Deviation'),
-                'format': '{:,}'
-            },
-            {
-                'name': 'pct_deviation',
-                'caption': tr('%Deviation'),
-                'format': '{:+.2%}'
-            }
-        ]
-
-        if self._plan.vapField:
-            self._fields.extend([
-                {
-                    'name': f'new_{self._plan.vapField}',
-                    'caption': tr('VAP'),
-                    'format': '{:,}'
-                },
-                {
-                    'name': self._plan.vapField,
-                    'caption': tr('VAP') + ' - ' + tr('Change'),
-                    'format': '{:+,}'
-                }
-            ])
-
-        if self._plan.cvapField:
-            self._fields.extend([
-                {
-                    'name': f'new_{self._plan.cvapField}',
-                    'caption': tr('CVAP'),
-                    'format': '{:,}'
-                },
-                {
-                    'name': self._plan.cvapField,
-                    'caption': tr('CVAP') + ' - ' + tr('Change'),
-                    'format': '{:+,}'
-                }
-            ])
-
-        field: DataField
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
-                self._fields.extend([
-                    {
-                        'name': f'new_{fn}',
-                        'caption': field.caption,
-                        'format': '{:,}'
-                    },
-                    {
-                        'name': fn,
-                        'caption': field.caption + ' - ' + tr('Change'),
-                        'format': '{:+,}'
-                    }
-                ])
-
-            if field.pctbase:
-                self._fields.append({
-                    'name': f'pct_{fn}',
-                    'caption': f'%{field.caption}',
-                    'format': '{:+.2%}'
-                })
-
-    def heading(self, index):
-        return self._fields[index]['caption']
 
     def isUpdatingPending(self):
         return self._pendingTask is not None

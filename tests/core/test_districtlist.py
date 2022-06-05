@@ -12,9 +12,10 @@ class TestDistrictList:
         return DistrictList(plan)
 
     @pytest.fixture
-    def district_list(self, empty_district_list: DistrictList) -> DistrictList:
-        empty_district_list.addDistrict(2, 'District 2')
-        return empty_district_list
+    def district_list(self, plan) -> DistrictList:
+        dist = DistrictList(plan)
+        dist.addDistrict(2, 'District 2')
+        return dist
 
     @pytest.fixture
     def district(self, district_list: DistrictList) -> District:
@@ -28,9 +29,10 @@ class TestDistrictList:
         assert len(empty_district_list) == 1
         assert empty_district_list[0].name == 'Unassigned'
 
-    def test_add_district(self, district_list):
-        assert len(district_list) == 2
-        assert district_list[1].name == 'District 2'
+    def test_add_district(self, empty_district_list):
+        empty_district_list.addDistrict(2, 'District 2')
+        assert len(empty_district_list) == 2
+        assert empty_district_list[1].name == 'District 2'
 
     def test_contains(self, district_list, district):
         assert district in district_list
@@ -50,16 +52,17 @@ class TestDistrictList:
     def test_index(self, district_list, district):
         assert district_list.index(district) == 1
 
-    def test_headings(self, empty_district_list):
-        assert empty_district_list.headings == ['District', 'Name', 'Population',
-                                                'Deviation', '%Deviation', 'VAP',
-                                                'BVAP', '%BVAP', 'APBVAP', '%APBVAP', 'WVAP', '%WVAP',
-                                                'Polsby-Popper', 'Reock', 'Convex Hull']
+    def test_getitem(self, district_list, district):
+        assert district_list['2'] == district
+        assert district_list[1] == district
+        with pytest.raises(IndexError):
+            district_list[2]  # pylint: disable=pointless-statement
 
-    def test_column_keys(self, empty_district_list):
-        assert empty_district_list.columnKeys == ['district', 'name', 'pop_total',
-                                                  'deviation', 'pct_deviation', 'vap_total',
-                                                  'vap_nh_black', 'pct_vap_nh_black',
-                                                  'vap_apblack', 'pct_vap_apblack',
-                                                  'vap_nh_white', 'pct_vap_nh_white',
-                                                  'polsbyPopper', 'reock', 'convexHull']
+        assert district_list['1'] is None
+        with pytest.raises(IndexError):
+            district_list['7']  # pylint: disable=pointless-statement
+
+        l = district_list[1:]
+        assert isinstance(l, DistrictList)
+        assert len(l) == 1
+        assert l[0] == district

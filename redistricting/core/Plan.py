@@ -155,14 +155,8 @@ class RedistrictingPlan(QObject):
 
         plan._popLayer = QgsProject.instance().mapLayer(data.get('pop-layer'))
         plan._popField = data.get('pop-field')
-        if plan._popField:
-            plan._districts.updateField(data['pop-field'])
         plan._vapField = data.get('vap-field')
-        if plan._vapField:
-            plan._districts.updateField(plan._vapField)
         plan._cvapField = data.get('cvap-field')
-        if plan._cvapField:
-            plan._districts.updateField(plan._cvapField)
 
         for field in data.get('data-fields', []):
             f = DataField.deserialize(field, plan.dataFields)
@@ -184,8 +178,6 @@ class RedistrictingPlan(QObject):
             plan._sourceLayer = layer
 
         plan._sourceIdField = data.get('src-id-field')
-        if plan.isValid():
-            plan._districts.updateColumnKeys()
 
         return plan
 
@@ -351,7 +343,7 @@ class RedistrictingPlan(QObject):
 
             oldValue = self._popField
             self._popField = value
-            self._districts.updateField(value, oldValue)
+            self._districts.updateDistrictFields()
             self._districts.resetData()
             self.planChanged.emit(self, 'pop-field', value, oldValue)
 
@@ -374,7 +366,7 @@ class RedistrictingPlan(QObject):
 
             oldValue = self._vapField
             self._vapField = value
-            self._districts.updateField(value, oldValue)
+            self._districts.updateDistrictFields()
             self._districts.resetData()
             self.planChanged.emit(self, 'vap-field', value, oldValue)
 
@@ -397,7 +389,7 @@ class RedistrictingPlan(QObject):
 
             oldValue = self._cvapField
             self._cvapField = value
-            self._districts.updateField(value, oldValue)
+            self._districts.updateDistrictFields()
             self._districts.resetData()
             self.planChanged.emit(self, 'cvap-field', value, oldValue)
 
@@ -519,7 +511,7 @@ class RedistrictingPlan(QObject):
         if self._distLayer:
             self._addFieldToLayer(
                 self._distLayer, [f.makeQgsField() for f in newFields])
-        self._districts.updateColumnKeys()
+        self._districts.updateDistrictFields()
         self._districts.resetData()
 
         for f in newFields:
@@ -835,7 +827,7 @@ class RedistrictingPlan(QObject):
             self._addFieldToLayer(self._distLayer, qf)
             self._districts.resetData()
 
-        self._districts.updateColumnKeys()
+        self._districts.updateDistrictFields()
         self._districts.resetData()
         self.dataFieldAdded.emit(self, f)
         self.planChanged.emit(self, 'data-fields',
@@ -889,7 +881,7 @@ class RedistrictingPlan(QObject):
                 provider.deleteAttributes([findex])
                 self._distLayer.updateFields()
 
-        self._districts.updateColumnKeys()
+        self._districts.updateDistrictFields()
         self.dataFieldRemoved.emit(self, field)
         self.planChanged.emit(self, 'data-fields',
                               self._dataFields, oldDataFields)

@@ -52,12 +52,10 @@ class DlgEditPlan(QWizard):
         self.setOptions(QWizard.NoBackButtonOnStartPage |
                         QWizard.CancelButtonOnLeft |
                         QWizard.NoDefaultButton |
-                        QWizard.IndependentPages |
                         QWizard.HaveFinishButtonOnEarlyPages)
-        self.setDefaultProperty('RdsMapLayerComboBox',
-                                'layer', RdsMapLayerComboBox.layerChanged)
-        self.setDefaultProperty(
-            'RdsFieldComboBox', 'field', RdsFieldComboBox.fieldChanged)
+
+        self.setDefaultProperty('RdsMapLayerComboBox', 'layer', RdsMapLayerComboBox.layerChanged)
+        self.setDefaultProperty('RdsFieldComboBox', 'field', RdsFieldComboBox.fieldChanged)
         self.setDefaultProperty('RdsFieldTableView', 'fields', RdsFieldTableView.fieldsChanged)
 
         self.addPage(dlgEditPlanDetailsPage(self))
@@ -79,8 +77,8 @@ class DlgEditPlan(QWizard):
             self.setField('vapField', plan.vapField)
             self.setField('cvapField', plan.cvapField)
             self.setField('sourceLayer', plan.sourceLayer)
-            self.setField('geoFields', list(plan.geoFields))
-            self.setField('dataFields', list(plan.dataFields))
+            self.setField('geoFields', QVariant(list(plan.geoFields)))
+            self.setField('dataFields', QVariant(list(plan.dataFields)))
         else:
             self.addPage(dlgEditPlanImportPage(self))
             self.setField('sourceLayer', iface.activeLayer())

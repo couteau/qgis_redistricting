@@ -31,7 +31,7 @@ class FieldList(QObject):
     fieldRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
     fieldMoved = pyqtSignal('PyQt_PyObject', int, int)
 
-    def __init__(self, parent: QObject = None, fields=None):
+    def __init__(self, parent: QObject = None, fields: List[Union[Field, DataField]] = None):
         super().__init__(parent)
         self._fields: List[Field] = fields or []
         for field in self._fields:
@@ -54,13 +54,15 @@ class FieldList(QObject):
 
     def __delitem__(self, key: Union[int, slice]):
         if isinstance(key, slice):
+            index = key.start
             fields = self._fields[key]
         else:
             fields = [self._fields[key]]
+            index = self._fields.index(fields[0])
         del self._fields[key]
         for f in fields:
             f.setParent(None)
-            self.fieldRemoved.emit(self, f, key)
+        self.fieldRemoved.emit(self, fields[0] if len(fields) == 1 else fields, index)
 
     def __contains__(self, item) -> bool:
         if isinstance(item, Field):
@@ -72,26 +74,28 @@ class FieldList(QObject):
 
         raise ValueError()
 
-    def append(self, item: Field):
+    def append(self, item: Union[Field, DataField]):
         item.setParent(self)
         self._fields.append(item)
         self.fieldAdded.emit(self, item, len(self._fields) - 1)
 
-    def insert(self, idx, item: Field):
+    def insert(self, idx, item: Union[Field, DataField]):
         item.setParent(self)
         self._fields.insert(idx, item)
         self.fieldAdded.emit(self, item, idx)
 
-    def extend(self, items: List[Field]):
+    def extend(self, items: List[Union[Field, DataField]]):
+        if not items:
+            return
         self._fields.extend(items)
         for f in items:
             f.setParent(self)
-            self.fieldAdded.emit(self, f, self._fields.index(f))
+        self.fieldAdded.emit(self, items, self._fields.index(items[0]))
 
     def clear(self):
         del self[:]
 
-    def remove(self, item: Field):
+    def remove(self, item: Union[Field, DataField]):
         if item in self._fields:
             item.setParent(None)
             i = self._fields.index(item)

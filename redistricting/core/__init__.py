@@ -20,7 +20,8 @@ from .Utils import makeFieldName, tr, loadSpatialiteModule
 from .Storage import ProjectStorage
 from .District import BaseDistrict, District
 from .DistrictList import DistrictList
-from .Field import Field, DataField
+from .Field import Field, DataField, BasePopulation
+from .FieldList import FieldList
 from .PlanStyle import PlanStyler
 from .AssignmentEditor import PlanAssignmentEditor
 from .DistrictDataModel import DistrictDataModel
@@ -30,7 +31,7 @@ from .PlanExport import PlanExporter
 from .PlanImport import PlanImporter
 from .Exception import RdsException
 
-__all__ = ['RedistrictingPlan', 'BaseDistrict', 'District', 'DistrictList', 'Field',
-           'DataField', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
+__all__ = ['RedistrictingPlan', 'BaseDistrict', 'District', 'DistrictList', 'FieldList',
+           'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'ProjectStorage',
            'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'RdsException']

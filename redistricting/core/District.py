@@ -95,6 +95,21 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
             return None
         return cls(plan, **data)
 
+    def updateFields(self):
+        keys = {makeFieldName(field) for field in self._plan.dataFields}
+        if self._plan.popField:
+            keys.add(self._plan.popField)
+        if self._plan.vapField:
+            keys.add(self._plan.vapField)
+        if self._plan.cvapField:
+            keys.add(self._plan.cvapField)
+        deletedKeys = set(self._data) - keys
+        for k in deletedKeys:
+            del self._data[k]
+
+        added = {s: 0 for s in keys if not s in self._data}
+        self._data.update(added)
+
     def clear(self):
         if self._plan.popField:
             self._data[self._plan.popField] = 0
@@ -155,21 +170,6 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
     @property
     def cvap(self):
         return self._data.get(self._plan.cvapField) if self._plan.cvapField else 0
-
-    def updateFields(self):
-        keys = {makeFieldName(field) for field in self._plan.dataFields}
-        if self._plan.popField:
-            keys.add(self._plan.popField)
-        if self._plan.vapField:
-            keys.add(self._plan.vapField)
-        if self._plan.cvapField:
-            keys.add(self._plan.cvapField)
-        deletedKeys = set(self._data) - keys
-        for k in deletedKeys:
-            del self._data[k]
-
-        added = {s: 0 for s in keys if not s in self._data}
-        self._data.update(added)
 
     @property
     def delta(self):
