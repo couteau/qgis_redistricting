@@ -29,9 +29,10 @@ from .GeoFieldsModel import GeoFieldsModel
 from .DeltaListModel import DeltaListModel
 from .PlanExport import PlanExporter
 from .PlanImport import PlanImporter
+from .PlanCopy import PlanCopier
 from .Exception import RdsException
 
 __all__ = ['RedistrictingPlan', 'BaseDistrict', 'District', 'DistrictList', 'FieldList',
            'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
-           'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'ProjectStorage',
+           'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
            'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'RdsException']

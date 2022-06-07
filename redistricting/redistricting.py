@@ -50,7 +50,7 @@ from qgis.PyQt.QtXml import QDomDocument
 
 from .resources import *
 from .gui import *
-from .core import ProjectStorage, RedistrictingPlan, PlanAssignmentEditor, PlanStyler, PlanExporter, PlanImporter
+from .core import ProjectStorage, RedistrictingPlan, PlanAssignmentEditor, PlanStyler, PlanExporter, PlanImporter, PlanCopier
 
 
 class Redistricting:
@@ -679,15 +679,10 @@ class Redistricting:
 
         dlgCopyPlan = DlgCopyPlan(self.activePlan)
         if dlgCopyPlan.exec_() == QDialog.Accepted:
-            plan = deepcopy(self.activePlan)
-            plan.name = dlgCopyPlan.planName
-            if dlgCopyPlan.copyAssignments:
-                shutil.copyfile(self.activePlan.geoPackagePath,
-                                dlgCopyPlan.geoPackagePath)
-                plan.addLayersFromGeoPackage(dlgCopyPlan.geoPackagePath)
-            else:
-                self.createPlanGeoPackage(plan, dlgCopyPlan.geoPackagePath)
-            plan.copyStyles(self.activePlan)
+            copier = PlanCopier(self.activePlan)
+            if not dlgCopyPlan.copyAssignments:
+                copier.copyComplete.connect(lambda p: self.createPlanGeoPackage(p, dlgCopyPlan.geoPackagePath))
+            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.copyAssignments, dlgCopyPlan.geoPackagePath)
             self.appendPlan(plan)
             self.setActivePlan(plan)
 
