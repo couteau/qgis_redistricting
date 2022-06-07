@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanExporter():
+class PlanExporter:
     exportComplete = pyqtSignal()
     exportTerminated = pyqtSignal()
 

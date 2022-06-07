@@ -106,15 +106,15 @@ class DistrictDataModel(QAbstractTableModel):
         ]
 
     def districtAdded(self, plan, dist, index):  # pylint: disable=unused-argument
-        if plan != self._plan:
-            return
+        # if plan != self._plan:
+        #    return
 
         self.beginInsertRows(QModelIndex(), index, index)
         self.endInsertRows()
 
     def districtRemoved(self, plan, dist, index):  # pylint: disable=unused-argument
-        if plan != self._plan:
-            return
+        # if plan != self._plan:
+        #    return
 
         self.beginRemoveRows(QModelIndex(), index, index)
         self.endRemoveRows()
@@ -125,7 +125,7 @@ class DistrictDataModel(QAbstractTableModel):
             self.updateColumnKeys()
             self.endResetModel()
         elif prop == 'deviation':
-            self.dataChanged(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+            self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._districts) if self._districts and not parent.isValid() else 0
@@ -133,16 +133,15 @@ class DistrictDataModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._headings) if not parent.isValid() else 0
 
-    def getDistData(self, dist, key):
-        return getattr(dist, key)
-
     def data(self, index, role=Qt.DisplayRole):
         if role in (Qt.DisplayRole, Qt.EditRole):
+            self._districts.update()
+
             row = index.row()
             column = index.column()
 
             key = self._keys[column]
-            value = self.getDistData(self._districts[row], key)
+            value = getattr(self._districts[row], key)
 
             if value is None:
                 return QVariant()
@@ -160,6 +159,8 @@ class DistrictDataModel(QAbstractTableModel):
             return value
 
         if role == Qt.BackgroundRole:
+            self._districts.update()
+
             brush = QVariant()
             row = index.row()
             col = index.column()

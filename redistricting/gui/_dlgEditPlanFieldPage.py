@@ -36,7 +36,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         #self.fieldsModel = DataFieldsModel(self)
         # self.tblDataFields.setModel(self.fieldsModel)
 
-        self.registerField('dataFields', self.tblDataFields)
+        self.registerField('dataFields', self.tblDataFields, 'fields', self.tblDataFields.fieldsChanged)
         self.tblDataFields.setEnableDragRows(True)
 
         self.btnAddField.setIcon(
@@ -57,7 +57,10 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         self.fexDataField.setLayer(self.field('popLayer') or self.field('sourceLayer'))
         self.fieldsModel.vapEnabled = bool(self.field('vapField'))
         self.fieldsModel.cvapEnabled = bool(self.field('cvapField'))
-        self.setFinalPage(self.parent().isComplete())
+        if hasattr(self.wizard(), "isComplete"):
+            self.setFinalPage(self.wizard().isComplete())
+        else:
+            self.setFinalPage(True)
 
     def cleanupPage(self):
         ...
@@ -71,8 +74,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         if not isValid:
             return
 
-        layer = self.field('popLayer') or self.field('sourceLayer')
-        self.fieldsModel.appendField(layer, field, isExpression)
+        self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
 
     def deleteField(self, index: QModelIndex):
         if index.column() == 6:

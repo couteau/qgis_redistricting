@@ -19,7 +19,7 @@ from typing import Union, Iterable, List
 
 from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QCoreApplication, QModelIndex, QVariant, pyqtSignal, pyqtProperty
 from qgis.PyQt.QtWidgets import QWidget, QTableView, QAbstractItemView, QProxyStyle, QStyleOption
-from qgis.PyQt.QtGui import QDropEvent, QMouseEvent
+from qgis.PyQt.QtGui import QDropEvent, QDragMoveEvent
 from qgis.core import QgsApplication
 from ..core import Field, DataField, FieldList, BasePopulation
 
@@ -160,15 +160,21 @@ class FieldListModel(QAbstractTableModel):
                 value = QCoreApplication.translate('Redistricting', 'Display sum for field {field} is {checkstate}'). \
                     format(field=field.fieldName, checkstate='checked' if field.sum else 'unchecked')
             elif col == 3:
-                value = QCoreApplication.translate('Redistricting', 'Display field {field} as percent of total population is {checkstate}'). \
+                value = QCoreApplication.translate(
+                    'Redistricting',
+                    'Display field {field} as percent of total population is {checkstate}'). \
                     format(field=field.fieldName,
                            checkstate='checked' if field.pctbase == BasePopulation.TOTALPOP else 'unchecked')
             elif col == 4:
-                value = QCoreApplication.translate('Redistricting', 'Display field {field} as percent of voting age population is {checkstate}'). \
+                value = QCoreApplication.translate(
+                    'Redistricting',
+                    'Display field {field} as percent of voting age population is {checkstate}'). \
                     format(field=field.fieldName,
                            checkstate='checked' if field.pctbase == BasePopulation.VAP else 'unchecked')
             elif col == 5:
-                value = QCoreApplication.translate('Redistricting', 'Display field {field} as percent of citizen voting age population is {checkstate}'). \
+                value = QCoreApplication.translate(
+                    'Redistricting',
+                    'Display field {field} as percent of citizen voting age population is {checkstate}'). \
                     format(field=field.fieldName,
                            checkstate='checked' if field.pctbase == BasePopulation.CVAP else 'unchecked')
             else:
@@ -356,9 +362,11 @@ class RdsFieldTableView(QTableView):
             event.accept()
         super().dropEvent(event)
 
-    def mouseReleaseEvent(self, e: QMouseEvent) -> None:
-        print('mouse release')
-        return super().mouseReleaseEvent(e)
+    def startDrag(self, supportedActions: Union[Qt.DropActions, Qt.DropAction]):
+        super().startDrag(supportedActions)
+
+    def dragMoveEvent(self, e: QDragMoveEvent):
+        super().dragMoveEvent(e)
 
     def dataChanged(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles: Iterable[int] = None):
         super().dataChanged(topLeft, bottomRight, roles)

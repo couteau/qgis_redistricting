@@ -131,11 +131,11 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
         return self._district
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @name.setter
-    def name(self, value):
+    def name(self, value: str):
         if value != self._name:
             oldValue = self._name
             self._name = value

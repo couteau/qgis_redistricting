@@ -26,7 +26,7 @@ from . import RedistrictingPlan, Field
 
 
 class GeoFieldsModel(QAbstractListModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...) -> None:
+    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._data = list(plan.geoFields)
         self._data.insert(0, Field(plan.assignLayer, plan.geoIdField,

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from . import Field
 
 
-def tr(message):
+def tr(context, message=None):
     """Get the translation for a string using Qt translation API.
 
             :param message: String for translation.
@@ -37,7 +37,10 @@ def tr(message):
             :returns: Translated version of message.
             :rtype: QString
             """
-    return QCoreApplication.translate('Redistricting', message)
+    if message is None:
+        message = context
+        context = 'Redistricting'
+    return QCoreApplication.translate(context, message)
 
 
 def loadSpatialiteModule(db: sqlite3.Connection):

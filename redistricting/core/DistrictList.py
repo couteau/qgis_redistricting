@@ -62,7 +62,7 @@ class DistrictList(QObject):
         self._updateTask = None
 
     @overload
-    def __getitem__(self, index: tuple) -> Union[str, int, float]:
+    def __getitem__(self, index: Union[str, int]) -> BaseDistrict:
         ...
 
     @overload
@@ -73,7 +73,6 @@ class DistrictList(QObject):
         if isinstance(index, slice):
             return DistrictList(self._plan, list(self._districts.values())[index])
 
-        self.update()
         if isinstance(index, str):
             if index.isnumeric():
                 index = int(index)
@@ -96,7 +95,7 @@ class DistrictList(QObject):
 
         if index in self._districts:
             i = list(self._districts.values()).index(self._districts[index])
-            self.districtRemoved.emit(self, self._districts[index], i)
+            self.districtRemoved.emit(self._plan, self._districts[index], i)
             del self._districts[index]
         else:
             raise IndexError()
@@ -121,7 +120,7 @@ class DistrictList(QObject):
         self._districts = {k: self._districts[k]
                            for k in sorted(self._districts)}
         i = list(self._districts.values()).index(dist)
-        self.districtAdded.emit(self, dist, i)
+        self.districtAdded.emit(self._plan, dist, i)
 
     def keys(self):
         return self._districts.keys()
@@ -192,6 +191,32 @@ class DistrictList(QObject):
                         d) if d > 0 else Unassigned(self._plan)
                 district.update(data.loc[d])
 
+    def updateTaskCompleted(self):
+        self._plan.distLayer.reload()
+        if self._updateTask.totalPop:
+            self._plan.totalPopulation = self._updateTask.totalPop
+
+        self.updateData(self._updateTask.districts, self._updateDistricts)
+
+        if self._needGeomUpdate:
+            self._plan.distLayer.triggerRepaint()
+            self._plan._cutEdges = len(  # pylint: disable=protected-access
+                self._updateTask.cutEdges)
+
+        self._needUpdate = False
+        self._needGeomUpdate = False
+        self._updateDistricts = None
+        self._updateTask = None
+
+        self.updateComplete.emit()
+
+    def updateTaskTerminated(self):
+        if self._updateTask.exception:
+            self._plan.setError(
+                f'{self._updateTask.exception!r}', Qgis.Critical)
+        self._updateTask = None
+        self.updateTerminated.emit()
+
     def update(self, force=False) -> QgsTask:
         """ update aggregate district data from assignments, including geometry where requested
 
@@ -201,39 +226,16 @@ class DistrictList(QObject):
         :returns: QgsTask object representing the background update task
         :rtype: QgsTask
         """
-        def taskCompleted():
-            self._plan.distLayer.reload()
-            if self._updateTask.totalPop:
-                self._plan.totalPopulation = self._updateTask.totalPop
+        if not self._needUpdate and not force:
+            return None
 
-            self.updateData(self._updateTask.districts, self._updateDistricts)
-
-            if self._needGeomUpdate:
-                self._plan.distLayer.triggerRepaint()
-                self._plan._cutEdges = len(  # pylint: disable=protected-access
-                    self._updateTask.cutEdges)
-
-            self._needUpdate = False
-            self._needGeomUpdate = False
-            self._updateDistricts = None
-            self._updateTask = None
-
-            self.updateComplete.emit()
-
-        def taskTerminated():
-            if self._updateTask.exception:
-                self._plan.setError(
-                    f'{self._updateTask.exception!r}', Qgis.Critical)
-            self._updateTask = None
-            self.updateTerminated.emit()
-
-        self._plan.clearError()
-
-        if self._updateTask and force:
+        if force:
             self._updateTask.cancel()
             self._updateTask = None
 
         if self._needUpdate and not self._updateTask:
+            self._plan.clearError()
+
             self.updating.emit()
             self._updateTask = AggregateDistrictDataTask(
                 self._plan,
@@ -241,13 +243,16 @@ class DistrictList(QObject):
                 includeGeometry=self._needGeomUpdate,
                 useBuffer=self._needGeomUpdate
             )
-            self._updateTask.taskCompleted.connect(taskCompleted)
-            self._updateTask.taskTerminated.connect(taskTerminated)
+            self._updateTask.taskCompleted.connect(self.updateTaskCompleted)
+            self._updateTask.taskTerminated.connect(self.updateTaskTerminated)
             QgsApplication.taskManager().addTask(self._updateTask)
 
         return self._updateTask
 
     def resetData(self, updateGeometry=False, districts: set[int] = None, immediate=False):
+        if not self._plan.isValid():
+            return
+
         if self._updateTask and updateGeometry and not self._needGeomUpdate:
             self._updateTask.cancel()
             self._updateTask = None

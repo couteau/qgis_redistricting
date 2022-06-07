@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanImporter():
+class PlanImporter:
     importComplete = pyqtSignal()
     importTerminated = pyqtSignal()
 
@@ -100,8 +100,9 @@ class PlanImporter():
             self.setError(tr('Committing unsaved changes before import'))
             self._plan.assignLayer.commitChanges(True)
 
-        self._importTask = ImportAssignmentFileTask(  # pylint: disable=attribute-defined-outside-init
-            self._plan, self.file, self.headerRow, self.geoColumn, self.distColumn, self.delimiter, self.quotechar, self.joinField)
+        self._importTask = ImportAssignmentFileTask(
+            self._plan, self.file, self.headerRow, self.geoColumn, self.distColumn,
+            self.delimiter, self.quotechar, self.joinField)
         self._importTask.taskCompleted.connect(taskCompleted)
         self._importTask.taskTerminated.connect(taskTerminated)
         if progress:
