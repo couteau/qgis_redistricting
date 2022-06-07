@@ -9,18 +9,25 @@ from redistricting.core.Plan import RedistrictingPlan
 
 # pylint: disable=redefined-outer-name, unused-argument
 
+@pytest.fixture
+def datadir(tmp_path: pathlib.Path):
+    d = tmp_path / 'data'
+    s = pathlib.Path(__file__).parent / 'data'
+    shutil.copytree(s, d)
+    return d
+
 
 @pytest.fixture
-def block_layer(qgis_new_project):
-    gpkg = pathlib.Path(pathlib.Path(__file__).parent, 'tuscaloosa_blocks.gpkg').resolve()
+def block_layer(datadir, qgis_new_project):
+    gpkg = (datadir / 'tuscaloosa_blocks.gpkg').resolve()
     layer = QgsVectorLayer(f'{gpkg}|layername=plans', 'blocks', 'ogr')
     QgsProject.instance().addMapLayer(layer)
     return layer
 
 
 @pytest.fixture
-def gpkg_path():
-    return pathlib.Path(pathlib.Path(__file__).parent, 'tuscaloosa_plan.gpkg').resolve()
+def gpkg_path(datadir):
+    return (datadir / 'tuscaloosa_plan.gpkg').resolve()
 
 
 @pytest.fixture

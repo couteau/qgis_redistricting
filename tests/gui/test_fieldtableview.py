@@ -51,16 +51,19 @@ class TestFieldTableView:
         model = FieldListModel(fields=data_field_list)
         qtmodeltester.check(model)
 
-    def test_add_field(self, block_layer, field_list_model: FieldListModel):
-        field_list_model.appendField(block_layer, 'countyid20')
+    def test_add_field(self, block_layer, field_list_model: FieldListModel, qtbot: QtBot):
+        with qtbot.waitSignals([field_list_model.rowsAboutToBeInserted, field_list_model.rowsInserted]):
+            field_list_model.appendField(block_layer, 'countyid20')
         assert field_list_model.rowCount() == 2
 
-    def test_move_field(self, field_list_model_two: FieldListModel):
-        field_list_model_two.moveField(1, 0)
+    def test_move_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
+        with qtbot.waitSignals([field_list_model_two.rowsAboutToBeMoved, field_list_model_two.rowsMoved]):
+            field_list_model_two.moveField(1, 0)
         assert field_list_model_two.fields[0].field == 'countyid20'
 
-    def test_delete_field(self, field_list_model_two: FieldListModel):
-        field_list_model_two.deleteField(0)
+    def test_delete_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
+        with qtbot.waitSignals([field_list_model_two.rowsAboutToBeRemoved, field_list_model_two.rowsRemoved]):
+            field_list_model_two.deleteField(0)
         assert field_list_model_two.rowCount() == 1
         assert field_list_model_two.fields[0].field == 'countyid20'
 
@@ -87,7 +90,3 @@ class TestFieldTableView:
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 5)) & Qt.ItemIsEnabled
         datafield_list_model.cvapEnabled = False
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 5)) & Qt.ItemIsEnabled == Qt.NoItemFlags
-
-    def test_drag_drop(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
-        field_table_view.show()
-        qtbot.mouseRelease(field_table_view, Qt.LeftButton)

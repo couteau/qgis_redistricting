@@ -1,14 +1,15 @@
 """QGIS Redistricting Plugin - unit tests for RdsFieldTableView class"""
 import pytest
+from pytestqt.plugin import QtBot
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QBrush
-from redistricting.core import DistrictDataModel
+from redistricting.core import DistrictDataModel, RedistrictingPlan
 
 # pylint: disable=no-self-use
 
 
-class TestPlanDataModelView:
+class TestDistrictDataModel:
     @pytest.fixture
     def district_model(self, plan) -> DistrictDataModel:
         return DistrictDataModel(plan)
@@ -47,3 +48,23 @@ class TestPlanDataModelView:
                                         'vap_nh_white', 'pct_vap_nh_white',
                                         'polsbyPopper', 'reock', 'convexHull']
     # pylint: enable=protected-access
+
+    def test_signals(self, district_model: DistrictDataModel, plan: RedistrictingPlan, qtbot: QtBot):
+        with qtbot.waitSignal(district_model.dataChanged):
+            plan.deviation = 0.01
+
+        with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):
+            plan.vapField = None
+
+        with qtbot.waitSignals([district_model.rowsAboutToBeInserted, district_model.rowsInserted]):
+            plan.addDistrict(3, 'District 3')
+
+        with qtbot.waitSignal(district_model.dataChanged):
+            district_model.setData(district_model.createIndex(3, 1), 'Council District 3', Qt.EditRole)
+        assert plan.districts[3].name == 'Council District 3'
+
+        with qtbot.waitSignals([district_model.rowsAboutToBeRemoved, district_model.rowsRemoved]):
+            plan.removeDistrict(3)
+
+        with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):
+            district_model.plan = None
