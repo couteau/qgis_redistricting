@@ -193,11 +193,11 @@ class BasePopulation(IntEnum):
 
 
 class DataField(Field):
-    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = False,
+    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
                  caption=None, sumfield=None, pctbase=None, parent: Optional['QObject'] = None):
         super().__init__(layer, field, isExpression, caption, parent)
 
-        if isExpression:
+        if self._isExpression:
             e = QgsExpression(field)
             context = QgsExpressionContext()
             context.appendScopes(

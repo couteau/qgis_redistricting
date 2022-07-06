@@ -89,7 +89,6 @@ class TestDataField:
         return DataField(
             block_layer,
             'vap_nh_apblack + vap_nh_asian + vap_nh_amind_aknative + vap_hispanic',
-            isExpression=True,
             caption='Dream Team',
             pctbase=BasePopulation.VAP
         )
