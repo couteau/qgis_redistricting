@@ -14,7 +14,7 @@ class TestField:
 
     @pytest.fixture
     def expr(self, block_layer) -> Field:
-        return Field(block_layer, 'statefp20 || countyfp20 || tractce20', True)
+        return Field(block_layer, 'statefp20 || countyfp20 || tractce20')
 
     def test_create(self, block_layer):
         field = Field(block_layer, 'vtdid20')
@@ -23,7 +23,7 @@ class TestField:
         assert field.caption == 'vtdid20'
 
     def test_create_expr(self, block_layer):
-        field = Field(block_layer, 'statefp20 || countyfp20 || tractce20', True)
+        field = Field(block_layer, 'statefp20 || countyfp20 || tractce20')
         assert field.field == 'statefp20 || countyfp20 || tractce20'
         assert field.isExpression
         assert field.caption == 'statefp20 || countyfp20 || tractce20'

@@ -41,35 +41,35 @@ class Field(QObject):
 
     fieldChanged = pyqtSignal('PyQt_PyObject')
 
-    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = False,
+    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
                  caption: str = None, parent: Optional['QObject'] = None):
         super().__init__(parent)
         if layer is None or field is None:
             raise ValueError()
 
+        self._layer = None
         self._error = None
         self._field = field
-        self._isExpression = isExpression
+        self._isExpression = isExpression if isExpression is not None else not field.isidentifier()
         self._caption = caption or field
+        self._index = -1
         self.setLayer(layer)
 
     def setLayer(self, layer: QgsVectorLayer):
-        self._layer = layer
-
         if self._isExpression:
-            if not self._validateExpr():
+            if not self._validateExpr(layer):
                 raise RdsException(tr('Expression "{}" invalid for layer {}').format(self.field, layer.name()))
-            self._index = -1
             self._icon = QgsApplication.getThemeIcon("/mIconExpression.svg")
-
         else:
             self._index = layer.fields().lookupField(self._field)
             if self._index == -1:
                 raise RdsException(tr('Field {} not found in layer {}').format(self._field, layer.name()))
 
             self._icon = layer.fields().iconForField(self._index, False)
-            if self._caption == self._field:
+            if self._caption is None or self._caption == self._field:
                 self._caption = layer.fields().field(self._index).displayName() or self._caption
+
+        self._layer = layer
 
     def __copy__(self):
         cls = self.__class__
@@ -96,12 +96,12 @@ class Field(QObject):
         layer = QgsProject.instance().mapLayer(data.get('layer'))
         return cls(layer, data['field'], data.get('expression', False), data.get('caption'), parent=parent)
 
-    def _validateExpr(self):
+    def _validateExpr(self, layer):
         if not self._isExpression:
             return True
 
         context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self._layer))
+        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
         e = QgsExpression(self._field)
         return e.prepare(context)
 
