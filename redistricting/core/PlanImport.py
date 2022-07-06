@@ -19,45 +19,36 @@ from __future__ import annotations
 
 import os
 from typing import TYPE_CHECKING
-from qgis.PyQt.QtCore import pyqtSignal
+
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.PyQt.QtWidgets import QProgressDialog
 from qgis.core import (
     Qgis,
     QgsApplication,
-    QgsMessageLog
+    QgsMessageLog,
+    QgsVectorLayer
 )
 from .Utils import tr
-from .Tasks import ImportAssignmentFileTask
+from .Tasks import ImportAssignmentFileTask, ImportShapeFileTask
+from . import District
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanImporter:
+class PlanImporter(QObject):
     importComplete = pyqtSignal()
     importTerminated = pyqtSignal()
 
     def __init__(
         self,
-        plan: RedistrictingPlan,
-        file,
-        joinField: str = None,
-        headerRow=True,
-        geoColumn=0,
-        distColumn=1,
-        delimiter=None,
-        quotechar=None,
+        plan: RedistrictingPlan
     ):
+        super().__init__(plan)
         self._plan = plan
-        self.file = file
-        self.joinField = joinField
-        self.headerRow = headerRow,
-        self.geoColumn = geoColumn
-        self.distColumn = distColumn
-        self.delimiter = delimiter
-        self.quotechar = quotechar
         self._error = None
         self._errorLevel = None
         self._importTask = None
+        self._progress: QProgressDialog = None
 
     def error(self):
         return (self._error, self._errorLevel)
@@ -70,41 +61,108 @@ class PlanImporter:
     def clearError(self):
         self._error = None
 
-    def importAssignments(self, progress: QProgressDialog = None):
-        def taskCompleted():
-            if progress:
-                progress.setValue(100)
-                progress.canceled.disconnect(self._importTask.cancel)
-            self._importTask = None
-            self._plan.districts.resetData(updateGeometry=True, immediate=True)
-            self.importComplete.emit()
+    def taskCompleted(self):
+        if self._progress:
+            self._progress.setValue(100)
+            self._progress.canceled.disconnect(self._importTask.cancel)
+        self._importTask = None
+        self._plan.districts.resetData(updateGeometry=True, immediate=True)
+        self.importComplete.emit()
 
-        def taskTerminated():
-            if progress:
-                progress.hide()
-                progress.canceled.disconnect(self._importTask.cancel)
-            if self._importTask.exception:
-                self.setError(f'{self._importTask.exception!r}')
-            elif self._importTask.isCanceled():
-                self.setError(tr('Import cancelled'), Qgis.UserCanceled)
-            self._importTask = None
-            self.importTerminated.emit()
+    def taskTerminated(self):
+        if self._progress:
+            self._progress.hide()
+            self._progress.canceled.disconnect(self._importTask.cancel)
+        if self._importTask.exception:
+            self.setError(f'{self._importTask.exception!r}')
+        elif self._importTask.isCanceled():
+            self.setError(tr('Import cancelled'), Qgis.UserCanceled)
+        self._importTask = None
+        self.importTerminated.emit()
+
+    def importAssignments(self,
+                          file,
+                          joinField: str = None,
+                          headerRow=True,
+                          geoColumn=0,
+                          distColumn=1,
+                          delimiter=None,
+                          quotechar=None,
+                          progress: QProgressDialog = None):
 
         self.clearError()
 
-        if not os.path.exists(self.file):
-            self.setError(tr(f'{self.file} does not exist'))
+        if not os.path.exists(file):
+            self.setError(tr(f'{file} does not exist'))
             return False
 
         if self._plan.assignLayer.isEditable():
             self.setError(tr('Committing unsaved changes before import'))
             self._plan.assignLayer.commitChanges(True)
 
+        self._progress = progress
         self._importTask = ImportAssignmentFileTask(
-            self._plan, self.file, self.headerRow, self.geoColumn, self.distColumn,
-            self.delimiter, self.quotechar, self.joinField)
-        self._importTask.taskCompleted.connect(taskCompleted)
-        self._importTask.taskTerminated.connect(taskTerminated)
+            self._plan, file, headerRow, geoColumn, distColumn,
+            delimiter, quotechar, joinField)
+        self._importTask.taskCompleted.connect(self.taskCompleted)
+        self._importTask.taskTerminated.connect(self.taskTerminated)
+        if progress:
+            self._importTask.progressChanged.connect(
+                lambda p: progress.setValue(int(p)))
+            progress.canceled.connect(self._importTask.cancel)
+
+        QgsApplication.taskManager().addTask(self._importTask)
+
+        return self._importTask
+
+    def importShapefile(self, file, distField: str, nameField: str = None,  membersField: str = None, progress: QProgressDialog = None):
+        self.clearError()
+
+        if not os.path.exists(file):
+            self.setError(tr(f'{file} does not exist'))
+            return False
+
+        layer = QgsVectorLayer(file)
+        if not layer.isValid() or layer.dataProvider().storageType() != 'ESRI Shapefile':
+            self.setError(tr('Invalid shapefile for import: {file}').format(file=file), Qgis.Critical)
+            return False
+
+        if layer.fields().lookupField(distField) == -1:
+            self.setError(tr('Field {field} not found in shapefile {file}').format(
+                field=distField, file=file), Qgis.Critical)
+            return False
+
+        if self._plan.assignLayer.isEditable():
+            self.setError(tr('Committing unsaved changes before import'))
+            self._plan.assignLayer.commitChanges(True)
+
+        if nameField and layer.fields().lookupField(nameField) == -1:
+            self.setError(tr('Field {field} not fond in shapefile {file}').format(
+                field=nameField, file=file), Qgis.Warning)
+            nameField = None
+        if membersField and layer.fields().lookupField(membersField) == -1:
+            self.setError(tr('Field {field} not fond in shapefile {file}').format(
+                field=membersField, file=file), Qgis.Warning)
+            membersField = None
+
+        districts = {}
+        for f in layer.getFeatures():
+            dist = f[distField]
+            if isinstance(dist, str):
+                if dist.isnumeric():
+                    dist = int(dist)
+                else:
+                    dist = f.id()+1
+
+            name = f[nameField] if nameField else None
+            members = f[membersField] if membersField else 1
+            districts[dist] = District(self._plan, dist, name, members)
+        self._plan.districts = districts
+
+        self._progress = progress
+        self._importTask = ImportShapeFileTask(self._plan, file, distField)
+        self._importTask.taskCompleted.connect(self.taskCompleted)
+        self._importTask.taskTerminated.connect(self.taskTerminated)
         if progress:
             self._importTask.progressChanged.connect(
                 lambda p: progress.setValue(int(p)))

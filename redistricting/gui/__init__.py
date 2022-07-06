@@ -26,6 +26,7 @@ from .DlgCopyPlan import DlgCopyPlan
 from .DlgSelectPlan import DlgSelectPlan
 from .DlgExportPlan import DlgExportPlan
 from .DlgImportPlan import DlgImportPlan
+from .DlgImportShape import DlgImportShape
 from .DlgNewDistrict import DlgNewDistrict
 from .DlgConfirmDelete import DlgConfirmDelete
 from .DistrictDataTable import DockDistrictDataTable
@@ -40,6 +41,7 @@ __all__ = [
     'DlgSelectPlan',
     'DlgExportPlan',
     'DlgImportPlan',
+    'DlgImportShape',
     'DlgNewDistrict',
     'DlgConfirmDelete',
     'DockRedistrictingToolbox',

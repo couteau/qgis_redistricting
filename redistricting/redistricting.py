@@ -1,20 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-/***************************************************************************
- QGIS Redistricting
+"""QGIS Redistricting Plugin
 
     QGIS plugin for building political districts from geographic units
         (Originally generated using Plugin Builder by
         gsherman@geoapt.com and then heavily modified)
 
-
         begin                : 2022-01-15
         git sha              : $Format:%H$
         copyright            : (C) 2022 by Cryptodira
         email                : stuart@cryptodira.org
-
-
- ***************************************************************************/
 
 /***************************************************************************
  *                                                                         *
@@ -26,9 +20,7 @@
  ***************************************************************************/
 """
 import os
-import shutil
 from typing import List
-from copy import deepcopy
 from glob import glob
 from uuid import UUID
 from qgis.core import (
@@ -50,7 +42,15 @@ from qgis.PyQt.QtXml import QDomDocument
 
 from .resources import *
 from .gui import *
-from .core import ProjectStorage, RedistrictingPlan, PlanAssignmentEditor, PlanStyler, PlanExporter, PlanImporter, PlanCopier
+from .core import (
+    ProjectStorage,
+    RedistrictingPlan,
+    PlanAssignmentEditor,
+    PlanStyler,
+    PlanExporter,
+    PlanImporter,
+    PlanCopier
+)
 
 
 class Redistricting:
@@ -289,6 +289,16 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
+        self.iface.actionImportShapefile = self.addAction(
+            ':/plugins/redistricting/importplan.svg',
+            text=self.tr('Import Shapefile'),
+            statusTip=self.tr('Import assignments from sahpefile'),
+            addToToolbarMenu=True,
+            enabledFlag=False,
+            callback=self.importShapefile,
+            parent=self.iface.mainWindow()
+        )
+
         self.iface.actionExportPlan = self.addAction(
             ':/plugins/redistricting/exportplan.svg',
             text=self.tr('Export Plan'),
@@ -424,7 +434,7 @@ class Redistricting:
         return dockwidget
 
     def progressCanceled(self):
-        if self.activePlan:
+        if self.activePlan and self.activePlan.error():
             error, level = self.activePlan.error()
         else:
             level = None
@@ -625,17 +635,18 @@ class Redistricting:
     ):
         def layersCreated(plan: RedistrictingPlan):
             if importPlan:
-                importer = PlanImporter(
-                    plan,
+                importer = PlanImporter(plan)
+                importer.importComplete.connect(plan.assignLayer.triggerRepaint)
+                importer.importAssignments(
                     importPath,
                     importField,
                     headerRow,
                     geoCol,
                     distCol,
                     delim,
-                    quote)
-                importer.importComplete.connect(plan.assignLayer.triggerRepaint)
-                importer.importAssignments(self.startProgress(self.tr('Importing assignments...')))
+                    quote,
+                    self.startProgress(self.tr('Importing assignments...'))
+                )
 
             PlanStyler.style(plan, self.activePlan)
             self.iface.layerTreeView().refreshLayerSymbology(plan.distLayer.id())
@@ -689,23 +700,41 @@ class Redistricting:
     def importPlan(self):
         if not self.activePlan:
             self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot import assignments: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
+                self.tr("Oops!"), self.tr(u"Cannot import: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
             return
 
         dlgImportPlan = DlgImportPlan(self.activePlan)
         if dlgImportPlan.exec_() == QDialog.Accepted:
-            importer = PlanImporter(
-                self.activePlan,
+            importer = PlanImporter(self.activePlan)
+            importer.importComplete.connect(self.activePlan.assignLayer.triggerRepaint)
+            importer.importAssignments(
                 dlgImportPlan.equivalencyFileName,
                 dlgImportPlan.joinField,
                 dlgImportPlan.headerRow,
                 dlgImportPlan.geoColumn,
                 dlgImportPlan.distColumn,
                 dlgImportPlan.delimiter,
-                dlgImportPlan.quotechar
+                dlgImportPlan.quotechar,
+                self.startProgress(self.tr('Importing assignments...'))
             )
+
+    def importShapefile(self):
+        if not self.activePlan:
+            self.iface.messageBar().pushMessage(
+                self.tr("Oops!"), self.tr(u"Cannot import: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
+            return
+
+        dlgImportPlan = DlgImportShape(self.activePlan)
+        if dlgImportPlan.exec_() == QDialog.Accepted:
+            importer = PlanImporter(self.activePlan)
             importer.importComplete.connect(self.activePlan.assignLayer.triggerRepaint)
-            importer.importAssignments(self.startProgress(self.tr('Importing assignments...')))
+            importer.importShapefile(
+                dlgImportPlan.shapefileFileName,
+                dlgImportPlan.distField,
+                dlgImportPlan.nameField,
+                dlgImportPlan.membersField,
+                self.startProgress(self.tr('Importing shapefile...'))
+            )
 
     def exportPlan(self):
         def planExported(plan: RedistrictingPlan):
@@ -829,6 +858,8 @@ class Redistricting:
                 self.activePlan is not None)
             self.iface.actionEditPlan.setEnabled(self.activePlan is not None)
             self.iface.actionImportAssignments.setEnabled(
+                self.activePlan is not None)
+            self.iface.actionImportShapefile.setEnabled(
                 self.activePlan is not None)
             self.iface.actionExportPlan.setEnabled(self.activePlan is not None)
             self.iface.actionCopyPlan.setEnabled(self.activePlan is not None)
