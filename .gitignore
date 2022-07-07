@@ -6,3 +6,5 @@ __pycache__
 tests/*.gpkg-shm
 tests/*.gpkg-wal
 redistricting/vendor
+coverage.xml
+.coverage
