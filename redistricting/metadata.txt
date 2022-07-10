@@ -3,9 +3,9 @@
 # This file should be included when you package your plugin.# Mandatory items:
 
 [general]
-name=Redistricting
-qgisMinimumVersion=3.0
-description=Tool for building districts from geographic units
+name=QGIS Redistricting
+qgisMinimumVersion=3.18
+description=Tool for building districting plans from geographic units
 version=0.1
 author=Cryptodira
 email=stuart@cryptodira.org
@@ -26,8 +26,8 @@ hasProcessingProvider=no
 tags=python
 
 homepage=http://homepage
-category=Vector
-icon=resources/icon.png
+icon=../resources/icon.png
+
 # experimental flag
 experimental=True
 
@@ -39,9 +39,8 @@ deprecated=False
 # Check the documentation for more information.
 # plugin_dependencies=
 
-Category of the plugin: Raster, Vector, Database or Web
-# category=
+# Category of the plugin: Raster, Vector, Database or Web
+category=Vector
 
 # If the plugin can run on QGIS Server.
 server=False
-
