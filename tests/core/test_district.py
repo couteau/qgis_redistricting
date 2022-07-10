@@ -1,6 +1,8 @@
 """QGIS Redistricting Plugin - unit tests for District class"""
 import pytest
-from redistricting.core.District import District, Unassigned
+from pytestqt.plugin import QtBot
+from redistricting.core import RedistrictingPlan, District
+from redistricting.core.District import Unassigned
 
 # pylint: disable=no-self-use
 
@@ -73,3 +75,9 @@ class TestDistrict:
     def test_valid(self, district: District, new_district: District):
         assert district.valid
         assert not new_district.valid
+
+    def test_properties(self, plan: RedistrictingPlan, qtbot: QtBot):
+        with qtbot.waitSignal(plan.planChanged, check_params_cb=lambda p, f, n, o: f == 'district.name'):
+            plan.districts[1].name = 'New Name'
+        f = next(plan.distLayer.getFeatures(f"{plan.distField} = 1"), None)
+        assert f['name'] == 'New Name'

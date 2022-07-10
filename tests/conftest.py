@@ -3,8 +3,11 @@
 import shutil
 import pathlib
 import pytest
+from pytest_mock.plugin import MockerFixture
 from qgis.core import QgsProject, QgsVectorLayer
 from redistricting.core.Plan import RedistrictingPlan
+from redistricting.core.DistrictList import DistrictList
+from redistricting.core.FieldList import FieldList
 
 
 # pylint: disable=redefined-outer-name, unused-argument
@@ -14,7 +17,8 @@ def datadir(tmp_path: pathlib.Path):
     d = tmp_path / 'data'
     s = pathlib.Path(__file__).parent / 'data'
     shutil.copytree(s, d)
-    return d
+    yield d
+    shutil.rmtree(tmp_path)
 
 
 @pytest.fixture
@@ -44,6 +48,13 @@ def dist_layer(gpkg_path, qgis_new_project):
         f'{gpkg_path}|layername=districts', 'test_districts', 'ogr')
     QgsProject.instance().addMapLayer(layer, False)
     return layer
+
+
+@pytest.fixture
+def plan_with_pop_layer(block_layer):
+    p = RedistrictingPlan('minimal', 5)
+    p.popLayer = block_layer
+    return p
 
 
 @pytest.fixture
@@ -97,11 +108,14 @@ def plan(block_layer, assign_layer, dist_layer):
 
 
 @ pytest.fixture
-def new_plan(gpkg_path, block_layer, tmp_path: pathlib.Path):
-    dst = pathlib.Path(tmp_path, 'tuscaloosa_new_plan.gpkg').absolute()
+def new_plan(gpkg_path, block_layer, datadir: pathlib.Path, mocker: MockerFixture):
+    dst = pathlib.Path(datadir, 'tuscaloosa_new_plan.gpkg').absolute()
     shutil.copy(gpkg_path, dst)
 
     p = RedistrictingPlan('test', 5)
+    update = mocker.patch.object(p.districts, 'updateDistricts')
+    update.return_value = None
+
     p.deviation = 0.025
     p.popLayer = block_layer
     p.geoIdField = 'geoid20'
@@ -110,10 +124,7 @@ def new_plan(gpkg_path, block_layer, tmp_path: pathlib.Path):
     p.vapField = 'vap_total'
     p.totalPopulation = 227036
 
-    p.assignLayer = QgsVectorLayer(
-        f'{dst}|layername=assignments', 'test_assignments', 'ogr')
-    p.distLayer = QgsVectorLayer(
-        f'{dst}|layername=districts', 'test_districts', 'ogr')
+    p.addLayersFromGeoPackage(dst)
 
     p.appendDataField('vap_nh_black', caption='BVAP')
     p.appendDataField('vap_apblack', caption='APBVAP')
@@ -121,3 +132,32 @@ def new_plan(gpkg_path, block_layer, tmp_path: pathlib.Path):
 
     p.appendGeoField('vtdid20', caption='VTD')
     return p
+
+
+@pytest.fixture
+def mock_plan(mocker: MockerFixture, assign_layer, dist_layer, block_layer):
+    plan = mocker.create_autospec(
+        spec=RedistrictingPlan,
+        spec_set=True,
+        instance=True
+    )
+    type(plan).assignLayer = mocker.PropertyMock(return_value=assign_layer)
+    type(plan).distLayer = mocker.PropertyMock(return_value=dist_layer)
+    type(plan).popLayer = mocker.PropertyMock(return_value=block_layer)
+    type(plan).sourceLayer = mocker.PropertyMock(return_value=block_layer)
+    type(plan).distField = mocker.PropertyMock(return_value='district')
+    type(plan).geoIdField = mocker.PropertyMock(return_value='geoid20')
+    type(plan).sourceIdField = mocker.PropertyMock(return_value='geoid20')
+    type(plan).joinField = mocker.PropertyMock(return_value='geoid20')
+    type(plan).popField = mocker.PropertyMock(return_value='pop_total')
+    type(plan).vapField = mocker.PropertyMock(return_value='vap_total')
+    type(plan).cvapField = mocker.PropertyMock(return_value=None)
+    type(plan).numDistricts = mocker.PropertyMock(return_value=5)
+
+    districts = mocker.create_autospec(spec=DistrictList, spec_set=True, instance=True)
+    type(plan).districts = mocker.PropertyMock(return_value=districts)
+
+    data_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
+    type(plan).dataFields = mocker.PropertyMock(return_value=data_fields)
+
+    return plan
