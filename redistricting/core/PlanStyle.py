@@ -18,7 +18,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, List
 
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import Qt, QObject
 from qgis.PyQt.QtGui import QColor, QFont
 from qgis.core import (
     QgsSymbol,
@@ -35,8 +35,9 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanStyler:
+class PlanStyler(QObject):
     def __init__(self, plan: RedistrictingPlan):
+        super().__init__(plan)
         self._plan = plan
         self._assignLayer = plan.assignLayer
         self._distLayer = plan.distLayer

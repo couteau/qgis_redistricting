@@ -47,9 +47,8 @@ class DistrictList(QObject):
         super().__init__(plan)
         self._plan = plan
         if districts:
-            self._districts: Dict[int, BaseDistrict] = {
-                dist.district: dist for dist in districts
-            }
+            self._districts: Dict[int, BaseDistrict] = {}
+            self.update({dist.district: dist for dist in districts})
         else:
             self._districts: Dict[int, BaseDistrict] = {
                 0: Unassigned(self._plan)
@@ -80,6 +79,8 @@ class DistrictList(QObject):
                     return self._districts[index]
                 if 0 <= index <= self._plan.numDistricts:
                     return None
+            elif 0 in self._districts and hasattr(self._districts[0], index):
+                return [getattr(dist, index) for dist in self.values() if dist.district != 0]
         elif isinstance(index, int):
             return list(self._districts.values())[index]
 
@@ -134,13 +135,23 @@ class DistrictList(QObject):
     def index(self, district):
         return list(self._districts.values()).index(district)
 
+    def update(self, districts: Dict[int, BaseDistrict]):
+        self._districts.update(districts)
+        self._districts = {k: self._districts[k]
+                           for k in sorted(self._districts)}
+
+    def clear(self):
+        unassigned = self.unassigned
+        self._districts.clear()
+        self._districts[0] = unassigned
+
+    @property
+    def unassigned(self):
+        return self._districts[0] if 0 in self._districts else None
+
     @property
     def updatingData(self):
-        return self.update() is not None
-
-    def waitForUpdate(self):
-        if self._updateTask:
-            self._updateTask.waitForFinished()
+        return self.updateDistricts() is not None
 
     def updateDistrictFields(self):
         for dist in self._districts.values():
@@ -162,22 +173,20 @@ class DistrictList(QObject):
         if self._plan.distLayer:
             dists = [str(d) for d in range(0, self._plan.numDistricts+1)] if loadall \
                 else [str(d) for d in self._districts]
-            # if len(dists) < self._plan.numDistricts:
-            #    self._needUpdate = True
 
             features = self._plan.distLayer.getFeatures(
                 f'{self._plan.distField} in ({",".join(dists)})')
 
             for f in features:
                 if not f['district'] in self._districts:
-                    self.addDistrict(f['district'])
+                    self.addDistrict(f['district'], f['name'], f['members'])
 
                 self._districts[f['district']].update(
                     {k: v if v != NULL else None for k, v in zip(
                         f.fields().names(), f.attributes())}
                 )
 
-    def updateData(self, data: pd.DataFrame, districts: List[int]):
+    def updateData(self, data: pd.DataFrame, districts: List[int] = None):
         if districts is None:
             districts = range(0, self._plan.numDistricts+1)
         for d in districts:
@@ -187,8 +196,7 @@ class DistrictList(QObject):
                 if d in self._districts:
                     district = self._districts[d]
                 else:
-                    district = self.addDistrict(
-                        d) if d > 0 else Unassigned(self._plan)
+                    district = self.addDistrict(d, data.name[d], data.members[d]) if d > 0 else Unassigned(self._plan)
                 district.update(data.loc[d])
 
     def updateTaskCompleted(self):
@@ -217,7 +225,11 @@ class DistrictList(QObject):
         self._updateTask = None
         self.updateTerminated.emit()
 
-    def update(self, force=False) -> QgsTask:
+    def waitForUpdate(self):
+        if self._updateTask:
+            self._updateTask.waitForFinished()
+
+    def updateDistricts(self, force=False) -> QgsTask:
         """ update aggregate district data from assignments, including geometry where requested
 
         :param force: Cancel any pending update and begin a new update
@@ -230,7 +242,8 @@ class DistrictList(QObject):
             return None
 
         if force:
-            self._updateTask.cancel()
+            if self._updateTask:
+                self._updateTask.cancel()
             self._updateTask = None
 
         if self._needUpdate and not self._updateTask:
@@ -264,4 +277,4 @@ class DistrictList(QObject):
             else:
                 self._updateDistricts |= districts
         if immediate:
-            self.update(True)
+            self.updateDistricts(True)

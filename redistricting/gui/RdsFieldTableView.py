@@ -19,7 +19,7 @@ from typing import Union, Iterable, List
 
 from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QCoreApplication, QModelIndex, QVariant, pyqtSignal, pyqtProperty
 from qgis.PyQt.QtWidgets import QWidget, QTableView, QAbstractItemView, QProxyStyle, QStyleOption
-from qgis.PyQt.QtGui import QDropEvent, QDragMoveEvent
+from qgis.PyQt.QtGui import QDropEvent, QDragMoveEvent, QMouseEvent
 from qgis.core import QgsApplication
 from ..core import Field, DataField, FieldList, BasePopulation
 
@@ -329,6 +329,8 @@ class RdsFieldTableView(QTableView):
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
         self.setModel(FieldListModel(parent=self))
+        self.canDelete = True
+        self.pressIndex = None
 
     def model(self) -> FieldListModel:
         return self._model
@@ -371,6 +373,21 @@ class RdsFieldTableView(QTableView):
     def dataChanged(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles: Iterable[int] = None):
         super().dataChanged(topLeft, bottomRight, roles)
         self.fieldsChanged.emit(self.model().fields)
+
+    def mousePressEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton:
+            index = self.indexAt(e.pos())
+            if index.isValid():
+                self.pressIndex = index
+        return super().mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e: QMouseEvent):
+        if e.button() == Qt.LeftButton and self.canDelete:
+            index = self.indexAt(e.pos())
+            if index.isValid() and index == self.pressIndex and index.column() == self._model.columnCount() - 1:
+                self._model.deleteField(index.row())
+        self.pressIndex = None
+        return super().mouseReleaseEvent(e)
 
     @pyqtProperty(list, notify=fieldsChanged)
     def fields(self) -> List[Field]:

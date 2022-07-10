@@ -25,12 +25,12 @@ import io
 import csv
 from qgis.PyQt.QtCore import Qt, QObject, QCoreApplication, QEvent, QModelIndex
 from qgis.PyQt.QtGui import QKeySequence
-from qgis.PyQt.QtWidgets import QDockWidget, QDialog, QWizard
+from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.core import QgsApplication
 from ..core import RedistrictingPlan, DistrictDataModel
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
-from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
+from .DlgEditFields import DlgEditFields
 
 
 class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
@@ -78,17 +78,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.plan = plan
 
     def addFieldDlg(self):
-        w = QWizard()
-        w.setWindowTitle(QCoreApplication.translate(
-            'Redistricting', 'Add/Edit Data Fields'))
-        w.wizardStyle = QWizard.ModernStyle
-        w.setOptions(QWizard.NoBackButtonOnStartPage |
-                     QWizard.NoDefaultButton)
-
-        w.addPage(dlgEditPlanFieldPage(self))
-        w.setField('dataFields', list(self._plan.dataFields))
-        if w.exec_() == QDialog.Accepted:
-            self._plan.dataFields = w.field('dataFields')
+        dlg = DlgEditFields(self._plan)
+        dlg.exec_()
 
     def recalculate(self):
         self._plan.districts.resetData(immediate=True)

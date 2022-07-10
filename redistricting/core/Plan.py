@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
-"""
-/***************************************************************************
- RedistrictingPlan
-        QGIS Redistricting plugin core logic
-                              -------------------
+"""RedistrictingPlan - QGIS Redistricting plugin core logic
+
         begin                : 2022-01-15
         git sha              : $Format:%H$
         copyright            : (C) 2022 by Cryptodira
         email                : stuart@cryptodira.org
- ***************************************************************************/
 
 /***************************************************************************
  *                                                                         *
@@ -23,6 +19,7 @@ from numbers import Number
 from typing import Any, Dict, Tuple, Iterable, List, Optional, Union, overload
 from math import ceil, floor
 from uuid import UUID, uuid4
+
 from qgis.PyQt.QtCore import QObject, QVariant, pyqtSignal
 from qgis.PyQt.QtWidgets import QProgressDialog
 from qgis.core import (
@@ -39,7 +36,7 @@ from .Exception import RdsException
 from .FieldList import FieldList
 from .Field import Field, DataField
 from .DistrictList import DistrictList
-from .District import District
+from .District import BaseDistrict, District
 from .PlanGroup import PlanGroup
 from .Utils import tr, makeFieldName
 from .Tasks import (
@@ -47,7 +44,7 @@ from .Tasks import (
     AddGeoFieldToAssignmentLayerTask
 )
 
-# pylint: disable=too-many-public-methods
+# pylint: disable=too-many-public-methods,too-many-lines,too-many-instance-attributes
 
 
 class RedistrictingPlan(QObject):
@@ -60,6 +57,13 @@ class RedistrictingPlan(QObject):
 
     def __init__(self, name='', numDistricts: int = None, uuid: UUID = None, parent: Optional[QObject] = None):
         super().__init__(parent)
+        if not name or not isinstance(name, str):
+            raise ValueError(tr('Cannot create redistricting plan: ') + tr('Redistricting plan name must be provided'))
+        if numDistricts is not None and (not isinstance(numDistricts, int) or numDistricts < 2):
+            raise ValueError(tr('Cannot create redistricting plan: ') +
+                             tr('Number of districts must be an integer between 2 and 2,000'))
+        if uuid is not None and not isinstance(uuid, UUID):
+            raise ValueError(tr('Cannot create redistricting plan: ') + tr('Invalid UUID'))
 
         self._totalPopulation = 0
         self._cutEdges = 0
@@ -135,7 +139,8 @@ class RedistrictingPlan(QObject):
 
     @classmethod
     def deserialize(cls, data: Dict[str, Any], parent: QObject):
-        uuid = data.get('id', uuid4())
+        uuid = data.get('id')
+        uuid = UUID(uuid) if uuid else uuid4()
         name = data.get('name', str(uuid))
         numDistricts = data.get('num-districts')
 
@@ -207,6 +212,7 @@ class RedistrictingPlan(QObject):
 
             oldValue = self._name
             self._name = value
+            self._updateLayerNames()
             self._group.updateName()
             self.planChanged.emit(self, 'name', value, oldValue)
 
@@ -338,9 +344,49 @@ class RedistrictingPlan(QObject):
     def sourceLayer(self) -> QgsVectorLayer:
         return self._sourceLayer or self._popLayer
 
-    @property
+    @sourceLayer.setter
+    def sourceLayer(self, value: QgsVectorLayer):
+        value = value or self._popLayer
+        if self._sourceIdField:
+            idx = value.fields().lookupField(self._sourceIdField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('join').capitalize(),
+                        field=self._sourceIdField,
+                        layertype=tr('source'),
+                        layername=value.name()
+                    )
+                )
+
+        if value and value != self.sourceLayer:
+            for f in self._geoFields:
+                f.setLayer(value)
+
+        if value == self._popLayer:
+            self._sourceLayer = None
+        else:
+            self._sourceLayer = value
+
+    @ property
     def sourceIdField(self) -> str:
         return self._sourceIdField or self._geoIdField
+
+    @sourceIdField.setter
+    def sourceIdField(self, value: str):
+        if value == self._geoIdField or not value:
+            self._sourceIdField = None
+        else:
+            if self.sourceLayer and self.sourceLayer.fields().lookupField(value) == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('join').capitalize(),
+                        field=value,
+                        layertype=tr('source'),
+                        layername=self.sourceLayer.name()
+                    )
+                )
+            self._sourceIdField = value
 
     @property
     def popLayer(self) -> QgsVectorLayer:
@@ -348,9 +394,61 @@ class RedistrictingPlan(QObject):
 
     @popLayer.setter
     def popLayer(self, value: QgsVectorLayer):
-        self._popLayer = value
+        if not value:
+            raise ValueError(tr('Population layer must be provided'))
+
+        if self._popField:
+            idx = value.fields().lookupField(self._popField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('population').capitalize(),
+                        field=self._popField,
+                        layertype=tr('population'),
+                        layername=value.name()
+                    )
+                )
+        if self._joinField:
+            idx = value.fields().lookupField(self._joinField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('join').capitalize(),
+                        field=self._joinField,
+                        layertype=tr('population'),
+                        layername=value.name()
+                    )
+                )
+        if self._vapField:
+            idx = value.fields().lookupField(self._vapField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('VAP').capitalize(),
+                        field=self._vapField,
+                        layertype=tr('population'),
+                        layername=value.name()
+                    )
+                )
+        if self._cvapField:
+            idx = value.fields().lookupField(self._cvapField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('CVAP').capitalize(),
+                        field=self._cvapField,
+                        layertype=tr('population'),
+                        layername=value.name()
+                    )
+                )
+
         for f in self._dataFields:
-            f.setLayer(self._popLayer)
+            f.setLayer(value)
+        if not self._sourceLayer:
+            for f in self._geoFields:
+                f.setLayer(value)
+
+        self._popLayer = value
 
     @property
     def joinField(self) -> str:
@@ -468,20 +566,50 @@ class RedistrictingPlan(QObject):
                 field = self._assignLayer.fields()[1]
                 if field:
                     self._geoIdField = field.name()
+            else:
+                idx = self._assignLayer.fields().lookupField(self._geoIdField)
+                if idx == -1:
+                    raise RdsException(
+                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                            fieldname=tr('Geo ID'),
+                            field=self._geoIdField,
+                            layertype=tr('assignments'),
+                            layername=self._assignLayer.name()
+                        )
+                    )
 
             if self._distField is None:
                 field = self._assignLayer.fields()[-1]
                 if field:
                     self._distField = field.name()
-
-            for f in self._geoFields:
-                f.setLayer(self._assignLayer)
+            else:
+                idx = self._assignLayer.fields().lookupField(self._distField)
+                if idx == -1:
+                    raise RdsException(
+                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                            fieldname=tr('district').capitalize(),
+                            field=self._distField,
+                            layertype=tr('assignments'),
+                            layername=self._assignLayer.name()
+                        )
+                    )
 
     @property
     def distLayer(self) -> QgsVectorLayer:
         return self._distLayer
 
-    def _setDistLayer(self, value):
+    def _setDistLayer(self, value: QgsVectorLayer):
+        if self._distField:
+            idx = value.fields().lookupField(self._distField)
+            if idx == -1:
+                raise RdsException(
+                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                        fieldname=tr('district').capitalize(),
+                        field=self._distField,
+                        layertype=tr('district'),
+                        layername=value.name()
+                    )
+                )
         self._distLayer = value
         self._group.updateLayers()
         self._districts.loadData()
@@ -489,6 +617,16 @@ class RedistrictingPlan(QObject):
     @property
     def districts(self) -> DistrictList:
         return self._districts
+
+    @districts.setter
+    def districts(self, districts: Union[DistrictList, Dict[int, BaseDistrict], List[BaseDistrict]]):
+        self.clearError()
+        oldDistricts = self._districts[:]
+        self._districts.clear()
+        if isinstance(districts, list):
+            districts = {dist.district: dist for dist in districts}
+        self._districts.update(districts)
+        self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
 
     @property
     def dataFields(self) -> FieldList:
@@ -635,6 +773,9 @@ class RedistrictingPlan(QObject):
                               Qgis.UserCanceled)
             del self._updateAssignLayerTask
 
+        if not self.assignLayer:
+            return None
+
         if isinstance(geoField, Field):
             geoField = [geoField]
 
@@ -657,14 +798,15 @@ class RedistrictingPlan(QObject):
 
     def _addGeoFieldToAssignLayer(self, geoField: Field, progress: QProgressDialog = None):
         if not self._assignLayer:
-            return
+            return None
 
         if not self.sourceLayer:
-            return
+            return None
 
         field = geoField.makeQgsField()
         if not field:
-            return
+            return None
+
         self._addFieldToLayer(self._assignLayer, field)
 
         return self._updateGeoField(geoField, progress)
@@ -703,11 +845,11 @@ class RedistrictingPlan(QObject):
 
         self.clearError()
 
-        self._sourceLayer = srcLayer or self.popLayer
-        self._sourceIdField = srcGeoIdField or self.joinField
+        self.sourceLayer = srcLayer or self._sourceLayer or self.popLayer
+        self.sourceIdField = srcGeoIdField or self._sourceIdField or self.joinField
 
         self._createLayersTask = CreatePlanLayersTask(  # pylint: disable=attribute-defined-outside-init
-            self, gpkgPath, self._sourceLayer, self._sourceIdField)
+            self, gpkgPath, self.sourceLayer, self.sourceIdField)
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
         if progress:
@@ -718,6 +860,12 @@ class RedistrictingPlan(QObject):
 
         return self._createLayersTask
 
+    def _updateLayerNames(self):
+        if self._assignLayer:
+            self._assignLayer.setName(f'{self.name}_assignments')
+        if self._distLayer:
+            self._distLayer.setName(f'{self.name}_districts')
+
     def addLayersFromGeoPackage(self, gpkgPath):
         self.clearError()
 
@@ -726,23 +874,25 @@ class RedistrictingPlan(QObject):
         if not assignLayer.isValid():
             self.setError(tr('Error creating new {} layer: {}').format(
                 tr('assignment'), assignLayer.lastError()))
+            return
         distLayer = QgsVectorLayer(f'{gpkgPath}|layername=districts', f'{self.name}_districts', 'ogr')
         if not distLayer.isValid():
             self.setError(tr('Error creating new {} layer: {}').format(
                 tr('district'), distLayer.lastError()))
+            return
         QgsProject.instance().addMapLayers([assignLayer, distLayer], False)
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)
 
-    @ overload
+    @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
         ...
 
-    @ overload
+    @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, field: QgsField):
         ...
 
-    @ overload
+    @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fields: Iterable[QgsField]):
         ...
 
@@ -784,11 +934,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
         return dist
 
-    @ overload
+    @overload
     def removeDistrict(self, district: District):
         ...
 
-    @ overload
+    @overload
     def removeDistrict(self, district: int):
         ...
 
@@ -802,11 +952,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(
             self, 'districts', self._districts[:], oldDistricts)
 
-    @ overload
+    @overload
     def appendDataField(self, field: str, isExpression: bool = False, caption: str = None):
         ...
 
-    @ overload
+    @overload
     def appendDataField(self, field: DataField):
         ...
 
@@ -815,26 +965,25 @@ class RedistrictingPlan(QObject):
 
         if isinstance(field, str):
             # don't allow duplicate fields
-            for f in self._dataFields:
-                if f.field == field:
-                    self.setError(
-                        tr('Attempt to add duplicate field {field} to plan {plan}').
-                        format(field=field, plan=self.name)
-                    )
-                    return
-
-            f = DataField(self.popLayer, field,
-                          isExpression, caption, parent=self)
-        elif isinstance(field, DataField):
-            if field in self._dataFields:
+            if any(f.field == field for f in self._dataFields):
                 self.setError(
                     tr('Attempt to add duplicate field {field} to plan {plan}').
-                    format(field=field, plan=self.name))
+                    format(field=field, plan=self.name)
+                )
+                return
+
+            f = DataField(self.popLayer, field, isExpression, caption)
+        elif isinstance(field, DataField):
+            if any(f.field == field.field for f in self._dataFields):
+                self.setError(
+                    tr('Attempt to add duplicate field {field} to plan {plan}').
+                    format(field=field.field, plan=self.name))
                 return
             f = field
-            f.setParent(self)
         else:
-            return
+            raise ValueError(
+                tr('Attempt to add invalid field {field!r} to plan {plan}').
+                format(field=field, plan=self.name))
 
         oldDataFields = self._dataFields[:]
         self._dataFields.append(f)
@@ -851,15 +1000,15 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'data-fields',
                               self._dataFields, oldDataFields)
 
-    @ overload
+    @overload
     def removeDataField(self, field: str):
         ...
 
-    @ overload
+    @overload
     def removeDataField(self, field: DataField):
         ...
 
-    @ overload
+    @overload
     def removeDataField(self, field: int):
         ...
 
@@ -868,25 +1017,25 @@ class RedistrictingPlan(QObject):
 
         if isinstance(field, DataField):
             if not field in self._dataFields:
-                self.setError(
+                raise ValueError(
                     tr('Could not remove field {field}. Field not found in plan {plan}.').
                     format(field=field.field, plan=self.name)
                 )
-                return
         elif isinstance(field, str):
             if field in self._dataFields:
                 field = self._dataFields[field]
             else:
-                self.setError(
+                raise ValueError(
                     tr('Could not remove field {field}. Field not found in plan {plan}.').
                     format(field=field, plan=self.name)
                 )
-                return
-        elif not isinstance(field, int) or field < 0 or field >= len(self.dataFields):
-            self.setError(
-                tr('Invalid index passed to RedistrictingPlan.removeDataField'))
+        elif isinstance(field, int):
+            if 0 <= field < len(self.dataFields):
+                field = self._dataFields[field]
+            else:
+                raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
         else:
-            field = self._dataFields[field]
+            raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
 
         oldDataFields = self._dataFields[:]
         self._dataFields.remove(field)
@@ -904,11 +1053,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'data-fields',
                               self._dataFields, oldDataFields)
 
-    @ overload
+    @overload
     def appendGeoField(self, field: str, isExpression: bool = False, caption: str = None):
         ...
 
-    @ overload
+    @overload
     def appendGeoField(self, field: Field):
         ...
 
@@ -917,59 +1066,75 @@ class RedistrictingPlan(QObject):
 
         if isinstance(field, str):
             # don't allow duplicate fields
-            for f in self.geoFields:
-                if f.field == field:
-                    self.setError(
-                        tr('Attempt to add duplicate field {field} to plan {plan}').
-                        format(field=field, plan=self.name)
-                    )
-                    return
-
-            f = Field(self._sourceLayer or self._popLayer or self._assignLayer,
-                      field, isExpression, caption, self)
-        elif isinstance(field, Field):
-            if field in self.geoFields:
+            if any(f.field == field for f in self._geoFields):
                 self.setError(
                     tr('Attempt to add duplicate field {field} to plan {plan}').
                     format(field=field, plan=self.name)
                 )
                 return
+
+            f = Field(self._sourceLayer or self._popLayer or self._assignLayer,
+                      field, isExpression, caption)
+        elif isinstance(field, Field):
+            if any(f.field == field.field for f in self._geoFields):
+                self.setError(
+                    tr('Attempt to add duplicate field {field} to plan {plan}').
+                    format(field=field.field, plan=self.name)
+                )
+                return
             f = field
-            f.setParent(self)
         else:
-            return
+            raise ValueError(
+                tr('Attempt to add invalid field {field!r} to plan {plan}').
+                format(field=field, plan=self.name)
+            )
 
         oldGeoFields = self._geoFields[:]
         self._geoFields.append(f)
-        if updateAssignLayer:
-            findex = self.assignLayer.fields().lookupField(f.fieldName)
+        if updateAssignLayer and self._assignLayer:
+            findex = self._assignLayer.fields().lookupField(f.fieldName)
             if findex == -1:
                 self._addGeoFieldToAssignLayer(f)
 
         self.geoFieldAdded.emit(self, f)
-        self.planChanged.emit(self, 'geo-fields',
-                              self._geoFields, oldGeoFields)
+        self.planChanged.emit(self, 'geo-fields', self._geoFields, oldGeoFields)
 
-    @ overload
+    @overload
+    def removeGeoField(self, field: Field):
+        ...
+
+    @overload
     def removeGeoField(self, field: str):
         ...
 
-    @ overload
-    def removeGeoField(self, field: Field):
+    @overload
+    def removeGeoField(self, field: int):
         ...
 
     def removeGeoField(self, field):
         self.clearError()
 
-        if not field in self.geoFields:
-            self.setError(
-                tr('Could not remove field {field}. Field not found in plan {plan}.').
-                format(field=field.field, plan=self.name)
-            )
-            return
-
-        if isinstance(field, str):
-            field = self.geoFields[field]
+        if isinstance(field, Field):
+            if not field in self.geoFields:
+                raise ValueError(
+                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    format(field=field.field, plan=self.name)
+                )
+        elif isinstance(field, str):
+            if field in self._geoFields:
+                field = self._geoFields[field]
+            else:
+                raise ValueError(
+                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    format(field=field, plan=self.name)
+                )
+        elif isinstance(field, int):
+            if 0 <= field < len(self.geoFields):
+                field = self._geoFields[field]
+            else:
+                raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
+        else:
+            raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
 
         oldGeoFields = self._geoFields[:]
         self._geoFields.remove(field)
@@ -983,8 +1148,7 @@ class RedistrictingPlan(QObject):
                 self._assignLayer.updateFields()
 
         self.geoFieldRemoved.emit(self, field)
-        self.planChanged.emit(self, 'geo-fields',
-                              self._geoFields, oldGeoFields)
+        self.planChanged.emit(self, 'geo-fields', self._geoFields, oldGeoFields)
 
     def assignmentsCommitted(self):
         districts = {d.district for d in self._districts if d.delta is not None}

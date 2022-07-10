@@ -15,7 +15,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import List
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QVariant, QModelIndex
 from qgis.PyQt.QtWidgets import QWidget, QWizardPage, QHeaderView, QComboBox, QStyledItemDelegate, QStyleOptionViewItem
 from qgis.core import QgsApplication, QgsVectorLayer, QgsMapLayerProxyModel
@@ -29,7 +28,6 @@ class GeoFieldDelegate(QStyledItemDelegate):
             editor = QComboBox(parent)
             editor.setFrame(False)
             rect = option.rect
-            # rect.setTopLeft(editor.parent().mapToGlobal(rect.topLeft()))
             editor.setGeometry(rect)
             editor.setEditable(True)
             editor.addItems([
@@ -59,7 +57,6 @@ class GeoFieldDelegate(QStyledItemDelegate):
     def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
         if index.column() == 1:
             rect = option.rect
-            # rect.setTopLeft(editor.parent().mapToGlobal(rect.topLeft()))
             editor.setGeometry(rect)
         else:
             super().updateEditorGeometry(editor, option, index)
@@ -72,8 +69,6 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.setupUi(self)
 
         self.fieldsModel = self.tblAddlGeography.model()
-        # self.fieldsModel = GeoFieldsModel(self)
-        # self.tblAddlGeography.setModel(self.fieldsModel)
 
         self.registerField('sourceLayer*', self.cmbSourceLayer)
         self.registerField('geoIdField*', self.cmbGeoIDField)
@@ -89,13 +84,11 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        #self.tblAddlGeography.setColumnWidth(2, 30)
         self.tblAddlGeography.setItemDelegateForColumn(1, GeoFieldDelegate(self))
 
         self.btnAddAddlGeoField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
         self.cmbAddlGeoField.fieldChanged.connect(self.fieldChanged)
         self.btnAddAddlGeoField.clicked.connect(self.addField)
-        self.tblAddlGeography.clicked.connect(self.deleteField)
         self.tblAddlGeography.setEnableDragRows(True)
 
     def initializePage(self):
@@ -110,7 +103,7 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.cmbGeoIDField.setLayer(sourceLayer)
         self.cmbAddlGeoField.setLayer(sourceLayer)
         self.setSourceLayer(sourceLayer)
-        self.setFinalPage(self.parent().isComplete())
+        self.setFinalPage(self.wizard().isComplete())
 
     def cleanupPage(self):
         ...
@@ -143,7 +136,3 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
 
         layer = self.field('sourceLayer')
         self.fieldsModel.appendField(layer, field, isExpression)
-
-    def deleteField(self, index: QModelIndex):
-        if index.column() == 2:
-            self.fieldsModel.deleteField(index.row())

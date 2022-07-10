@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import csv
 from contextlib import closing
+
 from typing import TYPE_CHECKING
 from qgis.PyQt.QtCore import QVariant
 from qgis.core import (
@@ -43,6 +44,20 @@ from ._debug import debug_thread
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan, Field
+
+
+def makeDbfFieldName(fieldName, fields: QgsFields):
+    if len(fieldName) <= 10:
+        return fieldName
+
+    fn = fieldName[:10]
+    i = 0
+    while fields.lookupField(fn) != -1:
+        i += 1
+        suff = str(i)
+        fn = fieldName[:10-len(suff)] + suff
+
+    return fn
 
 
 class ExportRedistrictingPlanTask(QgsTask):
@@ -85,35 +100,7 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         self.exception = None
 
-    def _exportShapeFile(self):
-        """Write shapefile"""
-
-        def makeDbfFieldName(fieldName, fields: QgsFields):
-            if len(fieldName) <= 10:
-                return fieldName
-
-            fn = fieldName[:10]
-            i = 0
-            while fields.lookupField(fn) != -1:
-                i += 1
-                suff = str(i)
-                fn = fieldName[:10-len(suff)] + suff
-
-            return fn
-
-        if self.districts.updatingData:
-            self.districts.waitForUpdate()
-
-        if not self.includeUnassigned:
-            flt = f'{self.distField} != 0 AND {self.distField} IS NOT NULL'
-        else:
-            flt = None
-
-        crs = self.distLayer.crs()
-        layer = QgsVectorLayer(f'MultiPolygon?crs={crs}&index=yes', 'tempshape', 'memory')
-
-        context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.distLayer))
+    def _createFields(self, context: QgsExpressionContext):
         fields = QgsFields()
         fieldNames = {self.distField: makeDbfFieldName(
             self.distField, fields), 'name': 'name'}
@@ -154,8 +141,24 @@ class ExportRedistrictingPlanTask(QgsTask):
             fields.append(QgsField('polsbypop', QVariant.Double))
             fields.append(QgsField('reock', QVariant.Double))
             fields.append(QgsField('convexhull', QVariant.Double))
-            fieldNames |= {'polsbyPopper': 'polsbypop',
-                           'reock': 'reock', 'convexHull': 'convexhull'}
+            fieldNames |= {
+                'polsbyPopper': 'polsbypop',
+                'reock': 'reock',
+                'convexHull': 'convexhull'
+            }
+        return fields, fieldNames
+
+    def _createDistrictsMemoryLayer(self):
+        if not self.includeUnassigned:
+            flt = f'{self.distField} != 0 AND {self.distField} IS NOT NULL'
+        else:
+            flt = None
+
+        layer = QgsVectorLayer(f'MultiPolygon?crs={self.distLayer.crs()}&index=yes', 'tempshape', 'memory')
+
+        context = QgsExpressionContext()
+        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.distLayer))
+        fields, fieldNames = self._createFields(context)
 
         pr = layer.dataProvider()
         pr.addAttributes(fields)
@@ -172,17 +175,31 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         features = []
         for f in self.distLayer.getFeatures(request):
-            dist = self.districts[str(f['district'])]
-            feat = QgsFeature()
-            data = [getattr(dist, srcFld) or 0 for srcFld in fieldNames]
-            feat.setAttributes(data)
-            feat.setGeometry(f.geometry())
-            features.append(feat)
+            if (dist := self.districts[str(f['district'])]) is not None:
+                feat = QgsFeature()
+                data = [getattr(dist, srcFld) or 0 for srcFld in fieldNames]
+                feat.setAttributes(data)
+                feat.setGeometry(f.geometry())
+                features.append(feat)
 
         success, _ = pr.addFeatures(features)
         if success:
             layer.updateExtents()
+        else:
+            self.exception = RdsException(
+                tr("Error when creating shapefile: {}").format(pr.lastError())
+            )
 
+        return layer if success else None
+
+    def _exportShapeFile(self):
+        """Write shapefile"""
+
+        if self.districts.updatingData:
+            self.districts.waitForUpdate()
+
+        layer = self._createDistrictsMemoryLayer()
+        if layer is not None:
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()
             saveOptions.driverName = "ESRI Shapefile"
             saveOptions.fileEncoding = "UTF-8"
@@ -204,8 +221,6 @@ class ExportRedistrictingPlanTask(QgsTask):
                 self.exception = RdsException(msg)
                 return False
         else:
-            self.exception = RdsException(
-                tr("Error when creating shapefile: {}").format(pr.lastError()))
             return False
 
         return True
@@ -244,7 +259,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 feedback.canceled.connect(self.cancel)
             saveOptions.feedback = feedback
 
-            error, msg = QgsVectorFileWriter.writeAsVectorFormatV2(  # pylint: disable=attribute-defined-outside-init
+            error, msg = QgsVectorFileWriter.writeAsVectorFormatV2(
                 layer=self.assignLayer,
                 fileName=self.equivalencyFileName,
                 transformContext=QgsProject.instance().transformContext(),

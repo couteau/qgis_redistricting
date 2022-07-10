@@ -23,7 +23,6 @@
  ***************************************************************************/
 """
 from typing import List, Optional, Any
-from qgis.utils import iface
 from qgis.PyQt.QtGui import QPixmap, QIcon, QColor
 from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtCore import Qt, QObject, QVariant, pyqtSignal, QAbstractListModel, QModelIndex
@@ -31,8 +30,6 @@ from qgis.core import QgsApplication, QgsFieldModel
 from qgis.gui import QgisInterface
 from .ui.DistrictTools import Ui_qdwDistrictTools
 from ..core import BaseDistrict, RedistrictingPlan, GeoFieldsModel, tr
-
-iface: QgisInterface
 
 
 class DistrictSelectModel(QAbstractListModel):
@@ -110,7 +107,7 @@ class DistrictSelectModel(QAbstractListModel):
 
 
 class SourceDistrictModel(DistrictSelectModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...):
+    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
         super().__init__(plan, parent)
         self._offset = 3
 
@@ -127,7 +124,10 @@ class SourceDistrictModel(DistrictSelectModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flags = super().flags(index)
-        if index.row() == 2 and self._plan.assignLayer.selectedFeatureCount() == 0 and self._plan.popLayer.selectedFeatureCount() == 0 and self._plan.sourceLayer.selectedFeatureCount() == 0:
+        if index.row() == 2 and \
+                self._plan.assignLayer.selectedFeatureCount() == 0 and \
+                self._plan.popLayer.selectedFeatureCount() == 0 and \
+                self._plan.sourceLayer.selectedFeatureCount() == 0:
             flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
         return flags
 
@@ -216,12 +216,6 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
     def __init__(self, plan, parent=None):
         super(DockRedistrictingToolbox, self).__init__(parent)
         self.setupUi(self)
-
-        self.btnAssign.setDefaultAction(iface.actionStartPaintDistricts)
-        self.btnCommitUpdate.setDefaultAction(iface.actionCommitPlanChanges)
-        self.btnRollbackUpdate.setDefaultAction(
-            iface.actionRollbackPlanChanges)
-        self.btnEditPlan.setDefaultAction(iface.actionEditPlan)
 
         self.cmbGeoSelect.currentIndexChanged.connect(self.cmbGeoFieldChanged)
         self.cmbTarget.currentIndexChanged.connect(self.cmbTargetChanged)

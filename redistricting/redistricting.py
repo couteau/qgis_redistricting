@@ -86,6 +86,9 @@ class Redistricting:
         # initialize plugin directory
         self.pluginDir = os.path.dirname(__file__)
 
+        if not hasattr(Qgis, 'UserCanceled'):
+            Qgis.UserCanceled = Qgis.Success + 1
+
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]
         localePath = os.path.join(
@@ -143,7 +146,7 @@ class Redistricting:
             addToToolbarMenu=False,
             statusTip=None,
             whatsThis=None,
-            parent=None):
+            parent=None) -> QAction:
         """Add a toolbar icon to the toolbar.
 
         :param iconPath: Path to the icon for this action or an instance of QIcon.
@@ -223,25 +226,23 @@ class Redistricting:
 
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
-        if not hasattr(Qgis, 'UserCanceled'):
-            Qgis.UserCanceled = Qgis.Success + 1
         if not self.projectSignalsConnected:
             self.project.readProjectWithContext.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
             self.project.layersAdded.connect(self.onLayersAdded)
+            self.project.layersRemoved.connect(self.onLayersRemoved)
             # layersWillBeRemoved signal is triggered when a project is closed or when
             # the user removes a layer, and there seems to be no way to disinguish. We
             # use a flag set in the signal handler for removeAll (the closest thing to
             # a 'project closed' signal QGIS seems to have) to ignore this signal when
             # triggered in the context of a project closing
-            self.project.layersWillBeRemoved.connect(
-                self.onLayersWillBeRemoved)
+            self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
             # QGIS inexplicably has no signal for when a project is closed, but removeAll
             # seems to come close
             self.project.removeAll.connect(self.onCloseProject)
             self.projectSignalsConnected = True
 
-        self.iface.actionShowPlanManager = self.addAction(
+        self.actionShowPlanManager = self.addAction(
             ':/plugins/redistricting/planmanager.svg',
             self.tr(u'Plan Manager'),
             addToToolbarMenu=True,
@@ -249,9 +250,9 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
         self.menuButton.clicked.connect(
-            lambda: self.iface.actionShowPlanManager.trigger())
+            lambda: self.actionShowPlanManager.trigger())
 
-        self.iface.actionNewPlan = self.addAction(
+        self.actionNewPlan = self.addAction(
             ':/plugins/redistricting/addplan.svg',
             text=self.tr(u'New Redistricting Plan'),
             statusTip=self.tr(u'Create a new redistricting plan'),
@@ -261,7 +262,7 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionCopyPlan = self.addAction(
+        self.actionCopyPlan = self.addAction(
             ':/plugins/redistricting/copyplan.svg',
             text=self.tr(u'Copy Plan'),
             statusTip=self.tr(
@@ -272,14 +273,14 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionEditPlan = self.addAction(
+        self.actionEditPlan = self.addAction(
             ':/plugins/redistricting/icon.png',
             self.tr(u'Edit Plan'),
             callback=self.editPlan,
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionImportAssignments = self.addAction(
+        self.actionImportAssignments = self.addAction(
             ':/plugins/redistricting/importplan.svg',
             text=self.tr('Import Equivalency File'),
             statusTip=self.tr('Import equivalency file to district field'),
@@ -289,7 +290,7 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionImportShapefile = self.addAction(
+        self.actionImportShapefile = self.addAction(
             ':/plugins/redistricting/importplan.svg',
             text=self.tr('Import Shapefile'),
             statusTip=self.tr('Import assignments from sahpefile'),
@@ -299,7 +300,7 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionExportPlan = self.addAction(
+        self.actionExportPlan = self.addAction(
             ':/plugins/redistricting/exportplan.svg',
             text=self.tr('Export Plan'),
             statusTip=self.tr('Export plan as equivalency and/or shapefile'),
@@ -308,7 +309,7 @@ class Redistricting:
             callback=self.exportPlan,
             parent=self.iface.mainWindow()
         )
-        self.iface.actionStartPaintDistricts = self.addAction(
+        self.actionStartPaintDistricts = self.addAction(
             ':/plugins/redistricting/paintdistricts.svg',
             self.tr(u'Paint districts'),
             callback=self.startPaintDistricts,
@@ -316,7 +317,7 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionCommitPlanChanges = self.addAction(
+        self.actionCommitPlanChanges = self.addAction(
             QgsApplication.getThemeIcon('/mActionSaveAllEdits.svg'),
             text=self.tr(u'Commit changes'),
             statusTip=self.tr(
@@ -326,7 +327,7 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
-        self.iface.actionRollbackPlanChanges = self.addAction(
+        self.actionRollbackPlanChanges = self.addAction(
             QgsApplication.getThemeIcon('/mActionCancelEdits.svg'),
             text=self.tr(u'Rollback changes'),
             statusTip=self.tr(
@@ -352,8 +353,8 @@ class Redistricting:
             self.project.readProjectWithContext.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
             self.project.layersAdded.disconnect(self.onLayersAdded)
-            self.project.layersWillBeRemoved.disconnect(
-                self.onLayersWillBeRemoved)
+            self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
+            self.project.layersRemoved.disconnect(self.onLayersRemoved)
             self.project.removeAll.disconnect(self.onCloseProject)
             self.projectSignalsConnected = False
 
@@ -383,6 +384,11 @@ class Redistricting:
         dockwidget.geoFieldChanged.connect(self.geoFieldChanged)
         dockwidget.targetChanged.connect(self.distTargetChanged)
         dockwidget.sourceChanged.connect(self.distSourceChanged)
+        dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
+        dockwidget.btnCommitUpdate.setDefaultAction(self.actionCommitPlanChanges)
+        dockwidget.btnRollbackUpdate.setDefaultAction(self.actionRollbackPlanChanges)
+        dockwidget.btnEditPlan.setDefaultAction(self.actionEditPlan)
+
         self.iface.addDockWidget(Qt.RightDockWidgetArea, dockwidget)
 
         self.addAction(
@@ -433,7 +439,22 @@ class Redistricting:
         dockwidget.hide()
         return dockwidget
 
+    def checkActivePlan(self, action):
+        if self.activePlan is None:
+            self.iface.messageBar().pushMessage(
+                self.tr("Oops!"),
+                self.tr(f"Cannot {action}: no active redistricting plan. Try creating a new plan."),
+                level=Qgis.Warning
+            )
+            return False
+
+        return True
+
+    # --------------------------------------------------------------------------
+
     def progressCanceled(self):
+        """Hide progress dialog and display message on cancel"""
+
         if self.activePlan and self.activePlan.error():
             error, level = self.activePlan.error()
         else:
@@ -447,7 +468,6 @@ class Redistricting:
 
     def startProgress(self, text=None, maximum=100, canCancel=True):
         """Create and initialize a progress dialog"""
-
         if self.dlg:
             try:
                 self.dlg.canceled.disconnect(self.progressCanceled)
@@ -497,30 +517,35 @@ class Redistricting:
         if self.projectClosing:
             self.projectClosing = False
         else:
+            deletePlans = set()
             for plan in self.redistrictingPlans:
                 for layer in layerIds:
                     if plan.popLayer.id() == layer:
-                        self.deletePlan(plan)
+                        deletePlans.add(plan)
                     elif plan.assignLayer.id() == layer:
-                        self.deletePlan(plan)
+                        deletePlans.add(plan)
                     elif plan.distLayer.id() == layer:
-                        self.deletePlan(plan)
+                        deletePlans.add(plan)
                     elif plan.sourceLayer.id() == layer:
                         plan.sourceLayer = None
-            for layer in self.project.mapLayers(True):
-                if isinstance(self.project.mapLayer(layer), QgsVectorLayer):
-                    self.iface.actionNewPlan.setEnabled(True)
-                    break
-            else:
-                self.iface.actionNewPlan.setEnabled(False)
+
+            for plan in deletePlans:
+                self.removePlan(plan)
 
     def onLayersAdded(self, layers):  # pylint: disable=unused-argument
-        if self.iface.actionNewPlan.isEnabled():
+        if self.actionNewPlan.isEnabled():
             return
-        for layer in layers:
-            if isinstance(layer, QgsVectorLayer):
-                self.iface.actionNewPlan.setEnabled(True)
-                break
+
+        self.actionNewPlan.setEnabled(
+            any(isinstance(layer, QgsVectorLayer)
+                for layer in self.project.mapLayers(True).values())
+        )
+
+    def onLayersRemoved(self, layers):
+        self.actionNewPlan.setEnabled(
+            any(isinstance(layer, QgsVectorLayer)
+                for layer in self.project.mapLayers(True).values())
+        )
 
     def onCloseProject(self):
         self.projectClosing = True
@@ -592,6 +617,8 @@ class Redistricting:
         """Open redistricting plan in the edit dialog"""
         if not isinstance(plan, RedistrictingPlan):
             plan = self.activePlan
+        if not plan:
+            return
 
         dlgEditPlan = DlgEditPlan(plan, None)
         if dlgEditPlan.exec_() == QDialog.Accepted:
@@ -599,24 +626,10 @@ class Redistricting:
             self.project.setDirty()
 
     def deletePlan(self, plan: RedistrictingPlan):
-        """Delete a plan, including associated layers"""
         if plan in self.redistrictingPlans:
             dlg = DlgConfirmDelete(plan)
             if dlg.exec_() == QDialog.Accepted:
-                if plan == self.activePlan:
-                    self.setActivePlan(None)
-                self.redistrictingPlans.remove(plan)
-
-                if dlg.removeLayers():
-                    plan.removeGroup()
-                    if dlg.deleteGeoPackage():
-                        path = plan.geoPackagePath
-                del plan
-                if dlg.removeLayers() and dlg.deleteGeoPackage():
-                    for i in glob(f'{path}*'):
-                        os.unlink(i)
-
-                self.project.setDirty()
+                self.removePlan(plan, dlg.removeLayers(), dlg.deleteGeoPackage())
 
     def createPlanGeoPackage(
         self,
@@ -683,9 +696,7 @@ class Redistricting:
                                       dlgNewPlan.importQuote())
 
     def copyPlan(self):
-        if self.activePlan is None:
-            self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot copy: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
+        if not self.checkActivePlan(self.tr('copy')):
             return
 
         dlgCopyPlan = DlgCopyPlan(self.activePlan)
@@ -698,9 +709,7 @@ class Redistricting:
             self.setActivePlan(plan)
 
     def importPlan(self):
-        if not self.activePlan:
-            self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot import: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
+        if not self.checkActivePlan(self.tr('import')):
             return
 
         dlgImportPlan = DlgImportPlan(self.activePlan)
@@ -719,9 +728,7 @@ class Redistricting:
             )
 
     def importShapefile(self):
-        if not self.activePlan:
-            self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot import: no active redistricting plan. Try creating a new plan."), level=Qgis.Warning)
+        if not self.checkActivePlan(self.tr('import')):
             return
 
         dlgImportPlan = DlgImportShape(self.activePlan)
@@ -741,9 +748,7 @@ class Redistricting:
             self.iface.messageBar().pushMessage(
                 "Success", f"Export of {plan.name} complete!", level=Qgis.Success)
 
-        if not self.activePlan:
-            self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot export: no active redistricting plan."), level=Qgis.Warning)
+        if not self.checkActivePlan(self.tr('export')):
             return
 
         dlgExportPlan = DlgExportPlan(self.activePlan)
@@ -761,12 +766,12 @@ class Redistricting:
                 export.export(self.startProgress(self.tr('Exporting redistricting plan...')))
 
     def editingStarted(self):
-        self.iface.actionCommitPlanChanges.setEnabled(True)
-        self.iface.actionRollbackPlanChanges.setEnabled(True)
+        self.actionCommitPlanChanges.setEnabled(True)
+        self.actionRollbackPlanChanges.setEnabled(True)
 
     def editingStopped(self):
-        self.iface.actionCommitPlanChanges.setEnabled(False)
-        self.iface.actionRollbackPlanChanges.setEnabled(False)
+        self.actionCommitPlanChanges.setEnabled(False)
+        self.actionRollbackPlanChanges.setEnabled(False)
 
     def planChanged(self, plan, prop, newValue, oldValue):
         self.project.setDirty()
@@ -796,13 +801,31 @@ class Redistricting:
         plan.planChanged.connect(self.planChanged)
         self.project.setDirty()
 
+    def removePlan(self, plan: RedistrictingPlan, removeLayers=True, deleteGpkg=False):
+        if plan in self.redistrictingPlans:
+            if plan == self.activePlan:
+                self.setActivePlan(None)
+            self.redistrictingPlans.remove(plan)
+
+            if removeLayers:
+                plan.removeGroup()
+                if deleteGpkg:
+                    path = plan.geoPackagePath
+            del plan
+            if removeLayers and deleteGpkg:
+                for i in glob(f'{path}*'):
+                    os.unlink(i)
+
+            self.project.setDirty()
+
     def clear(self):
         self.setActivePlan(None)
         self.redistrictingPlans.clear()
-        self.iface.actionNewPlan.setEnabled(
-            any(isinstance(layer, QgsVectorLayer)
-                for layer in self.project.mapLayers(True).values())
-        )
+        if not self.projectClosing:
+            self.actionNewPlan.setEnabled(
+                any(isinstance(layer, QgsVectorLayer)
+                    for layer in self.project.mapLayers(True).values())
+            )
 
     def setActivePlan(self, plan):
         if isinstance(plan, UUID):
@@ -842,9 +865,9 @@ class Redistricting:
                 self.activePlan.assignLayer.editingStopped.connect(
                     self.editingStopped)
 
-                self.iface.actionCommitPlanChanges.setEnabled(
+                self.actionCommitPlanChanges.setEnabled(
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
-                self.iface.actionRollbackPlanChanges.setEnabled(
+                self.actionRollbackPlanChanges.setEnabled(
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
             else:
                 if self.mapTool:
@@ -854,12 +877,12 @@ class Redistricting:
                             self.canvas, self.iface.activeLayer())
                     )
 
-            self.iface.actionStartPaintDistricts.setEnabled(
+            self.actionStartPaintDistricts.setEnabled(
                 self.activePlan is not None)
-            self.iface.actionEditPlan.setEnabled(self.activePlan is not None)
-            self.iface.actionImportAssignments.setEnabled(
+            self.actionEditPlan.setEnabled(self.activePlan is not None)
+            self.actionImportAssignments.setEnabled(
                 self.activePlan is not None)
-            self.iface.actionImportShapefile.setEnabled(
+            self.actionImportShapefile.setEnabled(
                 self.activePlan is not None)
-            self.iface.actionExportPlan.setEnabled(self.activePlan is not None)
-            self.iface.actionCopyPlan.setEnabled(self.activePlan is not None)
+            self.actionExportPlan.setEnabled(self.activePlan is not None)
+            self.actionCopyPlan.setEnabled(self.activePlan is not None)

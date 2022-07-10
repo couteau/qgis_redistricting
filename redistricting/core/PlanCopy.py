@@ -21,7 +21,7 @@ import shutil
 from typing import TYPE_CHECKING
 from contextlib import closing
 from copy import deepcopy
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.core import (
     Qgis,
     QgsFeedback,
@@ -34,13 +34,14 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanCopier:
+class PlanCopier(QObject):
     copyComplete = pyqtSignal('PyQt_PyObject')
 
     def __init__(
         self,
         sourcePlan: RedistrictingPlan
     ):
+        super().__init__(sourcePlan)
         self._plan = sourcePlan
         self._error = None
         self._errorLevel = None

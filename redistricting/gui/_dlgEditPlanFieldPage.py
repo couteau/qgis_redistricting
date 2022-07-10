@@ -18,7 +18,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import QModelIndex
 from qgis.PyQt.QtWidgets import QWizardPage
 from qgis.core import QgsApplication
 from ..core import DataField
@@ -43,7 +42,6 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
             QgsApplication.getThemeIcon('/mActionAdd.svg'))
         self.fexDataField.fieldChanged.connect(self.fieldChanged)
         self.btnAddField.clicked.connect(self.addField)
-        self.tblDataFields.clicked.connect(self.deleteField)
 
     def initializePage(self):
         super().initializePage()
@@ -75,7 +73,3 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
             return
 
         self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
-
-    def deleteField(self, index: QModelIndex):
-        if index.column() == 6:
-            self.fieldsModel.deleteField(index.row())

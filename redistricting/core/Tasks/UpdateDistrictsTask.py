@@ -76,7 +76,6 @@ class AggregateDistrictDataTask(QgsTask):
         self.useBuffer = useBuffer
 
         self.districts: Union[pd.DataFrame, gpd.GeoDataFrame] = None
-        self.assignments = None
         self.totalPop = 0
         self.cutEdges = []
         self.splits = {}
@@ -205,10 +204,10 @@ class AggregateDistrictDataTask(QgsTask):
                 df['geometry'] = df.geometry.apply(wkt.loads)
                 self.setProgress(99)
 
-                self.assignments: gpd.GeoDataFrame = gpd.GeoDataFrame(
+                gdf: gpd.GeoDataFrame = gpd.GeoDataFrame(
                     df, geometry='geometry', crs=crs.toWkt())
 
-                self.districts: gpd.GeoDataFrame = self.assignments.dissolve(
+                self.districts: gpd.GeoDataFrame = gdf.dissolve(
                     by=self.distField, aggfunc='sum')
                 self.setProgress(100)
 
@@ -231,7 +230,7 @@ class AggregateDistrictDataTask(QgsTask):
                     try:
                         from redistricting.vendor.gerrychain import Graph, Partition, updaters  # pylint: disable=import-outside-toplevel
 
-                        graph = Graph.from_geodataframe(self.assignments.to_crs('+proj=cea'), ignore_errors=True)
+                        graph = Graph.from_geodataframe(gdf.to_crs('+proj=cea'), ignore_errors=True)
                         partition = Partition(
                             graph,
                             assignment=self.distField,
@@ -243,7 +242,6 @@ class AggregateDistrictDataTask(QgsTask):
                 else:
                     self.cutEdges = []
             else:
-                self.assignments = df
                 self.districts = df.groupby(by=self.distField).sum()
                 self.cutEdges = []
 
@@ -270,12 +268,11 @@ class AggregateDistrictDataTask(QgsTask):
         if not result:
             return
 
-        name = pd.Series(
-            {d.district: d.name for d in self.distList if d.district in self.districts.index},
-            index=None, name='name', dtype=str
-        )
-        name.fillna(str(name.index))
+        name = [self.distList[d].name if d in self.distList else str(d) for d in self.districts.index]
         self.districts.insert(0, 'name', name)
+
+        members = [self.distList[d].members if d in self.distList else 1 for d in self.districts.index]
+        self.districts.insert(1, 'members', members)
 
         with closing(spatialite_connect(self.geoPackagePath)) as db:
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districts.columns)}

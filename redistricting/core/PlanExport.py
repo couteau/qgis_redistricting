@@ -18,7 +18,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.PyQt.QtWidgets import QProgressDialog
 from qgis.core import (
     Qgis,
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanExporter:
+class PlanExporter(QObject):
     exportComplete = pyqtSignal()
     exportTerminated = pyqtSignal()
 
@@ -46,6 +46,7 @@ class PlanExporter:
         includeDemographics=False,
         includeMetrics=False
     ):
+        super().__init__(plan)
         self._plan = plan
         self.equivalencyFile = equivalencyFile
         self.shapeFile = shapeFile

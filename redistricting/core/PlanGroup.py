@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - plan style manager
+"""QGIS Redistricting Plugin - manage layer group for redistrictin plan
 
          begin                : 2022-05-31
          git sha              : $Format:%H$
@@ -46,15 +46,15 @@ class PlanGroup:
         if not self._group:
             self.createGroup()
 
-        if self._plan.assignLayer:
+        if self._plan.assignLayer and not self._group.findLayer(self._plan.assignLayer):
             self._group.addLayer(self._plan.assignLayer)
-        if self._plan.distLayer:
+        if self._plan.distLayer and not self._group.findLayer(self._plan.distLayer):
             self._group.addLayer(self._plan.distLayer)
 
     def findGroup(self) -> QgsLayerTreeGroup:
         if self._plan.id:
             for g in QgsProject.instance().layerTreeRoot().children():
-                if g.customProperty('plan-id', None) == str(self._plan.id):
+                if g.customProperty('redistricting-plan-id', None) == str(self._plan.id):
                     return g
 
         return None
@@ -65,6 +65,5 @@ class PlanGroup:
 
     def createGroup(self) -> QgsLayerTreeGroup:
         self._group = QgsLayerTreeGroup(self.groupName)
-        self._group.setCustomProperty('plan-id', str(self._plan.id))
-        self.updateLayers()
+        self._group.setCustomProperty('redistricting-plan-id', str(self._plan.id))
         QgsProject.instance().layerTreeRoot().addChildNode(self._group)

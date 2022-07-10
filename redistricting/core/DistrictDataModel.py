@@ -135,7 +135,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if role in (Qt.DisplayRole, Qt.EditRole):
-            self._districts.update()
+            self._districts.updateDistricts()
 
             row = index.row()
             column = index.column()
@@ -159,7 +159,7 @@ class DistrictDataModel(QAbstractTableModel):
             return value
 
         if role == Qt.BackgroundRole:
-            self._districts.update()
+            self._districts.updateDistricts()
 
             brush = QVariant()
             row = index.row()

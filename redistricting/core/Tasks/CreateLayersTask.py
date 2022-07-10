@@ -17,7 +17,6 @@
 """
 from __future__ import annotations
 
-import os
 from typing import List, TYPE_CHECKING
 from contextlib import closing
 from qgis.PyQt.QtCore import QVariant
@@ -52,10 +51,10 @@ class CreatePlanLayersTask(QgsTask):
 
         self.geoIdField = plan.geoIdField
         self.distField = plan.distField
-        self.geoFields: List[Field] = plan.geoFields
+        self.geoFields: List[Field] = list(plan.geoFields)
 
         self.popLayer = plan.popLayer
-        self.dataFields: List[DataField] = plan.dataFields
+        self.dataFields: List[DataField] = list(plan.dataFields)
         self.popField = plan.popField
         self.vapField = plan.vapField
         self.cvapField = plan.cvapField
@@ -64,13 +63,14 @@ class CreatePlanLayersTask(QgsTask):
 
     def _createDistLayer(self, gpkgPath):
         l = QgsVectorLayer(
-            f'MultiPolygon?crs={self._sourceLayer.sourceCrs().authid()}&index=yes', 'districts', 'memory'
+            f'MultiPolygon?crs={self.srcLayer.sourceCrs().authid()}&index=yes', 'districts', 'memory'
         )
         provider = l.dataProvider()
 
         fields = [
             QgsField(self.distField, QVariant.Int, 'SMALLINT'),
             QgsField('name', QVariant.String, 'VARCHAR', 127),
+            QgsField('members', QVariant.Int, 'SMALLINT'),
             QgsField(self.popLayer.fields().field(self.popField))
         ]
 
@@ -88,7 +88,7 @@ class CreatePlanLayersTask(QgsTask):
                 context.setFeature(next(self.popLayer.getFeatures()))
 
             qf = f.makeQgsField(context)
-            if qf is None:
+            if qf is None:  # pragma: no cover
                 continue
             fields.append(qf)
 
@@ -104,17 +104,11 @@ class CreatePlanLayersTask(QgsTask):
         saveOptions = QgsVectorFileWriter.SaveVectorOptions()
         saveOptions.layerName = 'districts'
         saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
+        saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
 
-        # notwithstanding the name of the parameter, actionOnExisting file is not
-        # the action to take IF the file exists; it assumes the file exists, so
-        # you have to check that yourself or you'll get an error
-        if not os.path.exists(gpkgPath):
-            saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
-        else:
-            saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-        transformContext = QgsProject.instance().transformContext()
         error = QgsVectorFileWriter.writeAsVectorFormatV2(
-            l, gpkgPath, transformContext, saveOptions)
+            l, gpkgPath, QgsProject.instance().transformContext(), saveOptions
+        )
 
         if error[0] != QgsVectorFileWriter.NoError:
             self.exception = RdsException(
@@ -143,17 +137,14 @@ class CreatePlanLayersTask(QgsTask):
                 qf = field.makeQgsField(context)
                 if qf is not None:
                     fields.append(qf)
-                else:
-                    self.exception = Exception(field.error())
+                else:  # this should never happen - errors should be caught when field is created
+                    self.exception = RdsException(field.error())
+                    return False
 
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()
             saveOptions.layerName = 'assignments'
             saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
-
-            if not os.path.exists(self.path):
-                saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
-            else:
-                saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+            saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
 
             writer = QgsVectorFileWriter.create(
                 self.path,
@@ -185,7 +176,6 @@ class CreatePlanLayersTask(QgsTask):
         except CancelledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
-            print(e)
             self.exception = e
             return False
 

@@ -50,7 +50,7 @@ class DeltaList(QObject):
         self._pendingTask = None
 
     def __getitem__(self, index) -> Delta:
-        if self._districts.update():
+        if self._districts.updateDistricts():
             return None
 
         if isinstance(index, str) and index.isnumeric():
@@ -114,7 +114,7 @@ class DeltaList(QObject):
             return None
 
         self.updating.emit(self._plan)
-        self._pendingTask = AggregatePendingChangesTask(self._plan, self._districts.update())
+        self._pendingTask = AggregatePendingChangesTask(self._plan, self._districts.updateDistricts())
         self._pendingTask.taskCompleted.connect(taskCompleted)
         self._pendingTask.taskTerminated.connect(taskTerminated)
         QgsApplication.taskManager().addTask(self._pendingTask)

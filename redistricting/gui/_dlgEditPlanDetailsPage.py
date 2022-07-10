@@ -51,6 +51,7 @@ class dlgEditPlanDetailsPage(Ui_wzpPlanDetails, QWizardPage):
         self.inpPlanName.setFocus()
         if not self.wizard().new:
             self.fileGpkg.setEnabled(False)
+        self.setFinalPage(self.wizard().isComplete())
 
     def planNameChanged(self):
         if self.inpPlanName.text() and not self.fileGpkg.path and QgsProject.instance().absolutePath() != ' ':
