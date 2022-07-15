@@ -33,7 +33,7 @@ from .DistrictDataTable import DockDistrictDataTable
 from .DistrictTools import DockRedistrictingToolbox
 from .PendingChanges import DockPendingChanges
 
-from .PaintDistrictsTool import PaintDistrictsTool
+from .PaintDistrictsTool import PaintDistrictsTool, PaintMode
 
 __all__ = [
     'DlgEditPlan',
@@ -47,5 +47,6 @@ __all__ = [
     'DockRedistrictingToolbox',
     'DockDistrictDataTable',
     'DockPendingChanges',
-    'PaintDistrictsTool'
+    'PaintDistrictsTool',
+    'PaintMode'
 ]

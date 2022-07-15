@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '/Users/stuart/Source/redistricting/redistricting/ui/DistrictTools.ui'
+# Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/DistrictTools.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.3
 #
@@ -42,6 +42,10 @@ class Ui_qdwDistrictTools(object):
         self.btnAssign.setAutoRaise(True)
         self.btnAssign.setObjectName("btnAssign")
         self.horizontalLayout_2.addWidget(self.btnAssign)
+        self.btnSelectByGeography = QtWidgets.QToolButton(self.frame)
+        self.btnSelectByGeography.setAutoRaise(True)
+        self.btnSelectByGeography.setObjectName("btnSelectByGeography")
+        self.horizontalLayout_2.addWidget(self.btnSelectByGeography)
         self.btnCommitUpdate = QtWidgets.QToolButton(self.frame)
         self.btnCommitUpdate.setAutoRaise(True)
         self.btnCommitUpdate.setObjectName("btnCommitUpdate")
@@ -139,6 +143,7 @@ class Ui_qdwDistrictTools(object):
         _translate = QtCore.QCoreApplication.translate
         qdwDistrictTools.setWindowTitle(_translate("qdwDistrictTools", "QGIS Redistricting - Paint Districts"))
         self.btnAssign.setText(_translate("qdwDistrictTools", "..."))
+        self.btnSelectByGeography.setText(_translate("qdwDistrictTools", "..."))
         self.btnCommitUpdate.setText(_translate("qdwDistrictTools", "..."))
         self.btnRollbackUpdate.setText(_translate("qdwDistrictTools", "..."))
         self.btnUndo.setText(_translate("qdwDistrictTools", "..."))

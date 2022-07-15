@@ -20,7 +20,7 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, Union, Sized
+from typing import TYPE_CHECKING, Dict, List, Union, Sized
 from qgis.PyQt.QtCore import QVariant, QObject, pyqtSignal
 from qgis.core import (
     Qgis,
@@ -45,6 +45,9 @@ class PlanAssignmentEditor(QObject):
         super().__init__(parent)
         self._plan = plan
         self._assignLayer = plan.assignLayer
+        if self._assignLayer:
+            self._assignLayer.afterCommitChanges.connect(self.commitChanges)
+            self._assignLayer.afterRollBack.connect(self.rollback)
         self._distField = plan._distField
         self._error = None
         self._errorLevel: Qgis.MessageLevel = 0
@@ -62,7 +65,7 @@ class PlanAssignmentEditor(QObject):
     def _clearError(self):
         self._error = None
 
-    def getDistFeatures(self, field, value, sourceDistrict=None):
+    def getDistFeatures(self, field, value: Union[List[str], str], targetDistrict=None, sourceDistrict=None):
         self._clearError()
 
         if not self._assignLayer:
@@ -76,12 +79,21 @@ class PlanAssignmentEditor(QObject):
         context.appendScopes(
             QgsExpressionContextUtils.globalProjectLayerScopes(self._assignLayer))
         request = QgsFeatureRequest()
-        if f.type() == QVariant.String:
-            flt = f"{field} = '{value}'"
-        else:
-            flt = f'{field} = {value}'
+        if isinstance(value, str):
+            value = [value]
 
-        if not sourceDistrict is None:
+        if f.type() == QVariant.String:
+            flt = ' and '.join(f"{field} = '{v}'" for v in value)
+        else:
+            flt = ' and '.join(f'{field} = {v}' for v in value)
+
+        if targetDistrict is not None:
+            if targetDistrict == 0:
+                flt += f' and ({self._distField} is not null and {self._distField} != 0)'
+            else:
+                flt += f' and {self._distField} != {targetDistrict}'
+
+        if sourceDistrict is not None:
             if sourceDistrict == 0:
                 flt += f' and ({self._distField} = 0 or {self._distField} is null)'
             else:
@@ -121,14 +133,9 @@ class PlanAssignmentEditor(QObject):
 
             if isinstance(features, Sized):
                 count = len(features)
-                descrip = tr('Assign %d feature(s) to district %s') % (
-                    count, str(district))
             else:
                 count = 0
-                descrip = tr('Assign features to district %s') % (
-                    str(district))
 
-            self._assignLayer.beginEditCommand(descrip)
             i = 0
             for f in features:
                 self._assignLayer.changeAttributeValue(
@@ -140,8 +147,6 @@ class PlanAssignmentEditor(QObject):
                     progress = i
                 if feedback:
                     feedback.setProgress(progress)
-
-            self._assignLayer.endEditCommand()
         except:
             self._assignLayer.destroyEditCommand()
             # only delete the buffer on error if we were not already in a transaction --
@@ -156,9 +161,7 @@ class PlanAssignmentEditor(QObject):
         self._changed()
 
     def commitChanges(self):
-        self._assignLayer.commitChanges(True)
         self._changed()
 
     def rollback(self):
-        self._assignLayer.rollBack(True)
         self._changed()

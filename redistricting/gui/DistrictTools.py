@@ -27,7 +27,6 @@ from qgis.PyQt.QtGui import QPixmap, QIcon, QColor
 from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtCore import Qt, QObject, QVariant, pyqtSignal, QAbstractListModel, QModelIndex
 from qgis.core import QgsApplication, QgsFieldModel
-from qgis.gui import QgisInterface
 from .ui.DistrictTools import Ui_qdwDistrictTools
 from ..core import BaseDistrict, RedistrictingPlan, GeoFieldsModel, tr
 
@@ -52,7 +51,7 @@ class DistrictSelectModel(QAbstractListModel):
             self.beginInsertRows(QModelIndex(), i+self._offset, i+self._offset)
             self.endInsertRows()
 
-    def districtNameChanged(self, newValue, oldValue):
+    def districtNameChanged(self, newValue, oldValue):  # pylint: disable=unused-argument
         self.dataChanged.emit(
             self.createIndex(self._offset + 1, 0),
             self.createIndex(self._plan.allocatedDistricts + self._offset, 0),
@@ -60,19 +59,19 @@ class DistrictSelectModel(QAbstractListModel):
         )
 
     def indexFromDistrict(self, district):
-        if district in self._plan.districts.items:
-            i = self._plan.districts.items.index(district)
+        if district in self._plan.districts:
+            i = self._plan.districts.index(district)
             return 1 if i == 0 else i + self._offset
 
         return 0
 
-    def rowCount(self, parent: QModelIndex):
+    def rowCount(self, parent: QModelIndex):  # pylint: disable=unused-argument
         return self._offset if self._plan.allocatedDistricts == 0 else self._plan.allocatedDistricts + self._offset + 1
 
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role == Qt.DisplayRole or role == Qt.EditRole:
+        if role in {Qt.DisplayRole, Qt.EditRole}:
             if row == 0:
                 return tr('All')
             if row == 1:

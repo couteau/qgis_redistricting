@@ -1,0 +1,25 @@
+/* XPM */
+static char *paintbrush[] = {
+/* columns rows colors chars-per-pixel */
+"16 16 3 1 ",
+"  c None",
+". c black",
+"X c white",
+/* pixels */
+"         X.X    ",
+"         X..X   ",
+"        X....X  ",
+"        X.....X ",
+"       X.......X",
+"       X.....XX ",
+"       X.....X  ",
+"     XXXX...X   ",
+"    X...XXXX    ",
+"    X....X      ",
+"   X.....X      ",
+"   X.....X      ",
+"  X.....X       ",
+" XX....X        ",
+"X....XX         ",
+"XXXXX           "
+};
