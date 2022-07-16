@@ -19,8 +19,7 @@ from enum import IntEnum
 from typing import Iterable, List
 
 from qgis.gui import QgsMapCanvas, QgsMapMouseEvent, QgsMapToolIdentify, QgsRubberBand
-from qgis.core import QgsFeature, QgsFeedback, QgsWkbTypes, QgsGeometry, QgsVectorLayer
-from qgis.utils import iface
+from qgis.core import QgsFeature, QgsWkbTypes, QgsGeometry, QgsVectorLayer
 from qgis.PyQt.QtCore import Qt, QRect
 from qgis.PyQt.QtGui import QKeyEvent, QCursor, QPixmap, QColor
 from redistricting.core import RedistrictingPlan, PlanAssignmentEditor, tr
@@ -175,7 +174,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._assignmentEditor = None
             self._geoField = None
             self._distTarget = None
-            self._distSource = 0
+            self._distSource = None
 
     @ property
     def targetDistrict(self):
@@ -198,24 +197,14 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._paintMode = value
 
     def _paintFeature(self, features: Iterable[QgsFeature]):
-        if self._geoField is None or self._geoField == self._plan.geoIdField:
-            features = {feature.id(): feature for feature in features}
-        else:
+        if self._geoField is not None and self._geoField != self._plan.geoIdField:
             values = {str(feature.attribute(self._geoField)) for feature in features}
             features = self._assignmentEditor.getDistFeatures(
                 self._geoField, values, self._distTarget, self._distSource)
 
-        feedback = QgsFeedback()
-        feedback.progressChanged.connect(
-            lambda p: iface.statusBarIface().showMessage(
-                f'painted {p} {self._plan.geoDisplay.lower()}s'
-            )
-        )
-
         self._assignmentEditor.assignFeaturesToDistrict(
-            features, self._distTarget, self._distSource, feedback)
+            features, self._distTarget, self._distSource)
         self._layer.triggerRepaint()
-        self.canvas().refresh()
 
     def _selectFeatures(
         self,
@@ -231,16 +220,15 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     def canvasPressEvent(self, e: QgsMapMouseEvent):
         if self._layer is None or \
-                self._distSource is None or \
                 self._distTarget is None:
             return
 
-        if e.buttons() & Qt.LeftButton == 0:
+        if e.buttons() & Qt.LeftButton == Qt.NoButton:
             return
 
         if self._paintMode == PaintMode.PaintByGeography:
             r = self.searchRadiusMU(self.canvas())
-            self.setCanvasPropertiesOverrides(r/2)
+            self.setCanvasPropertiesOverrides(r/4)
             self._layer.beginEditCommand(tr('Assign features to district {}').format(
                 str(self.targetDistrict)))
         elif self._paintMode == PaintMode.SelectByGeography:
@@ -248,11 +236,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     def canvasReleaseEvent(self, e: QgsMapMouseEvent):
         if self._layer is None or \
-                self._distSource is None or \
                 self._distTarget is None:
             return
 
-        if e.buttons() & Qt.LeftButton == 0:
+        if e.button() != Qt.LeftButton:
             return
 
         self.restoreCanvasPropertiesOverrides()
@@ -287,7 +274,6 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     def canvasMoveEvent(self, e: QgsMapMouseEvent):
         if self._layer is None or \
-                self._distSource is None or \
                 self._distTarget is None:
             return
 
@@ -318,7 +304,6 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     def canActivate(self):
         return self._layer is not None and \
-            self._distSource is not None and \
             self._distTarget is not None
 
     def activate(self):
@@ -330,6 +315,8 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         return super().deactivate()
 
     def setGeoField(self, value):
+        if value != self._plan.geoIdField and self._plan.geoFields and value not in self._plan.geoFields:
+            raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
         self._geoField = value
 
     def setSourceDistrict(self, value):

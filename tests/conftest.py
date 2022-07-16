@@ -18,7 +18,7 @@ def datadir(tmp_path: pathlib.Path):
     s = pathlib.Path(__file__).parent / 'data'
     shutil.copytree(s, d)
     yield d
-    shutil.rmtree(tmp_path)
+    shutil.rmtree(tmp_path, ignore_errors=True)
 
 
 @pytest.fixture

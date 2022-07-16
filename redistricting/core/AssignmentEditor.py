@@ -20,16 +20,14 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Dict, List, Union, Sized
+from typing import TYPE_CHECKING, Iterable, Union
 from qgis.PyQt.QtCore import QVariant, QObject, pyqtSignal
 from qgis.core import (
     Qgis,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
-    QgsFeatureIterator,
     QgsFeatureRequest,
-    QgsFeedback,
     QgsMessageLog,
 )
 
@@ -65,7 +63,7 @@ class PlanAssignmentEditor(QObject):
     def _clearError(self):
         self._error = None
 
-    def getDistFeatures(self, field, value: Union[List[str], str], targetDistrict=None, sourceDistrict=None):
+    def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
         self._clearError()
 
         if not self._assignLayer:
@@ -107,10 +105,9 @@ class PlanAssignmentEditor(QObject):
 
     def assignFeaturesToDistrict(
         self,
-        features: Union[QgsFeatureIterator, Dict[int, QgsFeature]],
+        features: Iterable[QgsFeature],
         district,
-        oldDistrict=None,
-        feedback: QgsFeedback = None
+        oldDistrict=None
     ):
         self._clearError()
 
@@ -128,27 +125,10 @@ class PlanAssignmentEditor(QObject):
             self._assignLayer.undoStack()
 
         try:
-            if isinstance(features, QgsFeatureIterator):
-                features = {f.id(): f for f in features}
-
-            if isinstance(features, Sized):
-                count = len(features)
-            else:
-                count = 0
-
-            i = 0
             for f in features:
                 self._assignLayer.changeAttributeValue(
-                    f, fieldIndex, district, oldDistrict)
-                i += 1
-                if count:
-                    progress = 100 * (i+1) / float(count)
-                else:
-                    progress = i
-                if feedback:
-                    feedback.setProgress(progress)
+                    f.id(), fieldIndex, district, oldDistrict)
         except:
-            self._assignLayer.destroyEditCommand()
             # only delete the buffer on error if we were not already in a transaction --
             # otherwise we may discard prior, successful updates
             self._assignLayer.rollBack(not inTransaction)
