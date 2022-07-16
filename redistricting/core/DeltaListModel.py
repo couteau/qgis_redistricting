@@ -152,16 +152,20 @@ class DeltaListModel(QAbstractTableModel):
 
             if role in {Qt.DisplayRole, Qt.EditRole}:
                 dist = self._delta[col]
-                value = dist[self._fields[row]['name']]
-                return self._fields[row]['format'].format(value) if value is not None else None
+                if dist is not None:
+                    value = dist[self._fields[row]['name']]
+                    return self._fields[row]['format'].format(value) if value is not None else None
 
         return QVariant()
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
         if self._delta:
             if role == Qt.DisplayRole:
-                return self._delta[section].name if orientation == Qt.Horizontal \
-                    else self._fields[section]['caption']
+                if orientation == Qt.Horizontal:
+                    if self._delta[section] is not None:
+                        return self._delta[section].name
+                else:
+                    return self._fields[section]['caption']
             if role == Qt.TextAlignmentRole:
                 return int(Qt.AlignVCenter | Qt.AlignRight) if orientation == Qt.Vertical else int(Qt.AlignCenter)
 

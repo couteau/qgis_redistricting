@@ -36,7 +36,7 @@ class Delta:  # pylint: disable=too-few-public-methods
     def __getitem__(self, key):
         return self.__getattr__(key)
 
-    def __getattr__(self, key):
+    def __getattr__(self, key: str):
         if key in ('name', 'district'):
             return getattr(self._district, key)
 
@@ -46,15 +46,18 @@ class Delta:  # pylint: disable=too-few-public-methods
         if key in self._delta:
             return self._delta[key]
 
-        if key == 'deviation' or key[4:] == 'deviation':
+        if key.endswith('deviation'):
             dev = self._district.deviation
             if dev is not None and self._plan.popField in self._delta:
                 dev += self._delta[self._plan.popField]
-                value = dev if key == 'deviation' else dev/self._district.ideal
+                value = dev if key == 'deviation' \
+                    else dev/self._district.ideal \
+                    if self._district.ideal \
+                    else None
             else:
                 value = None
         else:
-            if key[:4] in ('new_', 'pct_'):
+            if key.startswith(('new_', 'pct_')):
                 attr = key[4:]
             else:
                 raise AttributeError()
@@ -64,7 +67,7 @@ class Delta:  # pylint: disable=too-few-public-methods
                 if attr in self._delta:
                     value += self._delta[attr]
 
-                if key[:4] == 'pct_':
+                if key.startswith('pct_'):
                     f = self._plan.dataFields[attr]
                     totalField = self._district.baseField(f)
                     if totalField and totalField in self._delta:

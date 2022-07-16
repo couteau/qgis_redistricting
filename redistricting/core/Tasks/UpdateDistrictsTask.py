@@ -271,7 +271,7 @@ class AggregateDistrictDataTask(QgsTask):
         name = [self.distList[d].name if d in self.distList else str(d) for d in self.districts.index]
         self.districts.insert(0, 'name', name)
 
-        members = [self.distList[d].members if d in self.distList else 1 for d in self.districts.index]
+        members = [0 if d == 0 else self.distList[d].members if d in self.distList else 1 for d in self.districts.index]
         self.districts.insert(1, 'members', members)
 
         with closing(spatialite_connect(self.geoPackagePath)) as db:

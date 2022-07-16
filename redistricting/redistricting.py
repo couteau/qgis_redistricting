@@ -19,33 +19,42 @@
  *                                                                         *
  ***************************************************************************/
 """
-import os
+import pathlib
 from typing import List
-from glob import glob
 from uuid import UUID
 from qgis.core import (
     Qgis,
     QgsApplication,
     QgsProject,
-    QgsFeature,
     QgsField,
     QgsReadWriteContext,
-    QgsMessageLog,
-    QgsVectorLayer,
-    QgsFeedback
+    QgsVectorLayer
 )
-from qgis.gui import QgisInterface, QgsMapTool, QgsMapToolIdentifyFeature
+from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTranslator, QSettings
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QDialog, QAction, QToolBar, QMenu, QToolButton, QProgressDialog
 from qgis.PyQt.QtXml import QDomDocument
 
-from .resources import *
-from .gui import *
+from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from .gui import (
+    DlgConfirmDelete,
+    DlgCopyPlan,
+    DlgEditPlan,
+    DlgExportPlan,
+    DlgImportPlan,
+    DlgImportShape,
+    DlgNewDistrict,
+    DlgSelectPlan,
+    DockRedistrictingToolbox,
+    DockDistrictDataTable,
+    DockPendingChanges,
+    PaintDistrictsTool,
+    PaintMode
+)
 from .core import (
     ProjectStorage,
     RedistrictingPlan,
-    PlanAssignmentEditor,
     PlanStyler,
     PlanExporter,
     PlanImporter,
@@ -54,16 +63,10 @@ from .core import (
 
 
 class Redistricting:
+    """QGIS Redistricting Plugin"""
+
     def __init__(self, iface: QgisInterface):
-        """Constructor.
-
-        :param iface: An interface instance that will be passed to this class
-            which provides the hook by which you can manipulate the QGIS
-            application at run time.
-        :type iface: QgsInterface
-        """
-
-        # Declare instance attributes
+        self.name = self.__class__.__name__
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
 
@@ -73,65 +76,44 @@ class Redistricting:
 
         self.redistrictingPlans: List[RedistrictingPlan] = []
         self.activePlan: RedistrictingPlan = None
+
         self.distSource = None
         self.distTarget = None
-        self.geoSelectField: QgsField = None
+        self.paintGeoField: QgsField = None
+
         self.dockwidget: DockRedistrictingToolbox = None
         self.dataTableWidget: DockDistrictDataTable = None
         self.pendingChangesWidget: DockPendingChanges = None
-        self.mapTool: QgsMapTool = None
-
-        self.name = self.__class__.__name__
+        self.mapTool: PaintDistrictsTool = None
 
         # initialize plugin directory
-        self.pluginDir = os.path.dirname(__file__)
+        self.pluginDir = pathlib.Path(__file__).parent
 
         if not hasattr(Qgis, 'UserCanceled'):
-            Qgis.UserCanceled = Qgis.Success + 1
+            Qgis.UserCanceled = Qgis.Success + 0x100
 
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]
-        localePath = os.path.join(
-            self.pluginDir,
-            'i18n',
-            '{}_{}.qm'.format(self.name, locale))
+        localePath = self.pluginDir / 'i18n' / f'{self.name}_{locale}.qm'
 
-        if os.path.exists(localePath):
+        if localePath.exists():
             self.translator = QTranslator()
-            self.translator.load(localePath)
+            self.translator.load(str(localePath))
             QCoreApplication.installTranslator(self.translator)
 
         self.actions = []
-        self.menuName = self.tr(u'&Redistricting')
+        self.menuName = self.tr('&Redistricting')
         self.icon = QIcon(':/plugins/redistricting/icon.png')
-        self.menu = QMenu(self.menuName, self.iface.mainWindow())
-        self.menu.setIcon(self.icon)
-        self.toolbar: QToolBar = self.iface.addToolBar(self.name)
-        self.toolbar.setObjectName(self.name)
 
-        self.menuButton = QToolButton(self.iface.mainWindow())
-        self.menuButton.setMenu(self.menu)
-        self.menuButton.setPopupMode(QToolButton.MenuButtonPopup)
-        self.menuButton.setIcon(self.icon)
-        self.menuButton.setToolTip(self.tr('Redistricting Utilities'))
-
-        self.toolBtnAction = self.toolbar.addWidget(self.menuButton)
-        m: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
-        m.addMenu(self.menuButton.menu())
+        self.menu = None
+        self.toolbar = None
+        self.menuButton = None
+        self.toolBtnAction = None
 
         self.dlg = None
-        self.assignmentEditor = None
 
     @staticmethod
     def tr(message):
-        """Get the translation for a string using Qt translation API.
-
-        :param message: String for translation.
-        :type message: str, QString
-
-        :returns: Translated version of message.
-        :rtype: QString
-        """
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
         return QCoreApplication.translate('redistricting', message)
 
@@ -145,48 +127,7 @@ class Redistricting:
             addToToolbar=False,
             addToToolbarMenu=False,
             statusTip=None,
-            whatsThis=None,
             parent=None) -> QAction:
-        """Add a toolbar icon to the toolbar.
-
-        :param iconPath: Path to the icon for this action or an instance of QIcon.
-            Can be a resource path (e.g. ':/plugins/foo/bar.png') or a normal file
-            system path.
-        :type iconPath: str | QIcon
-
-        :param text: Text that should be shown in menu items for this action.
-        :type text: str
-
-        :param callback: Function to be called when the action is triggered or a QAction instance.
-        :type callback: function | QAction
-
-        :param enabledFlag: A flag indicating if the action should be enabled
-            by default. Defaults to True.
-        :type enabledFlag: bool
-
-        :param addToMenu: Flag indicating whether the action should also
-            be added to the menu. Defaults to True.
-        :type addToMenu: bool
-
-        :param addToToolbar: Flag indicating whether the action should also
-            be added to the toolbar. Defaults to True.
-        :type addToToolbar: bool
-
-        :param statusTip: Optional text to show in a popup when mouse pointer
-            hovers over the action.
-        :type statusTip: str
-
-        :param whatsThis: Optional text to show in the status bar when the
-            mouse pointer hovers over the action.
-        :type whatsThis: str
-
-        :param parent: Parent widget for the new action. Defaults None.
-        :type parent: QWidget
-
-        :returns: The action that was created. Note that the action is also
-            added to self.actions list.
-        :rtype: QAction
-        """
 
         if isinstance(iconPath, QIcon):
             icon = iconPath
@@ -207,9 +148,6 @@ class Redistricting:
         if statusTip is not None:
             action.setStatusTip(statusTip)
 
-        if whatsThis is not None:
-            action.setWhatsThis(whatsThis)
-
         if addToToolbar:
             self.toolbar.addAction(action)
 
@@ -229,33 +167,56 @@ class Redistricting:
         if not self.projectSignalsConnected:
             self.project.readProjectWithContext.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
-            self.project.layersAdded.connect(self.onLayersAdded)
-            self.project.layersRemoved.connect(self.onLayersRemoved)
-            # layersWillBeRemoved signal is triggered when a project is closed or when
-            # the user removes a layer, and there seems to be no way to disinguish. We
-            # use a flag set in the signal handler for removeAll (the closest thing to
-            # a 'project closed' signal QGIS seems to have) to ignore this signal when
-            # triggered in the context of a project closing
+            # there is no signal that gets triggered before a project
+            # is closed, but removeAll comes close
+            self.project.removeAll.connect(self.onProjectClosing)
+
+            # layersWillBeRemoved signal is triggered when a project is
+            # closed or when the user removes a layer, and there seems
+            # to be no way to disinguish. We use a flag set in the
+            # signal handler for the project cleared signal (the closest
+            # thing to a 'project closed' signal QGIS seems to have) to
+            # ignore this signal when triggered in the context of a
+            # project closing
             self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
-            # QGIS inexplicably has no signal for when a project is closed, but removeAll
-            # seems to come close
-            self.project.removeAll.connect(self.onCloseProject)
+
+            self.project.layersAdded.connect(self.onUpdateNewPlanAction)
+            self.project.layersRemoved.connect(self.onUpdateNewPlanAction)
+
             self.projectSignalsConnected = True
 
+        self.menu = QMenu(self.menuName, self.iface.mainWindow())
+        self.menu.setIcon(self.icon)
+
+        self.toolbar: QToolBar = self.iface.addToolBar(self.name)
+        self.toolbar.setObjectName(self.name)
+
+        self.menuButton = QToolButton(self.iface.mainWindow())
+        self.menuButton.setMenu(self.menu)
+        self.menuButton.setPopupMode(QToolButton.MenuButtonPopup)
+        self.menuButton.setIcon(self.icon)
+        self.menuButton.setToolTip(self.tr('Redistricting Utilities'))
+
+        self.toolBtnAction = self.toolbar.addWidget(self.menuButton)
+        m: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
+        m.addMenu(self.menuButton.menu())
+
+        # pylint: disable=attribute-defined-outside-init
         self.actionShowPlanManager = self.addAction(
             ':/plugins/redistricting/planmanager.svg',
-            self.tr(u'Plan Manager'),
+            self.tr('Plan Manager'),
             addToToolbarMenu=True,
             callback=self.showPlanManager,
             parent=self.iface.mainWindow()
         )
         self.menuButton.clicked.connect(
-            lambda: self.actionShowPlanManager.trigger())
+            lambda: self.actionShowPlanManager.trigger()  # pylint: disable=unnecessary-lambda
+        )
 
         self.actionNewPlan = self.addAction(
             ':/plugins/redistricting/addplan.svg',
-            text=self.tr(u'New Redistricting Plan'),
-            statusTip=self.tr(u'Create a new redistricting plan'),
+            text=self.tr('New Redistricting Plan'),
+            statusTip=self.tr('Create a new redistricting plan'),
             addToToolbarMenu=True,
             enabledFlag=False,
             callback=self.newPlan,
@@ -264,9 +225,9 @@ class Redistricting:
 
         self.actionCopyPlan = self.addAction(
             ':/plugins/redistricting/copyplan.svg',
-            text=self.tr(u'Copy Plan'),
+            text=self.tr('Copy Plan'),
             statusTip=self.tr(
-                u'Copy the active plan to a new redistricting plan'),
+                'Copy the active plan to a new redistricting plan'),
             addToToolbarMenu=True,
             enabledFlag=False,
             callback=self.copyPlan,
@@ -275,7 +236,7 @@ class Redistricting:
 
         self.actionEditPlan = self.addAction(
             ':/plugins/redistricting/icon.png',
-            self.tr(u'Edit Plan'),
+            self.tr('Edit Plan'),
             callback=self.editPlan,
             parent=self.iface.mainWindow()
         )
@@ -309,19 +270,28 @@ class Redistricting:
             callback=self.exportPlan,
             parent=self.iface.mainWindow()
         )
+
         self.actionStartPaintDistricts = self.addAction(
-            ':/plugins/redistricting/paintdistricts.svg',
-            self.tr(u'Paint districts'),
+            ':/plugins/redistricting/paintpalette.svg',
+            self.tr('Paint districts'),
             callback=self.startPaintDistricts,
+            enabledFlag=False,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionSelectByGeography = self.addAction(
+            QgsApplication.getThemeIcon('/mActionSelectFreehand.svg'),
+            text=self.tr('Select by geography units'),
+            callback=self.selectByGeography,
             enabledFlag=False,
             parent=self.iface.mainWindow()
         )
 
         self.actionCommitPlanChanges = self.addAction(
             QgsApplication.getThemeIcon('/mActionSaveAllEdits.svg'),
-            text=self.tr(u'Commit changes'),
+            text=self.tr('Commit changes'),
             statusTip=self.tr(
-                u'Save all districting changes to the underlying layer'),
+                'Save all districting changes to the underlying layer'),
             callback=self.onCommitChanges,
             enabledFlag=False,
             parent=self.iface.mainWindow()
@@ -329,13 +299,16 @@ class Redistricting:
 
         self.actionRollbackPlanChanges = self.addAction(
             QgsApplication.getThemeIcon('/mActionCancelEdits.svg'),
-            text=self.tr(u'Rollback changes'),
+            text=self.tr('Rollback changes'),
             statusTip=self.tr(
-                u'Discard all unsaved districting changes'),
+                'Discard all unsaved districting changes'),
             callback=self.onRollbackChanges,
             enabledFlag=False,
             parent=self.iface.mainWindow()
         )
+        # pylint: enable=attribute-defined-outside-init
+
+        self.mapTool = PaintDistrictsTool(self.canvas)
 
         if not self.dockwidget:
             self.dockwidget = self.setupToolboxDockWidget()
@@ -352,10 +325,10 @@ class Redistricting:
         if self.projectSignalsConnected:
             self.project.readProjectWithContext.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
-            self.project.layersAdded.disconnect(self.onLayersAdded)
+            self.project.removeAll.disconnect(self.onProjectClosing)
             self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
-            self.project.layersRemoved.disconnect(self.onLayersRemoved)
-            self.project.removeAll.disconnect(self.onCloseProject)
+            self.project.layersAdded.disconnect(self.onUpdateNewPlanAction)
+            self.project.layersRemoved.disconnect(self.onUpdateNewPlanAction)
             self.projectSignalsConnected = False
 
         self.iface.removeDockWidget(self.dockwidget)
@@ -367,6 +340,7 @@ class Redistricting:
         self.iface.removeDockWidget(self.pendingChangesWidget)
         self.pendingChangesWidget.destroy()
         self.pendingChangesWidget = None
+        self.mapTool = None
 
         for action in self.actions:
             self.iface.removePluginVectorMenu(self.menuName, action)
@@ -381,10 +355,11 @@ class Redistricting:
         """Create the dockwidget with tools for painting districts."""
         dockwidget = DockRedistrictingToolbox(self.activePlan)
 
-        dockwidget.geoFieldChanged.connect(self.geoFieldChanged)
-        dockwidget.targetChanged.connect(self.distTargetChanged)
-        dockwidget.sourceChanged.connect(self.distSourceChanged)
+        dockwidget.geoFieldChanged.connect(self.mapTool.setGeoField)
+        dockwidget.sourceChanged.connect(self.mapTool.setSourceDistrict)
+        dockwidget.targetChanged.connect(self.setDistTarget)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
+        dockwidget.btnSelectByGeography.setDefaultAction(self.actionSelectByGeography)
         dockwidget.btnCommitUpdate.setDefaultAction(self.actionCommitPlanChanges)
         dockwidget.btnRollbackUpdate.setDefaultAction(self.actionRollbackPlanChanges)
         dockwidget.btnEditPlan.setDefaultAction(self.actionEditPlan)
@@ -393,7 +368,9 @@ class Redistricting:
 
         self.addAction(
             ':/plugins/redistricting/paintdistricts.svg',
-            text=self.tr(u'Paint Districts'),
+            text=self.tr('Paint Districts'),
+            statusTip=self.tr(
+                'Show/hide tools for creating/editing districts'),
             addToToolbar=True,
             addToMenu=True,
             callback=dockwidget.toggleViewAction(),
@@ -410,9 +387,9 @@ class Redistricting:
 
         self.addAction(
             QgsApplication.getThemeIcon('/mActionOpenTable.svg'),
-            text=self.tr(u'District Data'),
+            text=self.tr('District Data'),
             statusTip=self.tr(
-                u'Show/hide district demographic data/metrics table'),
+                'Show/hide district demographic data/metrics table'),
             addToToolbar=True,
             addToMenu=True,
             callback=dockwidget.toggleViewAction(),
@@ -429,8 +406,8 @@ class Redistricting:
 
         self.addAction(
             ':/plugins/redistricting/preview.svg',
-            text=self.tr(u'Pending Changes'),
-            statusTip=self.tr(u'Show/hide pending changes dock widget'),
+            text=self.tr('Pending Changes'),
+            statusTip=self.tr('Show/hide pending changes dock widget'),
             addToToolbar=True,
             addToMenu=True,
             callback=dockwidget.toggleViewAction(),
@@ -439,22 +416,10 @@ class Redistricting:
         dockwidget.hide()
         return dockwidget
 
-    def checkActivePlan(self, action):
-        if self.activePlan is None:
-            self.iface.messageBar().pushMessage(
-                self.tr("Oops!"),
-                self.tr(f"Cannot {action}: no active redistricting plan. Try creating a new plan."),
-                level=Qgis.Warning
-            )
-            return False
-
-        return True
-
     # --------------------------------------------------------------------------
 
     def progressCanceled(self):
         """Hide progress dialog and display message on cancel"""
-
         if self.activePlan and self.activePlan.error():
             error, level = self.activePlan.error()
         else:
@@ -471,7 +436,7 @@ class Redistricting:
         if self.dlg:
             try:
                 self.dlg.canceled.disconnect(self.progressCanceled)
-            except:
+            except:  # pylint: disable=bare-except
                 ...
             self.dlg.close()
         self.dlg = QProgressDialog(
@@ -513,13 +478,19 @@ class Redistricting:
             if self.activePlan == plan:
                 storage.writeActivePlan(plan)
 
+    def onProjectClosing(self):
+        self.projectClosing = True
+        self.clear()
+        self.dockwidget.hide()
+        self.dataTableWidget.hide()
+
     def onLayersWillBeRemoved(self, layerIds):
         if self.projectClosing:
             self.projectClosing = False
         else:
             deletePlans = set()
-            for plan in self.redistrictingPlans:
-                for layer in layerIds:
+            for layer in layerIds:
+                for plan in self.redistrictingPlans:
                     if plan.popLayer.id() == layer:
                         deletePlans.add(plan)
                     elif plan.assignLayer.id() == layer:
@@ -532,72 +503,43 @@ class Redistricting:
             for plan in deletePlans:
                 self.removePlan(plan)
 
-    def onLayersAdded(self, layers):  # pylint: disable=unused-argument
-        if self.actionNewPlan.isEnabled():
-            return
-
+    def onUpdateNewPlanAction(self, layers):  # pylint: disable=unused-argument
         self.actionNewPlan.setEnabled(
             any(isinstance(layer, QgsVectorLayer)
                 for layer in self.project.mapLayers(True).values())
         )
 
-    def onLayersRemoved(self, layers):
-        self.actionNewPlan.setEnabled(
-            any(isinstance(layer, QgsVectorLayer)
-                for layer in self.project.mapLayers(True).values())
-        )
+    # --------------------------------------------------------------------------
 
-    def onCloseProject(self):
-        self.projectClosing = True
-        self.clear()
-        self.dockwidget.hide()
-        self.dataTableWidget.hide()
-
-    def geoFieldChanged(self, field):
-        self.geoSelectField = field
-
-    def distSourceChanged(self, source):
-        self.distSource = source if source >= 0 else None
-
-    def distTargetChanged(self, target):
+    def setDistTarget(self, target):
         if target == -1:
-            self.distTarget = self.createDistrict()
-        elif target >= 0:
-            self.distTarget = target
-        if self.distTarget is None:
+            target = self.createDistrict()
+        self.mapTool.setTargetDistrict(target)
+        if target is None:
             self.canvas.unsetMapTool(self.mapTool)
+
+    def activateMapTool(self, mode):
+        self.mapTool.paintMode = mode
+        if self.mapTool.targetDistrict is None:
+            target = self.createDistrict()
+            self.mapTool.setTargetDistrict(target)
+        if self.mapTool.canActivate():
+            self.canvas.setMapTool(self.mapTool)
 
     def startPaintDistricts(self):
         if self.activePlan:
-            if self.distTarget is None:
-                self.distTarget = self.createDistrict()
-            if self.distTarget is not None:
-                self.canvas.setMapTool(self.mapTool)
-            self.assignmentEditor = PlanAssignmentEditor(self.activePlan, self.activePlan)
+            self.activateMapTool(PaintMode.PaintByGeography)
 
-    def onPaintDistrict(self, feature: QgsFeature):
-        if self.geoSelectField is None or self.geoSelectField == self.activePlan.geoIdField:
-            features = {feature.id(): feature}
-        else:
-            value = str(feature.attribute(self.geoSelectField))
-            features = self.assignmentEditor.getDistFeatures(
-                self.geoSelectField, value, self.distSource)
-
-        feedback = QgsFeedback()
-        feedback.progressChanged.connect(
-            lambda p: self.iface.statusBarIface().showMessage(
-                f'painted {p} {self.activePlan.geoDisplay.lower()}s')
-        )
-
-        self.assignmentEditor.assignFeaturesToDistrict(
-            features, self.distTarget, self.distSource)
-        self.activePlan.assignLayer.triggerRepaint()
+    def selectByGeography(self):
+        if self.activePlan:
+            self.activateMapTool(PaintMode.SelectByGeography)
 
     def onCommitChanges(self):
-        self.assignmentEditor.commitChanges()
+        self.activePlan.assignLayer.commitChanges(True)
+        self.activePlan.assignLayer.triggerRepaint()
 
     def onRollbackChanges(self):
-        self.assignmentEditor.rollback()
+        self.activePlan.assignLayer.rollBack(True)
         self.activePlan.assignLayer.triggerRepaint()
 
     def showPlanManager(self):
@@ -676,7 +618,7 @@ class Redistricting:
 
         if len(self.project.mapLayers()) == 0:
             self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr(u"Cannot create a redistricting plan for an \
+                self.tr("Oops!"), self.tr("Cannot create a redistricting plan for an \
                     empty project. Try adding some layers."), level=Qgis.Warning)
             return
 
@@ -773,26 +715,29 @@ class Redistricting:
         self.actionCommitPlanChanges.setEnabled(False)
         self.actionRollbackPlanChanges.setEnabled(False)
 
-    def planChanged(self, plan, prop, newValue, oldValue):
+    def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
         self.project.setDirty()
-        if prop in ['total-population', 'pop-field', 'vap-field', 'cvap-field', 'data-fields']:
+        if prop in ['total-population', 'deviation', 'pop-field', 'vap-field', 'cvap-field', 'data-fields']:
             self.dataTableWidget.tblDataTable.update()
 
     def createDistrict(self):
-        if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
-            QgsMessageLog.logMessage(
-                self.tr('All districts have already been allocated'), 'Redistricting')
-            self.distTarget = None
-            return
-
-        dlg = DlgNewDistrict(self.activePlan)
-        if dlg.exec_() == QDialog.Accepted:
-            dist = self.activePlan.addDistrict(
-                dlg.districtNumber, dlg.districtName, dlg.members, dlg.description)
-            self.dockwidget.setTargetDistrict(dist)
-            return dist.district
-        else:
+        if not self.checkActivePlan('create district'):
             return None
+
+        if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
+            self.iface.messageBar().pushMessage(
+                self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.Warning)
+            self.distTarget = None
+            return None
+
+        dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
+        if dlg.exec_() == QDialog.Rejected:
+            return None
+
+        dist = self.activePlan.addDistrict(
+            dlg.districtNumber, dlg.districtName, dlg.members, dlg.description)
+        self.dockwidget.setTargetDistrict(dist)
+        return dist.district
 
     # --------------------------------------------------------------------------
 
@@ -813,8 +758,10 @@ class Redistricting:
                     path = plan.geoPackagePath
             del plan
             if removeLayers and deleteGpkg:
-                for i in glob(f'{path}*'):
-                    os.unlink(i)
+                d = pathlib.Path(path).parent
+                g = str(pathlib.Path(path).name) + '*'
+                for f in d.glob(g):
+                    f.unlink()
 
             self.project.setDirty()
 
@@ -826,6 +773,17 @@ class Redistricting:
                 any(isinstance(layer, QgsVectorLayer)
                     for layer in self.project.mapLayers(True).values())
             )
+
+    def checkActivePlan(self, action):
+        if self.activePlan is None:
+            self.iface.messageBar().pushMessage(
+                self.tr("Oops!"),
+                self.tr(f"Cannot {action}: no active redistricting plan. Try creating a new plan."),
+                level=Qgis.Warning
+            )
+            return False
+
+        return True
 
     def setActivePlan(self, plan):
         if isinstance(plan, UUID):
@@ -848,18 +806,12 @@ class Redistricting:
 
             self.activePlan = plan
 
-            self.distTarget = None
-            self.distSource = None
-            self.geoSelectField = None
             self.dockwidget.plan = self.activePlan
             self.dataTableWidget.plan = self.activePlan
             self.pendingChangesWidget.plan = self.activePlan
+            self.mapTool.plan = self.activePlan
 
             if self.activePlan and self.activePlan.assignLayer:
-                self.mapTool = PaintDistrictsTool(
-                    self.canvas, self.activePlan.assignLayer)
-                self.mapTool.featureIdentified.connect(self.onPaintDistrict)
-
                 self.activePlan.assignLayer.editingStarted.connect(
                     self.editingStarted)
                 self.activePlan.assignLayer.editingStopped.connect(
@@ -869,15 +821,10 @@ class Redistricting:
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
                 self.actionRollbackPlanChanges.setEnabled(
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
-            else:
-                if self.mapTool:
-                    self.mapTool = None
-                    self.canvas.setMapTool(
-                        QgsMapToolIdentifyFeature(
-                            self.canvas, self.iface.activeLayer())
-                    )
 
             self.actionStartPaintDistricts.setEnabled(
+                self.activePlan is not None)
+            self.actionSelectByGeography.setEnabled(
                 self.activePlan is not None)
             self.actionEditPlan.setEnabled(self.activePlan is not None)
             self.actionImportAssignments.setEnabled(

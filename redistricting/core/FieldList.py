@@ -74,6 +74,9 @@ class FieldList(QObject):
 
         raise ValueError()
 
+    def __bool__(self):
+        return bool(self._fields)
+
     def append(self, item: Union[Field, DataField]):
         item.setParent(self)
         self._fields.append(item)

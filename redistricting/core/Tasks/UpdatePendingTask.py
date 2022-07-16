@@ -143,7 +143,7 @@ class AggregatePendingChangesTask(QgsTask):
             return False
 
         if self.updateTask:
-            self.updateTask.waitForFinished()
+            self.updateTask.waitForFinished(0)
 
         return True
 

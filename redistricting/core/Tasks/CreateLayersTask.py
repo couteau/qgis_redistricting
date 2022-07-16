@@ -16,11 +16,14 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+import sqlite3
 
 from typing import List, TYPE_CHECKING
 from contextlib import closing
 from qgis.PyQt.QtCore import QVariant
 from qgis.core import (
+    QgsCoordinateTransform,
+    QgsDataSourceUri,
     QgsProject,
     QgsTask,
     QgsExpressionContext,
@@ -32,6 +35,8 @@ from qgis.core import (
     QgsVectorFileWriter
 )
 from qgis.utils import spatialite_connect
+from processing.algs.gdal.GdalUtils import GdalUtils
+from osgeo import gdal, ogr
 
 from ._exception import CancelledError
 from ._debug import debug_thread
@@ -40,6 +45,39 @@ from ..Exception import RdsException
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan, Field, DataField
+
+
+def getOgrCompatibleSource(input_layer: QgsVectorLayer):
+    ogr_data_path = None
+
+    if input_layer is None or input_layer.dataProvider().name() == 'memory':
+        pass
+    elif input_layer.dataProvider().name() == 'ogr':
+        ogr_data_path = GdalUtils.ogrConnectionStringAndFormatFromLayer(input_layer)[
+            0]
+    elif input_layer.dataProvider().name() == 'delimitedtext':
+        ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
+            input_layer)[7:]
+    elif input_layer.dataProvider().name().lower() == 'wfs':
+        uri = QgsDataSourceUri(input_layer.source())
+        baseUrl = uri.param('url').split('?')[0]
+        ogr_data_path = "WFS:{}".format(baseUrl)
+    else:
+        ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
+            input_layer)
+
+    return ogr_data_path
+
+
+def getTableName(layer: QgsVectorLayer, dataset: gdal.Dataset):
+    if layer.dataProvider().name() == 'ogr':
+        table = GdalUtils.ogrLayerName(layer.dataProvider().dataSourceUri())
+    elif dataset.GetLayerCount() == 1:
+        table = dataset.GetLayer().GetName()
+    else:
+        table = layer.name()
+
+    return table
 
 
 class CreatePlanLayersTask(QgsTask):
@@ -59,6 +97,8 @@ class CreatePlanLayersTask(QgsTask):
         self.vapField = plan.vapField
         self.cvapField = plan.cvapField
 
+        self.totalPop = None
+
         self.exception = None
 
     def _createDistLayer(self, gpkgPath):
@@ -73,14 +113,23 @@ class CreatePlanLayersTask(QgsTask):
             QgsField('members', QVariant.Int, 'SMALLINT'),
             QgsField(self.popLayer.fields().field(self.popField))
         ]
+        fieldNames = {self.distField, 'name', 'members', self.popField}
+        sql = f'SELECT 0 as {self.distField}, "{tr("Unassigned")}" as name, SUM({self.popField}) as {self.popField}'
 
-        if self.vapField:
+        if self.vapField and self.vapField not in fieldNames:
             fields.append(self.popLayer.fields().field(self.vapField))
-        if self.cvapField:
+            fieldNames.add(self.vapField)
+            sql += f', SUM({self.vapField}) as {self.vapField}'
+        if self.cvapField and self.cvapField not in fieldNames:
             fields.append(self.popLayer.fields().field(self.cvapField))
+            fieldNames.add(self.cvapField)
+            sql += f', SUM({self.cvapField}) as {self.cvapField}'
 
         context = None
         for f in self.dataFields:
+            if f.fieldName in fieldNames:
+                continue
+
             if f.isExpression:
                 context = QgsExpressionContext()
                 context.appendScopes(
@@ -91,6 +140,7 @@ class CreatePlanLayersTask(QgsTask):
             if qf is None:  # pragma: no cover
                 continue
             fields.append(qf)
+            sql += f', SUM({qf.name()}) as {qf.name()}'
 
         fields.append(QgsField('polsbypopper', QVariant.Double))
         fields.append(QgsField('reock', QVariant.Double))
@@ -105,6 +155,12 @@ class CreatePlanLayersTask(QgsTask):
         saveOptions.layerName = 'districts'
         saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
         saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+        if l.crs() != QgsProject.instance().crs():
+            saveOptions.ct = QgsCoordinateTransform(
+                l.crs(),
+                QgsProject.instance().crs(),
+                QgsProject.instance().transformContext()
+            )
 
         error = QgsVectorFileWriter.writeAsVectorFormatV2(
             l, gpkgPath, QgsProject.instance().transformContext(), saveOptions
@@ -116,6 +172,25 @@ class CreatePlanLayersTask(QgsTask):
                     tr('district'), error[1])
             )
             return False
+
+        with closing(spatialite_connect(gpkgPath)) as db:
+            db: sqlite3.Connection
+            f = {}
+            source = getOgrCompatibleSource(self.popLayer)
+            if source is not None:
+                ds: gdal.Dataset = gdal.OpenEx(source, gdal.OF_VECTOR)
+                if ds is not None:
+                    try:
+                        sql += f' FROM {getTableName(self.popLayer, ds)}'
+                        lyr: ogr.Layer = ds.ExecuteSQL(sql)
+                        f = lyr.GetNextFeature().items()
+                    except:  # pylint: disable=bare-except
+                        ...
+
+            if f:
+                sql = f'INSERT INTO districts ({",".join(f.keys())}) VALUES ({",".join("?" * len(f))})'
+                db.execute(sql, list(f.values()))
+                self.totalPop = f[self.popField]
 
         return True
 
@@ -145,6 +220,12 @@ class CreatePlanLayersTask(QgsTask):
             saveOptions.layerName = 'assignments'
             saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
             saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
+            if self.srcLayer.crs() != QgsProject.instance().crs():
+                saveOptions.ct = QgsCoordinateTransform(
+                    self.srcLayer.crs(),
+                    QgsProject.instance().crs(),
+                    QgsProject.instance().transformContext()
+                )
 
             writer = QgsVectorFileWriter.create(
                 self.path,

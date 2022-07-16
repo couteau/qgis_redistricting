@@ -148,8 +148,9 @@ class RedistrictingPlan(QObject):
 
         plan._description = data.get('description', '')
         plan._numSeats = data.get('num-seats') or plan._numDistricts
-        plan._totalPopulation = data.get('total-population', 0)
         plan._deviation = data.get('deviation', 0.0)
+
+        plan._totalPopulation = data.get('total-population', 0)
         plan._cutEdges = data.get('cut-edges', 0)
 
         plan._distField = data.get('dist-field', plan._distField)
@@ -181,6 +182,9 @@ class RedistrictingPlan(QObject):
             plan._sourceLayer = layer
 
         plan._sourceIdField = data.get('src-id-field')
+
+        if plan._totalPopulation == 0:
+            plan._districts.resetData()
 
         return plan
 
@@ -599,20 +603,21 @@ class RedistrictingPlan(QObject):
         return self._distLayer
 
     def _setDistLayer(self, value: QgsVectorLayer):
-        if self._distField:
-            idx = value.fields().lookupField(self._distField)
-            if idx == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('district').capitalize(),
-                        field=self._distField,
-                        layertype=tr('district'),
-                        layername=value.name()
-                    )
-                )
         self._distLayer = value
-        self._group.updateLayers()
-        self._districts.loadData()
+        if self._distLayer is not None:
+            if self._distField:
+                idx = self._distLayer.fields().lookupField(self._distField)
+                if idx == -1:
+                    raise RdsException(
+                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                            fieldname=tr('district').capitalize(),
+                            field=self._distField,
+                            layertype=tr('district'),
+                            layername=self._distLayer.name()
+                        )
+                    )
+            self._group.updateLayers()
+            self._districts.loadData()
 
     @property
     def districts(self) -> DistrictList:
@@ -815,6 +820,8 @@ class RedistrictingPlan(QObject):
         def taskCompleted():
             if progress:
                 progress.canceled.disconnect(self._createLayersTask.cancel)
+
+            self._totalPopulation = self._createLayersTask.totalPop
 
             del self._createLayersTask
             self.addLayersFromGeoPackage(gpkgPath)
