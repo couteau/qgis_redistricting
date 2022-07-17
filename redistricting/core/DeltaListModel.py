@@ -130,7 +130,7 @@ class DeltaListModel(QAbstractTableModel):
                 self._fields.append({
                     'name': f'pct_{fn}',
                     'caption': f'%{field.caption}',
-                    'format': '{:+.2%}'
+                    'format': '{:.2%}'
                 })
 
     def planChanged(self, plan, field, new, old):  # pylint: disable=unused-argument
