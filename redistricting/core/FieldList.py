@@ -72,6 +72,9 @@ class FieldList(QObject):
             f = next((f for f in self._fields if f.fieldName == item), None)
             return f is not None
 
+        if item is None:
+            return False
+
         raise ValueError()
 
     def __bool__(self):

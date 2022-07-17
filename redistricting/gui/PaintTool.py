@@ -27,7 +27,8 @@ from redistricting.core import RedistrictingPlan, PlanAssignmentEditor, tr
 
 class PaintMode(IntEnum):
     PaintByGeography = 1
-    SelectByGeography = 2
+    PaintRectangle = 2
+    SelectByGeography = 3
 
 
 class PaintDistrictsTool(QgsMapToolIdentify):
@@ -151,15 +152,21 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def __init__(self, canvas: QgsMapCanvas, plan: RedistrictingPlan = None):
         super().__init__(canvas)
         self._plan = None
-        self.plan = plan
+        self._geoField = None
+        self._distTarget = None
+        self._distSource = None
+
         pixmap = QPixmap(PaintDistrictsTool.PAINT_CURSOR24)
         self.setCursor(QCursor(
             pixmap, 2, 23)
         )
+
         self._paintMode = PaintMode.PaintByGeography
         self._selectRect = QRect(0, 0, 0, 0)
         self._dragging = False
         self._rubberBand = None
+
+        self.plan = plan
 
     @ property
     def plan(self):
@@ -172,7 +179,8 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._layer = self._plan.assignLayer if self._plan is not None else None
 
             self._assignmentEditor = None
-            self._geoField = None
+            if self._plan and self._plan.geoFields and self._geoField not in self._plan.geoFields:
+                self._geoField = None
             self._distTarget = None
             self._distSource = None
 
@@ -196,7 +204,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def paintMode(self, value):
         self._paintMode = value
 
-    def _paintFeature(self, features: Iterable[QgsFeature]):
+    def _paintFeatures(self, features: Iterable[QgsFeature]):
         if self._geoField is not None and self._geoField != self._plan.geoIdField:
             values = {str(feature.attribute(self._geoField)) for feature in features}
             features = self._assignmentEditor.getDistFeatures(
@@ -231,7 +239,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self.setCanvasPropertiesOverrides(r/4)
             self._layer.beginEditCommand(tr('Assign features to district {}').format(
                 str(self.targetDistrict)))
-        elif self._paintMode == PaintMode.SelectByGeography:
+        elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             self._selectRect.setRect(e.x(), e.y(), e.x()+1, e.y()+1)
 
     def canvasReleaseEvent(self, e: QgsMapMouseEvent):
@@ -250,9 +258,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             if not results:
                 self._layer.destroyEditCommand()
                 return
-            self._paintFeature(r.mFeature for r in results)
+            self._paintFeatures(r.mFeature for r in results)
             self._layer.endEditCommand()
-        elif self._paintMode == PaintMode.SelectByGeography:
+        elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if self._dragging:
                 self._dragging = False
                 tooShort = (self._selectRect.topLeft() - self._selectRect.bottomRight()) \
@@ -269,8 +277,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 results: List[QgsMapToolIdentify.IdentifyResult] = \
                     self.identify(geom, QgsMapToolIdentify.DefaultQgsSetting,
                                   [self._layer], QgsMapToolIdentify.VectorLayer)
-
-                self._selectFeatures(r.mFeature for r in results)
+                if self._paintMode == PaintMode.SelectByGeography:
+                    self._selectFeatures(r.mFeature for r in results)
+                else:
+                    self._paintFeatures(r.mFeature for r in results)
 
     def canvasMoveEvent(self, e: QgsMapMouseEvent):
         if self._layer is None or \
@@ -284,12 +294,14 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             results: List[QgsMapToolIdentify.IdentifyResult] = \
                 self.identify(e.x(), e.y(), [self._layer])
 
-            self._paintFeature(r.mFeature for r in results)
-        elif self._paintMode == PaintMode.SelectByGeography:
+            self._paintFeatures(r.mFeature for r in results)
+        elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if not self._dragging:
                 self._dragging = True
                 self._rubberBand = QgsRubberBand(self.canvas(), QgsWkbTypes.PolygonGeometry)
-                color = QColor(Qt.blue)
+                color = QColor(Qt.blue) \
+                    if self._paintMode == PaintMode.PaintRectangle \
+                    else QColor(Qt.lightGray)
                 color.setAlpha(63)
                 self._rubberBand.setColor(color)
                 self._selectRect.setTopLeft(e.pos())
@@ -315,7 +327,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         return super().deactivate()
 
     def setGeoField(self, value):
-        if value != self._plan.geoIdField and self._plan.geoFields and value not in self._plan.geoFields:
+        if value is not None and self._plan is not None and \
+                value != self._plan.geoIdField and \
+                self._plan.geoFields and value not in self._plan.geoFields:
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
         self._geoField = value
 

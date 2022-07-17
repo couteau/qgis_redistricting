@@ -8,6 +8,7 @@
     <file alias="exportplan.svg">exportplan.svg</file>
     <file alias="planmanager.svg">toolbox.svg</file>
     <file alias="paintdistricts.svg">paintdistricts.svg</file>
+    <file alias="paintrubberband.svg">paintrubberband.svg</file>
     <file alias="paintpalette.svg">paintpalette.svg</file>
     <file alias="paintcursor.png">paintcursor16.png</file>
     <file alias="preview.svg">preview.svg</file>

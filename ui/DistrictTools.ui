@@ -68,6 +68,13 @@
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="btnPaintRectangle">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="btnSelectByGeography">
          <property name="text">
           <string>...</string>

@@ -279,6 +279,14 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
+        self.actionPaintRectangle = self.addAction(
+            ':/plugins/redistricting/paintrubberband.svg',
+            self.tr('Paint districts within selection rectangle'),
+            callback=self.startPaintRectangle,
+            enabledFlag=False,
+            parent=self.iface.mainWindow()
+        )
+
         self.actionSelectByGeography = self.addAction(
             QgsApplication.getThemeIcon('/mActionSelectFreehand.svg'),
             text=self.tr('Select by geography units'),
@@ -359,6 +367,7 @@ class Redistricting:
         dockwidget.sourceChanged.connect(self.mapTool.setSourceDistrict)
         dockwidget.targetChanged.connect(self.setDistTarget)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
+        dockwidget.btnPaintRectangle.setDefaultAction(self.actionPaintRectangle)
         dockwidget.btnSelectByGeography.setDefaultAction(self.actionSelectByGeography)
         dockwidget.btnCommitUpdate.setDefaultAction(self.actionCommitPlanChanges)
         dockwidget.btnRollbackUpdate.setDefaultAction(self.actionRollbackPlanChanges)
@@ -529,6 +538,10 @@ class Redistricting:
     def startPaintDistricts(self):
         if self.activePlan:
             self.activateMapTool(PaintMode.PaintByGeography)
+
+    def startPaintRectangle(self):
+        if self.activePlan:
+            self.activateMapTool(PaintMode.PaintRectangle)
 
     def selectByGeography(self):
         if self.activePlan:
@@ -823,6 +836,8 @@ class Redistricting:
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
 
             self.actionStartPaintDistricts.setEnabled(
+                self.activePlan is not None)
+            self.actionPaintRectangle.setEnabled(
                 self.activePlan is not None)
             self.actionSelectByGeography.setEnabled(
                 self.activePlan is not None)

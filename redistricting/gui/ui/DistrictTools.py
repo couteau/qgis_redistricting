@@ -42,6 +42,9 @@ class Ui_qdwDistrictTools(object):
         self.btnAssign.setAutoRaise(True)
         self.btnAssign.setObjectName("btnAssign")
         self.horizontalLayout_2.addWidget(self.btnAssign)
+        self.btnPaintRectangle = QtWidgets.QToolButton(self.frame)
+        self.btnPaintRectangle.setObjectName("btnPaintRectangle")
+        self.horizontalLayout_2.addWidget(self.btnPaintRectangle)
         self.btnSelectByGeography = QtWidgets.QToolButton(self.frame)
         self.btnSelectByGeography.setAutoRaise(True)
         self.btnSelectByGeography.setObjectName("btnSelectByGeography")
@@ -143,6 +146,7 @@ class Ui_qdwDistrictTools(object):
         _translate = QtCore.QCoreApplication.translate
         qdwDistrictTools.setWindowTitle(_translate("qdwDistrictTools", "QGIS Redistricting - Paint Districts"))
         self.btnAssign.setText(_translate("qdwDistrictTools", "..."))
+        self.btnPaintRectangle.setText(_translate("qdwDistrictTools", "..."))
         self.btnSelectByGeography.setText(_translate("qdwDistrictTools", "..."))
         self.btnCommitUpdate.setText(_translate("qdwDistrictTools", "..."))
         self.btnRollbackUpdate.setText(_translate("qdwDistrictTools", "..."))
