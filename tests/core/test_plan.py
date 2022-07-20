@@ -63,7 +63,6 @@ class TestPlan:
         assert plan.geoDisplay is None
         assert plan.deviation == 0
         assert plan.totalPopulation == 0
-        assert plan.cutEdges == 0
         assert len(plan.geoFields) == 0
         assert len(plan.dataFields) == 0
         assert len(plan.districts) == 1
@@ -204,11 +203,17 @@ class TestPlan:
         assert len(plan_with_pop_layer.dataFields) == 3
 
     @pytest.mark.parametrize('field', ['bvap_field_str', 'bvap_field_fld'])
-    def test_datafields_set_error_when_duplicate_field_added(self, plan_with_pop_layer: RedistrictingPlan, field, request):
+    def test_datafields_set_error_when_duplicate_field_added(
+        self,
+        plan_with_pop_layer: RedistrictingPlan,
+        field,
+        request
+    ):
         plan_with_pop_layer.appendDataField('vap_nh_black', False, 'BVAP')
         plan_with_pop_layer.appendDataField(request.getfixturevalue(field))
         assert len(plan_with_pop_layer.dataFields) == 1
-        assert plan_with_pop_layer.error() == ('Attempt to add duplicate field vap_nh_black to plan minimal', Qgis.Warning)
+        assert plan_with_pop_layer.error() == \
+            ('Attempt to add duplicate field vap_nh_black to plan minimal', Qgis.Warning)
 
     def test_datafields_throw_exception_when_invalid_field_added(self, plan_with_pop_layer: RedistrictingPlan):
         with pytest.raises(ValueError):
@@ -218,7 +223,11 @@ class TestPlan:
         with pytest.raises(RdsException):
             plan_with_pop_layer.appendDataField('not_a_field')
 
-    def test_datafields_throw_exception_when_non_existent_field_removed(self, plan_with_pop_layer: RedistrictingPlan, bvap_field_fld):
+    def test_datafields_throw_exception_when_non_existent_field_removed(
+        self,
+        plan_with_pop_layer: RedistrictingPlan,
+        bvap_field_fld
+    ):
         with pytest.raises(ValueError):
             plan_with_pop_layer.removeDataField('vap_hispanic')
 
@@ -284,13 +293,21 @@ class TestPlan:
         assert len(plan_with_pop_layer.geoFields) == 3
 
     @pytest.mark.parametrize('field', ['vtd_field_str', 'vtd_field_fld'])
-    def test_geofields_set_error_when_duplicate_field_added(self, plan_with_pop_layer: RedistrictingPlan, field, request):
+    def test_geofields_set_error_when_duplicate_field_added(
+        self,
+        plan_with_pop_layer: RedistrictingPlan,
+        field,
+        request
+    ):
         plan_with_pop_layer.appendGeoField('vtdid20', False, 'VTD')
         plan_with_pop_layer.appendGeoField(request.getfixturevalue(field))
         assert len(plan_with_pop_layer.geoFields) == 1
         assert plan_with_pop_layer.error() == ('Attempt to add duplicate field vtdid20 to plan minimal', Qgis.Warning)
 
-    def test_geofields_throw_exception_when_invalid_field_added(self, plan_with_pop_layer: RedistrictingPlan):
+    def test_geofields_throw_exception_when_invalid_field_added(
+        self,
+        plan_with_pop_layer: RedistrictingPlan
+    ):
         with pytest.raises(ValueError):
             plan_with_pop_layer.appendGeoField(1)
 
@@ -298,7 +315,11 @@ class TestPlan:
         with pytest.raises(RdsException):
             plan_with_pop_layer.appendGeoField('not_a_field')
 
-    def test_geofields_throw_exception_when_nonexistent_field_removed(self, plan_with_pop_layer: RedistrictingPlan, vtd_field_fld):
+    def test_geofields_throw_exception_when_nonexistent_field_removed(
+        self,
+        plan_with_pop_layer: RedistrictingPlan,
+        vtd_field_fld
+    ):
         with pytest.raises(ValueError):
             plan_with_pop_layer.removeGeoField('blockid20')
 
@@ -308,7 +329,12 @@ class TestPlan:
         with pytest.raises(ValueError):
             plan_with_pop_layer.removeGeoField(3)
 
-    def test_geofields_remove_field(self, plan_with_pop_layer: RedistrictingPlan, vtd_field_fld, qtbot: QtBot):
+    def test_geofields_remove_field(
+        self,
+        plan_with_pop_layer: RedistrictingPlan,
+        vtd_field_fld,
+        qtbot: QtBot
+    ):
         plan_with_pop_layer.appendGeoField(vtd_field_fld)
         plan_with_pop_layer.appendGeoField('statefp20 || countyfp20 || vtd', True)
         plan_with_pop_layer.appendGeoField('countyid20')
@@ -354,9 +380,14 @@ class TestPlan:
         assert plan.error() == ('Plan name, source layer, geography id field, and population field must be set '
                                 'before creating redistricting plan layers', Qgis.Critical)
 
-    def test_createlayers_triggers_background_task_when_plan_is_valid(self, datadir, block_layer, mocker: MockerFixture):
+    def test_createlayers_triggers_background_task_when_plan_is_valid(
+        self,
+        datadir,
+        block_layer,
+        mocker: MockerFixture
+    ):
         plan = RedistrictingPlan('test', 5)
-        gpkg = datadir / 'tuscaloosa_plan.gpkg'
+        gpkg = (datadir / 'tuscaloosa_plan.gpkg').resolve()
         plan.addLayersFromGeoPackage(gpkg)
 
         mock = mocker.patch.object(redistricting.core.Plan.QgsApplication.taskManager(), 'addTask')

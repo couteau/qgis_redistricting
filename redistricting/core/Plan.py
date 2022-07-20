@@ -43,6 +43,7 @@ from .Tasks import (
     CreatePlanLayersTask,
     AddGeoFieldToAssignmentLayerTask
 )
+from .PlanStats import PlanStats
 
 # pylint: disable=too-many-public-methods,too-many-lines,too-many-instance-attributes
 
@@ -66,7 +67,6 @@ class RedistrictingPlan(QObject):
             raise ValueError(tr('Cannot create redistricting plan: ') + tr('Invalid UUID'))
 
         self._totalPopulation = 0
-        self._cutEdges = 0
 
         self._uuid = uuid or uuid4()
         self._name = name or self._uuid
@@ -95,6 +95,8 @@ class RedistrictingPlan(QObject):
         self._cvapField = None
         self._dataFields = FieldList(self)
 
+        self._stats = PlanStats(self)
+
         self._districts = DistrictList(self)
         self._error = None
         self._errorLevel = None
@@ -118,7 +120,6 @@ class RedistrictingPlan(QObject):
             'num-districts': self._numDistricts,
             'num-seats': self.numSeats if self.numSeats != self._numDistricts else None,
             'deviation': self._deviation,
-            'cut-edges': self._cutEdges,
             'pop-layer': self._popLayer.id() if self._popLayer else None,
             'assign-layer': self._assignLayer.id() if self._assignLayer else None,
             'dist-layer': self._distLayer.id() if self._distLayer else None,
@@ -132,7 +133,8 @@ class RedistrictingPlan(QObject):
             'src-id-field': self._sourceIdField,
             'data-fields': [field.serialize() for field in self._dataFields],
             'geo-fields': [field.serialize() for field in self._geoFields],
-            'districts': [dist.serialize() for dist in self._districts if dist.district != 0]
+            'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
+            'plan-stats': self._stats.serialize()
         }
 
         return {k: v for k, v in data.items() if v is not None}
@@ -151,7 +153,6 @@ class RedistrictingPlan(QObject):
         plan._deviation = data.get('deviation', 0.0)
 
         plan._totalPopulation = data.get('total-population', 0)
-        plan._cutEdges = data.get('cut-edges', 0)
 
         plan._distField = data.get('dist-field', plan._distField)
         plan._geoIdField = data.get('geo-id-field', plan._geoIdField)
@@ -166,6 +167,8 @@ class RedistrictingPlan(QObject):
             f = DataField.deserialize(field, plan.dataFields)
             if f:
                 plan._dataFields.append(f)
+
+        plan._districts.updateDistrictFields()
 
         for field in data.get('geo-fields', []):
             f = Field.deserialize(field, plan.geoFields)
@@ -183,6 +186,7 @@ class RedistrictingPlan(QObject):
 
         plan._sourceIdField = data.get('src-id-field')
 
+        plan._stats = PlanStats.deserialize(plan, data.get('plan-stats', {}))
         if plan._totalPopulation == 0:
             plan._districts.resetData()
 
@@ -714,6 +718,7 @@ class RedistrictingPlan(QObject):
             self._updateGeoField(newFields)
             for f in newFields:
                 self.geoFieldAdded.emit(self, f)
+
         self.planChanged.emit(self, 'geo-fields', self._geoFields, oldFields)
 
     @property
@@ -729,8 +734,8 @@ class RedistrictingPlan(QObject):
                                   self._totalPopulation, oldValue)
 
     @property
-    def cutEdges(self) -> int:
-        return self._cutEdges
+    def stats(self) -> PlanStats:
+        return self._stats
 
     @property
     def ideal(self):

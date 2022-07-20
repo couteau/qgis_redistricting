@@ -51,4 +51,4 @@ class TestDeltaModel:
     def test_data(self, delta_model):
         assert delta_model.data(delta_model.createIndex(0, 0), Qt.DisplayRole) == '44,784'
         assert delta_model.data(delta_model.createIndex(1, 0), Qt.DisplayRole) == '+100'
-        assert delta_model.data(delta_model.createIndex(14, 0), Qt.DisplayRole) == '+70.18%'
+        assert delta_model.data(delta_model.createIndex(14, 0), Qt.DisplayRole) == '70.18%'

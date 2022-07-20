@@ -17,29 +17,91 @@
 """
 from __future__ import annotations
 from statistics import fmean
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
+    from .Field import Field
 
 
 class PlanStats:
     def __init__(self, plan: RedistrictingPlan):
         self._plan = plan
         self._cutEdges = 0
+        self.updateSplits()
+        self._plan.planChanged.connect(self.updateSplits)
+
+    def planChanged(self, plan, field, oldValue, newValue):  # pylint: disable=unused-argument
+        if field == 'geo-fields':
+            self.updateSplits()
+
+    def updateSplits(self):
+        self._splits: Dict[Field, int] = {
+            f: [] for f in self._plan.geoFields
+        }
+
+    def serialize(self):
+        return {
+            'cut-edges': self._cutEdges,
+            'splits': {
+                f.fieldName: split for f, split in self._splits.items()
+            }
+        }
+
+    @classmethod
+    def deserialize(cls, plan: RedistrictingPlan, data: Dict[str, Any]):
+        stats = cls(plan)
+        stats._cutEdges = data.get('cut-edges', 0)
+        for f, split in data.get('splits', {}).items():
+            field = plan.geoFields[f]
+            if field is not None:
+                stats._splits[field] = split
+        return stats
 
     @property
     def avgReock(self):
-        return fmean(self._plan.districts['reock'])
+        if len(self._plan.districts) <= 1:
+            return None
+
+        values = self._plan.districts[1:]['reock']
+        if None in values:
+            return None
+
+        return fmean(values)
 
     @property
     def avgPolsbyPopper(self):
-        return fmean(self._plan.districts['polsbyPopper'])
+        if len(self._plan.districts) <= 1:
+            return None
+
+        values = self._plan.districts[1:]['polsbyPopper']
+        if None in values:
+            return None
+
+        return fmean(values)
 
     @property
     def avgConvexHull(self):
-        return fmean(self._plan.districts['convexHull'])
+        if len(self._plan.districts) <= 1:
+            return None
+
+        values = self._plan.districts[1:]['convexHull']
+        if None in values:
+            return None
+
+        return fmean(values)
 
     @property
     def cutEdges(self):
         return self._cutEdges
+
+    @property
+    def splits(self) -> Dict[Field, int]:
+        return self._splits
+
+    def update(self, cutEdges, splits):
+        self._cutEdges = cutEdges
+        for f, split in splits.items():
+            field = self._plan.geoFields[f]
+            if field is not None:
+                self._splits[field] = split

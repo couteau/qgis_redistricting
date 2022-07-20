@@ -253,7 +253,7 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             self.cmbTarget.model().updateDistricts(newValue, oldValue)
         elif prop == 'geo-fields':
             index = self.cmbGeoSelect.currentIndex()
-            if len(self._plan.geoFields) > 0:
+            if self._plan.geoFields:
                 model = GeoFieldsModel(self._plan, self)
             else:
                 model = QgsFieldModel(self)
@@ -261,7 +261,11 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
             self.cmbGeoSelect.setModel(model)
             self.cmbGeoSelect.setCurrentIndex(index)
-            self.geoFieldChanged.emit(self.cmbGeoSelect.currentText())
+            if isinstance(model, QgsFieldModel):
+                field = model.fields().field(index).name()
+            else:
+                field = model.fields[index].fieldName
+            self.geoFieldChanged.emit(field)
 
     def cmbGeoFieldChanged(self, index):
         if index == -1:

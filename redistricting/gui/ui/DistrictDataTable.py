@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file '/Users/stuart/Source/redistricting/redistricting/ui/DistrictDataTable.ui'
+# Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/DistrictDataTable.ui'
 #
 # Created by: PyQt5 UI code generator 5.12.3
 #
@@ -13,14 +13,52 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_qdwDistrictData(object):
     def setupUi(self, qdwDistrictData):
         qdwDistrictData.setObjectName("qdwDistrictData")
-        qdwDistrictData.resize(400, 300)
+        qdwDistrictData.resize(538, 296)
         self.dockWidgetContents = QtWidgets.QWidget()
         self.dockWidgetContents.setObjectName("dockWidgetContents")
         self.gridLayout = QtWidgets.QGridLayout(self.dockWidgetContents)
         self.gridLayout.setObjectName("gridLayout")
         self.tblDataTable = QtWidgets.QTableView(self.dockWidgetContents)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.tblDataTable.sizePolicy().hasHeightForWidth())
+        self.tblDataTable.setSizePolicy(sizePolicy)
+        self.tblDataTable.setMinimumSize(QtCore.QSize(20, 0))
         self.tblDataTable.setObjectName("tblDataTable")
         self.gridLayout.addWidget(self.tblDataTable, 2, 1, 1, 1)
+        self.gbxPlanStats = QtWidgets.QGroupBox(self.dockWidgetContents)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.gbxPlanStats.sizePolicy().hasHeightForWidth())
+        self.gbxPlanStats.setSizePolicy(sizePolicy)
+        self.gbxPlanStats.setMinimumSize(QtCore.QSize(10, 0))
+        self.gbxPlanStats.setFlat(False)
+        self.gbxPlanStats.setObjectName("gbxPlanStats")
+        self.gloStatistics = QtWidgets.QGridLayout(self.gbxPlanStats)
+        self.gloStatistics.setContentsMargins(0, 0, 0, 0)
+        self.gloStatistics.setObjectName("gloStatistics")
+        self.tblPlanStats = QtWidgets.QTableView(self.gbxPlanStats)
+        self.tblPlanStats.setStyleSheet("QTableView {\n"
+"    background-color: #F0F0F0;\n"
+"}\n"
+"QHeaderView {\n"
+"     border: none;\n"
+"     padding-left: 5px\n"
+"}\n"
+"QHeaderView::section {\n"
+"    border: none;\n"
+"}")
+        self.tblPlanStats.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.tblPlanStats.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.tblPlanStats.setShowGrid(False)
+        self.tblPlanStats.setGridStyle(QtCore.Qt.NoPen)
+        self.tblPlanStats.setObjectName("tblPlanStats")
+        self.tblPlanStats.horizontalHeader().setVisible(False)
+        self.tblPlanStats.verticalHeader().setDefaultSectionSize(21)
+        self.gloStatistics.addWidget(self.tblPlanStats, 5, 0, 1, 1)
+        self.gridLayout.addWidget(self.gbxPlanStats, 2, 2, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.label = QtWidgets.QLabel(self.dockWidgetContents)
@@ -53,7 +91,7 @@ class Ui_qdwDistrictData(object):
         self.btnAddFields.setObjectName("btnAddFields")
         self.horizontalLayout_2.addWidget(self.btnAddFields)
         self.horizontalLayout.addWidget(self.frame)
-        self.gridLayout.addLayout(self.horizontalLayout, 0, 1, 1, 1)
+        self.gridLayout.addLayout(self.horizontalLayout, 0, 1, 1, 2)
         qdwDistrictData.setWidget(self.dockWidgetContents)
 
         self.retranslateUi(qdwDistrictData)
@@ -62,6 +100,7 @@ class Ui_qdwDistrictData(object):
     def retranslateUi(self, qdwDistrictData):
         _translate = QtCore.QCoreApplication.translate
         qdwDistrictData.setWindowTitle(_translate("qdwDistrictData", "QGIS Redistricting - Plan Analysis"))
+        self.gbxPlanStats.setTitle(_translate("qdwDistrictData", "Plan Statistics"))
         self.label.setText(_translate("qdwDistrictData", "Redistricting Plan"))
         self.lblPlanName.setText(_translate("qdwDistrictData", "No plan selected"))
         self.btnCopy.setToolTip(_translate("qdwDistrictData", "Copy entire table to clipboard"))

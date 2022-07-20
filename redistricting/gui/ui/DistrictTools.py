@@ -43,6 +43,7 @@ class Ui_qdwDistrictTools(object):
         self.btnAssign.setObjectName("btnAssign")
         self.horizontalLayout_2.addWidget(self.btnAssign)
         self.btnPaintRectangle = QtWidgets.QToolButton(self.frame)
+        self.btnPaintRectangle.setAutoRaise(True)
         self.btnPaintRectangle.setObjectName("btnPaintRectangle")
         self.horizontalLayout_2.addWidget(self.btnPaintRectangle)
         self.btnSelectByGeography = QtWidgets.QToolButton(self.frame)

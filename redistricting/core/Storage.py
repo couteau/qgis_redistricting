@@ -11,7 +11,7 @@
 """
 
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Sized
 from uuid import UUID
 from qgis.core import QgsProject, QgsReadWriteContext, QgsMessageLog
 from qgis.PyQt.QtCore import QTextStream, QByteArray
@@ -278,14 +278,12 @@ class ProjectStorage:
     def serializeToNode(self, data: dict[str, Any], nodeName):
         node = self._doc.createElement(nodeName)
         for key, value in data.items():
-            if not isinstance(value, (list, dict, set)):
-                # Python/Qt/sip doesn't seem to know how to figure out which overload
-                # to call when float value == 0.0, leading to implicit conversion warnings
-                if isinstance(value, Enum) or (isinstance(value, float) and int(value) == value):
-                    node.setAttribute(key, int(value))
-                else:
-                    node.setAttribute(key, value)
-            elif len(value) > 0:
+            if isinstance(value, Sized) and len(value) == 0:
+                continue
+
+            if isinstance(value, dict):
+                node.appendChild(self.serializeToNode(item, childKey))
+            elif isinstance(value, (list, set)):
                 if key[-1] == 's':
                     childKey = key[:-1]
                 else:
@@ -296,6 +294,11 @@ class ProjectStorage:
                     groupNode.appendChild(childNode)
 
                 node.appendChild(groupNode)
+            else:
+                if isinstance(value, Enum):
+                    node.setAttribute(key, int(value))
+                else:
+                    node.setAttribute(key, value)
 
         return node
 
