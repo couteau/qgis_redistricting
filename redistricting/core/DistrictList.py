@@ -79,8 +79,10 @@ class DistrictList(QObject):
                     return self._districts[index]
                 if 0 <= index <= self._plan.numDistricts:
                     return None
-            elif 0 in self._districts and hasattr(self._districts[0], index):
-                return [getattr(dist, index) for dist in self.values() if dist.district != 0]
+            else:
+                d = next(iter(self._districts.values()), BaseDistrict(self._plan, 0))
+                if hasattr(d, index):
+                    return [getattr(dist, index) for dist in self.values() if dist.district != 0]
         elif isinstance(index, int):
             return list(self._districts.values())[index]
 
@@ -115,6 +117,9 @@ class DistrictList(QObject):
             index = int(index)
 
         return index in self._districts
+
+    def __bool__(self) -> bool:
+        return bool(self._districts)
 
     def _append(self, dist: District):
         self._districts[dist.district] = dist
@@ -205,11 +210,10 @@ class DistrictList(QObject):
             self._plan.totalPopulation = self._updateTask.totalPop
 
         self.updateData(self._updateTask.districts, self._updateDistricts)
+        self._plan.stats.update(self._updateTask.cutEdges, self._updateTask.splits)
 
         if self._needGeomUpdate:
             self._plan.distLayer.triggerRepaint()
-            self._plan._cutEdges = len(  # pylint: disable=protected-access
-                self._updateTask.cutEdges)
 
         self._needUpdate = False
         self._needGeomUpdate = False
