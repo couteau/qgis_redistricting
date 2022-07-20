@@ -90,6 +90,7 @@ class TestFieldTableView:
         datafield_list_model.cvapEnabled = False
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 5)) & Qt.ItemIsEnabled == Qt.NoItemFlags
 
+    @pytest.mark.gui
     def test_drag_field(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
         qtbot.addWidget(field_table_view)
         with qtbot.waitExposed(field_table_view):
@@ -106,6 +107,7 @@ class TestFieldTableView:
         qtbot.wait(100)
         assert field_table_view.model()._data[0].fieldName == 'countyid20'  # pylint: disable=protected-access
 
+    @pytest.mark.gui
     def test_click_delete(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
         qtbot.addWidget(field_table_view)
         with qtbot.waitExposed(field_table_view):
