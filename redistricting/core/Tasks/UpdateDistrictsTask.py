@@ -175,7 +175,7 @@ class AggregateDistrictDataTask(QgsTask):
 
             # convert null values to 0 if the "unassigned" district is among those being aggregated
             if not self.includeDistricts or 0 in self.includeDistricts:  # pylint: disable=unsupported-membership-test
-                df[self.distField] = pd.to_numeric(df[self.distField], errors='coerce').fillna(0)
+                df[self.distField] = pd.to_numeric(df[self.distField], errors='coerce').fillna(0).astype(int)
 
             if self.includeDemographics:
                 context = QgsExpressionContext()
