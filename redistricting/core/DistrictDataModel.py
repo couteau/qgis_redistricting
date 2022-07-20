@@ -120,7 +120,7 @@ class DistrictDataModel(QAbstractTableModel):
         self.endRemoveRows()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
-        if prop in ('data-fields', 'pop-field', 'vap-field', 'cvap-field'):
+        if prop in ('districts', 'data-fields', 'pop-field', 'vap-field', 'cvap-field'):
             self.beginResetModel()
             self.updateColumnKeys()
             self.endResetModel()
