@@ -16,11 +16,14 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+import math
 
 from typing import TYPE_CHECKING
+from qgis.PyQt.QtCore import NULL
 from qgis.core import (
     Qgis,
     QgsCoordinateTransform,
+    QgsGeometry,
     QgsMessageLog,
     QgsProject,
     QgsSpatialIndex,
@@ -54,60 +57,84 @@ class ImportShapeFileTask(QgsTask):
     def run(self):
         debug_thread()
         try:
+            chunkSize = 100
+
             layer = QgsVectorLayer(self.shapeFile)
+            sindex = layer.fields().lookupField(self.importDistField)
+            if sindex == -1:
+                self.exception = ValueError('invalid source field for shapefile import')
+                return False
+            dindex = self.assignLayer.fields().lookupField(self.distField)
+            if dindex == -1:
+                self.exception = ValueError('invalid district field for shapefile import')
+                return False
 
             crsSrc = layer.crs()
             crsDest = self.assignLayer.crs()
             if crsSrc.authid() != crsDest.authid():
                 transformContext = QgsProject.instance().transformContext()
                 xform = QgsCoordinateTransform(crsSrc, crsDest, transformContext)
-                l = QgsVectorLayer(f"multipolygon?crs={crsDest}&field=id:integer", "xformlayer",  "memory")
+                l = QgsVectorLayer(f"multipolygon?crs={crsDest}", "xformlayer",  "memory")
+                pv = l.dataProvider()
+                pv.addAttributes(layer.fields().toList())
+                l.updateFields()
                 feats = []
-
                 for f in layer.getFeatures():
-                    g = f.geometry()
+                    g = QgsGeometry(f.geometry())
                     g.transform(xform)
                     f.setGeometry(g)
                     feats.append(f)
 
-                l.dataProvider().addFeatures(feats)
+                pv.addFeatures(feats)
                 l.updateExtents()
                 layer = l
 
             index = QgsSpatialIndex(layer.getFeatures())
 
-            dindex = self.assignLayer.fields().lookupField(self.distField)
-            if dindex == -1:
-                self.exception = ValueError('invalid district field for shapefile import')
-                return False
-            sindex = layer.fields().lookupField(self.importDistField)
-            if sindex == -1:
-                self.exception = ValueError('invalid source field for shapefile import')
-                return False
+            distmap = {}
+            for d in layer.getFeatures():
+                dist = d[sindex]
+                if dist == NULL:
+                    dist = 0
+                elif isinstance(dist, str) and dist.isnumeric():
+                    dist = int(dist)
+                elif not isinstance(dist, int):
+                    dist = d.id()+1
+                distmap[d[sindex]] = dist
 
-            total = self.assignLayer.featureCount()
+            total = math.ceil(self.assignLayer.featureCount() / chunkSize)
             count = 0
-            self.assignLayer.startEditing()
-            for f in self.assignLayer.getFeatures():
+            pv = self.assignLayer.dataProvider()
+            chunk = {}
+            for f in pv.getFeatures():
                 g = f.geometry()
                 candidates = index.intersects(g.boundingBox())
                 for d in layer.getFeatures(candidates):
                     i = g.intersection(d.geometry())
                     if not i.isEmpty() and i.area() > g.area() / 2:
-                        self.assignLayer.changeAttributeValue(f.id(), dindex, d[sindex], f[dindex], True)
+                        chunk[f.id()] = {dindex: distmap[d[sindex]]}
                         break
                 else:
                     self.errors.append(f.id())
-                count += 1
-                self.setProgress(count/total)
+
+                if len(chunk) == chunkSize:
+                    pv.changeAttributeValues(chunk)
+                    chunk.clear()
+                    count += 1
+                    if self.isCanceled():
+                        raise CancelledError()
+                    self.setProgress(100*count/total)
+
+            # write any partial chunk
+            if len(chunk) > 0:
+                pv.changeAttributeValues(chunk)
                 if self.isCanceled():
                     raise CancelledError()
-            self.assignLayer.commitChanges(True)
+                self.setProgress(100*count/total)
+
         except CancelledError:
-            self.assignLayer.rollBack(True)
             return False
         except Exception as e:  # pylint: disable=broad-except
-            self.assignLayer.rollBack(True)
             self.exception = e
             return False
 

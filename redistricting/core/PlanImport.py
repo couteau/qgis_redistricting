@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-from qgis.PyQt.QtCore import QObject, pyqtSignal
+from qgis.PyQt.QtCore import QObject, pyqtSignal, NULL
 from qgis.PyQt.QtWidgets import QProgressDialog
 from qgis.core import (
     Qgis,
@@ -115,7 +115,14 @@ class PlanImporter(QObject):
 
         return self._importTask
 
-    def importShapefile(self, file, distField: str, nameField: str = None,  membersField: str = None, progress: QProgressDialog = None):
+    def importShapefile(
+        self,
+        file,
+        distField: str,
+        nameField: str = None,
+        membersField: str = None,
+        progress: QProgressDialog = None
+    ):
         self.clearError()
 
         if not os.path.exists(file):
@@ -137,26 +144,28 @@ class PlanImporter(QObject):
             self._plan.assignLayer.commitChanges(True)
 
         if nameField and layer.fields().lookupField(nameField) == -1:
-            self.setError(tr('Field {field} not fond in shapefile {file}').format(
+            self.setError(tr('Field {field} not found in shapefile {file}').format(
                 field=nameField, file=file), Qgis.Warning)
             nameField = None
         if membersField and layer.fields().lookupField(membersField) == -1:
-            self.setError(tr('Field {field} not fond in shapefile {file}').format(
+            self.setError(tr('Field {field} not found in shapefile {file}').format(
                 field=membersField, file=file), Qgis.Warning)
             membersField = None
 
         districts = {}
         for f in layer.getFeatures():
             dist = f[distField]
-            if isinstance(dist, str):
-                if dist.isnumeric():
-                    dist = int(dist)
-                else:
-                    dist = f.id()+1
+            if dist == NULL:
+                dist = 0
+            elif isinstance(dist, str) and dist.isnumeric():
+                dist = int(dist)
+            elif not isinstance(dist, int):
+                dist = f.id()+1
 
             name = f[nameField] if nameField else None
             members = f[membersField] if membersField else 1
-            districts[dist] = District(self._plan, dist, name, members)
+            if dist != 0:
+                districts[dist] = District(self._plan, dist, name, members)
         self._plan.districts = districts
 
         self._progress = progress
