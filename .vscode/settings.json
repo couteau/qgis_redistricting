@@ -3,4 +3,18 @@
     "python.formatting.autopep8Path": "~/anaconda3/envs/qgis_plugin/bin/autopep8",
     "python.linting.pylintPath": "~/anaconda3/envs/qgis_plugin/bin/pylint",
     "python.testing.pytestPath": "~/anaconda3/envs/qgis_plugin/bin/pytest",
+    "python.autoComplete.extraPaths": [
+        "/Applications/QGIS.app/Contents/Resources/python/",
+        "/Applications/QGIS.app/Contents/Resources/python/site-packages",
+        "/Applications/QGIS.app/Contents/Resources/python/plugins",
+        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
+        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
+    ],
+    "python.analysis.extraPaths": [
+        "/Applications/QGIS.app/Contents/Resources/python/",
+        "/Applications/QGIS.app/Contents/Resources/python/site-packages",
+        "/Applications/QGIS.app/Contents/Resources/python/plugins",
+        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
+        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins"
+    ],
 }

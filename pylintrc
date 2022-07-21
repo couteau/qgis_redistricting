@@ -61,7 +61,11 @@ ignored-modules=qgis,qgis.core,qgis.gui
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-#init-hook=
+init-hook='import sys; sys.path.extend([
+            "/Applications/QGIS.app/Contents/Resources/python/plugins",
+            "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
+            "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
+      ])'
 
 # Use multiple processes to speed up Pylint. Specifying 0 will auto-detect the
 # number of processors available to use.
