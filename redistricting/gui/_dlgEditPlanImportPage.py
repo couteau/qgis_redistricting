@@ -169,8 +169,10 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
     def updatePreviewCsv(self, csvfile=None, header=None, dialect=None):
         close = not isinstance(csvfile, IOBase)
         if close:
-            csvfile = open(self.fileImportFrom.path,
-                           newline='')  # pylint: disable=unspecified-encoding,consider-using-with
+            csvfile = open(  # pylint: disable=unspecified-encoding,consider-using-with
+                self.fileImportFrom.path,
+                newline=''
+            )
         try:
             if header is None:
                 header = self.cbxHeaderRow.isChecked()

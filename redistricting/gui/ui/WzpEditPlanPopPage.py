@@ -57,7 +57,7 @@ class Ui_wzpPopulation(object):
         self.cmbPopLayer.setAllowEmptyLayer(True)
         self.cmbPopLayer.setObjectName("cmbPopLayer")
         self.gridLayout_2.addWidget(self.cmbPopLayer, 2, 1, 1, 1)
-        self.cmbJoinField = gui.QgsFieldComboBox(self.gbxPopLayer)
+        self.cmbJoinField = RdsFieldComboBox(self.gbxPopLayer)
         self.cmbJoinField.setEnabled(False)
         self.cmbJoinField.setObjectName("cmbJoinField")
         self.gridLayout_2.addWidget(self.cmbJoinField, 3, 1, 1, 1)
@@ -106,10 +106,6 @@ class Ui_wzpPopulation(object):
         self.lblJoinField.setBuddy(self.cmbJoinField)
 
         self.retranslateUi(wzpPopulation)
-        self.cmbPopLayer.layerChanged['QgsMapLayer*'].connect(self.cmbPopField.setLayer)
-        self.cmbPopLayer.layerChanged['QgsMapLayer*'].connect(self.cmbVAPField.setLayer)
-        self.cmbPopLayer.layerChanged['QgsMapLayer*'].connect(self.cmbCVAPField.setLayer)
-        self.cmbPopLayer.layerChanged['QgsMapLayer*'].connect(self.cmbJoinField.setLayer)
         self.btnOtherPopLayer.toggled['bool'].connect(self.cmbPopLayer.setEnabled)
         self.btnOtherPopLayer.toggled['bool'].connect(self.cmbJoinField.setEnabled)
         self.btnOtherPopLayer.toggled['bool'].connect(self.lblJoinField.setEnabled)
@@ -136,5 +132,4 @@ class Ui_wzpPopulation(object):
         self.lblVAPField.setText(_translate("wzpPopulation", "Voting Age Population Field"))
         self.lblMaxDeviation.setText(_translate("wzpPopulation", "Maximum Deviation"))
         self.lblCVAPField.setText(_translate("wzpPopulation", "Citizen VAP Field"))
-from qgis import gui
 from .RedistrictingWidgets import RdsFieldComboBox, RdsMapLayerComboBox

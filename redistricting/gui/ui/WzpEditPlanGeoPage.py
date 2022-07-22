@@ -20,11 +20,6 @@ class Ui_wzpAddlGeography(object):
         self.cmbGeoCaption.setEditable(True)
         self.cmbGeoCaption.setInsertPolicy(QtWidgets.QComboBox.InsertAlphabetically)
         self.cmbGeoCaption.setObjectName("cmbGeoCaption")
-        self.cmbGeoCaption.addItem("")
-        self.cmbGeoCaption.addItem("")
-        self.cmbGeoCaption.addItem("")
-        self.cmbGeoCaption.addItem("")
-        self.cmbGeoCaption.addItem("")
         self.gridLayout.addWidget(self.cmbGeoCaption, 2, 1, 1, 2)
         self.groupBox = QtWidgets.QGroupBox(wzpAddlGeography)
         self.groupBox.setFlat(False)
@@ -74,8 +69,6 @@ class Ui_wzpAddlGeography(object):
         self.lblGeoIDField.setBuddy(self.cmbGeoIDField)
 
         self.retranslateUi(wzpAddlGeography)
-        self.cmbSourceLayer.layerChanged['QgsMapLayer*'].connect(self.cmbGeoIDField.setLayer)
-        self.cmbSourceLayer.layerChanged['QgsMapLayer*'].connect(self.cmbAddlGeoField.setLayer)
         QtCore.QMetaObject.connectSlotsByName(wzpAddlGeography)
 
     def retranslateUi(self, wzpAddlGeography):
@@ -83,11 +76,6 @@ class Ui_wzpAddlGeography(object):
         wzpAddlGeography.setWindowTitle(_translate("wzpAddlGeography", "Geography"))
         wzpAddlGeography.setTitle(_translate("wzpAddlGeography", "Geography"))
         wzpAddlGeography.setSubTitle(_translate("wzpAddlGeography", "Define units of geography from which the districting plan will be built"))
-        self.cmbGeoCaption.setItemText(0, _translate("wzpAddlGeography", "Block"))
-        self.cmbGeoCaption.setItemText(1, _translate("wzpAddlGeography", "Block Group"))
-        self.cmbGeoCaption.setItemText(2, _translate("wzpAddlGeography", "Tract"))
-        self.cmbGeoCaption.setItemText(3, _translate("wzpAddlGeography", "Precinct/VTD"))
-        self.cmbGeoCaption.setItemText(4, _translate("wzpAddlGeography", "County/Parish"))
         self.groupBox.setToolTip(_translate("wzpAddlGeography", "Add additional levels of geography from which districts can be built"))
         self.groupBox.setTitle(_translate("wzpAddlGeography", "Additional Geography"))
         self.btnAddAddlGeoField.setText(_translate("wzpAddlGeography", "..."))

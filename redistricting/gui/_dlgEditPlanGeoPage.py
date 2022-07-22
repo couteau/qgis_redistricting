@@ -15,9 +15,11 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import Qt, QCoreApplication, QVariant, QModelIndex
+from qgis.PyQt.QtCore import Qt, QVariant, QModelIndex
 from qgis.PyQt.QtWidgets import QWidget, QWizardPage, QHeaderView, QComboBox, QStyledItemDelegate, QStyleOptionViewItem
 from qgis.core import QgsApplication, QgsVectorLayer, QgsMapLayerProxyModel
+from ..core import defaults
+from ..core.Utils import getDefaultField
 from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 from .RdsFieldTableView import FieldListModel
 
@@ -30,13 +32,7 @@ class GeoFieldDelegate(QStyledItemDelegate):
             rect = option.rect
             editor.setGeometry(rect)
             editor.setEditable(True)
-            editor.addItems([
-                QCoreApplication.translate('Redistricting', 'Block'),
-                QCoreApplication.translate('Redistricting', 'Block Group'),
-                QCoreApplication.translate('Redistricting', 'Tract'),
-                QCoreApplication.translate('Redistricting', 'Precinct/VTD'),
-                QCoreApplication.translate('Redistricting', 'County/Parish'),
-            ])
+            editor.addItems(defaults.GEOID_LABELS)
             return editor
         return super().createEditor(parent, option, index)
 
@@ -86,6 +82,8 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tblAddlGeography.setItemDelegateForColumn(1, GeoFieldDelegate(self))
 
+        self.cmbGeoCaption.addItems(defaults.GEOID_LABELS)
+
         self.btnAddAddlGeoField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
         self.cmbAddlGeoField.fieldChanged.connect(self.fieldChanged)
         self.btnAddAddlGeoField.clicked.connect(self.addField)
@@ -106,24 +104,22 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.setFinalPage(self.wizard().isComplete())
 
     def cleanupPage(self):
-        ...
+        ...  # prevent fields from being reset
 
     def setSourceLayer(self, layer: QgsVectorLayer):
-        if layer and not self.field('geoIdField'):
-            if layer.fields().lookupField('geoid20') != -1:
-                self.cmbGeoIDField.setField('geoid20')
-            elif layer.fields().lookupField('geoid30') != -1:
-                self.cmbGeoIDField.setField('geoid30')
-            elif layer.fields().lookupField('geoid10') != -1:
-                self.cmbGeoIDField.setField('geoid10')
-            elif layer.fields().lookupField('geoid') != -1:
-                self.cmbGeoIDField.setField('geoid')
-            elif layer.fields().lookupField('block') != -1:
-                self.cmbGeoIDField.setField('block')
+        if self.cmbGeoIDField.layer() != layer:
+            field = self.field('geoIdField')
+            self.cmbGeoIDField.setLayer(layer)
+            if layer:
+                if field and layer.fields().lookupField(field) != -1:
+                    self.cmbGeoIDField.setField(field)
+                else:
+                    self.cmbGeoIDField.setField(getDefaultField(layer, defaults.GEOID_FIELDS))
 
         if self.cmbAddlGeoField.layer() != layer:
             self.cmbAddlGeoField.setField(None)
             self.fieldsModel.fields = []
+            self.cmbAddlGeoField.setLayer(layer)
 
     def fieldChanged(self, field):
         self.btnAddAddlGeoField.setEnabled(field != '' and (

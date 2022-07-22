@@ -21,7 +21,9 @@ import sys
 import os
 import sqlite3
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Union
+
+from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QCoreApplication
 
 if TYPE_CHECKING:
@@ -85,3 +87,16 @@ def makeFieldName(field: Field):
         name = field.field
 
     return name
+
+
+def getDefaultField(layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern]]):
+    for f in fieldList:
+        if isinstance(f, str):
+            if (i := layer.fields().lookupField(f)) != -1:
+                return layer.fields()[i].name()
+        elif isinstance(f, re.Pattern):
+            for fld in layer.fields():
+                if f.match(fld.name()):
+                    return fld.name()
+
+    return None

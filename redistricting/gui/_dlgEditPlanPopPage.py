@@ -18,9 +18,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-import re
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtWidgets import QWizardPage
+from ..core import defaults
+from ..core.Utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
 
@@ -54,21 +55,13 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         sourceLayer = self.field('sourceLayer') or None
         if popLayer is None:
             popLayer = sourceLayer
-        joinField = self.field('joinField')
-        geoIdField = self.field('geoIdField')
 
         if popLayer == sourceLayer:
             self.btnUseGeoLayer.setChecked(True)
         else:
             self.btnOtherPopLayer.setChecked(True)
 
-        self.cmbJoinField.setLayer(popLayer)
-        if joinField is None and popLayer and popLayer.fields().lookupField(geoIdField) != -1:
-            self.cmbJoinField.setField(geoIdField)
         self.cmbPopLayer.setLayer(popLayer)
-        self.cmbPopField.setLayer(popLayer)
-        self.cmbVAPField.setLayer(popLayer)
-        self.cmbCVAPField.setLayer(popLayer)
         self.setPopLayer(popLayer)
         self.cmbPopField.setFocus()
         self.setFinalPage(self.wizard().isComplete())
@@ -83,28 +76,38 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
     def setPopLayer(self, layer: QgsVectorLayer):
         if not layer:
+            self.cmbJoinField.setLayer(None)
+            self.cmbPopField.setLayer(None)
+            self.cmbVAPField.setLayer(None)
+            self.cmbCVAPField.setLayer(None)
             return
 
-        if not self.field('popField'):
-            if layer.fields().indexFromName('pop_total') != -1:
-                self.cmbPopField.setField('pop_total')
-            elif layer.fields().indexFromName('p0010001') != -1:
-                self.cmbPopField.setField('p0010001')
-            elif layer.fields().indexFromName('P0010001') != -1:
-                self.cmbPopField.setField('P0010001')
+        if layer != self.cmbJoinField.layer():
+            joinField = self.field('joinField')
+            geoIdField = self.field('geoIdField')
+            self.cmbJoinField.setLayer(layer)
+            if joinField and layer.fields().lookupField(joinField) != -1:
+                self.cmbJoinField.setField(joinField)
+            elif layer.fields().lookupField(geoIdField) != -1:
+                self.cmbJoinField.setField(geoIdField)
 
-        if not self.field('vapField'):
-            if layer.fields().indexFromName('vap_total') != -1:
-                self.cmbVAPField.setField('vap_total')
-            elif layer.fields().indexFromName('p0030001') != -1:
-                self.cmbVAPField.setField('p0030001')
-            elif layer.fields().indexFromName('P0030001') != -1:
-                self.cmbVAPField.setField('P0030001')
+            popField = self.field('popField')
+            self.cmbPopField.setLayer(layer)
+            if popField and layer.fields().lookupField(popField) != -1:
+                self.cmbPopField.setField(popField)
+            else:
+                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_FIELDS))
 
-        if not self.field('cvapField'):
-            if layer.fields().indexFromName('cvap_total') != -1:
-                self.cmbCVAPField.setField('cvap_total')
-            regex = re.compile(r'^cvap_(?:\d{4}_)total$')
-            for f in layer.fields():
-                if regex.match(f.name()):
-                    self.cmbCVAPField.setField(f.name())
+            vapField = self.field('vapField')
+            self.cmbVAPField.setLayer(layer)
+            if vapField and layer.fields().lookupField(vapField) != -1:
+                self.cmbVAPField.setField(vapField)
+            else:
+                self.cmbVAPField.setField(getDefaultField(layer, defaults.VAP_FIELDS))
+
+            cvapField = self.field('cvapField')
+            self.cmbCVAPField.setLayer(layer)
+            if cvapField and layer.fields().lookupField(cvapField) != -1:
+                self.cmbCVAPField.setField(cvapField)
+            else:
+                self.cmbCVAPField.setField(getDefaultField(layer, defaults.CVAP_FIELDS))
