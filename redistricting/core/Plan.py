@@ -690,12 +690,12 @@ class RedistrictingPlan(QObject):
 
         oldFields = self._geoFields
 
-        newFields: List[DataField] = []
+        newFields: List[Field] = []
         for f in value:
             if not any(field.field == f.field for field in self._geoFields):
                 newFields.append(f)
 
-        removedFields: List[DataField] = []
+        removedFields: List[Field] = []
         for f in self._geoFields:
             if not any(field.field == f.field for field in value):
                 removedFields.append(f)
