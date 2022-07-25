@@ -1,24 +1,37 @@
 # -*- coding: utf-8 -*-
-"""
+"""QGIS Redistricting Plugin - save/load plans to/from the project file 
+
+        begin                : 2022-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+
 /***************************************************************************
- * *
- *   This program is free software; you can redistribute it and / or modify *
- *   it under the terms of the GNU General Public License as published by *
- *   the Free Software Foundation; either version 2 of the License, or *
- *   (at your option) any later version. *
- * *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
  ***************************************************************************/
 """
-
-from enum import Enum
-from typing import Any, Dict, List, Sized
-from uuid import UUID
-from qgis.core import QgsProject, QgsReadWriteContext, QgsMessageLog
-from qgis.PyQt.QtCore import QTextStream, QByteArray
-from qgis.PyQt.QtXml import QDomDocument, QDomElement, QDomNode
-from PyQt5.QtXmlPatterns import QXmlSchema, QXmlSchemaValidator
-from .Plan import RedistrictingPlan
 from .Utils import tr
+from .Plan import RedistrictingPlan
+from PyQt5.QtXmlPatterns import QXmlSchema, QXmlSchemaValidator
+from qgis.PyQt.QtXml import QDomDocument, QDomElement, QDomNode
+from qgis.PyQt.QtCore import QTextStream, QByteArray
+from qgis.core import QgsProject, QgsReadWriteContext, QgsMessageLog
+from uuid import UUID
+from typing import Any, Dict, List, Sized
+from enum import Enum
+
 
 planSchema = b"""<?xml version="1.0"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">

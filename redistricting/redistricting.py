@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin
 
-    QGIS plugin for building political districts from geographic units
-        (Originally generated using Plugin Builder by
-        gsherman@geoapt.com and then heavily modified)
+        QGIS plugin for building political districts from geographic units
+        (Originally generated using Plugin Builder bygsherman@geoapt.com 
+        and then heavily modified)
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
@@ -14,8 +14,15 @@
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
+ *   the Free Software Foundation; either version 3 of the License, or     *
  *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
 """
@@ -633,6 +640,16 @@ class Redistricting:
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"), self.tr("Cannot create a redistricting plan for an \
                     empty project. Try adding some layers."), level=Qgis.Warning)
+            return
+
+        if self.project.isDirty():
+            # the project must be saved before a plan can be created
+            self.iface.messageBar().pushMessage(
+                self.tr("Warning!"),
+                self.tr("Please save your project before "
+                        "creating a redistricting plan."),
+                level=Qgis.Warning
+            )
             return
 
         dlgNewPlan = DlgEditPlan()
