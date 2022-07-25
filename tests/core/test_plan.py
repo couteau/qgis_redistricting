@@ -270,6 +270,12 @@ class TestPlan:
         plan_with_pop_layer.appendGeoField('vtdid20')
         assert plan_with_pop_layer.geoFields[0].parent() == plan_with_pop_layer.geoFields
 
+    def test_geofields_assign(self, plan_with_pop_layer, vtd_field_fld, qtbot: QtBot):
+        with qtbot.waitSignal(plan_with_pop_layer.planChanged):
+            plan_with_pop_layer.geoFields = [vtd_field_fld]
+        assert len(plan_with_pop_layer.geoFields) == 1
+        assert len(plan_with_pop_layer.stats.splits) == 1
+
     def test_geofields_append_adds_field(self, plan_with_pop_layer: RedistrictingPlan, block_layer, qtbot: QtBot):
         with qtbot.waitSignal(plan_with_pop_layer.geoFields.fieldAdded):
             plan_with_pop_layer.appendGeoField('vtdid20', False, 'VTD')
@@ -340,7 +346,7 @@ class TestPlan:
         plan_with_pop_layer.appendGeoField('countyid20')
         f1 = plan_with_pop_layer.geoFields[1]
 
-        with qtbot.waitSignal(plan_with_pop_layer.geoFields.fieldRemoved):
+        with qtbot.waitSignals((plan_with_pop_layer.geoFields.fieldRemoved, plan_with_pop_layer.geoFieldRemoved, plan_with_pop_layer.planChanged)):
             plan_with_pop_layer.removeGeoField('vtdid20')
         assert len(plan_with_pop_layer.geoFields) == 2
         assert plan_with_pop_layer.geoFields[0].field == 'statefp20 || countyfp20 || vtd'
