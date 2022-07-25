@@ -52,7 +52,7 @@ planSchema = b"""<?xml version="1.0"?>
                                                 <xs:attribute name="expression" type="xs:boolean" use="required" />
                                                 <xs:attribute name="caption" type="xs:string" />
                                                 <xs:attribute name="sum" type="xs:boolean" default="true" />
-                                                <xs:attribute name="pctbase" type="xs:integer" default="false" />
+                                                <xs:attribute name="pctbase" type="xs:integer" default="0" />
                                             </xs:complexType>
                                         </xs:element>
                                     </xs:sequence>
