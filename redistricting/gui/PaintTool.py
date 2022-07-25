@@ -22,7 +22,7 @@ from qgis.gui import QgsMapCanvas, QgsMapMouseEvent, QgsMapToolIdentify, QgsRubb
 from qgis.core import QgsFeature, QgsWkbTypes, QgsGeometry, QgsVectorLayer
 from qgis.PyQt.QtCore import Qt, QRect
 from qgis.PyQt.QtGui import QKeyEvent, QCursor, QPixmap, QColor
-from redistricting.core import RedistrictingPlan, PlanAssignmentEditor, tr
+from ..core import RedistrictingPlan, PlanEditor, tr
 
 
 class PaintMode(IntEnum):
@@ -319,7 +319,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._distTarget is not None
 
     def activate(self):
-        self._assignmentEditor = PlanAssignmentEditor(self.plan, self)
+        self._assignmentEditor = PlanEditor(self.plan, self)
         return super().activate()
 
     def deactivate(self):

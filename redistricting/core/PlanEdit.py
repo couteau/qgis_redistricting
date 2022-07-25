@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanAssignmentEditor(QObject):
+class PlanEditor(QObject):
     assignmentsChanged = pyqtSignal()
 
     def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
