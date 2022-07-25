@@ -28,7 +28,7 @@ from qgis.PyQt.QtWidgets import QDockWidget
 from qgis.PyQt.QtCore import Qt, QObject, QVariant, pyqtSignal, QAbstractListModel, QModelIndex
 from qgis.core import QgsApplication, QgsFieldModel
 from .ui.DistrictTools import Ui_qdwDistrictTools
-from ..core import BaseDistrict, RedistrictingPlan, GeoFieldsModel, tr
+from ..core import BaseDistrict, RedistrictingPlan, GeoFieldsModel, tr, showHelp
 
 
 class DistrictSelectModel(QAbstractListModel):
@@ -219,7 +219,6 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.cmbGeoSelect.currentIndexChanged.connect(self.cmbGeoFieldChanged)
         self.cmbTarget.currentIndexChanged.connect(self.cmbTargetChanged)
         self.cmbSource.currentIndexChanged.connect(self.cmbSourceChanged)
-        self.btnPreview.clicked.connect(self.btnPreviewClicked)
 
         self.btnUndo.setIcon(QgsApplication.getThemeIcon('/mActionUndo.svg'))
         self.btnRedo.setIcon(QgsApplication.getThemeIcon('/mActionRedo.svg'))
@@ -227,6 +226,9 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.btnRedo.setEnabled(False)
         self.btnUndo.clicked.connect(self.undo)
         self.btnRedo.clicked.connect(self.redo)
+
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.clicked.connect(self.btnHelpClicked)
 
         self.plan = plan
 
@@ -294,5 +296,5 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             dist = self._plan.districts[index-2]
             self.sourceChanged.emit(dist.district)
 
-    def btnPreviewClicked(self):
-        ...
+    def btnHelpClicked(self):
+        showHelp('usage/toolbox.html')

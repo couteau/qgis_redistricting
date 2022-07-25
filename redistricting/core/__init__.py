@@ -16,14 +16,14 @@
  ***************************************************************************/
 """
 from .Plan import RedistrictingPlan
-from .Utils import makeFieldName, tr, loadSpatialiteModule
+from .Utils import makeFieldName, tr, loadSpatialiteModule, showHelp
 from .Storage import ProjectStorage
 from .District import BaseDistrict, District
 from .DistrictList import DistrictList
 from .Field import Field, DataField, BasePopulation
 from .FieldList import FieldList
 from .PlanStyle import PlanStyler
-from .AssignmentEditor import PlanAssignmentEditor
+from .PlanEdit import PlanEditor
 from .DistrictDataModel import DistrictDataModel
 from .GeoFieldsModel import GeoFieldsModel
 from .DeltaListModel import DeltaListModel
@@ -34,5 +34,5 @@ from .Exception import RdsException
 
 __all__ = ['RedistrictingPlan', 'BaseDistrict', 'District', 'DistrictList', 'FieldList',
            'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
-           'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
-           'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'RdsException']
+           'PlanEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
+           'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'showHelp', 'RdsException']

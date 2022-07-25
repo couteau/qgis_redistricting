@@ -32,7 +32,7 @@ from ._dlgEditPlanImportPage import dlgEditPlanImportPage
 from .RdsFieldComboBox import RdsFieldComboBox
 from .RdsMapLayerComboBox import RdsMapLayerComboBox
 from .RdsFieldTableView import RdsFieldTableView
-from ..core import RedistrictingPlan, tr
+from ..core import RedistrictingPlan, tr, showHelp
 
 iface: QgisInterface
 
@@ -52,11 +52,15 @@ class DlgEditPlan(QWizard):
         self.setOptions(QWizard.NoBackButtonOnStartPage |
                         QWizard.CancelButtonOnLeft |
                         QWizard.NoDefaultButton |
-                        QWizard.HaveFinishButtonOnEarlyPages)
+                        QWizard.HaveFinishButtonOnEarlyPages |
+                        QWizard.HaveHelpButton |
+                        QWizard.HelpButtonOnRight)
 
         self.setDefaultProperty('RdsMapLayerComboBox', 'layer', RdsMapLayerComboBox.layerChanged)
         self.setDefaultProperty('RdsFieldComboBox', 'field', RdsFieldComboBox.fieldChanged)
         self.setDefaultProperty('RdsFieldTableView', 'fields', RdsFieldTableView.fieldsChanged)
+
+        self.helpRequested.connect(self.showHelp)
 
         self.addPage(dlgEditPlanDetailsPage(self))
         self.addPage(dlgEditPlanGeoPage(self))
@@ -82,6 +86,9 @@ class DlgEditPlan(QWizard):
         else:
             self.addPage(dlgEditPlanImportPage(self))
             self.setField('sourceLayer', iface.activeLayer())
+
+    def showHelp(self):
+        showHelp(f'usage/create_plan.html#page-{self.currentId()+1}')
 
     def planName(self):
         return self.field('planName')

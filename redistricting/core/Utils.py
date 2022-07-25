@@ -16,6 +16,7 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+import pathlib
 
 import sys
 import os
@@ -24,7 +25,8 @@ import re
 from typing import TYPE_CHECKING, List, Union
 
 from qgis.core import QgsVectorLayer
-from qgis.PyQt.QtCore import QCoreApplication
+from qgis.PyQt.QtCore import QCoreApplication, QUrl
+from qgis.PyQt.QtGui import QDesktopServices
 
 if TYPE_CHECKING:
     from . import Field
@@ -100,3 +102,9 @@ def getDefaultField(layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern
                     return fld.name()
 
     return None
+
+
+def showHelp(helpPage='index.html'):
+    """Display application help to the user."""
+    helpfile = f'file:///{str(pathlib.Path(__file__).parent.parent.resolve())}/help/{helpPage}'
+    QDesktopServices.openUrl(QUrl(helpfile))

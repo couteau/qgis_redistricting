@@ -1,160 +1,160 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
-    <class>wzpPlanDetails</class>
-    <widget class="QWizardPage" name="wzpPlanDetails">
-        <property name="geometry">
-            <rect>
-                <x>0</x>
-                <y>0</y>
-                <width>605</width>
-                <height>406</height>
-            </rect>
-        </property>
-        <property name="sizePolicy">
-            <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-                <horstretch>0</horstretch>
-                <verstretch>0</verstretch>
-            </sizepolicy>
-        </property>
-        <property name="windowTitle">
-            <string>Plan Details</string>
-        </property>
-        <property name="title">
-            <string>Plan Details</string>
-        </property>
-        <property name="subTitle">
-            <string>Configure plan name, GeoPackage, number of districts, and primary geography</string>
-        </property>
-        <layout class="QGridLayout" name="gridLayout">
-            <item row="0" column="1">
-                <widget class="QLineEdit" name="inpPlanName">
-                    <property name="toolTip">
-                        <string>Enter a name for your districting plan</string>
-                    </property>
-                </widget>
-            </item>
-            <item row="6" column="0" colspan="2">
-                <widget class="QPlainTextEdit" name="txtDescription">
-                    <property name="tabChangesFocus">
-                        <bool>true</bool>
-                    </property>
-                </widget>
-            </item>
-            <item row="2" column="0">
-                <widget class="QLabel" name="lblNumDistricts">
-                    <property name="text">
-                        <string>&amp;Number of Districts</string>
-                    </property>
-                    <property name="buddy">
-                        <cstring>sbxNumDistricts</cstring>
-                    </property>
-                </widget>
-            </item>
-            <item row="3" column="0">
-                <widget class="QLabel" name="lblNumSeats">
-                    <property name="text">
-                        <string>Number of &amp;Seats</string>
-                    </property>
-                    <property name="buddy">
-                        <cstring>sbxNumSeats</cstring>
-                    </property>
-                </widget>
-            </item>
-            <item row="2" column="1">
-                <widget class="QSpinBox" name="sbxNumDistricts">
-                    <property name="toolTip">
-                        <string>Enter the total number of districts in your plan</string>
-                    </property>
-                    <property name="minimum">
-                        <number>1</number>
-                    </property>
-                    <property name="maximum">
-                        <number>1000</number>
-                    </property>
-                </widget>
-            </item>
-            <item row="5" column="0">
-                <widget class="QLabel" name="lblDescription">
-                    <property name="text">
-                        <string>Plan &amp;Description</string>
-                    </property>
-                    <property name="buddy">
-                        <cstring>txtDescription</cstring>
-                    </property>
-                </widget>
-            </item>
-            <item row="3" column="1">
-                <widget class="QSpinBox" name="sbxNumSeats">
-                    <property name="toolTip">
-                        <string>Enter the number of seats that are elected from the districts in this plan</string>
-                    </property>
-                    <property name="minimum">
-                        <number>1</number>
-                    </property>
-                    <property name="maximum">
-                        <number>1000</number>
-                    </property>
-                    <property name="value">
-                        <number>1</number>
-                    </property>
-                </widget>
-            </item>
-            <item row="0" column="0">
-                <widget class="QLabel" name="lblPlanName">
-                    <property name="text">
-                        <string>Plan Na&amp;me</string>
-                    </property>
-                    <property name="buddy">
-                        <cstring>inpPlanName</cstring>
-                    </property>
-                </widget>
-            </item>
-            <item row="1" column="1">
-                <widget class="RdsFileWidget" name="fileGpkg">
-                    <property name="toolTip">
-                        <string>Enter the path to a new GeoPackage in which to store geography assignments and district summary</string>
-                    </property>
-                    <property name="dialogTitle">
-                        <string>Plan GeoPackage File</string>
-                    </property>
-                    <property name="filter">
-                        <string notr="true">*.gpkg</string>
-                    </property>
-                    <property name="storageMode">
-                        <enum>QgsFileWidget::SaveFile</enum>
-                    </property>
-                </widget>
-            </item>
-            <item row="1" column="0">
-                <widget class="QLabel" name="lblGpkg">
-                    <property name="text">
-                        <string>GeoPackage &amp;Path</string>
-                    </property>
-                    <property name="buddy">
-                        <cstring>fileGpkg</cstring>
-                    </property>
-                </widget>
-            </item>
-        </layout>
+ <class>wzpPlanDetails</class>
+ <widget class="QWizardPage" name="wzpPlanDetails">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>605</width>
+    <height>406</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="windowTitle">
+   <string>Plan Details</string>
+  </property>
+  <property name="title">
+   <string>Plan Details</string>
+  </property>
+  <property name="subTitle">
+   <string>Configure plan name, GeoPackage, number of districts, number of members, and description</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="1">
+    <widget class="QLineEdit" name="inpPlanName">
+     <property name="toolTip">
+      <string>Enter a name for your districting plan</string>
+     </property>
     </widget>
-    <customwidgets>
-        <customwidget>
-            <class>QgsFileWidget</class>
-            <extends>QWidget</extends>
-            <header>qgsfilewidget.h</header>
-        </customwidget>
-        <customwidget>
-            <class>RdsFileWidget</class>
-            <extends>QgsFileWidget</extends>
-            <header>.RedistrictingWidgets</header>
-        </customwidget>
-    </customwidgets>
-    <tabstops>
-        <tabstop>inpPlanName</tabstop>
-        <tabstop>sbxNumDistricts</tabstop>
-        <tabstop>sbxNumSeats</tabstop>
-        <tabstop>txtDescription</tabstop>
-    </tabstops>
-    <resources />
-    <connections />
+   </item>
+   <item row="6" column="0" colspan="2">
+    <widget class="QPlainTextEdit" name="txtDescription">
+     <property name="tabChangesFocus">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QLabel" name="lblNumDistricts">
+     <property name="text">
+      <string>&amp;Number of Districts</string>
+     </property>
+     <property name="buddy">
+      <cstring>sbxNumDistricts</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QLabel" name="lblNumSeats">
+     <property name="text">
+      <string>Number of &amp;Seats</string>
+     </property>
+     <property name="buddy">
+      <cstring>sbxNumSeats</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="1">
+    <widget class="QSpinBox" name="sbxNumDistricts">
+     <property name="toolTip">
+      <string>Enter the total number of districts in your plan</string>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>1000</number>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="0">
+    <widget class="QLabel" name="lblDescription">
+     <property name="text">
+      <string>Plan &amp;Description</string>
+     </property>
+     <property name="buddy">
+      <cstring>txtDescription</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="1">
+    <widget class="QSpinBox" name="sbxNumSeats">
+     <property name="toolTip">
+      <string>Enter the number of seats that are elected from the districts in this plan</string>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>1000</number>
+     </property>
+     <property name="value">
+      <number>1</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0">
+    <widget class="QLabel" name="lblPlanName">
+     <property name="text">
+      <string>Plan Na&amp;me</string>
+     </property>
+     <property name="buddy">
+      <cstring>inpPlanName</cstring>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="RdsFileWidget" name="fileGpkg">
+     <property name="toolTip">
+      <string>Enter the path to a new GeoPackage in which to store geography assignments and district summary</string>
+     </property>
+     <property name="dialogTitle">
+      <string>Plan GeoPackage File</string>
+     </property>
+     <property name="filter">
+      <string notr="true">*.gpkg</string>
+     </property>
+     <property name="storageMode">
+      <enum>QgsFileWidget::SaveFile</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QLabel" name="lblGpkg">
+     <property name="text">
+      <string>GeoPackage &amp;Path</string>
+     </property>
+     <property name="buddy">
+      <cstring>fileGpkg</cstring>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsFileWidget</class>
+   <extends>QWidget</extends>
+   <header>qgsfilewidget.h</header>
+  </customwidget>
+  <customwidget>
+   <class>RdsFileWidget</class>
+   <extends>QgsFileWidget</extends>
+   <header>.RedistrictingWidgets</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>inpPlanName</tabstop>
+  <tabstop>sbxNumDistricts</tabstop>
+  <tabstop>sbxNumSeats</tabstop>
+  <tabstop>txtDescription</tabstop>
+ </tabstops>
+ <resources/>
+ <connections/>
 </ui>

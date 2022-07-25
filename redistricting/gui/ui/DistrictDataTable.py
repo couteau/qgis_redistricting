@@ -40,10 +40,7 @@ class Ui_qdwDistrictData(object):
         self.gloStatistics.setContentsMargins(0, 0, 0, 0)
         self.gloStatistics.setObjectName("gloStatistics")
         self.tblPlanStats = QtWidgets.QTableView(self.gbxPlanStats)
-        self.tblPlanStats.setStyleSheet("QTableView {\n"
-"    background-color: #F0F0F0;\n"
-"}\n"
-"QHeaderView {\n"
+        self.tblPlanStats.setStyleSheet("QHeaderView {\n"
 "     border: none;\n"
 "     padding-left: 5px\n"
 "}\n"
@@ -56,7 +53,7 @@ class Ui_qdwDistrictData(object):
         self.tblPlanStats.setGridStyle(QtCore.Qt.NoPen)
         self.tblPlanStats.setObjectName("tblPlanStats")
         self.tblPlanStats.horizontalHeader().setVisible(False)
-        self.tblPlanStats.verticalHeader().setDefaultSectionSize(21)
+        self.tblPlanStats.verticalHeader().setDefaultSectionSize(24)
         self.gloStatistics.addWidget(self.tblPlanStats, 5, 0, 1, 1)
         self.gridLayout.addWidget(self.gbxPlanStats, 2, 2, 1, 1)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
@@ -82,14 +79,21 @@ class Ui_qdwDistrictData(object):
         self.horizontalLayout_2.setSpacing(4)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.btnCopy = QtWidgets.QToolButton(self.frame)
+        self.btnCopy.setAutoRaise(True)
         self.btnCopy.setObjectName("btnCopy")
         self.horizontalLayout_2.addWidget(self.btnCopy)
         self.btnRecalculate = QtWidgets.QToolButton(self.frame)
+        self.btnRecalculate.setAutoRaise(True)
         self.btnRecalculate.setObjectName("btnRecalculate")
         self.horizontalLayout_2.addWidget(self.btnRecalculate)
         self.btnAddFields = QtWidgets.QToolButton(self.frame)
+        self.btnAddFields.setAutoRaise(True)
         self.btnAddFields.setObjectName("btnAddFields")
         self.horizontalLayout_2.addWidget(self.btnAddFields)
+        self.btnHelp = QtWidgets.QToolButton(self.frame)
+        self.btnHelp.setAutoRaise(True)
+        self.btnHelp.setObjectName("btnHelp")
+        self.horizontalLayout_2.addWidget(self.btnHelp)
         self.horizontalLayout.addWidget(self.frame)
         self.gridLayout.addLayout(self.horizontalLayout, 0, 1, 1, 2)
         qdwDistrictData.setWidget(self.dockWidgetContents)
@@ -110,3 +114,4 @@ class Ui_qdwDistrictData(object):
         self.btnRecalculate.setText(_translate("qdwDistrictData", "..."))
         self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data fields"))
         self.btnAddFields.setText(_translate("qdwDistrictData", "..."))
+        self.btnHelp.setText(_translate("qdwDistrictData", "..."))

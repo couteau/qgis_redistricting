@@ -28,7 +28,7 @@ from qgis.PyQt.QtCore import Qt, QObject, QCoreApplication, QEvent, QModelIndex,
 from qgis.PyQt.QtGui import QKeySequence, QFont
 from qgis.PyQt.QtWidgets import QWidget, QDockWidget
 from qgis.core import QgsApplication
-from ..core import RedistrictingPlan, DistrictDataModel, Field, tr
+from ..core import RedistrictingPlan, DistrictDataModel, Field, tr, showHelp
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
 from .DlgEditFields import DlgEditFields
@@ -178,6 +178,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             QgsApplication.getThemeIcon('/mActionAddManualTable.svg'))
         self.btnAddFields.clicked.connect(self.addFieldDlg)
 
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.clicked.connect(self.btnHelpClicked)
         self._plan: RedistrictingPlan = None
         self.plan = plan
 
@@ -233,3 +235,6 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             self.copySelection()
             return True
         return super().eventFilter(source, event)
+
+    def btnHelpClicked(self):
+        showHelp('usage/data_table.html')

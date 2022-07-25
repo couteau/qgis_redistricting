@@ -75,7 +75,7 @@ class Ui_wzpPlanDetails(object):
         _translate = QtCore.QCoreApplication.translate
         wzpPlanDetails.setWindowTitle(_translate("wzpPlanDetails", "Plan Details"))
         wzpPlanDetails.setTitle(_translate("wzpPlanDetails", "Plan Details"))
-        wzpPlanDetails.setSubTitle(_translate("wzpPlanDetails", "Configure plan name, GeoPackage, number of districts, and primary geography"))
+        wzpPlanDetails.setSubTitle(_translate("wzpPlanDetails", "Configure plan name, GeoPackage, number of districts, number of members, and description"))
         self.inpPlanName.setToolTip(_translate("wzpPlanDetails", "Enter a name for your districting plan"))
         self.lblNumDistricts.setText(_translate("wzpPlanDetails", "&Number of Districts"))
         self.lblNumSeats.setText(_translate("wzpPlanDetails", "Number of &Seats"))
