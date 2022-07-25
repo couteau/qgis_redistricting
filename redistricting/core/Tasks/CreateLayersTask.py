@@ -22,7 +22,6 @@ from typing import List, TYPE_CHECKING
 from contextlib import closing
 from qgis.PyQt.QtCore import QVariant
 from qgis.core import (
-    QgsCoordinateTransform,
     QgsDataSourceUri,
     QgsProject,
     QgsTask,
@@ -53,15 +52,15 @@ def getOgrCompatibleSource(input_layer: QgsVectorLayer):
     if input_layer is None or input_layer.dataProvider().name() == 'memory':
         pass
     elif input_layer.dataProvider().name() == 'ogr':
-        ogr_data_path = GdalUtils.ogrConnectionStringAndFormatFromLayer(input_layer)[
-            0]
+        ogr_data_path = \
+            GdalUtils.ogrConnectionStringAndFormatFromLayer(input_layer)[0]
     elif input_layer.dataProvider().name() == 'delimitedtext':
         ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
             input_layer)[7:]
     elif input_layer.dataProvider().name().lower() == 'wfs':
         uri = QgsDataSourceUri(input_layer.source())
         baseUrl = uri.param('url').split('?')[0]
-        ogr_data_path = "WFS:{}".format(baseUrl)
+        ogr_data_path = f"WFS:{baseUrl}"
     else:
         ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
             input_layer)
@@ -103,7 +102,7 @@ class CreatePlanLayersTask(QgsTask):
 
     def _createDistLayer(self, gpkgPath):
         l = QgsVectorLayer(
-            f'MultiPolygon?crs={self.srcLayer.sourceCrs().authid()}&index=yes', 'districts', 'memory'
+            f'MultiPolygon?crs={self.srcLayer.crs().authid()}&index=yes', 'districts', 'memory'
         )
         provider = l.dataProvider()
 
@@ -155,12 +154,6 @@ class CreatePlanLayersTask(QgsTask):
         saveOptions.layerName = 'districts'
         saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
         saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
-        if l.crs() != QgsProject.instance().crs():
-            saveOptions.ct = QgsCoordinateTransform(
-                l.crs(),
-                QgsProject.instance().crs(),
-                QgsProject.instance().transformContext()
-            )
 
         error = QgsVectorFileWriter.writeAsVectorFormatV2(
             l, gpkgPath, QgsProject.instance().transformContext(), saveOptions
@@ -173,24 +166,24 @@ class CreatePlanLayersTask(QgsTask):
             )
             return False
 
-        with closing(spatialite_connect(gpkgPath)) as db:
-            db: sqlite3.Connection
-            f = {}
-            source = getOgrCompatibleSource(self.popLayer)
-            if source is not None:
-                ds: gdal.Dataset = gdal.OpenEx(source, gdal.OF_VECTOR)
-                if ds is not None:
-                    try:
-                        sql += f' FROM {getTableName(self.popLayer, ds)}'
-                        lyr: ogr.Layer = ds.ExecuteSQL(sql)
-                        f = lyr.GetNextFeature().items()
-                    except:  # pylint: disable=bare-except
-                        ...
+        f = {}
+        source = getOgrCompatibleSource(self.popLayer)
+        if source is not None:
+            ds: gdal.Dataset = gdal.OpenEx(source, gdal.OF_VECTOR)
+            if ds is not None:
+                try:
+                    sql += f' FROM {getTableName(self.popLayer, ds)}'
+                    lyr: ogr.Layer = ds.ExecuteSQL(sql)
+                    f = lyr.GetNextFeature().items()
+                except:  # pylint: disable=bare-except
+                    ...
 
-            if f:
+        if f:
+            self.totalPop = f[self.popField]
+            with closing(spatialite_connect(gpkgPath)) as db:
                 sql = f'INSERT INTO districts ({",".join(f.keys())}) VALUES ({",".join("?" * len(f))})'
+                db: sqlite3.Connection
                 db.execute(sql, list(f.values()))
-                self.totalPop = f[self.popField]
 
         return True
 
@@ -220,12 +213,6 @@ class CreatePlanLayersTask(QgsTask):
             saveOptions.layerName = 'assignments'
             saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
             saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-            if self.srcLayer.crs() != QgsProject.instance().crs():
-                saveOptions.ct = QgsCoordinateTransform(
-                    self.srcLayer.crs(),
-                    QgsProject.instance().crs(),
-                    QgsProject.instance().transformContext()
-                )
 
             writer = QgsVectorFileWriter.create(
                 self.path,
