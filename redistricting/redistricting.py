@@ -475,6 +475,8 @@ class Redistricting:
         storage = ProjectStorage(self.project, doc, context)
         self.redistrictingPlans.extend(storage.readRedistrictingPlans())
         for plan in self.redistrictingPlans:
+            for err, level in plan.errors():
+                self.iface.messageBar().pushMessage(err, level)
             plan.planChanged.connect(self.planChanged)
 
         if len(self.redistrictingPlans) == 1:

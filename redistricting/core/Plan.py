@@ -105,8 +105,9 @@ class RedistrictingPlan(QObject):
         self._stats = PlanStats(self)
 
         self._districts = DistrictList(self)
-        self._error = None
-        self._errorLevel = None
+        self._errors = []
+
+        QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
     def __copy__(self):
         data = self.serialize()
@@ -165,10 +166,10 @@ class RedistrictingPlan(QObject):
         plan._geoIdField = data.get('geo-id-field', plan._geoIdField)
         plan._geoDisplay = data.get('geo-id-display', '')
 
-        plan._popLayer = QgsProject.instance().mapLayer(data.get('pop-layer'))
         plan._popField = data.get('pop-field')
         plan._vapField = data.get('vap-field')
         plan._cvapField = data.get('cvap-field')
+        plan.popLayer = QgsProject.instance().mapLayer(data.get('pop-layer'))
 
         for field in data.get('data-fields', []):
             f = DataField.deserialize(field, plan.dataFields)
@@ -413,16 +414,8 @@ class RedistrictingPlan(QObject):
             raise ValueError(tr('Population layer must be provided'))
 
         if self._popField:
-            idx = value.fields().lookupField(self._popField)
-            if idx == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('population').capitalize(),
-                        field=self._popField,
-                        layertype=tr('population'),
-                        layername=value.name()
-                    )
-                )
+            self.validatePopField(self._popField, tr('population').capitalize(), value)
+
         if self._joinField:
             idx = value.fields().lookupField(self._joinField)
             if idx == -1:
@@ -434,28 +427,20 @@ class RedistrictingPlan(QObject):
                         layername=value.name()
                     )
                 )
+
         if self._vapField:
-            idx = value.fields().lookupField(self._vapField)
-            if idx == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('VAP').capitalize(),
-                        field=self._vapField,
-                        layertype=tr('population'),
-                        layername=value.name()
-                    )
-                )
+            try:
+                self.validatePopField(self._vapField, tr('VAP'), value)
+            except RdsException as e:
+                self.pushError(e, Qgis.Critical)
+                self._vapField = None
+
         if self._cvapField:
-            idx = value.fields().lookupField(self._cvapField)
-            if idx == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('CVAP').capitalize(),
-                        field=self._cvapField,
-                        layertype=tr('population'),
-                        layername=value.name()
-                    )
-                )
+            try:
+                self.validatePopField(self._cvapField, tr('CVAP'), value)
+            except RdsException as e:
+                self.pushError(e, Qgis.Critical)
+                self._cvapField = None
 
         for f in self._dataFields:
             f.setLayer(value)
@@ -494,16 +479,8 @@ class RedistrictingPlan(QObject):
         if value != self._popField:
             if not value:
                 raise ValueError(tr('Population field must be set'))
-            if self._popLayer and self._popLayer.fields().lookupField(value) == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('population').capitalize(),
-                        field=value,
-                        layertype=tr('population'),
-                        layername=self._popLayer.name()
-                    )
-                )
 
+            self.validatePopField(value, tr('population').capitalize())
             oldValue = self._popField
             self._popField = value
             self._districts.updateDistrictFields()
@@ -517,16 +494,8 @@ class RedistrictingPlan(QObject):
     @vapField.setter
     def vapField(self, value: str):
         if value != self._vapField:
-            if value and self._popLayer and self._popLayer.fields().lookupField(value) == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('VAP'),
-                        field=value,
-                        layertype=tr('population'),
-                        layername=self._popLayer.name()
-                    )
-                )
-
+            if value:
+                self.validatePopField(value, tr('VAP'))
             oldValue = self._vapField
             self._vapField = value
             self._districts.updateDistrictFields()
@@ -540,16 +509,8 @@ class RedistrictingPlan(QObject):
     @cvapField.setter
     def cvapField(self, value: str):
         if value != self._cvapField:
-            if value and self._popLayer and self._popLayer.fields().lookupField(value) == -1:
-                raise RdsException(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('CVAP'),
-                        field=value,
-                        layertype=tr('population'),
-                        layername=self._popLayer.name()
-                    )
-                )
-
+            if value:
+                self.validatePopField(value, tr('CVAP'))
             oldValue = self._cvapField
             self._cvapField = value
             self._districts.updateDistrictFields()
@@ -765,16 +726,52 @@ class RedistrictingPlan(QObject):
 
         return ''
 
+    def validatePopField(self, field: str, fieldname: str, layer: QgsVectorLayer = None):
+        if layer is None:
+            layer = self._popLayer
+
+        if not layer:
+            return True
+
+        if (idx := layer.fields().lookupField(field)) == -1:
+            raise RdsException(
+                tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
+                    fieldname=fieldname,
+                    field=field,
+                    layertype=tr('population'),
+                    layername=layer.name()
+                )
+            )
+
+        f = layer.fields().field(idx)
+        if not f.isNumeric():
+            raise RdsException(
+                tr('{fieldname} field {field} must be numeric').format(
+                    fieldname=fieldname,
+                    field=field
+                )
+            )
+
+        return True
+
     def error(self) -> Union[Tuple[str, int], None]:
-        return (self._error, self._errorLevel) if self._error is not None else None
+        return self._errors.pop() if self._errors else None
+
+    def errors(self) -> List[Tuple[str, int]]:
+        return self._errors
 
     def setError(self, error, level=Qgis.Warning):
-        self._error = error
-        self._errorLevel = level
+        self._errors.clear()
+        self.pushError(error, level)
+
+    def pushError(self, error, level=Qgis.Warning):
+        if isinstance(error, Exception):
+            error = str(error)
+        self._errors.append((error, level))
         QgsMessageLog.logMessage(error, 'Redistricting', level)
 
     def clearError(self):
-        self._error = None
+        self._errors.clear()
 
     def removeGroup(self):
         self._group.removeGroup()
@@ -879,6 +876,16 @@ class RedistrictingPlan(QObject):
 
         return self._createLayersTask
 
+    def layerRemoved(self, layer):
+        if layer == self._assignLayer:
+            self._setAssignLayer(None)
+        elif layer == self._distLayer:
+            self._setDistLayer(None)
+        elif layer == self._popLayer:
+            self._popLayer = None
+        elif self._sourceLayer:
+            self._sourceLayer = None
+
     def _updateLayerNames(self):
         if self._assignLayer:
             self._assignLayer.setName(f'{self.name}_assignments')
@@ -903,15 +910,15 @@ class RedistrictingPlan(QObject):
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)
 
-    @overload
+    @ overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
         ...
 
-    @overload
+    @ overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, field: QgsField):
         ...
 
-    @overload
+    @ overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fields: Iterable[QgsField]):
         ...
 
@@ -953,11 +960,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
         return dist
 
-    @overload
+    @ overload
     def removeDistrict(self, district: District):
         ...
 
-    @overload
+    @ overload
     def removeDistrict(self, district: int):
         ...
 
@@ -971,11 +978,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(
             self, 'districts', self._districts[:], oldDistricts)
 
-    @overload
+    @ overload
     def appendDataField(self, field: str, isExpression: bool = False, caption: str = None):
         ...
 
-    @overload
+    @ overload
     def appendDataField(self, field: DataField):
         ...
 
@@ -1019,15 +1026,15 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'data-fields',
                               self._dataFields, oldDataFields)
 
-    @overload
+    @ overload
     def removeDataField(self, field: str):
         ...
 
-    @overload
+    @ overload
     def removeDataField(self, field: DataField):
         ...
 
-    @overload
+    @ overload
     def removeDataField(self, field: int):
         ...
 
@@ -1072,11 +1079,11 @@ class RedistrictingPlan(QObject):
         self.planChanged.emit(self, 'data-fields',
                               self._dataFields, oldDataFields)
 
-    @overload
+    @ overload
     def appendGeoField(self, field: str, isExpression: bool = False, caption: str = None):
         ...
 
-    @overload
+    @ overload
     def appendGeoField(self, field: Field):
         ...
 
@@ -1118,15 +1125,15 @@ class RedistrictingPlan(QObject):
         self.geoFieldAdded.emit(self, f)
         self.planChanged.emit(self, 'geo-fields', self._geoFields, oldGeoFields)
 
-    @overload
+    @ overload
     def removeGeoField(self, field: Field):
         ...
 
-    @overload
+    @ overload
     def removeGeoField(self, field: str):
         ...
 
-    @overload
+    @ overload
     def removeGeoField(self, field: int):
         ...
 
