@@ -239,6 +239,9 @@ class DataField(Field):
 
     @sum.setter
     def sum(self, value: bool):
+        if value and not self.isNumeric:
+            return
+
         if self._sum != value:
             self._sum = value
             self.fieldChanged.emit(self)
@@ -249,6 +252,9 @@ class DataField(Field):
 
     @pctbase.setter
     def pctbase(self, value: BasePopulation):
+        if not self.isNumeric and value != BasePopulation.NOPCT:
+            return
+
         if self._pctbase != value:
             self._pctbase = value
             self.fieldChanged.emit(self)
@@ -259,7 +265,7 @@ class DataField(Field):
 
     @pctpop.setter
     def pctpop(self, value: bool):
-        self.pctbase = BasePopulation.TOTALPOP if value else BasePopulation.NOPCT
+        self.pctbase = BasePopulation.TOTALPOP if value and self.isNumeric else BasePopulation.NOPCT
 
     @property
     def pctvap(self) -> bool:
@@ -267,7 +273,7 @@ class DataField(Field):
 
     @pctvap.setter
     def pctvap(self, value: bool):
-        self.pctbase = BasePopulation.VAP if value else BasePopulation.NOPCT
+        self.pctbase = BasePopulation.VAP if value and self.isNumeric else BasePopulation.NOPCT
 
     @property
     def pctcvap(self) -> bool:
@@ -275,7 +281,7 @@ class DataField(Field):
 
     @pctcvap.setter
     def pctcvap(self, value: bool):
-        self.pctbase = BasePopulation.CVAP if value else BasePopulation.NOPCT
+        self.pctbase = BasePopulation.CVAP if value and self.isNumeric else BasePopulation.NOPCT
 
     def serialize(self):
         return super().serialize() | {
@@ -286,7 +292,8 @@ class DataField(Field):
     @classmethod
     def deserialize(cls, data, parent: Optional['QObject'] = None):
         if field := super().deserialize(data, parent):
-            field.sum = data.get('sum', field.sum)
-            field.pctbase = BasePopulation(data.get('pctbase', field.pctbase))
+            field.sum = data.get('sum', field.sum) if field.isNumeric else False
+            field.pctbase = BasePopulation(data.get('pctbase', field.pctbase)) \
+                if field.isNumeric else BasePopulation.NOPCT
 
         return field
