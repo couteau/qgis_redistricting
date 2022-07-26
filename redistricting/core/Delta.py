@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - class for calculating pending changes to 
+"""QGIS Redistricting Plugin - class for calculating pending changes to
         a district
 
         begin                : 2022-05-25

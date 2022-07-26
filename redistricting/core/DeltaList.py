@@ -45,11 +45,12 @@ class DeltaList(QObject):
         super().__init__(parent)
         self._plan = plan
         self._districts = plan.districts
-        # self._plan.assignmentsChanged.connect(self.update)
+
         self._undoStack = self._plan.assignLayer.undoStack()
         self._undoStack.indexChanged.connect(self.update)
         self._plan.assignLayer.afterCommitChanges.connect(self.update)
         self._plan.assignLayer.afterRollBack.connect(self.update)
+
         self._pendingTask = None
 
     def __getitem__(self, index) -> Delta:
@@ -111,7 +112,7 @@ class DeltaList(QObject):
         if self._pendingTask:
             return self._pendingTask
 
-        if not self._plan.assignLayer.editBuffer() or \
+        if not self._plan.assignLayer or not self._plan.assignLayer.editBuffer() or \
                 len(self._plan.assignLayer.editBuffer().changedAttributeValues()) == 0:
             self.clear()
             return None
