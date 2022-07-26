@@ -259,7 +259,7 @@ class DistrictList(QObject):
             self.updating.emit()
             self._updateTask = AggregateDistrictDataTask(
                 self._plan,
-                districts=self._updateDistricts,
+                updateDistricts=self._updateDistricts,
                 includeGeometry=self._needGeomUpdate,
                 useBuffer=self._needGeomUpdate
             )
