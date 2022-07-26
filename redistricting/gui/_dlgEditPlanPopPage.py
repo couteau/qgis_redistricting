@@ -22,7 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsVectorLayer
+from qgis.core import QgsVectorLayer, QgsFieldProxyModel
 from qgis.PyQt.QtWidgets import QWizardPage
 from ..core import defaults
 from ..core.Utils import getDefaultField
@@ -50,6 +50,10 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
         self.cmbPopLayer.layerChanged.connect(self.setPopLayer)
         self.btnUseGeoLayer.toggled.connect(self.updatePopLayer)
+
+        self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbVAPField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbCVAPField.setFilters(QgsFieldProxyModel.Numeric)
 
         self.setFinalPage(True)
 
