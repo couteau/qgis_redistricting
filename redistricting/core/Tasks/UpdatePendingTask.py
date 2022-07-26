@@ -33,30 +33,19 @@ from qgis.core import (
     QgsFeatureRequest,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsVectorLayer,
-
 )
 from ..Utils import tr
 from ._debug import debug_thread
+from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, DataField
+    from .. import RedistrictingPlan
 
 
-class AggregatePendingChangesTask(QgsTask):
+class AggregatePendingChangesTask(AggregateDataTask):
     def __init__(self, plan: RedistrictingPlan, updateTask: QgsTask = None):
-        super().__init__(tr('Calculating pending changes'), QgsTask.AllFlags)
-        self.assignLayer: QgsVectorLayer = plan.assignLayer
-        self.popLayer: QgsVectorLayer = plan.popLayer
-        self.distField = plan.distField
-        self.geoIdField = plan.geoIdField
-        self.joinField = plan.joinField
-        self.popField = plan.popField
-        self.vapField = plan.vapField
-        self.cvapField = plan.cvapField
-        self.dataFields = plan.dataFields
+        super().__init__(plan, tr('Computing pending changes'))
         self.data = None
-        self.exception = None
         self.updateTask = updateTask
         if self.updateTask:
             self.updateTask.taskCompleted.connect(self.clearUpdateTask)
@@ -67,25 +56,6 @@ class AggregatePendingChangesTask(QgsTask):
 
     def run(self):
         debug_thread()
-
-        def getFieldValue(fld: DataField, context: QgsExpressionContext):
-            return lambda f: fld.getValue(f, context)
-
-        def addPopFields(cols: list, getters: list, context: QgsExpressionContext):
-            cols.append(self.popField)
-            getters.append(lambda f: f[self.popField])
-            if self.vapField:
-                cols.append(self.vapField)
-                getters.append(lambda f: f[self.vapField])
-            if self.cvapField:
-                cols.append(self.cvapField)
-                getters.append(lambda f: f[self.cvapField])
-            cols.extend(
-                fld.fieldName for fld in self.dataFields
-            )
-            getters.extend(
-                getFieldValue(fld, context) for fld in self.dataFields
-            )
 
         try:
             dindex = self.assignLayer.fields().lookupField(self.distField)
@@ -124,7 +94,8 @@ class AggregatePendingChangesTask(QgsTask):
 
             cols = [self.joinField]
             getters = [lambda f: f[self.joinField]]
-            addPopFields(cols, getters, context)
+            aggs = {}
+            self.addPopFields(cols, getters, aggs, context)
 
             request = QgsFeatureRequest()
             request.setExpressionContext(context)
@@ -136,15 +107,11 @@ class AggregatePendingChangesTask(QgsTask):
             dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=cols)
             pending = pd.merge(pending, dfpop, how='left', left_index=True, right_index=True)
 
-            newdist = pending.groupby(f'new_{self.distField}').sum()
-            newdist.drop(columns=f'old_{self.distField}', inplace=True)
-            olddist = pending.groupby(f'old_{self.distField}').sum()
-            olddist.drop(columns=f'new_{self.distField}', inplace=True)
+            newdist = pending.groupby(f'new_{self.distField}').agg(aggs)
+            olddist = pending.groupby(f'old_{self.distField}').agg(aggs)
             del pending
 
-            data = newdist.sub(olddist, fill_value=0)
-
-            self.data = data
+            self.data = newdist.sub(olddist, fill_value=0)
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e
             return False

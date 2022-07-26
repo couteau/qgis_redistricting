@@ -29,54 +29,42 @@ import pandas as pd
 import geopandas as gpd
 from shapely import wkt
 from qgis.core import (
-    QgsTask,
     QgsGeometry,
     QgsFeatureRequest,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsVectorLayer,
     QgsAggregateCalculator,
 )
 from qgis.utils import spatialite_connect
 from ..Utils import tr
-from ._exception import CancelledError
+from .UpdateTask import AggregateDataTask
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, Field, DataField
+    from .. import RedistrictingPlan, Field
 
 
-class AggregateDistrictDataTask(QgsTask):
+class AggregateDistrictDataTask(AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(
         self,
         plan: 'RedistrictingPlan',
-        districts: Iterable[int] = None,
+        updateDistricts: Iterable[int] = None,
         includeDemographics=True,
         includeGeometry=True,
         useBuffer=True
     ):
-        description = tr('Calculate district geometry and metrics')
-        super().__init__(description, QgsTask.AllFlags)
+        super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
-        self.assignLayer: QgsVectorLayer = plan.assignLayer
-        self.distLayer: QgsVectorLayer = plan.distLayer
-        self.popLayer: QgsVectorLayer = plan.popLayer
-        self.distField: str = plan.distField
-        self.geoIdField: str = plan.geoIdField
-        self.joinField: str = plan.joinField
-        self.popField: str = plan.popField
-        self.vapField: str = plan.vapField
-        self.cvapField: str = plan.cvapField
-        self.dataFields: List['DataField'] = plan.dataFields
+
         self.geoFields: List['Field'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
         self.geoPackagePath = plan.geoPackagePath
 
-        self.includeDistricts: Set[int] = None \
-            if districts is None or set(districts) == set(range(0, self.numDistricts+1)) \
-            else set(districts)
+        self.updateDistricts: Set[int] = None \
+            if updateDistricts is None or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
+            else set(updateDistricts)
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
@@ -88,46 +76,8 @@ class AggregateDistrictDataTask(QgsTask):
         self.splits = {}
         self.calculateCutEdges = False
         self.calculateSplits = True
-        self.exception = None
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        def hasExpression():
-            for f in self.dataFields:
-                if f.isExpression:
-                    return True
-
-            return False
-
-        def getData(data):
-            nonlocal count
-
-            if self.isCanceled():
-                raise CancelledError()
-
-            count += 1
-            if count % 100 == 0:
-                self.setProgress(98 * count/total)
-            return data
-
-        def getFieldValue(fld: 'DataField', context: QgsExpressionContext):
-            return lambda f: fld.getValue(f, context)
-
-        def addPopFields(cols: list, getters: list, context: QgsExpressionContext):
-            cols.append(self.popField)
-            getters.append(lambda f: f[self.popField])
-            if self.vapField:
-                cols.append(self.vapField)
-                getters.append(lambda f: f[self.vapField])
-            if self.cvapField:
-                cols.append(self.cvapField)
-                getters.append(lambda f: f[self.cvapField])
-            cols.extend(
-                fld.fieldName for fld in self.dataFields
-            )
-            getters.extend(
-                getFieldValue(fld, context) for fld in self.dataFields
-            )
-
         debug_thread()
 
         try:
@@ -144,14 +94,14 @@ class AggregateDistrictDataTask(QgsTask):
             else:
                 request.setFlags(QgsFeatureRequest.NoGeometry)
 
-            if self.includeDistricts:
+            if self.updateDistricts:
                 context = QgsExpressionContext()
                 context.appendScopes(
                     QgsExpressionContextUtils.globalProjectLayerScopes(self.assignLayer))
                 request.setExpressionContext(context)
 
-                flt = f"{self.distField} in ({','.join(str(d) for d in self.includeDistricts)})"  # pylint: disable=not-an-iterable
-                if 0 in self.includeDistricts:  # pylint: disable=unsupported-membership-test
+                flt = f"{self.distField} in ({','.join(str(d) for d in self.updateDistricts)})"  # pylint: disable=not-an-iterable
+                if 0 in self.updateDistricts:  # pylint: disable=unsupported-membership-test
                     flt += f" or {self.distField} is null"
                 request.setFilterExpression(flt)
 
@@ -163,7 +113,6 @@ class AggregateDistrictDataTask(QgsTask):
             else:
                 total = self.assignLayer.featureCount()
 
-            count = 0
             if self.includeDemographics:
                 total *= 2
 
@@ -175,13 +124,13 @@ class AggregateDistrictDataTask(QgsTask):
                 features = self.assignLayer.dataProvider().getFeatures(request)
 
             if self.includeGeometry:
-                datagen = (getData([f[gIndex], f[dIndex], f.geometry().asWkt()]) for f in features)
+                datagen = (self.getData([f[gIndex], f[dIndex], f.geometry().asWkt()]) for f in features)
             else:
-                datagen = (getData([f[gIndex], f[dIndex]]) for f in features)
+                datagen = (self.getData([f[gIndex], f[dIndex]]) for f in features)
             df = pd.DataFrame.from_records(datagen, index=self.geoIdField, columns=cols)
 
             # convert null values to 0 if the "unassigned" district is among those being aggregated
-            if not self.includeDistricts or 0 in self.includeDistricts:  # pylint: disable=unsupported-membership-test
+            if not self.updateDistricts or 0 in self.updateDistricts:  # pylint: disable=unsupported-membership-test
                 df[self.distField] = pd.to_numeric(df[self.distField], errors='coerce').fillna(0).astype(int)
 
             if self.includeDemographics:
@@ -190,26 +139,27 @@ class AggregateDistrictDataTask(QgsTask):
 
                 cols = [self.joinField]
                 getters = [lambda f: f[self.joinField]]
-                addPopFields(cols, getters, context)
+                aggs = {}
+                self.addPopFields(cols, getters, aggs, context)
 
                 request = QgsFeatureRequest()
-                if self.includeDistricts is not None:
+                if self.updateDistricts is not None:
                     request.setExpressionContext(context)
                     r = ','.join([f"'{geoid}'" for geoid in df.index])
                     request.setFilterExpression(f'{self.joinField} in ({r})')
 
-                if not hasExpression():
+                if not self.hasExpression():
                     request.setSubsetOfAttributes(cols, self.popLayer.fields())
 
                 features = self.popLayer.getFeatures(request)
 
-                datagen = (getData([getter(f) for getter in getters]) for f in features)
+                datagen = (self.getData([getter(f) for getter in getters]) for f in features)
                 dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=cols)
                 df = pd.merge(df, dfpop, how='left', left_index=True, right_index=True, copy=False)
 
             if self.includeGeometry:
                 df['geometry'] = df.geometry.apply(wkt.loads)
-                self.setProgress(99)
+                self.setProgress(95)
 
                 gdf: gpd.GeoDataFrame = gpd.GeoDataFrame(
                     df, geometry='geometry', crs=crs.toWkt())
@@ -233,7 +183,7 @@ class AggregateDistrictDataTask(QgsTask):
                     geo.convex_hull.area
 
                 # calculate cut edges only if all districts are being aggregated
-                if self.calculateCutEdges and self.includeDistricts is None:
+                if self.calculateCutEdges and self.updateDistricts is None:
                     try:
                         from redistricting.vendor.gerrychain import Graph, Partition, updaters  # pylint: disable=import-outside-toplevel
 
@@ -253,7 +203,7 @@ class AggregateDistrictDataTask(QgsTask):
                 self.cutEdges = []
 
             # calculate total population only if all districts are being aggregated
-            if self.includeDemographics and self.includeDistricts is None:
+            if self.includeDemographics and self.updateDistricts is None:
                 self.totalPop = int(self.districts[self.popField].sum())
 
             self.splits = {}
