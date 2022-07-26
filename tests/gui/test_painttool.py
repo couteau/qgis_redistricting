@@ -16,7 +16,7 @@ class TestPaintTool:
     @pytest.fixture
     def active_tool(self, qgis_canvas: QgsMapCanvas, tool: PaintDistrictsTool,
                     qtbot: QtBot, mocker: MockerFixture):
-        mocker.patch('redistricting.gui.PaintTool.PlanAssignmentEditor')
+        mocker.patch('redistricting.gui.PaintTool.PlanEditor')
         with qtbot.wait_signal(tool.activated):
             qgis_canvas.setMapTool(tool)
         return tool
@@ -55,7 +55,7 @@ class TestPaintTool:
         assert tool.geoField == 'district'
 
     def test_activate(self, tool: PaintDistrictsTool, qgis_canvas: QgsMapCanvas, qtbot: QtBot, mocker: MockerFixture):
-        cls = mocker.patch('redistricting.gui.PaintTool.PlanAssignmentEditor')
+        cls = mocker.patch('redistricting.gui.PaintTool.PlanEditor')
         tool.setTargetDistrict(2)
         assert tool.targetDistrict == 2
 
