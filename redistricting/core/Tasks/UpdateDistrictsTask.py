@@ -22,9 +22,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+from distutils.version import LooseVersion
 import math
 from typing import Iterable, List, Set, Union, TYPE_CHECKING
 from contextlib import closing
+import fiona
 import pandas as pd
 import geopandas as gpd
 from shapely import wkt
@@ -39,6 +41,7 @@ from qgis.utils import spatialite_connect
 from ..Utils import tr
 from .UpdateTask import AggregateDataTask
 from ._debug import debug_thread
+from ._exception import CancelledError
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan, Field
@@ -83,51 +86,77 @@ class AggregateDistrictDataTask(AggregateDataTask):
         try:
             crs = self.assignLayer.crs()
 
-            fields = self.assignLayer.fields()
-            gIndex = fields.lookupField(self.geoIdField)
-            dIndex = fields.lookupField(self.distField)
-            cols = [self.geoIdField, self.distField]
-
-            request = QgsFeatureRequest()
-            if self.includeGeometry:
-                cols.append('geometry')
-            else:
-                request.setFlags(QgsFeatureRequest.NoGeometry)
-
             if self.updateDistricts:
                 context = QgsExpressionContext()
                 context.appendScopes(
                     QgsExpressionContextUtils.globalProjectLayerScopes(self.assignLayer))
-                request.setExpressionContext(context)
 
                 flt = f"{self.distField} in ({','.join(str(d) for d in self.updateDistricts)})"  # pylint: disable=not-an-iterable
                 if 0 in self.updateDistricts:  # pylint: disable=unsupported-membership-test
                     flt += f" or {self.distField} is null"
-                request.setFilterExpression(flt)
 
                 agg = QgsAggregateCalculator(self.assignLayer)
                 agg.setFilter(flt)
-                total, success = agg.calculate(QgsAggregateCalculator.Count, self.geoIdField, context)
+                self.total, success = agg.calculate(QgsAggregateCalculator.Count, self.geoIdField, context)
                 if not success:
-                    total = 100
+                    self.total = 100
+
+                if self.includeDemographics:
+                    self.total *= 2
+
+                fields = self.assignLayer.fields()
+                gIndex = fields.lookupField(self.geoIdField)
+                dIndex = fields.lookupField(self.distField)
+                cols = [self.geoIdField, self.distField]
+
+                request = QgsFeatureRequest()
+                if self.includeGeometry:
+                    cols.append('geometry')
+                else:
+                    request.setFlags(QgsFeatureRequest.NoGeometry)
+
+                request.setExpressionContext(context)
+                request.setFilterExpression(flt)
+                request.setSubsetOfAttributes(cols, fields)
+
+                if self.useBuffer:
+                    features = self.assignLayer.getFeatures(request)
+                else:
+                    features = self.assignLayer.dataProvider().getFeatures(request)
+
+                if self.includeGeometry:
+                    datagen = (self.getData([f[gIndex], f[dIndex], wkt.loads(f.geometry().asWkt())]) for f in features)
+                else:
+                    datagen = (self.getData([f[gIndex], f[dIndex]]) for f in features)
+                df = gpd.GeoDataFrame.from_records(datagen, index=self.geoIdField, columns=cols)
+                if self.includeGeometry:
+                    df.set_geometry(df.geometry, inplace=True, crs=crs.toWkt())
+                    self.setProgress(95)
             else:
+                cols = [self.geoIdField, self.distField]
                 total = self.assignLayer.featureCount()
-
-            if self.includeDemographics:
-                total *= 2
-
-            request.setSubsetOfAttributes(cols, fields)
-
-            if self.useBuffer:
-                features = self.assignLayer.getFeatures(request)
-            else:
-                features = self.assignLayer.dataProvider().getFeatures(request)
-
-            if self.includeGeometry:
-                datagen = (self.getData([f[gIndex], f[dIndex], f.geometry().asWkt()]) for f in features)
-            else:
-                datagen = (self.getData([f[gIndex], f[dIndex]]) for f in features)
-            df = pd.DataFrame.from_records(datagen, index=self.geoIdField, columns=cols)
+                self.total = total * 2 if self.includeDemographics else total
+                chunkSize = max(100, 10 ** (math.ceil(math.log10(total)) - 2))
+                self.count = 0
+                df: gpd.GeoDataFrame = None
+                while self.count < total:
+                    s = slice(self.count, min(self.count+chunkSize, total))
+                    f = gpd.read_file(
+                        self.geoPackagePath,
+                        layer='assignments',
+                        rows=s,
+                        geometry='geometry',
+                        include_fields=cols
+                    )
+                    df = f if df is None else pd.concat([df, f], copy=False)
+                    self.count = s.stop
+                    if self.isCanceled():
+                        raise CancelledError()
+                    self.setProgress(90 * self.count/self.total)
+                df.set_index(self.geoIdField, drop=True, inplace=True)
+                if LooseVersion(fiona.__version__) < LooseVersion('1.19'):
+                    cols.append('geometry')
+                    df.drop(columns=[col for col in df if col not in cols], inplace=True)
 
             # convert null values to 0 if the "unassigned" district is among those being aggregated
             if not self.updateDistricts or 0 in self.updateDistricts:  # pylint: disable=unsupported-membership-test
@@ -158,15 +187,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 df = pd.merge(df, dfpop, how='left', left_index=True, right_index=True, copy=False)
 
             if self.includeGeometry:
-                df['geometry'] = df.geometry.apply(wkt.loads)
-                self.setProgress(95)
-
-                gdf: gpd.GeoDataFrame = gpd.GeoDataFrame(
-                    df, geometry='geometry', crs=crs.toWkt())
-
-                self.districts: gpd.GeoDataFrame = gdf.dissolve(
-                    by=self.distField, aggfunc='sum')
-                self.setProgress(100)
+                self.districts: gpd.GeoDataFrame = df.dissolve(by=self.distField, aggfunc=aggs)
 
                 geo: gpd.GeoSeries = self.districts['geometry'].to_crs('+proj=cea')
                 area = geo.area
@@ -187,7 +208,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                     try:
                         from redistricting.vendor.gerrychain import Graph, Partition, updaters  # pylint: disable=import-outside-toplevel
 
-                        graph = Graph.from_geodataframe(gdf.to_crs('+proj=cea'), ignore_errors=True)
+                        graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
                         partition = Partition(
                             graph,
                             assignment=self.distField,
@@ -199,8 +220,10 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 else:
                     self.cutEdges = []
             else:
-                self.districts = df.groupby(by=self.distField).sum()
+                self.districts = df.groupby(by=self.distField).agg(aggs)
                 self.cutEdges = []
+
+            self.setProgress(99)
 
             # calculate total population only if all districts are being aggregated
             if self.includeDemographics and self.updateDistricts is None:
@@ -215,6 +238,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                         s = db.execute(sql).fetchall()
                         self.splits[field.fieldName] = s
 
+            self.setProgress(100)
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e
             return False
@@ -222,6 +246,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
         return True
 
     def finished(self, result: bool):
+        super().finished(result)
+
         if not result:
             return
 

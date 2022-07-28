@@ -27,9 +27,7 @@ from __future__ import annotations
 from typing import Any, Dict, TYPE_CHECKING
 import pandas as pd
 from qgis.core import (
-    Qgis,
     QgsTask,
-    QgsMessageLog,
     QgsFeatureRequest,
     QgsExpressionContext,
     QgsExpressionContextUtils,
@@ -120,9 +118,3 @@ class AggregatePendingChangesTask(AggregateDataTask):
             self.updateTask.waitForFinished(0)
 
         return True
-
-    def finished(self, result: bool):
-        if not result:
-            if self.exception is not None:
-                QgsMessageLog.logMessage(f'{self.exception!r}',
-                                         'Redistricting', Qgis.Critical)

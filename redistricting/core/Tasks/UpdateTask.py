@@ -25,7 +25,9 @@
 from __future__ import annotations
 from typing import Dict, TYPE_CHECKING
 from qgis.core import (
+    Qgis,
     QgsExpressionContext,
+    QgsMessageLog,
     QgsTask,
     QgsVectorLayer
 )
@@ -90,3 +92,9 @@ class AggregateDataTask(QgsTask):
             cols.append(fld.fieldName)
             getters.append(self.getFieldValue(fld, context))
             aggs[fld.fieldName] = 'sum' if fld.isNumeric else 'first'
+
+    def finished(self, result: bool):
+        if not result:
+            if self.exception is not None:
+                QgsMessageLog.logMessage(
+                    f'{self.exception!r}', 'Redistricting', Qgis.Critical)
