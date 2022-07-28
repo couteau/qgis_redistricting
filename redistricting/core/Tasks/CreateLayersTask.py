@@ -23,26 +23,27 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+from itertools import islice
 import sqlite3
 
 from typing import List, TYPE_CHECKING
 from contextlib import closing
 from qgis.PyQt.QtCore import QVariant
 from qgis.core import (
+    Qgis,
     QgsDataSourceUri,
+    QgsMessageLog,
     QgsProject,
     QgsTask,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsField,
-    QgsFields,
-    QgsFeature,
     QgsVectorLayer,
     QgsVectorFileWriter
 )
 from qgis.utils import spatialite_connect
 from processing.algs.gdal.GdalUtils import GdalUtils
-from osgeo import gdal, ogr
+from osgeo import gdal, ogr, osr
 
 from ._exception import CancelledError
 from ._debug import debug_thread
@@ -162,7 +163,10 @@ class CreatePlanLayersTask(QgsTask):
         saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
         saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
 
-        error = QgsVectorFileWriter.writeAsVectorFormatV2(
+        WriteVectorFile = QgsVectorFileWriter.writeAsVectorFormatV3 \
+            if hasattr(QgsVectorFileWriter, "writeAsVectorFormatV3") \
+            else QgsVectorFileWriter.writeAsVectorFormatV2
+        error = WriteVectorFile(
             l, gpkgPath, QgsProject.instance().transformContext(), saveOptions
         )
 
@@ -194,6 +198,18 @@ class CreatePlanLayersTask(QgsTask):
 
         return True
 
+    def qgisTypeToGdalType(self, qt: QVariant.Type):
+        if qt == QVariant.String:
+            t = ogr.OFTString
+        elif qt in (QVariant.Int, QVariant.UInt, QVariant.LongLong, QVariant.ULongLong):
+            t = ogr.OFTInteger64
+        elif qt == QVariant.Double:
+            t = ogr.OFTReal
+        else:
+            t = ogr.OFTString
+
+        return t
+
     def run(self):
         debug_thread()
 
@@ -201,53 +217,76 @@ class CreatePlanLayersTask(QgsTask):
             if not self._createDistLayer(self.path):
                 return False
 
+            ds: gdal.Dataset = gdal.OpenEx(self.path, gdal.OF_UPDATE | gdal.OF_SHARED | gdal.OF_VERBOSE_ERROR, ['GPKG'])
+            layer: ogr.Layer = ds.CreateLayer(
+                'assignments',
+                srs=osr.SpatialReference(self.srcLayer.crs().toWkt()),
+                geom_type=ogr.wkbMultiPolygon,
+                options=[
+                    'GEOMETRY_NAME=geometry',
+                    'OVERWRITE=YES',
+                    'PRECISION=YES'
+                    'FID=fid'
+                ]
+            )
+
+            fields = []
+            srcField = self.srcLayer.fields().field(self.srcGeoIdField)
+            t = self.qgisTypeToGdalType(srcField.type())
+            fld = ogr.FieldDefn(self.geoIdField, t)
+            fld.SetNullable(False)
+            fld.SetUnique(True)
+            if t == ogr.OFTString:
+                fld.SetWidth(srcField.length())
+            fields.append(fld)
+            fld = ogr.FieldDefn(self.distField, ogr.OFTInteger)
+            fld.SetDefault('0')
+            fields.append(fld)
+
             context = QgsExpressionContext()
             context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.srcLayer))
             context.setFeature(next(self.srcLayer.getFeatures()))
 
-            fields = QgsFields()
-            fields.append(QgsField(self.geoIdField, QVariant.String, 'VARCHAR'))
-            fields.append(QgsField(self.distField, QVariant.Int, 'INTEGER'))
             for field in self.geoFields:
-                qf = field.makeQgsField(context)
-                if qf is not None:
-                    fields.append(qf)
-                else:  # this should never happen - errors should be caught when field is created
-                    self.exception = RdsException(field.error())
-                    return False
+                t = self.qgisTypeToGdalType(field.fieldType(context))
+                fld = ogr.FieldDefn(field.fieldName, t)
+                fields.append(fld)
+            layer.CreateFields(fields)
+            ds.FlushCache()
+            del layer
+            del ds
 
-            saveOptions = QgsVectorFileWriter.SaveVectorOptions()
-            saveOptions.layerName = 'assignments'
-            saveOptions.layerOptions = ['GEOMETRY_NAME=geometry']
-            saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteLayer
-
-            writer = QgsVectorFileWriter.create(
-                self.path,
-                fields,
-                self.srcLayer.wkbType(),
-                self.srcLayer.crs(),
-                QgsProject.instance().transformContext(),
-                saveOptions)
-
-            if writer.hasError() != QgsVectorFileWriter.NoError:
-                self.exception = RdsException(
-                    tr("Error when creating assignments layer: {}").format(writer.errorMessage()))
-                return False
-
-            total = self.srcLayer.featureCount() or 1
+            total = self.srcLayer.featureCount()
             count = 0
-            for f in self.srcLayer.getFeatures():
-                if self.isCanceled():
-                    raise CancelledError()
-                attrs = [f[self.srcGeoIdField], 0] + [field.getValue(f, context) for field in self.geoFields]
-                feat = QgsFeature()
-                feat.setAttributes(attrs)
-                feat.setGeometry(f.geometry())
-                writer.addFeature(feat)
-                count += 1
-                self.setProgress(100 * count/total)
+            with closing(spatialite_connect(self.path)) as db:
+                db: sqlite3.Connection
 
-            del writer
+                db.execute(
+                    f'CREATE UNIQUE INDEX idx_districts_{self.distField} ON districts ({self.distField})'
+                )
+                db.execute(f'CREATE UNIQUE INDEX idx_assignments_{self.geoIdField} ON assignments ({self.geoIdField})')
+                db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
+                for field in [field.fieldName for field in self.geoFields]:
+                    db.execute(f'CREATE INDEX idx_assignments_{field} ON assignments ({field})')
+                db.commit()
+
+                gen = (
+                    [f[self.srcGeoIdField], 0] +
+                    [field.getValue(f, context) for field in self.geoFields] +
+                    [f.geometry().asWkt()]
+                    for f in self.srcLayer.getFeatures()
+                )
+                sql = f'INSERT INTO assignments ({",".join(fld.GetName() for fld in fields)}, geometry) ' \
+                    f'VALUES({",".join("?" * len(fields))}, GeomFromText(?))'
+                while count < total:
+                    s = islice(gen, 1000)
+                    if self.isCanceled():
+                        raise CancelledError()
+                    db.executemany(sql, s)
+                    count = min(total, count + 1000)
+                    self.setProgress(100 * count/total)
+                db.commit()
+
         except CancelledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
@@ -258,12 +297,7 @@ class CreatePlanLayersTask(QgsTask):
         return True
 
     def finished(self, result: bool):
-        if result:
-            with closing(spatialite_connect(self.path)) as db:
-                db.execute(
-                    f'CREATE UNIQUE INDEX idx_districts_{self.distField} ON districts ({self.distField})')
-                db.execute(f'CREATE UNIQUE INDEX idx_assignments_{self.geoIdField} ON assignments ({self.geoIdField})')
-                db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
-                for field in [field.fieldName for field in self.geoFields]:
-                    db.execute(f'CREATE INDEX idx_assignments_{field} ON assignments ({field})')
-                db.commit()
+        if not result:
+            if self.exception is not None:
+                QgsMessageLog.logMessage(
+                    f'{self.exception!r}', 'Redistricting', Qgis.Critical)
