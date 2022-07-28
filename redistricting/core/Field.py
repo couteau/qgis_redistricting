@@ -58,14 +58,17 @@ class Field(QObject):
         self.setLayer(layer)
 
     def setLayer(self, layer: QgsVectorLayer):
+        self._error = None
         if self._isExpression:
             if not self._validateExpr(layer):
-                raise RdsException(tr('Expression "{}" invalid for layer {}').format(self.field, layer.name()))
+                raise RdsException(tr('Expression "{}" invalid for layer {}: {}').format(
+                    self.field, layer.name(), self._error))
             self._icon = QgsApplication.getThemeIcon("/mIconExpression.svg")
         else:
             self._index = layer.fields().lookupField(self._field)
             if self._index == -1:
-                raise RdsException(tr('Field {} not found in layer {}').format(self._field, layer.name()))
+                self._error = tr('Field {} not found in layer {}').format(self._field, layer.name())
+                raise RdsException(self._error)
 
             self._icon = layer.fields().iconForField(self._index, False)
             if self._caption is None or self._caption == self._field:
@@ -102,10 +105,16 @@ class Field(QObject):
         if not self._isExpression:
             return True
 
+        self._error = None
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
         e = QgsExpression(self._field)
-        return e.prepare(context)
+        result = e.prepare(context)
+        if e.hasEvalError():
+            self._error = e.evalErrorString()
+        elif e.hasParserError():
+            self._error = e.parserErrorString()
+        return result
 
     @property
     def layer(self) -> QgsVectorLayer:
@@ -142,32 +151,36 @@ class Field(QObject):
     def error(self):
         return self._error
 
-    def makeQgsField(self, context: QgsExpressionContext = None, name: str = None):
-        if name is None:
-            name = self.fieldName
-
+    def fieldType(self, context: QgsExpressionContext = None):
         if self.isExpression:
             if not context:
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.layer))
+            if context.feature() is None:
                 context.setFeature(next(self.layer.getFeatures()))
             expr = QgsExpression(self.field)
             result = expr.evaluate(context)
             if expr.hasEvalError():
                 self._error = expr.evalErrorString()
-                field = None
-            else:
-                t = QVariant(result).type()
-                field = QgsField(name, QVariant.LongLong if t == QVariant.Int else t)
+                return None
+
+            return QVariant(result).type()
         else:
             i = self.layer.fields().lookupField(self.field)
             if i == -1:
                 self._error = tr(f'Field {self.field} not found')
-                field = None
-            else:
-                field = QgsField(name, self.layer.fields().field(i).type())
+                return None
 
-        return field
+            return self.layer.fields().field(i).type()
+
+    def makeQgsField(self, context: QgsExpressionContext = None, name: str = None):
+        self._error = None
+
+        if name is None:
+            name = self.fieldName
+
+        t = self.fieldType(context)
+        return QgsField(name, QVariant.LongLong if t == QVariant.Int else t)
 
     def getValue(self, feature: QgsFeature, context: QgsExpressionContext = None):
         if self._isExpression:

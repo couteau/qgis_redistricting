@@ -23,13 +23,14 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Union, Iterable, List
+from typing import Type, Union, Iterable, List
 
 from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QCoreApplication, QModelIndex, QVariant, pyqtSignal, pyqtProperty
 from qgis.PyQt.QtWidgets import QWidget, QTableView, QAbstractItemView, QProxyStyle, QStyleOption
 from qgis.PyQt.QtGui import QDropEvent, QDragMoveEvent, QMouseEvent
-from qgis.core import QgsApplication
-from ..core import Field, DataField, FieldList, BasePopulation
+from qgis.core import Qgis, QgsApplication
+from qgis.utils import iface
+from ..core import Field, DataField, FieldList, BasePopulation, RdsException, tr
 
 # TODO: come up with an accessible method for reordering without the mouse
 
@@ -97,7 +98,7 @@ class FieldListModel(QAbstractTableModel):
         return self._fieldType
 
     @fieldType.setter
-    def fieldType(self, value: type):
+    def fieldType(self, value: Type[Field]):
         self._fieldType = value
         self.setColCount(7 if self._fieldType == DataField else 3)
 
@@ -298,8 +299,14 @@ class FieldListModel(QAbstractTableModel):
             if f.field == field:
                 return
 
+        try:
+            fld = self._fieldType(layer, field, isExpression, caption)
+        except RdsException as e:
+            iface.messageBar().pushMessage(tr('Error'), str(e), level=Qgis.Critical)
+            return
+
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
-        self._data.append(self._fieldType(layer, field, isExpression, caption))
+        self._data.append(fld)
         self.endInsertRows()
 
     def deleteField(self, row):
