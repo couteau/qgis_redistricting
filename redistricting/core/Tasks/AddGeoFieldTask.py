@@ -27,6 +27,8 @@ from __future__ import annotations
 from contextlib import closing
 from typing import TYPE_CHECKING, List
 from qgis.core import (
+    Qgis,
+    QgsMessageLog,
     QgsTask,
     QgsFeatureRequest,
     QgsExpressionContext,
@@ -123,5 +125,9 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
         return True
 
     def finished(self, result: bool):
-        if result:
+        if not result:
+            if self.exception is not None:
+                QgsMessageLog.logMessage(
+                    f'{self.exception!r}', 'Redistricting', Qgis.Critical)
+        else:
             self.assignLayer.reload()
