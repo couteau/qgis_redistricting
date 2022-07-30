@@ -35,7 +35,7 @@ from qgis.core import (
     QgsVectorLayer,
     QgsFeature,
     QgsField)
-from .Utils import makeFieldName, tr
+from .utils import makeFieldName, tr
 from .Exception import RdsException
 
 
@@ -58,18 +58,12 @@ class Field(QObject):
         self.setLayer(layer)
 
     def setLayer(self, layer: QgsVectorLayer):
-        self._error = None
+        if not self.validate(layer):
+            raise RdsException(self._error)
+
         if self._isExpression:
-            if not self._validateExpr(layer):
-                raise RdsException(tr('Expression "{}" invalid for layer {}: {}').format(
-                    self.field, layer.name(), self._error))
             self._icon = QgsApplication.getThemeIcon("/mIconExpression.svg")
         else:
-            self._index = layer.fields().lookupField(self._field)
-            if self._index == -1:
-                self._error = tr('Field {} not found in layer {}').format(self._field, layer.name())
-                raise RdsException(self._error)
-
             self._icon = layer.fields().iconForField(self._index, False)
             if self._caption is None or self._caption == self._field:
                 self._caption = layer.fields().field(self._index).displayName() or self._caption
@@ -116,6 +110,25 @@ class Field(QObject):
             self._error = e.parserErrorString()
         return result
 
+    def validate(self, layer: QgsVectorLayer = None):
+        if layer is None:
+            layer = self._layer
+
+        self._error = None
+        if self._isExpression:
+            if not self._validateExpr(layer):
+                self._error = tr('Expression "{}" invalid for layer {}: {}').format(
+                    self.field, layer.name(), self._error)
+                return False
+
+        else:
+            self._index = layer.fields().lookupField(self._field)
+            if self._index == -1:
+                self._error = tr('Field {} not found in layer {}').format(self._field, layer.name())
+                return False
+
+        return True
+
     @property
     def layer(self) -> QgsVectorLayer:
         return self._layer
@@ -156,7 +169,6 @@ class Field(QObject):
             if not context:
                 context = QgsExpressionContext()
                 context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.layer))
-            if context.feature() is None:
                 context.setFeature(next(self.layer.getFeatures()))
             expr = QgsExpression(self.field)
             result = expr.evaluate(context)
