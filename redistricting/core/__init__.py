@@ -23,23 +23,26 @@
  ***************************************************************************/
 """
 from .Plan import RedistrictingPlan
-from .Utils import makeFieldName, tr, loadSpatialiteModule, showHelp
-from .Storage import ProjectStorage
+from .utils import makeFieldName, tr, loadSpatialiteModule, showHelp
+from .storage import ProjectStorage
 from .District import BaseDistrict, District
 from .DistrictList import DistrictList
 from .Field import Field, DataField, BasePopulation
 from .FieldList import FieldList
 from .PlanStyle import PlanStyler
-from .PlanEdit import PlanEditor
+from .PlanAssignments import PlanAssignmentEditor
 from .DistrictDataModel import DistrictDataModel
 from .GeoFieldsModel import GeoFieldsModel
 from .DeltaListModel import DeltaListModel
+from .PlanBuilder import PlanBuilder
+from .PlanEdit import PlanEditor
 from .PlanExport import PlanExporter
 from .PlanImport import PlanImporter
 from .PlanCopy import PlanCopier
 from .Exception import RdsException
 
-__all__ = ['RedistrictingPlan', 'BaseDistrict', 'District', 'DistrictList', 'FieldList',
+__all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor',
+           'BaseDistrict', 'District', 'DistrictList', 'FieldList',
            'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
-           'PlanEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
+           'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
            'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'showHelp', 'RdsException']
