@@ -38,7 +38,7 @@ class TestPlanImport:
         p.setDistField('district')
         result = p.importPlan(new_plan)
         assert not result
-        msg, _ = p.error()
+        msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
         assert msg is not None and re.search('not exist', msg)
 
     def test_import_shapefile_bad_shapefile_sets_error(self, new_plan, datadir):
@@ -47,7 +47,7 @@ class TestPlanImport:
         p.setDistField('district')
         result = p.importPlan(new_plan)
         assert not result
-        msg, _ = p.error()
+        msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
         assert re.search('Invalid shapefile', msg)
 
     def test_import_shapefile(self, new_plan, shapefile, mocker: MockerFixture):
@@ -65,7 +65,7 @@ class TestPlanImport:
         p.setSourceFile('/notafile.txt')
         result = p.importPlan(new_plan)
         assert not result
-        msg, _ = p.error()
+        msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
         assert re.search('not exist', msg)
 
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
