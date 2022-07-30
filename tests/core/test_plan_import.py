@@ -33,15 +33,19 @@ class TestPlanImport:
         return str((datadir / 'tuscaloosa_be.csv').resolve())
 
     def test_import_shapefile_non_existent_file_sets_error(self, new_plan):
-        p = redistricting.core.PlanImport.PlanImporter(new_plan)
-        result = p.importShapefile('/notafile.txt', 'district')
+        p = redistricting.core.PlanImport.ShapefileImporter()
+        p.setSourceFile('/notafile.txt')
+        p.setDistField('district')
+        result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()
-        assert re.search('not exist', msg)
+        assert msg is not None and re.search('not exist', msg)
 
     def test_import_shapefile_bad_shapefile_sets_error(self, new_plan, datadir):
-        p = redistricting.core.PlanImport.PlanImporter(new_plan)
-        result = p.importShapefile(str(datadir / 'tuscaloosa_be.csv'), 'district')
+        p = redistricting.core.PlanImport.ShapefileImporter()
+        p.setSourceFile(datadir / 'tuscaloosa_be.csv')
+        p.setDistField('district')
+        result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()
         assert re.search('Invalid shapefile', msg)
@@ -49,14 +53,17 @@ class TestPlanImport:
     def test_import_shapefile(self, new_plan, shapefile, mocker: MockerFixture):
         task = mocker.patch('redistricting.core.PlanImport.ImportShapeFileTask')
         add = mocker.patch.object(redistricting.core.PlanImport.QgsApplication.taskManager(), 'addTask')
-        p = redistricting.core.PlanImport.PlanImporter(new_plan)
-        p.importShapefile(shapefile, 'district')
+        p = redistricting.core.PlanImport.ShapefileImporter()
+        p.setSourceFile(shapefile)
+        p.setDistField('district')
+        p.importPlan(new_plan)
         task.assert_called_once()
         add.assert_called_once()
 
     def test_import_assignments_non_existent_file_sets_error(self, new_plan):
-        p = redistricting.core.PlanImport.PlanImporter(new_plan)
-        result = p.importAssignments('/notafile.txt')
+        p = redistricting.core.PlanImport.AssignmentImporter()
+        p.setSourceFile('/notafile.txt')
+        result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()
         assert re.search('not exist', msg)
@@ -64,7 +71,8 @@ class TestPlanImport:
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
         task = mocker.patch('redistricting.core.PlanImport.ImportAssignmentFileTask')
         add = mocker.patch.object(redistricting.core.PlanImport.QgsApplication.taskManager(), 'addTask')
-        p = redistricting.core.PlanImport.PlanImporter(new_plan)
-        p.importAssignments(assignmentfile)
+        p = redistricting.core.PlanImport.AssignmentImporter()
+        p.setSourceFile(assignmentfile)
+        p.importPlan(new_plan)
         task.assert_called_once()
         add.assert_called_once()
