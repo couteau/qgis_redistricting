@@ -25,7 +25,7 @@
 from qgis.core import QgsVectorLayer, QgsFieldProxyModel
 from qgis.PyQt.QtWidgets import QWizardPage
 from ..core import defaults
-from ..core.Utils import getDefaultField
+from ..core.utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
 

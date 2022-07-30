@@ -28,7 +28,7 @@ from qgis.PyQt.QtCore import Qt, QVariant, QObject, QAbstractTableModel, QModelI
 from qgis.PyQt.QtGui import QBrush, QColor
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
-from .Utils import tr, makeFieldName
+from .utils import tr, makeFieldName
 
 
 class DistrictDataModel(QAbstractTableModel):

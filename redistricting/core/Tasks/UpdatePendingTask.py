@@ -32,7 +32,7 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
 )
-from ..Utils import tr
+from ..utils import tr
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
 

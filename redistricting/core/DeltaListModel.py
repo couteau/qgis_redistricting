@@ -28,7 +28,7 @@ from qgis.PyQt.QtCore import Qt, QObject, QVariant, QAbstractTableModel, QModelI
 from .Plan import RedistrictingPlan
 from .DeltaList import DeltaList
 from .Field import DataField
-from .Utils import tr, makeFieldName
+from .utils import tr, makeFieldName
 
 
 class DeltaListModel(QAbstractTableModel):

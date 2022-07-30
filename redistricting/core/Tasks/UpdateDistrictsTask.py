@@ -38,7 +38,7 @@ from qgis.core import (
     QgsAggregateCalculator,
 )
 from qgis.utils import spatialite_connect
-from ..Utils import tr
+from ..utils import tr
 from .UpdateTask import AggregateDataTask
 from ._debug import debug_thread
 from ._exception import CancelledError

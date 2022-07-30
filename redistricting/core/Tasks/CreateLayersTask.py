@@ -47,7 +47,7 @@ from osgeo import gdal, ogr, osr
 
 from ._exception import CancelledError
 from ._debug import debug_thread
-from ..Utils import tr
+from ..utils import tr
 from ..Exception import RdsException
 
 if TYPE_CHECKING:

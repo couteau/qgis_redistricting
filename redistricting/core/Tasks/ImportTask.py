@@ -39,7 +39,7 @@ from qgis.utils import spatialite_connect
 
 from ._exception import CancelledError
 from ._debug import debug_thread
-from ..Utils import tr
+from ..utils import tr
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan

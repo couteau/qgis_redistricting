@@ -22,7 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from .Utils import tr
+from .utils import tr
 from .Plan import RedistrictingPlan
 from PyQt5.QtXmlPatterns import QXmlSchema, QXmlSchemaValidator
 from qgis.PyQt.QtXml import QDomDocument, QDomElement, QDomNode

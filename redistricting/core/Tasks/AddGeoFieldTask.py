@@ -36,7 +36,7 @@ from qgis.core import (
     QgsVectorLayer
 )
 from qgis.utils import spatialite_connect
-from ..Utils import tr
+from ..utils import tr
 from ..Exception import RdsException
 from ._debug import debug_thread
 if TYPE_CHECKING:

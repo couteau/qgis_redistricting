@@ -35,7 +35,7 @@ from qgis.core import (
     QgsMessageLog
 )
 from qgis.utils import spatialite_connect
-from .Utils import tr
+from .utils import tr
 from .PlanStyle import PlanStyler
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan

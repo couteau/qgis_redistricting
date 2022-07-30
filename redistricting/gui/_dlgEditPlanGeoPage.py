@@ -26,7 +26,7 @@ from qgis.PyQt.QtCore import Qt, QVariant, QModelIndex
 from qgis.PyQt.QtWidgets import QWidget, QWizardPage, QHeaderView, QComboBox, QStyledItemDelegate, QStyleOptionViewItem
 from qgis.core import QgsApplication, QgsVectorLayer, QgsMapLayerProxyModel
 from ..core import defaults
-from ..core.Utils import getDefaultField
+from ..core.utils import getDefaultField
 from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 from .RdsFieldTableView import FieldListModel
 

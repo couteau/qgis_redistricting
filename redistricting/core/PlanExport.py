@@ -32,7 +32,7 @@ from qgis.core import (
     QgsApplication,
     QgsMessageLog,
 )
-from .Utils import tr
+from .utils import tr
 from .Field import Field
 from .Tasks import ExportRedistrictingPlanTask
 if TYPE_CHECKING:

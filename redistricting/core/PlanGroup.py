@@ -26,7 +26,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qgis.core import QgsProject, QgsLayerTreeGroup
-from .Utils import tr
+from .utils import tr
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan

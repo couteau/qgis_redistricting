@@ -31,7 +31,7 @@ from qgis.PyQt.QtGui import QColor, QPalette
 from qgis.core import QgsFeature, QgsCategorizedSymbolRenderer
 
 from .Field import DataField, BasePopulation
-from .Utils import makeFieldName, tr
+from .utils import makeFieldName, tr
 from .Delta import Delta
 
 if TYPE_CHECKING:
