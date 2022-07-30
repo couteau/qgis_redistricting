@@ -182,9 +182,9 @@ class TestPluginInit:
         assert not plugin_with_plan.actionExportPlan.isEnabled()
         assert not plugin_with_plan.actionCopyPlan.isEnabled()
 
-    def test_set_active_invalid_plan(self, plugin, plan_with_pop_layer):
-        plugin.appendPlan(plan_with_pop_layer)
-        plugin.setActivePlan(plan_with_pop_layer)
+    def test_set_active_invalid_plan(self, plugin, minimal_plan):
+        plugin.appendPlan(minimal_plan)
+        plugin.setActivePlan(minimal_plan)
         assert plugin.activePlan is None
 
     def test_remove_layer(self, plugin_with_gui, block_layer, qtbot: QtBot):
@@ -230,7 +230,7 @@ class TestPluginInit:
     def test_write_project(self, plugin_with_project: redistricting.Redistricting, mocker: MockerFixture):
         storage = mocker.patch('redistricting.redistricting.ProjectStorage')
         plan = plugin_with_project.activePlan
-        plan.deviation = 0.05
+        plan._setDeviation(0.05)  # pylint: disable=protected-access
         assert QgsProject.instance().isDirty()
         QgsProject.instance().write()
         storage.assert_called_once()

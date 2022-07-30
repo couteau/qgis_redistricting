@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - manage editing of assignments
+"""QGIS Redistricting Plugin - background task to calculate pending changes
 
-        begin                : 2022-05-25
+        begin                : 2022-01-15
         git sha              : $Format:%H$
         copyright            : (C) 2022 by Cryptodira
         email                : stuart@cryptodira.org
@@ -22,129 +22,165 @@
  *                                                                         *
  ***************************************************************************/
 """
-from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, Union
-from qgis.PyQt.QtCore import QVariant, QObject, pyqtSignal
-from qgis.core import (
-    Qgis,
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
-    QgsFeature,
-    QgsFeatureRequest,
-    QgsMessageLog,
-)
-
-from .Utils import tr
-if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
+from typing import List, Set, Union, Iterable, overload
+from qgis.core import Qgis, QgsApplication, QgsField, QgsVectorDataProvider, QgsVectorLayer
+from qgis.PyQt.QtCore import QObject, QVariant
+from .utils import tr
+from .Field import Field, DataField
+from .BasePlanBuilder import BasePlanBuilder
+from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
 
 
-class PlanEditor(QObject):
-    assignmentsChanged = pyqtSignal()
-
-    def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
+class PlanEditor(BasePlanBuilder):
+    def __init__(self, parent: QObject = None):
         super().__init__(parent)
-        self._plan = plan
-        self._assignLayer = plan.assignLayer
-        if self._assignLayer:
-            self._assignLayer.afterCommitChanges.connect(self.commitChanges)
-            self._assignLayer.afterRollBack.connect(self.rollback)
-        self._distField = plan._distField
-        self._error = None
-        self._errorLevel: Qgis.MessageLevel = 0
-        self._undoStack = self._assignLayer.undoStack()
-        self._undoStack.indexChanged.connect(self.undoChanged)
+        self._updateAssignLayerTask = None
 
-    def error(self):
-        return (self._error, self._errorLevel)
+    def setProgress(self, progress: float):
+        self.progressChanged.emit(int(progress))
 
-    def _setError(self, error, level=Qgis.Warning):
-        self._error = error
-        self._errorLevel = level
-        QgsMessageLog.logMessage(error, 'Redistricting', level)
+    def cancel(self):
+        if self._updateAssignLayerTask:
+            self._updateAssignLayerTask.cancel()
 
-    def _clearError(self):
-        self._error = None
+    @overload
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
+        ...
 
-    def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
-        self._clearError()
+    @overload
+    def _addFieldToLayer(self, layer: QgsVectorLayer, field: QgsField):
+        ...
 
-        if not self._assignLayer:
-            return None
+    @overload
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fields: Iterable[QgsField]):
+        ...
 
-        f = self._assignLayer.fields().field(field)
-        if not f:
-            return None
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldOrFieldName, fieldType=None):
+        if isinstance(fieldOrFieldName, str):
+            if layer.fields().lookupField(fieldOrFieldName) != -1:
+                # fieldName undefined or field already exists
+                self.setError(
+                    tr('Error creating new field: field {field} already exits in layer {layer}').
+                    format(field=fieldOrFieldName, layer=layer.name())
+                )
+                return
+            if fieldType is None:
+                self.setError(tr('Field type is required when adding fields by name'))
+                return
 
-        context = QgsExpressionContext()
-        context.appendScopes(
-            QgsExpressionContextUtils.globalProjectLayerScopes(self._assignLayer))
-        request = QgsFeatureRequest()
-        if isinstance(value, str):
-            value = [value]
-
-        if f.type() == QVariant.String:
-            flt = ' and '.join(f"{field} = '{v}'" for v in value)
+            fields = [QgsField(fieldOrFieldName, fieldType)]
+        elif isinstance(fieldOrFieldName, QgsField):
+            fields = [QgsField(fieldOrFieldName)]
         else:
-            flt = ' and '.join(f'{field} = {v}' for v in value)
+            fields = fieldOrFieldName
 
-        if targetDistrict is not None:
-            if targetDistrict == 0:
-                flt += f' and ({self._distField} is not null and {self._distField} != 0)'
-            else:
-                flt += f' and {self._distField} != {targetDistrict}'
-
-        if sourceDistrict is not None:
-            if sourceDistrict == 0:
-                flt += f' and ({self._distField} = 0 or {self._distField} is null)'
-            else:
-                flt += f' and {self._distField} = {sourceDistrict}'
-
-        request.setExpressionContext(context)
-        request.setFilterExpression(flt)
-        request.setFlags(QgsFeatureRequest.NoGeometry)
-
-        return self._assignLayer.getFeatures(request)
-
-    def assignFeaturesToDistrict(
-        self,
-        features: Iterable[QgsFeature],
-        district,
-        oldDistrict=None
-    ):
-        self._clearError()
-
-        fieldIndex = self._assignLayer.fields().indexOf(self._distField)
-        if fieldIndex == -1:
-            self._setError(
-                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.').
-                format(plan=self._plan.name, field=self._distField)
-            )
+        provider = layer.dataProvider()
+        if not int(QgsVectorDataProvider.AddAttributes) & int(provider.capabilities()):
+            self.pushError('Could not add field to layer', Qgis.Critical)
             return
+        for field in reversed(fields):
+            # ignore fields with conflicting names
+            if provider.fields().lookupField(field.name()) != -1:
+                self.pushError(
+                    tr('A field named {field} already exists in layer {layer}. Omitting.').
+                    format(field=field.name(), layer=layer.name()),
+                    Qgis.Warning
+                )
+                fields.remove(field)
+        if fields:
+            provider.addAttributes(fields)
+            layer.updateFields()
 
-        inTransaction = self._assignLayer.isEditable()
-        if not inTransaction:
-            self._assignLayer.startEditing()
-            self._assignLayer.undoStack()
+    def _updateGeoField(self, geoField: Union[Field, List[Field]]):
 
-        try:
-            for f in features:
-                self._assignLayer.changeAttributeValue(
-                    f.id(), fieldIndex, district, oldDistrict)
-        except:
-            # only delete the buffer on error if we were not already in a transaction --
-            # otherwise we may discard prior, successful updates
-            self._assignLayer.rollBack(not inTransaction)
-            raise
+        def cleanup():
+            if self._updateAssignLayerTask.isCanceled():
+                self.setError(tr('Add geography field canceled'),
+                              Qgis.UserCanceled)
+            self._updateAssignLayerTask = None
 
-    def _changed(self):
-        self.assignmentsChanged.emit()
+        if not self._plan or not self._plan.assignLayer:
+            return None
 
-    def undoChanged(self, index):  # pylint: disable=unused-argument
-        self._changed()
+        if isinstance(geoField, Field):
+            geoField = [geoField]
 
-    def commitChanges(self):
-        self._changed()
+        self._updateAssignLayerTask = AddGeoFieldToAssignmentLayerTask(
+            self._geoPackagePath,
+            self._plan.assignLayer,
+            self._sourceLayer,
+            geoField,
+            self._sourceIdField,
+            self._geoIdField
+        )
+        self._updateAssignLayerTask.taskCompleted.connect(cleanup)
+        self._updateAssignLayerTask.taskTerminated.connect(cleanup)
+        self._updateAssignLayerTask.progressChanged.connect(self.setProgress)
+        QgsApplication.taskManager().addTask(self._updateAssignLayerTask)
+        return self._updateAssignLayerTask
 
-    def rollback(self):
-        self._changed()
+    # pylint: disable=protected-access
+    def updatePlan(self):
+        self.clearErrors()
+
+        if not self._plan or not self.validate():
+            return None
+
+        self._plan._setName(self._name)
+        self._plan._setNumDistricts(self._numDistricts)
+        self._plan._setNumSeats(self._numSeats)
+        self._plan._setDescription(self._description)
+        self._plan._setDeviation(self._deviation)
+
+        if self._dataFields != self._plan.dataFields:
+            if self._plan.distLayer:
+                layer = self._plan.distLayer
+
+                addedFields: Set[DataField] = set(self._dataFields) - set(self._plan.dataFields)
+                if addedFields:
+                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+
+                removedFields: Set[DataField] = set(self._plan.dataFields) - set(self._dataFields)
+                if removedFields:
+                    provider = layer.dataProvider()
+                    for f in removedFields:
+                        findex = layer.fields().lookupField(f.fieldName)
+                        if findex != -1:
+                            provider.deleteAttributes([findex])
+                    layer.updateFields()
+
+            self._plan._setDataFields(self._dataFields)
+
+        if self._geoFields != self._plan.geoFields:
+            if self._plan.assignLayer:
+                layer = self._plan.assignLayer
+
+                removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
+                if removedFields:
+                    provider = layer.dataProvider()
+                    for f in removedFields:
+                        findex = layer.fields().lookupField(f.fieldName)
+                        if findex != -1:
+                            provider.deleteAttributes([findex])
+                    layer.updateFields()
+
+                addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
+                if addedFields:
+                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+                    self._updateGeoField(addedFields)
+
+            self._plan._setGeoFields(self._geoFields)
+
+        self._plan._setGeoIdField(self._geoIdField)
+        self._plan._setGeoDisplay(self._geoDisplay)
+
+        self._plan._setSourceLayer(self._sourceLayer)
+        self._plan._setSourceIdField(self._sourceIdField)
+
+        self._plan._setPopLayer(self._popLayer)
+        self._plan._setJoinField(self._joinField)
+        self._plan._setPopField(self._popField)
+        self._plan._setVAPField(self._vapField)
+        self._plan._setCVAPField(self._cvapField)
+
+        return self._plan

@@ -8,6 +8,7 @@ from qgis.core import QgsProject, QgsVectorLayer
 from redistricting.core.Plan import RedistrictingPlan
 from redistricting.core.DistrictList import DistrictList
 from redistricting.core.FieldList import FieldList
+from redistricting.core.PlanBuilder import PlanBuilder
 
 
 # pylint: disable=redefined-outer-name, unused-argument
@@ -51,10 +52,19 @@ def dist_layer(gpkg_path, qgis_new_project):
 
 
 @pytest.fixture
-def plan_with_pop_layer(block_layer):
-    p = RedistrictingPlan('minimal', 5)
-    p.popLayer = block_layer
-    return p
+def minimal_plan():
+    return RedistrictingPlan('minimal', 5)
+
+
+@pytest.fixture
+def valid_plan(minimal_plan, block_layer, gpkg_path):
+    # pylint: disable=protected-access
+    minimal_plan._setPopLayer(block_layer)
+    minimal_plan._setPopField('pop_total')
+    minimal_plan._setGeoIdField('geoid20')
+    # pylint: enable=protected-access
+    minimal_plan.addLayersFromGeoPackage(gpkg_path)
+    return minimal_plan
 
 
 @pytest.fixture
@@ -77,12 +87,6 @@ def plan(block_layer, assign_layer, dist_layer):
         ],
         'data-fields': [
             {'layer': block_layer.id(),
-             'field': 'vap_nh_black',
-             'expression': False,
-             'caption': 'BVAP',
-             'sum': True,
-             'pctvap': True},
-            {'layer': block_layer.id(),
              'field': 'vap_apblack',
              'expression': False,
              'caption': 'APBVAP',
@@ -92,6 +96,12 @@ def plan(block_layer, assign_layer, dist_layer):
              'field': 'vap_nh_white',
              'expression': False,
              'caption': 'WVAP',
+             'sum': True,
+             'pctvap': True},
+            {'layer': block_layer.id(),
+             'field': 'vap_hispanic',
+             'expression': False,
+             'caption': 'HVAP',
              'sum': True,
              'pctvap': True},
         ],
@@ -112,25 +122,27 @@ def new_plan(gpkg_path, block_layer, datadir: pathlib.Path, mocker: MockerFixtur
     dst = pathlib.Path(datadir, 'tuscaloosa_new_plan.gpkg').absolute()
     shutil.copy(gpkg_path, dst)
 
-    p = RedistrictingPlan('test', 5)
+    p = PlanBuilder() \
+        .setName('test') \
+        .setNumDistricts(5) \
+        .setDeviation(0.025) \
+        .setPopLayer(block_layer) \
+        .setGeoIdField('geoid20') \
+        .setDistField('district') \
+        .setPopField('pop_total') \
+        .setVAPField('vap_total') \
+        .appendDataField('vap_nh_black', caption='BVAP') \
+        .appendDataField('vap_apblack', caption='APBVAP') \
+        .appendDataField('vap_nh_white', caption='WVAP') \
+        .appendGeoField('vtdid20', caption='VTD') \
+        .createPlan(createLayers=False)
+
     update = mocker.patch.object(p.districts, 'updateDistricts')
     update.return_value = None
 
-    p.deviation = 0.025
-    p.popLayer = block_layer
-    p.geoIdField = 'geoid20'
-    p.distField = 'district'
-    p.popField = 'pop_total'
-    p.vapField = 'vap_total'
+    p.addLayersFromGeoPackage(dst)
     p.totalPopulation = 227036
 
-    p.addLayersFromGeoPackage(dst)
-
-    p.appendDataField('vap_nh_black', caption='BVAP')
-    p.appendDataField('vap_apblack', caption='APBVAP')
-    p.appendDataField('vap_nh_white', caption='WVAP')
-
-    p.appendGeoField('vtdid20', caption='VTD')
     return p
 
 

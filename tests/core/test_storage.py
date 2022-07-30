@@ -20,7 +20,7 @@ import re
 import pytest
 from qgis.core import QgsProject
 from qgis.PyQt.QtXml import QDomDocument
-from redistricting.core.Storage import ProjectStorage
+from redistricting.core.storage import ProjectStorage
 from redistricting.core.Plan import RedistrictingPlan
 
 # pylint: disable=no-self-use

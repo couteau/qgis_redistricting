@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Reidstricting Plugin - constants and default values
+"""QGIS Redistricting Plugin - background task to calculate pending changes
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
@@ -22,21 +22,33 @@
  *                                                                         *
  ***************************************************************************/
 """
-import re
-from .utils import tr
+from typing import List, Tuple, Union
+from qgis.core import Qgis, QgsMessageLog
 
-MAX_DISTRICTS = 1000
 
-POP_FIELDS = ['pop_total', 'p0010001']
-VAP_FIELDS = ['vap_total', 'p0030001']
-CVAP_FIELDS = ['cvap_total', re.compile(r'^cvap_(?:\d{4}_)total$')]
+class ErrorListMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._errors = []
 
-GEOID_FIELDS = ['geoid20', 'geoid30', 'geoid10', 'geoid', 'block', 'block_id']
+    def error(self) -> Union[Tuple[str, int], None]:
+        return self._errors[0] if self._errors else None
 
-GEOID_LABELS = [
-    tr('Block'),
-    tr('Block Group'),
-    tr('Tract'),
-    tr('Precinct/VTD'),
-    tr('County/Parish'),
-]
+    def errors(self) -> List[Tuple[str, int]]:
+        return self._errors
+
+    def hasErrors(self) -> bool:
+        return bool(self._errors)
+
+    def setError(self, error, level=Qgis.Warning):
+        self._errors.clear()
+        self.pushError(error, level)
+
+    def pushError(self, error, level=Qgis.Warning):
+        if isinstance(error, Exception):
+            error = str(error)
+        self._errors.append((error, level))
+        QgsMessageLog.logMessage(error, 'Redistricting', level)
+
+    def clearErrors(self):
+        self._errors.clear()

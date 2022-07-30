@@ -4,7 +4,7 @@ from pytestqt.plugin import QtBot
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QBrush
-from redistricting.core import DistrictDataModel, RedistrictingPlan
+from redistricting.core import DistrictDataModel, RedistrictingPlan, PlanEditor
 
 # pylint: disable=no-self-use
 
@@ -37,24 +37,28 @@ class TestDistrictDataModel:
     def test_headings(self, district_model: DistrictDataModel):
         assert district_model._headings == ['District', 'Name', 'Population',
                                             'Deviation', '%Deviation', 'VAP',
-                                            'BVAP', '%BVAP', 'APBVAP', '%APBVAP', 'WVAP', '%WVAP',
+                                            'APBVAP', '%APBVAP', 'WVAP', '%WVAP', 'HVAP', '%HVAP',
                                             'Polsby-Popper', 'Reock', 'Convex Hull']
 
     def test_column_keys(self, district_model: DistrictDataModel):
         assert district_model._keys == ['district', 'name', 'pop_total',
                                         'deviation', 'pct_deviation', 'vap_total',
-                                        'vap_nh_black', 'pct_vap_nh_black',
                                         'vap_apblack', 'pct_vap_apblack',
                                         'vap_nh_white', 'pct_vap_nh_white',
+                                        'vap_hispanic', 'pct_vap_hispanic',
                                         'polsbyPopper', 'reock', 'convexHull']
     # pylint: enable=protected-access
 
     def test_signals(self, district_model: DistrictDataModel, plan: RedistrictingPlan, qtbot: QtBot):
         with qtbot.waitSignal(district_model.dataChanged):
-            plan.deviation = 0.01
+            e = PlanEditor.fromPlan(plan)
+            e.setDeviation(0.01)
+            e.updatePlan()
 
         with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):
-            plan.vapField = None
+            e = PlanEditor.fromPlan(plan)
+            e.setVAPField(None)
+            e.updatePlan()
 
         with qtbot.waitSignals([district_model.rowsAboutToBeInserted, district_model.rowsInserted]):
             plan.addDistrict(3, 'District 3')

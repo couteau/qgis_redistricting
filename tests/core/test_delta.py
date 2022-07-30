@@ -18,7 +18,6 @@
 """
 import pytest
 from redistricting.core.Delta import Delta
-
 from redistricting.core.Plan import RedistrictingPlan
 
 # pylint: disable=no-self-use
