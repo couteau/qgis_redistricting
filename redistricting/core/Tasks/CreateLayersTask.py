@@ -24,6 +24,7 @@
 """
 from __future__ import annotations
 from itertools import islice
+import math
 import sqlite3
 
 from typing import List, TYPE_CHECKING
@@ -225,7 +226,7 @@ class CreatePlanLayersTask(QgsTask):
                 options=[
                     'GEOMETRY_NAME=geometry',
                     'OVERWRITE=YES',
-                    'PRECISION=YES'
+                    'PRECISION=YES',
                     'FID=fid'
                 ]
             )
@@ -278,12 +279,13 @@ class CreatePlanLayersTask(QgsTask):
                 )
                 sql = f'INSERT INTO assignments ({",".join(fld.GetName() for fld in fields)}, geometry) ' \
                     f'VALUES({",".join("?" * len(fields))}, GeomFromText(?))'
+                chunkSize = max(100, 10 ** (math.ceil(math.log10(total)) - 2))
                 while count < total:
-                    s = islice(gen, 1000)
+                    s = islice(gen, chunkSize)
                     if self.isCanceled():
                         raise CancelledError()
                     db.executemany(sql, s)
-                    count = min(total, count + 1000)
+                    count = min(total, count + chunkSize)
                     self.setProgress(100 * count/total)
                 db.commit()
 

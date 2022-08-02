@@ -23,18 +23,31 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import overload, TypeVar
+import pathlib
+from typing import List, Union, overload, TypeVar
 from numbers import Number
 from qgis.core import QgsVectorLayer
+from qgis.PyQt.QtCore import QObject
 from .defaults import MAX_DISTRICTS
 from .utils import tr
 from .PlanValidate import PlanValidator
 from .Field import Field, DataField
+from .FieldList import FieldList
+from .Plan import RedistrictingPlan
 
 Self = TypeVar("Self", bound="BasePlanBuilder")
 
 
 class BasePlanBuilder(PlanValidator):
+    def __init__(self, parent: QObject = None):
+        super().__init__(parent)
+        self._geoPackagePath: pathlib.Path = None
+
+    @classmethod
+    def fromPlan(cls, plan: RedistrictingPlan, parent: QObject = None):
+        instance = super().fromPlan(plan, parent)
+        instance._geoPackagePath = plan.geoPackagePath  # pylint: disable=protected-access
+        return instance
 
     def setName(self, value: str):
         if not isinstance(value, str):
@@ -46,6 +59,7 @@ class BasePlanBuilder(PlanValidator):
     def setDescription(self, value: str):
         if value is not None and not isinstance(value, str):
             raise ValueError(tr('Plan description must be a string'))
+
         self._description = value
         return self
 
@@ -79,7 +93,7 @@ class BasePlanBuilder(PlanValidator):
 
     def setGeoIdField(self, value: str):
         if value is not None and not isinstance(value, str):
-            raise ValueError(tr('Geograph ID field must be a string'))
+            raise ValueError(tr('Geography ID field must be a string'))
 
         self._geoIdField = value
         if self._sourceIdField is None:
@@ -112,7 +126,11 @@ class BasePlanBuilder(PlanValidator):
             self._sourceLayer = value
 
         if self._popLayer is None:
-            self._popLayer = value
+            self.setPopLayer(value)
+
+        for f in self._geoFields:
+            f.setLayer(self._sourceLayer)
+
         return self
 
     def setSourceIdField(self, value: str):
@@ -132,7 +150,11 @@ class BasePlanBuilder(PlanValidator):
             self._popLayer = value
 
         if self._sourceLayer is None:
-            self._sourceLayer = value
+            self.setSourceLayer(value)
+
+        for f in self._dataFields:
+            f.setLayer(self._popLayer)
+
         return self
 
     def setJoinField(self, value: str):
@@ -163,6 +185,23 @@ class BasePlanBuilder(PlanValidator):
         self._cvapField = value
         return self
 
+    def _checkNotDuplicate(self, field: Field, fieldList: FieldList):
+        if any(f.field == field.field for f in fieldList):
+            return False
+
+        return True
+
+    def setDataFields(self, dataFields: Union[List[DataField], FieldList]):
+        l = FieldList()
+        for f in dataFields:
+            if not self._checkNotDuplicate(f, l):
+                raise ValueError(tr('Field list contains duplicate fields'))
+
+            f.setLayer(self._popLayer)
+            l.append(f)
+        self._dataFields = l
+        return self
+
     @overload
     def appendDataField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
         ...
@@ -173,28 +212,20 @@ class BasePlanBuilder(PlanValidator):
 
     def appendDataField(self, field, isExpression=False, caption=None) -> Self:
         if isinstance(field, str):
-            # don't allow duplicate fields
-            if any(f.field == field for f in self._dataFields):
-                self.setError(
-                    tr('Attempt to add duplicate field {field} to plan {plan}').
-                    format(field=field, plan=self._name)
-                )
-                return self
-
-            f = DataField(self._popLayer, field, isExpression, caption)
-        elif isinstance(field, DataField):
-            if any(f.field == field.field for f in self._dataFields):
-                self.setError(
-                    tr('Attempt to add duplicate field {field} to plan {plan}').
-                    format(field=field.field, plan=self._name))
-                return self
-            f = field
-        else:
+            field = DataField(self._popLayer, field, isExpression, caption)
+        elif not isinstance(field, DataField):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name))
 
-        self._dataFields.append(f)
+        if self._checkNotDuplicate(field, self._dataFields):
+            self._dataFields.append(field)
+        else:
+            self.setError(
+                tr('Attempt to add duplicate field {field} to plan {plan}').
+                format(field=field.field, plan=self._name)
+            )
+
         return self
 
     @overload
@@ -235,6 +266,19 @@ class BasePlanBuilder(PlanValidator):
         self._dataFields.remove(field)
         return self
 
+    def setGeoFields(self, geoFields: Union[List[Field], FieldList]):
+
+        l = FieldList()
+        for f in geoFields:
+            if not self._checkNotDuplicate(f, l):
+                raise ValueError(tr('Field list contains duplicate fields'))
+
+            f.setLayer(self._sourceLayer)
+            l.append(f)
+
+        self._geoFields = l
+        return self
+
     @overload
     def appendGeoField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
         ...
@@ -245,30 +289,21 @@ class BasePlanBuilder(PlanValidator):
 
     def appendGeoField(self, field, isExpression=False, caption=None) -> Self:
         if isinstance(field, str):
-            # don't allow duplicate fields
-            if any(f.field == field for f in self._geoFields):
-                self.setError(
-                    tr('Attempt to add duplicate field {field} to plan {plan}').
-                    format(field=field, plan=self._name)
-                )
-                return self
-
-            f = Field(self._sourceLayer, field, isExpression, caption)
-        elif isinstance(field, Field):
-            if any(f.field == field.field for f in self._geoFields):
-                self.setError(
-                    tr('Attempt to add duplicate field {field} to plan {plan}').
-                    format(field=field.field, plan=self._name)
-                )
-                return self
-            f = field
-        else:
+            field = Field(self._sourceLayer, field, isExpression, caption)
+        elif not isinstance(field, Field):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name)
             )
 
-        self._geoFields.append(f)
+        if self._checkNotDuplicate(field, self._geoFields):
+            self._geoFields.append(field)
+        else:
+            self.setError(
+                tr('Attempt to add duplicate field {field} to plan {plan}').
+                format(field=field.field, plan=self._name)
+            )
+
         return self
 
     @overload

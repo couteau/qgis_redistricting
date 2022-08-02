@@ -72,7 +72,7 @@ class TestPlanEditor:
     def test_datafields_append_sets_parent(self, editor: PlanEditor, valid_plan: RedistrictingPlan):
         editor.appendDataField('vap_apblack', False, 'APBVAP')
         editor.updatePlan()
-        assert valid_plan.dataFields[0].parent() == valid_plan
+        assert valid_plan.dataFields[0].parent() is valid_plan.dataFields
 
     def test_datafields_append_adds_field(
         self,
@@ -86,7 +86,7 @@ class TestPlanEditor:
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
         assert isinstance(valid_plan.dataFields[0], DataField)
-        assert valid_plan.dataFields[0].parent() == valid_plan
+        assert valid_plan.dataFields[0].parent() is valid_plan.dataFields
         assert valid_plan.dataFields[0].layer == block_layer
         assert valid_plan.dataFields[0].field == 'vap_apblack'
         assert not valid_plan.dataFields[0].isExpression
@@ -98,7 +98,7 @@ class TestPlanEditor:
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
         assert isinstance(valid_plan.dataFields[1], DataField)
-        assert valid_plan.dataFields[1].parent() == valid_plan
+        assert valid_plan.dataFields[1].parent() is valid_plan.dataFields
         assert valid_plan.dataFields[1].field == 'pop_apblack'
 
         editor.appendDataField('vap_nh_white')
@@ -199,7 +199,7 @@ class TestPlanEditor:
     ):
         editor.appendGeoField('vtdid20')
         editor.updatePlan()
-        assert valid_plan.geoFields[0].parent() == valid_plan.geoFields
+        assert valid_plan.geoFields[0].parent() is valid_plan.geoFields
         mock_update_geo_field_task[0].assert_called_once()
         mock_update_geo_field_task[1].assert_called_once()
 
@@ -216,7 +216,7 @@ class TestPlanEditor:
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
         assert isinstance(valid_plan.geoFields[0], Field)
-        assert valid_plan.geoFields[0].parent() == valid_plan.geoFields
+        assert valid_plan.geoFields[0].parent() is valid_plan.geoFields
         assert valid_plan.geoFields[0].layer == block_layer
         assert valid_plan.geoFields[0].field == 'vtdid20'
         assert not valid_plan.geoFields[0].isExpression
@@ -227,7 +227,7 @@ class TestPlanEditor:
             editor.appendGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
-        assert valid_plan.geoFields[1].parent() == valid_plan.geoFields
+        assert valid_plan.geoFields[1].parent() is valid_plan.geoFields
         assert valid_plan.geoFields[1].field == 'statefp20 || countyfp20 || vtd'
         assert valid_plan.geoFields[1].isExpression
 

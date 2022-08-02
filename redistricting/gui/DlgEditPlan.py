@@ -122,6 +122,9 @@ class DlgEditPlan(QWizard):
         layer = self.field('popLayer')
         return None if isinstance(layer, QVariant) else layer
 
+    def joinField(self):
+        return self.field('joinField') or self.field('geoIdField')
+
     def popField(self):
         return self.field('popField')
 

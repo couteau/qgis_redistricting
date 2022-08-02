@@ -1,7 +1,9 @@
 """Test redististricting plugin initialization"""
 import pathlib
 import configparser
+from unittest.mock import MagicMock
 from uuid import uuid4
+
 import pytest
 from pytestqt.plugin import QtBot
 from pytest_mock.plugin import MockerFixture
@@ -9,6 +11,8 @@ from qgis.core import Qgis, QgsProject, QgsVectorLayer
 from qgis.PyQt.QtCore import Qt, QObject
 from qgis.PyQt.QtWidgets import QDialog, QProgressDialog, QPushButton
 from redistricting import redistricting, classFactory
+from redistricting.core import FieldList
+from redistricting.gui import DlgEditPlan, DlgCopyPlan, DlgImportPlan, DlgImportShape
 
 
 class TestPluginInit:
@@ -32,7 +36,7 @@ class TestPluginInit:
 
     @pytest.fixture
     def plugin_with_plan(self, plugin_with_gui, plan):
-        plugin_with_gui.appendPlan(plan)
+        plugin_with_gui.redistrictingPlans.append(plan)
         return plugin_with_gui
 
     @pytest.fixture
@@ -41,6 +45,84 @@ class TestPluginInit:
         with qtbot.waitSignal(project.readProjectWithContext):
             project.read(str((datadir / 'test_project.qgs').resolve()))
         return plugin_with_gui
+
+    @pytest.fixture
+    def mock_builder(self, mocker: MockerFixture):
+        builder_class = mocker.patch('redistricting.redistricting.PlanBuilder', spec=redistricting.PlanBuilder)
+        builder = builder_class.return_value
+        builder.setName.return_value = builder
+        builder.setNumDistricts.return_value = builder
+        builder.setNumSeats.return_value = builder
+        builder.setDescription.return_value = builder
+        builder.setDeviation.return_value = builder
+        builder.setGeoIdField.return_value = builder
+        builder.setGeoDisplay.return_value = builder
+        builder.setSourceLayer.return_value = builder
+        builder.setPopLayer.return_value = builder
+        builder.setJoinField.return_value = builder
+        builder.setPopField.return_value = builder
+        builder.setVAPField.return_value = builder
+        builder.setCVAPField.return_value = builder
+        builder.setDataFields.return_value = builder
+        builder.setGeoFields.return_value = builder
+        builder.setGeoPackagePath.return_value = builder
+        return builder_class
+
+    @pytest.fixture
+    def mock_editor(self, mocker: MockerFixture):
+        builder_class = mocker.patch('redistricting.redistricting.PlanEditor', spec=redistricting.PlanEditor)
+        mocker.patch.object(redistricting.PlanEditor, 'fromPlan', builder_class)
+        builder = builder_class.return_value
+        builder.setName.return_value = builder
+        builder.setNumDistricts.return_value = builder
+        builder.setNumSeats.return_value = builder
+        builder.setDescription.return_value = builder
+        builder.setDeviation.return_value = builder
+        builder.setGeoIdField.return_value = builder
+        builder.setGeoDisplay.return_value = builder
+        builder.setSourceLayer.return_value = builder
+        builder.setPopLayer.return_value = builder
+        builder.setJoinField.return_value = builder
+        builder.setPopField.return_value = builder
+        builder.setVAPField.return_value = builder
+        builder.setCVAPField.return_value = builder
+        builder.setDataFields.return_value = builder
+        builder.setGeoFields.return_value = builder
+        return builder_class
+
+    @pytest.fixture
+    def mock_edit_dlg(self, mocker: MockerFixture, datadir):
+        dlg_class = mocker.patch('redistricting.redistricting.DlgEditPlan', spec=DlgEditPlan)
+        dlg = dlg_class.return_value
+        dlg.planName.return_value = 'mocked'
+        dlg.numDistricts.return_value = 5
+        dlg.numSeats.return_value = 5
+        dlg.description.return_value = 'mocked edit dialog plan'
+        dlg.deviation.return_value = 0.03
+        dlg.sourceLayer.return_value = None
+        dlg.popLayer.return_value = None
+        dlg.geoIdField.return_value = 'geoid20'
+        dlg.geoIdDisplay.return_value = 'Block'
+        dlg.joinField.return_value = 'geoid20'
+        dlg.popField.return_value = 'pop_total'
+        dlg.vapField.return_value = 'vap_total'
+        dlg.cvapField.return_value = None
+        dlg.dataFields.return_value = FieldList()
+        dlg.geoFields.return_value = FieldList()
+        dlg.gpkgPath.return_value = datadir / 'test_plan.gpkg'
+
+        dlg.importPlan.return_value = False
+        dlg.importPath.return_value = datadir / 'tuscaloosa_be.csv'
+        dlg.importField.return_value = 'geoid20'
+        dlg.importHeaderRow.return_value = True
+        dlg.importDelim.return_value = ','
+        dlg.importQuote.return_value = '"'
+        dlg.importGeoCol.return_value = 0
+        dlg.importDistCol.return_value = 1
+
+        dlg.exec_.return_value = QDialog.Accepted
+
+        return dlg_class
 
     def test_metadata(self):
         """Test that the plugin metadata.txt will validate on plugins.qgis.org."""
@@ -127,9 +209,9 @@ class TestPluginInit:
         assert d3 != d2
         d3.hide()
 
-    def test_append_plan(self, plugin, plan: QObject):
-        plugin.appendPlan(plan)
-        assert len(plugin.redistrictingPlans) == 1
+    def test_append_plan(self, plugin_with_gui, plan: QObject):
+        plugin_with_gui.appendPlan(plan)
+        assert len(plugin_with_gui.redistrictingPlans) == 1
         assert plan.isSignalConnected(plan.metaObject().method(plan.metaObject().indexOfMethod(
             'planChanged(PyQt_PyObject,QString,PyQt_PyObject,PyQt_PyObject)'))
         )
@@ -275,7 +357,7 @@ class TestPluginInit:
         new_plan.addDistrict(3, 'District 3')
         new_plan.addDistrict(4, 'District 4')
         new_plan.addDistrict(5, 'District 5')
-        plugin_with_gui.appendPlan(new_plan)
+        plugin_with_gui.redistrictingPlans.append(new_plan)
         result = plugin_with_gui.createDistrict()
         assert result is None
         assert "Oops!:Cannot create district: no active redistricting plan. Try creating a new plan." \
@@ -296,3 +378,170 @@ class TestPluginInit:
             plan.assignLayer.rollBack(True)
         assert not plugin_with_project.actionCommitPlanChanges.isEnabled()
         assert not plugin_with_project.actionRollbackPlanChanges.isEnabled()
+
+    def test_delete_plan(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        minimal_plan,
+        mocker: MockerFixture
+    ):
+        dlg = mocker.patch('redistricting.redistricting.DlgConfirmDelete')
+        dlg.return_value.exec_.return_value = QDialog.Accepted
+        dlg.return_value.removeLayers.return_value = False
+        dlg.return_value.deleteGeoPackage.return_value = False
+
+        plugin_with_project.deletePlan(minimal_plan)
+        dlg.assert_not_called()
+
+        plugin_with_project.deletePlan(plugin_with_project.redistrictingPlans[0])
+        dlg.assert_called_once()
+
+    def test_edit_plan(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        mock_edit_dlg: MagicMock,
+        mock_editor: MagicMock
+    ):
+        builder = mock_editor.return_value
+
+        plugin_with_project.editPlan()
+        mock_edit_dlg.assert_called_once()
+        mock_editor.assert_called_once()
+        builder.setName.assert_called_once_with('mocked')
+        builder.updatePlan.assert_called_once()
+
+    def test_create_plan(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        mock_edit_dlg: MagicMock,
+        mock_builder: MagicMock,
+        mocker: MockerFixture,
+        qgis_iface
+    ):
+        builder = mock_builder.return_value
+        importer_class = mocker.patch('redistricting.redistricting.AssignmentImporter')
+
+        plugin_with_project.project.setDirty(True)
+        plugin_with_project.newPlan()
+        mock_edit_dlg.assert_not_called()
+        mock_builder.assert_not_called()
+        assert "Wait!:Please save your project before creating a redistricting plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+        plugin_with_project.project.setDirty(False)
+        plugin_with_project.newPlan()
+        mock_edit_dlg.assert_called_once()
+        mock_builder.assert_called_once()
+        builder.setName.assert_called_once_with('mocked')
+        builder.createPlan.assert_called_once()
+        importer_class.assert_not_called()
+
+        dlg = mock_edit_dlg.return_value
+        dlg.importPlan.return_value = True
+        plugin_with_project.newPlan()
+        importer_class.assert_called_once()
+
+    def test_create_plan_no_layers_warns(
+        self,
+        plugin_with_gui: redistricting.Redistricting,
+        mock_edit_dlg: MagicMock,
+        mock_builder: MagicMock,
+        qgis_iface,
+        qgis_new_project  # pylint: disable=unused-argument
+    ):
+        plugin_with_gui.newPlan()
+        mock_edit_dlg.assert_not_called()
+        mock_builder.assert_not_called()
+        assert "Oops!:Cannot create a redistricting plan for an empty project. Try adding some layers." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+    def test_copy_plan(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        datadir,
+        mocker: MockerFixture,
+        qgis_iface
+    ):
+        dlg = mocker.patch('redistricting.redistricting.DlgCopyPlan', spec=DlgCopyPlan)
+        dlg.return_value.planName = 'copied'
+        dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
+        dlg.return_value.copyAssignments = False
+        dlg.return_value.exec_.return_value = QDialog.Accepted
+
+        cpy = mocker.patch('redistricting.redistricting.PlanCopier', spec=redistricting.PlanCopier)
+
+        plugin_with_project.setActivePlan(None)
+        plugin_with_project.copyPlan()
+        dlg.assert_not_called()
+        assert "Oops!:Cannot copy: no active redistricting plan. Try creating a new plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+        plugin_with_project.setActivePlan(plugin_with_project.redistrictingPlans[0])
+        plugin_with_project.copyPlan()
+        dlg.assert_called_once()
+        cpy.assert_called_once()
+        dlg.return_value.exec_.assert_called_once()
+        cpy.return_value.copyPlan.assert_called_once_with('copied', str(datadir / 'test_plan.gpkg'), False)
+
+    def test_import_plan(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        datadir,
+        mocker: MockerFixture,
+        qgis_iface
+    ):
+        dlg_class = mocker.patch('redistricting.redistricting.DlgImportPlan', spec=DlgImportPlan)
+        dlgImportPlan = dlg_class.return_value
+        dlgImportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
+        dlgImportPlan.joinField = 'geoid20'
+        dlgImportPlan.headerRow = True
+        dlgImportPlan.geoColumn = 0
+        dlgImportPlan.distColumn = 1
+        dlgImportPlan.delimiter = ','
+        dlgImportPlan.quotechar = '"'
+        dlgImportPlan.exec_.return_value = QDialog.Accepted
+
+        importer_class = mocker.patch('redistricting.redistricting.AssignmentImporter',
+                                      spec=redistricting.AssignmentImporter)
+
+        plugin_with_project.setActivePlan(None)
+        plugin_with_project.importPlan()
+        dlg_class.assert_not_called()
+        assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+        plugin_with_project.setActivePlan(plugin_with_project.redistrictingPlans[0])
+        plugin_with_project.importPlan()
+        dlg_class.assert_called_once()
+        importer_class.assert_called_once()
+        dlgImportPlan.exec_.assert_called_once()
+
+    def test_import_shapefile(
+        self,
+        plugin_with_project: redistricting.Redistricting,
+        datadir,
+        mocker: MockerFixture,
+        qgis_iface
+    ):
+        dlg_class = mocker.patch('redistricting.redistricting.DlgImportShape', spec=DlgImportShape)
+        dlgImportPlan = dlg_class.return_value
+        dlgImportPlan.shapefileFileName = str(datadir / 'tuscaloosa.shp')
+        dlgImportPlan.distField = 'GEOID20'
+        dlgImportPlan.nameField = None
+        dlgImportPlan.membersField = None
+        dlgImportPlan.exec_.return_value = QDialog.Accepted
+
+        importer_class = mocker.patch('redistricting.redistricting.ShapefileImporter',
+                                      spec=redistricting.ShapefileImporter)
+
+        plugin_with_project.setActivePlan(None)
+        plugin_with_project.importShapefile()
+        dlg_class.assert_not_called()
+        assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+        plugin_with_project.setActivePlan(plugin_with_project.redistrictingPlans[0])
+        plugin_with_project.importShapefile()
+        dlg_class.assert_called_once()
+        importer_class.assert_called_once()
+        dlgImportPlan.exec_.assert_called_once()

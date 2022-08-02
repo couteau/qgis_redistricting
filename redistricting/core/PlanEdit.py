@@ -24,7 +24,7 @@
 """
 from typing import List, Set, Union, Iterable, overload
 from qgis.core import Qgis, QgsApplication, QgsField, QgsVectorDataProvider, QgsVectorLayer
-from qgis.PyQt.QtCore import QObject, QVariant
+from qgis.PyQt.QtCore import QObject, QVariant, pyqtSignal
 from .utils import tr
 from .Field import Field, DataField
 from .BasePlanBuilder import BasePlanBuilder
@@ -32,6 +32,8 @@ from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
 
 
 class PlanEditor(BasePlanBuilder):
+    progressChanged = pyqtSignal(int)
+
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
         self._updateAssignLayerTask = None

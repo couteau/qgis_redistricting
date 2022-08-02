@@ -37,8 +37,6 @@ class PlanValidator(ErrorListMixin, QObject):
         super().__init__(parent)
         self._plan: RedistrictingPlan = None
 
-        self._geoPackagePath = None
-
         self._name = ''
         self._description = ''
         self._numDistricts = 0
@@ -68,7 +66,6 @@ class PlanValidator(ErrorListMixin, QObject):
         instance = cls(parent)
         instance._plan = plan
 
-        instance._geoPackagePath = plan.geoPackagePath
         instance._name = plan.name
         instance._description = plan.description
         instance._numDistricts = plan.numDistricts

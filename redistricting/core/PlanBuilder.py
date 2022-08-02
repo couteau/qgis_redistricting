@@ -23,6 +23,7 @@
  ***************************************************************************/
 """
 import pathlib
+from typing import Union
 from uuid import uuid4
 from qgis.core import Qgis, QgsApplication
 from qgis.PyQt.QtCore import QObject, pyqtSignal
@@ -35,12 +36,18 @@ from .Plan import RedistrictingPlan
 
 class PlanBuilder(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
-    layersCreated = pyqtSignal()
+    layersCreated = pyqtSignal('PyQt_PyObject')
 
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
         self._importer: PlanImporter = None
         self._createLayersTask = None
+
+    @classmethod
+    def fromPlan(cls, plan: RedistrictingPlan, parent: QObject = None):
+        instance = super().fromPlan(plan, parent)
+        instance._plan = None  # pylint: disable=protected-access
+        return instance
 
     def setProgress(self, progress: float):
         self.progressChanged.emit(int(progress))
@@ -53,12 +60,13 @@ class PlanBuilder(BasePlanBuilder):
         self._importer = value
         return self
 
-    def setGeoPackagePath(self, value: str):
-        if not isinstance(value, str):
+    def setGeoPackagePath(self, value: Union[str, pathlib.Path]):
+        if isinstance(value, str):
+            value = pathlib.Path(value)
+        elif not isinstance(value, pathlib.Path):
             raise ValueError(tr('Invalid GeoPackage path'))
 
-        path = pathlib.Path(value)
-        if path.resolve().exists():
+        if value.resolve().exists():
             self.pushError(tr('GeoPackage already exists at location {path}').format(path=value))
 
         self._geoPackagePath = value
@@ -73,7 +81,7 @@ class PlanBuilder(BasePlanBuilder):
                 self._importer.importPlan(plan)
             else:
                 plan.resetData(updateGeometry=True)
-            self.layersCreated.emit()
+            self.layersCreated.emit(plan)
 
         def taskTerminated():
             if self._createLayersTask.isCanceled():
@@ -91,11 +99,12 @@ class PlanBuilder(BasePlanBuilder):
 
         self._createLayersTask = CreatePlanLayersTask(
             plan,
-            self._geoPackagePath,
+            str(self._geoPackagePath),
             self._sourceLayer,
             self._sourceIdField)
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
+        self._createLayersTask.progressChanged.connect(self.setProgress)
 
         QgsApplication.taskManager().addTask(self._createLayersTask)
 
@@ -104,12 +113,36 @@ class PlanBuilder(BasePlanBuilder):
     def createPlan(self, parent: QObject = None, createLayers=True):
         self.clearErrors()
 
-        if (createLayers and not self._geoPackagePath):
-            self.pushError(
-                tr('GeoPackage path must be specified to create plan layers'),
-                Qgis.Critical
-            )
-            return None
+        if createLayers:
+            if not self._geoPackagePath:
+                self.pushError(
+                    tr('GeoPackage path must be specified to create plan layers'),
+                    Qgis.Critical
+                )
+                return None
+
+            try:
+                self._geoPackagePath.touch()
+            except FileExistsError:
+                self.pushError(
+                    tr('GeoPackage {path} already exists').format(path=self._geoPackagePath),
+                    Qgis.Critical
+                )
+                return None
+            except PermissionError:
+                self.pushError(
+                    tr('Cannot create GeoPackage at {path}: insufficient permissions').format(
+                        path=self._geoPackagePath),
+                    Qgis.Critical
+                )
+                return None
+            except OSError as e:
+                self.pushError(
+                    tr('Cannot create GeoPackage at {path}: {error}')
+                    .format(path=self._geoPackagePath, error=e),
+                    Qgis.Critical
+                )
+                return None
 
         if not self.validate():
             return None
