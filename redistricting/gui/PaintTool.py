@@ -334,7 +334,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         return super().deactivate()
 
     def setGeoField(self, value):
-        if value is not None and self._plan is not None and \
+        if value and self._plan is not None and \
                 value != self._plan.geoIdField and \
                 self._plan.geoFields and value not in self._plan.geoFields:
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
