@@ -59,10 +59,10 @@ class PlanStats:
     def deserialize(cls, plan: RedistrictingPlan, data: Dict[str, Any]):
         stats = cls(plan)
         stats._cutEdges = data.get('cut-edges', 0)
-        for f, split in data.get('splits', {}).items():
-            field = plan.geoFields[f]
-            if field is not None:
-                stats._splits[field] = split
+        for f, s in data.get('splits', {}).items():
+            if f in plan.geoFields:
+                field = plan.geoFields[f]
+                stats._splits[field] = s
         return stats
 
     @property
