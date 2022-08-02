@@ -23,57 +23,103 @@ from qgis.PyQt.QtXml import QDomDocument
 from redistricting.core.storage import ProjectStorage
 from redistricting.core.Plan import RedistrictingPlan
 
-# pylint: disable=no-self-use
-
 
 class TestStorage:
     @pytest.fixture
     def project_document(self, block_layer, assign_layer, dist_layer) -> QDomDocument:
         doc = QDomDocument('plan')
         doc.setContent(f"""
-        <!DOCTYPE qgis PUBLIC 'http://mrcc.com/qgis.dtd' 'SYSTEM'>
-        <qgis saveUser="joe" saveDateTime="2022-05-05T08:25:43" version="3.18.3-Zürich" saveUserFull="Joe Q. User" projectname="">
-          <properties>
-            <redistricting>
-              <redistricting-plan 
-                  num-districts="5" 
-                  dist-field="district" 
-                  cut-edges="0" 
-                  geo-id-display="Block" 
-                  description="" 
-                  total-population="227036" 
-                  vap-field="vap_total" 
-                  deviation="0" 
-                  name="test" 
-                  src-id-field="geoid20" 
-                  id="a11bb61d-534d-4cbe-acb0-be04a29d3e2f" 
-                  pop-field="pop_total" 
-                  pop-layer="{block_layer.id()}" 
-                  dist-layer="{dist_layer.id()}" 
-                  geo-id-field="geoid20" 
-                  assign-layer="{assign_layer.id()}" 
-                  src-layer="{block_layer.id()}"
-              >
-                <data-fields>
-                  <data-field expression="0" pctbase="2" layer="{block_layer.id()}" field="vap_nh_white" caption="WVAP" sum="1"/>
-                  <data-field expression="0" pctbase="2" layer="{block_layer.id()}" field="vap_nh_black" caption="BVAP" sum="1"/>
-                  <data-field expression="0" pctbase="2" layer="{block_layer.id()}" field="vap_apblack" caption="APBVAP" sum="1"/>
-                </data-fields>
-                <geo-fields>
-                  <geo-field expression="0" layer="{assign_layer.id()}" field="vtdid20" caption="VTD"/>
-                </geo-fields>
-                <districts>
-                  <district description="" name="CD1" district="1" members="1"/>
-                  <district description="" name="CD2" district="2" members="1"/>
-                  <district description="" name="CD3" district="3" members="1"/>
-                  <district description="" name="CD4" district="4" members="1"/>
-                  <district description="" name="CD5" district="5" members="1"/>
-                </districts>
-              </redistricting-plan>
-              <active-plan>a11bb61d-534d-4cbe-acb0-be04a29d3e2f</active-plan>
-            </redistricting>
-          </properties>
-        </qgis>
+            <!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>
+            <qgis version="3.18.3-Zürich" projectname="" saveUser="joe" saveUserFull="Joe Q. User" saveDateTime="2022-05-05T08:25:43">
+                <properties>
+                    <redistricting version="1.0.0">
+                        <redistricting-plan name="test" uuid="a11bb61d-534d-4cbe-acb0-be04a29d3e2f">
+                            <![CDATA[{{"id": "a11bb61d-534d-4cbe-acb0-be04a29d3e2f", 
+                            "name": "test", 
+                            "description": "", 
+                            "total-population": 227036, 
+                            "num-districts": 5, 
+                            "deviation": 0.025, 
+                            "pop-layer": "{block_layer.id()}", 
+                            "assign-layer": "{assign_layer.id()}", 
+                            "dist-layer": "{dist_layer.id()}", 
+                            "geo-id-field": "geoid20", 
+                            "geo-id-display": "", 
+                            "dist-field": "district", 
+                            "pop-field": "pop_total", 
+                            "vap-field": "vap_total", 
+                            "data-fields": [
+                                {{
+                                    "layer": "{block_layer.id()}", 
+                                    "field": "vap_apblack", 
+                                    "expression": false, 
+                                    "caption": "APBVAP", 
+                                    "sum": true, 
+                                    "pctbase": 2
+                                }}, 
+                                {{
+                                    "layer": "{block_layer.id()}", 
+                                    "field": "vap_nh_white", 
+                                    "expression": false, 
+                                    "caption": "WVAP", 
+                                    "sum": true, 
+                                    "pctbase": 2
+                                }}, 
+                                {{
+                                    "layer": "{block_layer.id()}", 
+                                    "field": "vap_hispanic", 
+                                    "expression": false, 
+                                    "caption": "HVAP", 
+                                    "sum": true, 
+                                    "pctbase": 2
+                                }}
+                            ], 
+                            "geo-fields": [
+                                {{
+                                    "layer": "{assign_layer.id()}", 
+                                    "field": "vtdid20", 
+                                    "expression": false, 
+                                    "caption": "VTD"
+                                }}
+                            ], 
+                            "districts": [
+                                {{
+                                    "district": 1, 
+                                    "name": "CD1", 
+                                    "members": 1
+                                }}, 
+                                {{
+                                    "district": 2, 
+                                    "name": "CD2", 
+                                    "members": 1
+                                }},
+                                {{
+                                    "district": 3, 
+                                    "name": "CD3", 
+                                    "members": 1
+                                }}, 
+                                {{
+                                    "district": 4, 
+                                    "name": "CD4", 
+                                    "members": 1
+                                }}, 
+                                {{
+                                    "district": 5, 
+                                    "name": "CD5", 
+                                    "members": 1
+                                }}
+                            ], 
+                            "plan-stats": {{
+                                "cut-edges": 0, 
+                                "splits": {{
+                                    "vtdid20": []
+                                }}
+                            }}}}]]>
+                        </redistricting-plan>
+                        <active-plan>a11bb61d-534d-4cbe-acb0-be04a29d3e2f</active-plan>
+                    </redistricting>
+                </properties>
+            </qgis>
         """.encode('utf-8'))
         return doc
 
@@ -114,21 +160,27 @@ class TestStorage:
         u = storage.readActivePlan()
         assert str(u) == "a11bb61d-534d-4cbe-acb0-be04a29d3e2f"
 
-    def test_write_plan(self,
-                        empty_project_document: QDomDocument,
-                        empty_storage: ProjectStorage,
-                        plan: RedistrictingPlan,
-                        dist_layer
-                        ):
+    def test_write_plan(
+        self,
+        empty_project_document: QDomDocument,
+        empty_storage: ProjectStorage,
+        plan: RedistrictingPlan,
+        dist_layer,
+        block_layer
+    ):
         empty_storage.writePlan(plan)
         assert re.search(
-            f'<redistricting>\\s+<redistricting-plan.+dist-layer="{dist_layer.id()}"',
+            '<redistricting version="1.0.0">\\s*<redistricting-plan\\s+'
+            '(?=.*\\bname\\b)(?=.*\\bid\\b).*><!\\[CDATA\\[\\{'
+            f'(?=.*"dist-layer":\\s*"{dist_layer.id()}")'
+            f'(?=.*"pop-layer":\\s*"{block_layer.id()}")'
+            '.*\\}\\]\\]>\\s*</redistricting-plan>\\s*</redistricting>',
             empty_project_document.toString()
         )
 
     def test_write_active_plan(self, empty_storage: ProjectStorage, empty_project_document: QDomDocument, plan):
         empty_storage.writeActivePlan(plan)
         assert re.search(
-            f'<redistricting>\\s+<active-plan>{str(plan.id)}</active-plan>',
+            f'<redistricting version="1.0.0">\\s+<active-plan>{str(plan.id)}</active-plan>',
             empty_project_document.toString()
         )
