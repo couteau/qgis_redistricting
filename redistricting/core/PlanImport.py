@@ -81,6 +81,8 @@ class PlanImporter(ErrorListMixin, QObject):
         else:
             raise ValueError(tr('Invalid type for source path'))
 
+        return self
+
     def setProgress(self, progress: float):
         self.progressChanged.emit(int(progress))
 
@@ -141,21 +143,27 @@ class AssignmentImporter(PlanImporter):
 
     def setJoinField(self, value: str):
         self._joinField = value
+        return self
 
     def setHeaderRow(self, value: bool):
         self._headerRow = value
+        return self
 
     def setGeoColumn(self, value: int):
         self._geoColumn = value
+        return self
 
     def setDistColumn(self, value: int):
         self._distColumn = value
+        return self
 
     def setDelimiter(self, value: str):
         self._delimiter = value
+        return self
 
     def setQuoteChar(self, value: str):
         self._quotechar = value
+        return self
 
     def _isValid(self) -> bool:
         result = super()._isValid()
@@ -220,12 +228,15 @@ class ShapefileImporter(PlanImporter):
 
     def setDistField(self, value: str):
         self._distField = value
+        return self
 
     def setNameField(self, value: str):
         self._nameField = value
+        return self
 
     def setMembersField(self, value: str):
         self._membersField = value
+        return self
 
     def _createImportTask(self):
         return ImportShapeFileTask(self._plan, self._file, self._distField)
