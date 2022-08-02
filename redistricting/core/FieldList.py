@@ -94,13 +94,13 @@ class FieldList(QObject):
         self._fields.insert(idx, item)
         self.fieldAdded.emit(self, item, idx)
 
-    def extend(self, items: List[Union[Field, DataField]]):
+    def extend(self, items: Union[FieldList, List[Union[Field, DataField]]]):
         if not items:
             return
         self._fields.extend(items)
         for f in items:
             f.setParent(self)
-        self.fieldAdded.emit(self, items, self._fields.index(items[0]))
+            self.fieldAdded.emit(self, f, self._fields.index(f))
 
     def clear(self):
         del self[:]
