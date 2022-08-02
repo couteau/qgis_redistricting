@@ -493,13 +493,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         newFields: Set[DataField] = set(value) - set(oldFields)
         removedFields: Set[DataField] = set(oldFields) - set(value)
 
-        if isinstance(value, FieldList):
-            self._dataFields = value[:]
-            self._dataFields.setParent(self)
-            for field in self._dataFields:
-                field.setParent(self)
-        else:
-            self._dataFields = FieldList(self, value)
+        self._dataFields.clear()
+        self._dataFields.extend(value)
 
         self._districts.updateDistrictFields()
         self._districts.resetData()
@@ -525,13 +520,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         newFields: Set[Field] = set(value) - set(oldFields)
         removedFields: Set[Field] = set(oldFields) - set(value)
 
-        if isinstance(value, FieldList):
-            self._geoFields = value[:]
-            self._geoFields.setParent(self)
-            for field in self._geoFields:
-                field.setParent(self._geoFields)
-        else:
-            self._geoFields = FieldList(self, value)
+        self._geoFields.clear()
+        self._geoFields.extend(value)
 
         for f in removedFields:
             self.geoFieldRemoved.emit(self, f)
