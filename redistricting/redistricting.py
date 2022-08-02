@@ -2,7 +2,7 @@
 """QGIS Redistricting Plugin
 
         QGIS plugin for building political districts from geographic units
-        (Originally generated using Plugin Builder bygsherman@geoapt.com 
+        (Originally generated using Plugin Builder bygsherman@geoapt.com
         and then heavily modified)
 
         begin                : 2022-01-15
@@ -29,14 +29,7 @@
 import pathlib
 from typing import List
 from uuid import UUID
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsProject,
-    QgsField,
-    QgsReadWriteContext,
-    QgsVectorLayer
-)
+from qgis.core import Qgis, QgsApplication, QgsProject, QgsField, QgsVectorLayer
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTranslator, QSettings
 from qgis.PyQt.QtGui import QIcon
@@ -62,9 +55,12 @@ from .gui import (
 from .core import (
     ProjectStorage,
     RedistrictingPlan,
+    PlanBuilder,
+    PlanEditor,
     PlanStyler,
     PlanExporter,
-    PlanImporter,
+    AssignmentImporter,
+    ShapefileImporter,
     PlanCopier
 )
 
@@ -80,6 +76,8 @@ class Redistricting:
         self.project = QgsProject.instance()
         self.projectClosing = False
         self.projectSignalsConnected = False
+
+        self.importer = None
 
         self.redistrictingPlans: List[RedistrictingPlan] = []
         self.activePlan: RedistrictingPlan = None
@@ -172,7 +170,7 @@ class Redistricting:
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
         if not self.projectSignalsConnected:
-            self.project.readProjectWithContext.connect(self.onReadProject)
+            self.project.readProject.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
             # there is no signal that gets triggered before a project
             # is closed, but removeAll comes close
@@ -187,8 +185,8 @@ class Redistricting:
             # project closing
             self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
 
-            self.project.layersAdded.connect(self.onUpdateNewPlanAction)
-            self.project.layersRemoved.connect(self.onUpdateNewPlanAction)
+            self.project.layersAdded.connect(self.updateNewPlanAction)
+            self.project.layersRemoved.connect(self.updateNewPlanAction)
 
             self.projectSignalsConnected = True
 
@@ -338,12 +336,12 @@ class Redistricting:
         """Removes the plugin menu item and icon from QGIS GUI."""
 
         if self.projectSignalsConnected:
-            self.project.readProjectWithContext.disconnect(self.onReadProject)
+            self.project.readProject.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
             self.project.removeAll.disconnect(self.onProjectClosing)
             self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
-            self.project.layersAdded.disconnect(self.onUpdateNewPlanAction)
-            self.project.layersRemoved.disconnect(self.onUpdateNewPlanAction)
+            self.project.layersAdded.disconnect(self.updateNewPlanAction)
+            self.project.layersRemoved.disconnect(self.updateNewPlanAction)
             self.projectSignalsConnected = False
 
         self.iface.removeDockWidget(self.dockwidget)
@@ -437,10 +435,11 @@ class Redistricting:
     def progressCanceled(self):
         """Hide progress dialog and display message on cancel"""
         if self.activePlan and self.activePlan.error():
-            error, level = self.activePlan.error()
+            error, _ = self.activePlan.error()
         else:
-            level = None
-        if level == Qgis.UserCanceled:
+            error = ''
+
+        if error:
             self.iface.messageBar().pushMessage(
                 self.tr("Canceled"), error, level=Qgis.Warning)
         else:
@@ -468,11 +467,20 @@ class Redistricting:
 
         return self.dlg
 
+    def endProgress(self, progress: QProgressDialog = None):
+        if progress is None:
+            progress = self.dlg
+
+        if progress is not None and not progress.wasCanceled():
+            progress.canceled.disconnect(self.progressCanceled)
+            progress.cancel()
+            progress.hide()
+
     # --------------------------------------------------------------------------
 
-    def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
+    def onReadProject(self, doc: QDomDocument):
         self.clear()
-        storage = ProjectStorage(self.project, doc, context)
+        storage = ProjectStorage(self.project, doc)
         self.redistrictingPlans.extend(storage.readRedistrictingPlans())
         for plan in self.redistrictingPlans:
             for err, level in plan.errors():
@@ -521,7 +529,7 @@ class Redistricting:
             for plan in deletePlans:
                 self.removePlan(plan)
 
-    def onUpdateNewPlanAction(self, layers):  # pylint: disable=unused-argument
+    def updateNewPlanAction(self, layers):  # pylint: disable=unused-argument
         self.actionNewPlan.setEnabled(
             any(isinstance(layer, QgsVectorLayer)
                 for layer in self.project.mapLayers(True).values())
@@ -586,8 +594,25 @@ class Redistricting:
 
         dlgEditPlan = DlgEditPlan(plan, None)
         if dlgEditPlan.exec_() == QDialog.Accepted:
-            dlgEditPlan.updatePlan(plan)
-            self.project.setDirty()
+            builder = PlanEditor.fromPlan(plan) \
+                .setName(dlgEditPlan.planName()) \
+                .setNumDistricts(dlgEditPlan.numDistricts()) \
+                .setNumSeats(dlgEditPlan.numSeats()) \
+                .setDescription(dlgEditPlan.description()) \
+                .setDeviation(dlgEditPlan.deviation()) \
+                .setGeoIdField(dlgEditPlan.geoIdField) \
+                .setGeoDisplay(dlgEditPlan.geoIdDisplay()) \
+                .setSourceLayer(dlgEditPlan.sourceLayer()) \
+                .setPopLayer(dlgEditPlan.popLayer()) \
+                .setJoinField(dlgEditPlan.joinField()) \
+                .setPopField(dlgEditPlan.popField()) \
+                .setVAPField(dlgEditPlan.vapField()) \
+                .setCVAPField(dlgEditPlan.cvapField()) \
+                .setDataFields(dlgEditPlan.dataFields()) \
+                .setGeoFields(dlgEditPlan.geoFields())
+
+            if builder.updatePlan():
+                self.project.setDirty()
 
     def deletePlan(self, plan: RedistrictingPlan):
         if plan in self.redistrictingPlans:
@@ -595,59 +620,39 @@ class Redistricting:
             if dlg.exec_() == QDialog.Accepted:
                 self.removePlan(plan, dlg.removeLayers(), dlg.deleteGeoPackage())
 
-    def createPlanGeoPackage(
-        self,
-        plan: RedistrictingPlan,
-        path: str,
-        srcLayer=None,
-        srcGeoId=None,
-        importPlan=False,
-        importPath=None,
-        importField=None,
-        headerRow=False,
-        geoCol=0,
-        distCol=1,
-        delim=',',
-        quote='"'
-    ):
-        def layersCreated(plan: RedistrictingPlan):
-            if importPlan:
-                importer = PlanImporter(plan)
-                importer.importComplete.connect(plan.assignLayer.triggerRepaint)
-                importer.importAssignments(
-                    importPath,
-                    importField,
-                    headerRow,
-                    geoCol,
-                    distCol,
-                    delim,
-                    quote,
-                    self.startProgress(self.tr('Importing assignments...'))
-                )
+    def layersCreated(self, plan: RedistrictingPlan):
+        PlanStyler.style(plan, self.activePlan)
+        self.iface.layerTreeView().refreshLayerSymbology(plan.distLayer.id())
+        self.iface.layerTreeView().refreshLayerSymbology(plan.assignLayer.id())
 
-            PlanStyler.style(plan, self.activePlan)
-            self.iface.layerTreeView().refreshLayerSymbology(plan.distLayer.id())
-            self.iface.layerTreeView().refreshLayerSymbology(plan.assignLayer.id())
-
-            self.appendPlan(plan)
-            self.setActivePlan(plan)
-
-        plan.layersCreated.connect(layersCreated)
-        plan.createLayers(path, srcLayer, srcGeoId, self.startProgress(self.tr('Creating plan layers...')))
+        self.appendPlan(plan)
 
     def newPlan(self):
         """Display new redistricting plan dialog and create new plan"""
 
+        def updateProgress(value: int):
+            progress.setValue(value)
+
+        def importStarted():
+            # not sure why pylint thinks this variable is used before assignement -- disable
+            self.endProgress(progress)  # pylint: disable=used-before-assignment
+            progress = self.startProgress(self.tr('Importing assignments...'))
+            importer.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(importer.cancel)
+            self.layersCreated(plan)
+
         if len(self.project.mapLayers()) == 0:
             self.iface.messageBar().pushMessage(
-                self.tr("Oops!"), self.tr("Cannot create a redistricting plan for an \
-                    empty project. Try adding some layers."), level=Qgis.Warning)
+                self.tr("Oops!"),
+                self.tr("Cannot create a redistricting plan for an "
+                        "empty project. Try adding some layers."),
+                level=Qgis.Warning)
             return
 
         if self.project.isDirty():
             # the project must be saved before a plan can be created
             self.iface.messageBar().pushMessage(
-                self.tr("Warning!"),
+                self.tr("Wait!"),
                 self.tr("Please save your project before "
                         "creating a redistricting plan."),
                 level=Qgis.Warning
@@ -656,18 +661,50 @@ class Redistricting:
 
         dlgNewPlan = DlgEditPlan()
         if dlgNewPlan.exec_() == QDialog.Accepted:
-            plan = dlgNewPlan.createPlan()
-            self.createPlanGeoPackage(plan, dlgNewPlan.gpkgPath(),
-                                      dlgNewPlan.sourceLayer(),
-                                      dlgNewPlan.geoIdField(),
-                                      dlgNewPlan.importPlan(),
-                                      dlgNewPlan.importPath(),
-                                      dlgNewPlan.importField(),
-                                      dlgNewPlan.importHeaderRow(),
-                                      dlgNewPlan.importGeoCol(),
-                                      dlgNewPlan.importDistCol(),
-                                      dlgNewPlan.importDelim(),
-                                      dlgNewPlan.importQuote())
+            builder = PlanBuilder() \
+                .setName(dlgNewPlan.planName()) \
+                .setNumDistricts(dlgNewPlan.numDistricts()) \
+                .setNumSeats(dlgNewPlan.numSeats()) \
+                .setDescription(dlgNewPlan.description()) \
+                .setDeviation(dlgNewPlan.deviation()) \
+                .setGeoIdField(dlgNewPlan.geoIdField()) \
+                .setGeoDisplay(dlgNewPlan.geoIdDisplay()) \
+                .setSourceLayer(dlgNewPlan.sourceLayer()) \
+                .setPopLayer(dlgNewPlan.popLayer()) \
+                .setJoinField(dlgNewPlan.joinField()) \
+                .setPopField(dlgNewPlan.popField()) \
+                .setVAPField(dlgNewPlan.vapField()) \
+                .setCVAPField(dlgNewPlan.cvapField()) \
+                .setDataFields(dlgNewPlan.dataFields()) \
+                .setGeoFields(dlgNewPlan.geoFields()) \
+                .setGeoPackagePath(dlgNewPlan.gpkgPath())
+
+            if dlgNewPlan.importPlan():
+                importer = AssignmentImporter(self.iface) \
+                    .setSourceFile(dlgNewPlan.importPath()) \
+                    .setJoinField(dlgNewPlan.importField()) \
+                    .setHeaderRow(dlgNewPlan.importHeaderRow()) \
+                    .setDelimiter(dlgNewPlan.importDelim()) \
+                    .setQuoteChar(dlgNewPlan.importQuote()) \
+                    .setGeoColumn(dlgNewPlan.importGeoCol()) \
+                    .setDistColumn(dlgNewPlan.importDistCol())
+                builder.setPlanImporter(importer)
+            else:
+                importer = None
+
+            progress = self.startProgress(self.tr('Creating plan layers...'))
+            builder.progressChanged.connect(updateProgress)
+            progress.canceled.connect(builder.cancel)
+
+            if importer:
+                builder.layersCreated.connect(importStarted)
+            else:
+                builder.layersCreated.connect(self.layersCreated)
+
+            if not (plan := builder.createPlan(QgsProject.instance())):
+                self.endProgress(progress)
+                for msg, level in builder.errors():
+                    self.iface.messageBar().pushMessage(msg, level)
 
     def copyPlan(self):
         if not self.checkActivePlan(self.tr('copy')):
@@ -676,11 +713,8 @@ class Redistricting:
         dlgCopyPlan = DlgCopyPlan(self.activePlan)
         if dlgCopyPlan.exec_() == QDialog.Accepted:
             copier = PlanCopier(self.activePlan)
-            if not dlgCopyPlan.copyAssignments:
-                copier.copyComplete.connect(lambda p: self.createPlanGeoPackage(p, dlgCopyPlan.geoPackagePath))
-            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.copyAssignments, dlgCopyPlan.geoPackagePath)
-            self.appendPlan(plan)
-            self.setActivePlan(plan)
+            copier.copyComplete.connect(self.appendPlan)
+            copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
 
     def importPlan(self):
         if not self.checkActivePlan(self.tr('import')):
@@ -688,18 +722,21 @@ class Redistricting:
 
         dlgImportPlan = DlgImportPlan(self.activePlan)
         if dlgImportPlan.exec_() == QDialog.Accepted:
-            importer = PlanImporter(self.activePlan)
+            importer = AssignmentImporter(self.iface) \
+                .setSourceFile(dlgImportPlan.equivalencyFileName) \
+                .setJoinField(dlgImportPlan.joinField) \
+                .setHeaderRow(dlgImportPlan.headerRow) \
+                .setGeoColumn(dlgImportPlan.geoColumn) \
+                .setDistColumn(dlgImportPlan.distColumn) \
+                .setDelimiter(dlgImportPlan.delimiter) \
+                .setQuoteChar(dlgImportPlan.quotechar)
+
+            progress = self.startProgress(self.tr('Importing assignments...'))
+            importer.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(importer.cancel)
             importer.importComplete.connect(self.activePlan.assignLayer.triggerRepaint)
-            importer.importAssignments(
-                dlgImportPlan.equivalencyFileName,
-                dlgImportPlan.joinField,
-                dlgImportPlan.headerRow,
-                dlgImportPlan.geoColumn,
-                dlgImportPlan.distColumn,
-                dlgImportPlan.delimiter,
-                dlgImportPlan.quotechar,
-                self.startProgress(self.tr('Importing assignments...'))
-            )
+            if not importer.importPlan(self.activePlan):
+                self.endProgress(progress)
 
     def importShapefile(self):
         if not self.checkActivePlan(self.tr('import')):
@@ -707,15 +744,18 @@ class Redistricting:
 
         dlgImportPlan = DlgImportShape(self.activePlan)
         if dlgImportPlan.exec_() == QDialog.Accepted:
-            importer = PlanImporter(self.activePlan)
+            importer = ShapefileImporter(self.iface) \
+                .setSourceFile(dlgImportPlan.shapefileFileName) \
+                .setDistField(dlgImportPlan.distField) \
+                .setNameField(dlgImportPlan.nameField) \
+                .setMembersField(dlgImportPlan.membersField)
+
+            progress = self.startProgress(self.tr('Importing shapefile...'))
+            importer.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(importer.cancel)
             importer.importComplete.connect(self.activePlan.assignLayer.triggerRepaint)
-            importer.importShapefile(
-                dlgImportPlan.shapefileFileName,
-                dlgImportPlan.distField,
-                dlgImportPlan.nameField,
-                dlgImportPlan.membersField,
-                self.startProgress(self.tr('Importing shapefile...'))
-            )
+            if not importer.importPlan(self.activePlan):
+                self.endProgress(progress)
 
     def exportPlan(self):
         def planExported(plan: RedistrictingPlan):
@@ -777,6 +817,7 @@ class Redistricting:
         self.redistrictingPlans.append(plan)
         plan.planChanged.connect(self.planChanged)
         self.project.setDirty()
+        self.setActivePlan(plan)
 
     def removePlan(self, plan: RedistrictingPlan, removeLayers=True, deleteGpkg=False):
         if plan in self.redistrictingPlans:

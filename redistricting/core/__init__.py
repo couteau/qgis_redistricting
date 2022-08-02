@@ -37,12 +37,12 @@ from .DeltaListModel import DeltaListModel
 from .PlanBuilder import PlanBuilder
 from .PlanEdit import PlanEditor
 from .PlanExport import PlanExporter
-from .PlanImport import PlanImporter
+from .PlanImport import AssignmentImporter, ShapefileImporter
 from .PlanCopy import PlanCopier
 from .Exception import RdsException
 
-__all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor',
+__all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'BaseDistrict', 'District', 'DistrictList', 'FieldList',
            'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
-           'PlanAssignmentEditor', 'PlanExporter', 'PlanImporter', 'PlanCopier', 'ProjectStorage',
+           'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanCopier',
            'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'showHelp', 'RdsException']
