@@ -25,23 +25,22 @@
 from __future__ import annotations
 
 import shutil
+import sqlite3
 from typing import TYPE_CHECKING
 from contextlib import closing
-from copy import deepcopy
+
 from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import (
-    Qgis,
-    QgsFeedback,
-    QgsMessageLog
-)
+from qgis.core import Qgis, QgsProject
 from qgis.utils import spatialite_connect
 from .utils import tr
-from .PlanStyle import PlanStyler
+from .ErrorList import ErrorListMixin
+from . import PlanStyler, PlanBuilder
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
-class PlanCopier(QObject):
+class PlanCopier(ErrorListMixin, QObject):
+    progressChanged = pyqtSignal(int)
     copyComplete = pyqtSignal('PyQt_PyObject')
 
     def __init__(
@@ -50,43 +49,45 @@ class PlanCopier(QObject):
     ):
         super().__init__(sourcePlan)
         self._plan = sourcePlan
-        self._error = None
-        self._errorLevel = None
-        self._exportTask = None
+        self._copyTask = None
 
-    def error(self):
-        return (self._error, self._errorLevel)
+    def copyPlan(self, planName, destGpkgPath, copyAssignments: bool = True, copyStyles: bool = True):
+        if not destGpkgPath:
+            raise ValueError(tr('Destination GeoPackage path required'))
 
-    def setError(self, error, level=Qgis.Warning):
-        self._error = error
-        self._errorLevel = level
-        QgsMessageLog.logMessage(error, 'Redistricting', level)
+        self.clearErrors()
 
-    def clearError(self):
-        self._error = None
+        builder = PlanBuilder.fromPlan(self._plan)
+        builder.setName(planName)
 
-    def copyPlan(self, planName, copyAssignments: bool = True, destGpkgPath: str = None, copyStyles: bool = True):
-        plan = deepcopy(self._plan)
-        plan.name = planName
-        if copyAssignments and destGpkgPath:
+        # if not copying assignments, emit the copyComplete signal
+        # only after plan layers are created
+        if not copyAssignments:
+            builder.layersCreated.connect(self.copyComplete)
+
+        plan = builder.createPlan(QgsProject.instance(), not copyAssignments)
+        if not plan:
+            self._errors = builder.errors()
+            return None
+
+        if copyAssignments:
             shutil.copyfile(self._plan.geoPackagePath, destGpkgPath)
             plan.addLayersFromGeoPackage(destGpkgPath)
+            self.copyComplete.emit(plan)
 
         if copyStyles:
             PlanStyler(plan).copyStyles(self._plan)
 
-        self.copyComplete(plan)
         return plan
 
-    def copyAssignments(self, target: RedistrictingPlan, feedback: QgsFeedback = None):
+    def copyAssignments(self, target: RedistrictingPlan):
+        def progress():
+            nonlocal count
+            count += 1
+            self.progressChanged.emit(count)
+            return 0
 
-        def makeTuple(dist, geoid):
-            nonlocal c
-            c += 1
-            feedback.setProgress(c/total)
-            return (dist, geoid)
-
-        self.clearError()
+        self.clearErrors()
 
         if not target.assignLayer:
             self.setError(
@@ -109,23 +110,15 @@ class PlanCopier(QObject):
             self._plan.assignLayer.commitChanges(True)
 
         with closing(spatialite_connect(target.geoPackagePath)) as db:
-            if feedback:
-                total = self._plan.assignLayer.featureCount()
-                c = 0
-                generator = (
-                    makeTuple(f[self._plan.distField],
-                              f[self._plan.geoIdField])
-                    for f in self._plan.assignLayer.getFeatures()
-                )
-            else:
-                generator = (
-                    (f[self._plan.distField], f[self._plan.geoIdField])
-                    for f in self._plan.assignLayer.getFeatures()
-                )
-
-            sql = f"UPDATE assignments SET {target.distField} = ? WHERE  {target.geoIdField} = ?"
-            db.executemany(sql, generator)
+            db: sqlite3.Connection
+            count = 0
+            db.execute(f"ATTACH DATABASE '{self._plan.geoPackagePath}' AS source")
+            db.set_progress_handler(progress, 1)
+            sql = f"UPDATE assignments SET {target.distField} = s.{self._plan.distField} " \
+                f"FROM source.assignments s WHERE assignments.{target.geoIdField} = s.{self._plan.geoIdField}"
+            db.execute(sql)
+            db.set_progress_handler(None, 1)
             db.commit()
 
         target.assignLayer.reload()
-        target.districts.resetData(updateGeometry=True)
+        target.resetData(updateGeometry=True)
