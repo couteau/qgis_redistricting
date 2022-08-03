@@ -17,6 +17,8 @@ from redistricting.core.PlanBuilder import PlanBuilder
 def datadir(tmp_path: pathlib.Path):
     d = tmp_path / 'data'
     s = pathlib.Path(__file__).parent / 'data'
+    if d.exists():
+        shutil.rmtree(d)
     shutil.copytree(s, d)
     yield d
     shutil.rmtree(tmp_path, ignore_errors=True)
@@ -118,9 +120,8 @@ def plan(block_layer, assign_layer, dist_layer):
 
 
 @ pytest.fixture
-def new_plan(gpkg_path, block_layer, datadir: pathlib.Path, mocker: MockerFixture):
-    dst = pathlib.Path(datadir, 'tuscaloosa_new_plan.gpkg').absolute()
-    shutil.copy(gpkg_path, dst)
+def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
+    dst = (datadir / 'tuscaloosa_new_plan.gpkg')
 
     p = PlanBuilder() \
         .setName('test') \
