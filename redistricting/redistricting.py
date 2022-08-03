@@ -600,7 +600,7 @@ class Redistricting:
                 .setNumSeats(dlgEditPlan.numSeats()) \
                 .setDescription(dlgEditPlan.description()) \
                 .setDeviation(dlgEditPlan.deviation()) \
-                .setGeoIdField(dlgEditPlan.geoIdField) \
+                .setGeoIdField(dlgEditPlan.geoIdField()) \
                 .setGeoDisplay(dlgEditPlan.geoIdDisplay()) \
                 .setSourceLayer(dlgEditPlan.sourceLayer()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
