@@ -22,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+from copy import deepcopy
 import pathlib
 from typing import Union
 from uuid import uuid4
@@ -45,7 +46,9 @@ class PlanBuilder(BasePlanBuilder):
 
     @classmethod
     def fromPlan(cls, plan: RedistrictingPlan, parent: QObject = None):
-        instance = super().fromPlan(plan, parent)
+        # using deepcopy forces duplication of the data and geo fields
+        newplan = deepcopy(plan)
+        instance = super().fromPlan(newplan, parent)
         instance._plan = None  # pylint: disable=protected-access
         return instance
 
