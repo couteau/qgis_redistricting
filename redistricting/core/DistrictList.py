@@ -254,7 +254,7 @@ class DistrictList(QObject):
             self._updateTask = None
 
         if self._needUpdate and not self._updateTask:
-            self._plan.clearError()
+            self._plan.clearErrors()
 
             self.updating.emit()
             self._updateTask = AggregateDistrictDataTask(
