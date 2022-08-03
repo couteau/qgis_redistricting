@@ -24,9 +24,9 @@
 """
 from uuid import UUID
 from typing import Any, List, Sized
-from packaging import version
 from enum import Enum
 import json
+from packaging import version
 from qgis.PyQt.QtXml import QDomDocument, QDomElement
 from qgis.core import QgsProject, QgsReadWriteContext
 from .utils import tr
