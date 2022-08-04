@@ -10,6 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy docs
     steps:
+      - name: setting the committer name and email
+        id: committer
+        shell: bash
+        run: |
+          author_name="$(git show --format=%an -s)"
+          author_email="$(git show --format=%ae -s)"
+          echo "::group::Set committer"
+          echo "git config user.name $author_name"
+          git config user.name $author_name
+          echo "git config user.email $author_email"
+          git config user.email $author_email
+          echo "::endgroup::"
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
