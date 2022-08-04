@@ -23,7 +23,6 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-import pathlib
 
 import sys
 import os
@@ -113,5 +112,5 @@ def getDefaultField(layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern
 
 def showHelp(helpPage='index.html'):
     """Display application help to the user."""
-    helpfile = f'file:///{str(pathlib.Path(__file__).parent.parent.resolve())}/help/{helpPage}'
+    helpfile = f'https://couteau.github.io/qgis_redistricting/{helpPage}'
     QDesktopServices.openUrl(QUrl(helpfile))
