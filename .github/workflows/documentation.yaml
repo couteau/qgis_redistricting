@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy docs
     steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: setting the committer name and email
         id: committer
         shell: bash
@@ -22,9 +25,6 @@ jobs:
           echo "git config user.email $author_email"
           git config user.email $author_email
           echo "::endgroup::"
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
