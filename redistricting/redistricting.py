@@ -879,10 +879,10 @@ class Redistricting:
 
             self.activePlan = plan
 
+            self.mapTool.plan = self.activePlan
             self.dockwidget.plan = self.activePlan
             self.dataTableWidget.plan = self.activePlan
             self.pendingChangesWidget.plan = self.activePlan
-            self.mapTool.plan = self.activePlan
 
             if self.activePlan and self.activePlan.assignLayer:
                 self.activePlan.assignLayer.editingStarted.connect(

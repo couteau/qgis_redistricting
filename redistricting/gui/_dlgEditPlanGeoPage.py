@@ -76,7 +76,7 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.registerField('sourceLayer*', self.cmbSourceLayer)
         self.registerField('geoIdField*', self.cmbGeoIDField)
         self.registerField('geoCaption', self.cmbGeoCaption, 'currentText', self.cmbGeoCaption.currentTextChanged)
-        self.registerField('geoFields', self.tblAddlGeography)
+        self.registerField('geoFields', self.tblAddlGeography, 'fields', self.tblAddlGeography.fieldsChanged)
 
         # Annoyingly, loading the UI sets the layer property of a QgsLayerCombo to
         # the first layer in the project, even if allowEmptyLayer is set to true.

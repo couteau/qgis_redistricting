@@ -206,7 +206,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 # calculate cut edges only if all districts are being aggregated
                 if self.calculateCutEdges and self.updateDistricts is None:
                     try:
-                        from redistricting.vendor.gerrychain import Graph, Partition, updaters  # pylint: disable=import-outside-toplevel
+                        # pylint: disable=import-outside-toplevel
+                        from redistricting.vendor.gerrychain import Graph, Partition, updaters  # type: ignore
+                        # pylint: enable=import-outside-toplevel
 
                         graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
                         partition = Partition(
@@ -251,7 +253,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         if not result:
             return
 
-        name = [self.distList[d].name if d in self.distList else str(d) for d in self.districts.index]
+        name = [self.distList[d].name if d in self.distList else d for d in self.districts.index.astype(str)]
         self.districts.insert(0, 'name', name)
 
         members = [0 if d == 0 else self.distList[d].members if d in self.distList else 1 for d in self.districts.index]
