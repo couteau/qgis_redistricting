@@ -195,16 +195,25 @@ class DistrictList(QObject):
                 )
 
     def updateData(self, data: pd.DataFrame, districts: List[int] = None):
+        updateall = districts is None or districts == list(self._districts.keys())
+
         if districts is None:
             districts = range(0, self._plan.numDistricts+1)
+
         for d in districts:
-            if not d in data.index and d in self._districts:
+            if updateall and not d in data.index and d in self._districts:
                 self._districts[d].clear()
             elif d in data.index:
                 if d in self._districts:
                     district = self._districts[d]
                 else:
-                    district = self.addDistrict(d, data.name[d], data.members[d]) if d > 0 else Unassigned(self._plan)
+                    district = \
+                        self.addDistrict(
+                            int(d),
+                            str(data.name[d]),
+                            int(data.members[d])
+                        ) if d > 0 \
+                        else Unassigned(self._plan)
                 district.update(data.loc[d])
 
     def updateTaskCompleted(self):
