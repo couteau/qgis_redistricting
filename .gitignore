@@ -6,4 +6,3 @@ __pycache__
 redistricting/vendor
 coverage.xml
 .coverage
-build/
