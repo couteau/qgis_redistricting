@@ -80,6 +80,7 @@ class DlgEditPlan(QWizard):
             self.setField('geoCaption', plan.geoDisplay)
             self.setField('gpkgPath', plan.geoPackagePath)
             self.setField('popLayer', plan.popLayer)
+            self.setField('joinField', plan.joinField)
             self.setField('popField', plan.popField)
             self.setField('vapField', plan.vapField)
             self.setField('cvapField', plan.cvapField)
