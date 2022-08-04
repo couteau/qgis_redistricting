@@ -404,7 +404,7 @@ class RdsFieldTableView(QTableView):
         self.pressIndex = None
         return super().mouseReleaseEvent(e)
 
-    @pyqtProperty(list, notify=fieldsChanged)
+    @pyqtProperty("QVariantList", notify=fieldsChanged)
     def fields(self) -> List[Field]:
         m = self.model()
         if hasattr(m, 'fields'):
