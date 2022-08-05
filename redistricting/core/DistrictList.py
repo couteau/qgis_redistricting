@@ -222,7 +222,7 @@ class DistrictList(QObject):
             self._plan.totalPopulation = self._updateTask.totalPop
 
         self.updateData(self._updateTask.districts, self._updateDistricts)
-        self._plan.stats.update(self._updateTask.cutEdges, self._updateTask.splits)
+        self._plan.stats.update(None, self._updateTask.splits)
 
         if self._needGeomUpdate:
             self._plan.distLayer.triggerRepaint()

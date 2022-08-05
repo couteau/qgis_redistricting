@@ -36,6 +36,7 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsAggregateCalculator,
+    QgsTask
 )
 from qgis.utils import spatialite_connect
 from ..utils import tr
@@ -75,9 +76,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.districts: Union[pd.DataFrame, gpd.GeoDataFrame] = None
         self.totalPop = 0
-        self.cutEdges = []
         self.splits = {}
-        self.calculateCutEdges = False
         self.calculateSplits = True
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -202,28 +201,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 self.districts['convexhull'] = area / \
                     geo.convex_hull.area
-
-                # calculate cut edges only if all districts are being aggregated
-                if self.calculateCutEdges and self.updateDistricts is None:
-                    try:
-                        # pylint: disable=import-outside-toplevel
-                        from redistricting.vendor.gerrychain import Graph, Partition, updaters  # type: ignore
-                        # pylint: enable=import-outside-toplevel
-
-                        graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
-                        partition = Partition(
-                            graph,
-                            assignment=self.distField,
-                            updaters={"cut_edges": updaters.cut_edges}
-                        )
-                        self.cutEdges = partition['cut_edges']
-                    except ImportError:
-                        self.cutEdges = []
-                else:
-                    self.cutEdges = []
             else:
                 self.districts = df.groupby(by=self.distField).agg(aggs)
-                self.cutEdges = []
 
             self.setProgress(99)
 
@@ -281,3 +260,73 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 f"VALUES ({','.join(fields.values())})"
             db.executemany(sql, data)
             db.commit()
+
+
+class CalculateCutEdgesTask(QgsTask):
+    """Task to calculate the cut edges of a plan in the background"""
+
+    def __init__(
+        self,
+        plan: 'RedistrictingPlan',
+        geoField=None,
+        useBuffer=True
+    ):
+        super().__init__(plan, tr('Calculating district geometry and metrics'))
+        self.useBuffer = useBuffer
+        self.assignLayer = plan.assignLayer
+        self.distField = plan.distField
+        self.geoIdField = plan.geoIdField
+
+        if geoField != self.geoIdField and self.assignLayer.fields().lookupField(geoField) != -1:
+            self.geoField = geoField
+        else:
+            self.geoField = None
+
+        self.cutEdges = []
+        self.exception = None
+
+    def run(self):
+        try:
+            if self.useBuffer:
+                features = self.assignLayer.getFeatures()
+            else:
+                features = self.assignLayer.dataProvider().getFeatures()
+
+            gIndex = self.assignLayer.fields().lookupField(self.geoField)
+            dIndex = self.assignLayer.fields().lookupField(self.distField)
+            if self.geoField:
+                fIndex = self.assignLayer.fields().lookupField(self.geoField)
+                datagen = ([f[gIndex], f[fIndex], f[dIndex], wkt.loads(f.geometry().asWkt())] for f in features)
+                cols = [self.geoField, self.geoField, self.distField, 'geometry']
+            else:
+                datagen = ([f[gIndex], f[dIndex], wkt.loads(f.geometry().asWkt())] for f in features)
+                cols = [self.geoField, self.distField, 'geometry']
+
+            df: gpd.GeoDataFrame = gpd.GeoDataFrame.from_records(
+                datagen,
+                index=self.geoField,
+                columns=cols)
+            df.set_geometry(df.geometry, inplace=True, crs=self.assignLayer.crs().toWkt())
+
+            if self.geoField:
+                df = df.dissolve(by=self.geoField)
+
+            try:
+                # pylint: disable=import-outside-toplevel
+                from gerrychain import Graph, Partition, updaters  # type: ignore
+                # pylint: enable=import-outside-toplevel
+
+                graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
+                partition = Partition(
+                    graph,
+                    assignment=self.distField,
+                    updaters={"cut_edges": updaters.cut_edges}
+                )
+                self.cutEdges = partition['cut_edges']
+            except ImportError:
+                pass
+        except Exception as e:  # pylint: disable=broad-except
+            self.exception = e
+            return False
+
+        return True
