@@ -29,7 +29,7 @@
 import pathlib
 from typing import List
 from uuid import UUID
-from qgis.core import Qgis, QgsApplication, QgsProject, QgsField, QgsVectorLayer
+from qgis.core import Qgis, QgsApplication, QgsProject, QgsField, QgsVectorLayer, QgsReadWriteContext
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTranslator, QSettings
 from qgis.PyQt.QtGui import QIcon
@@ -170,7 +170,7 @@ class Redistricting:
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
         if not self.projectSignalsConnected:
-            self.project.readProject.connect(self.onReadProject)
+            self.project.readProjectWithContext.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
             # there is no signal that gets triggered before a project
             # is closed, but removeAll comes close
@@ -336,7 +336,7 @@ class Redistricting:
         """Removes the plugin menu item and icon from QGIS GUI."""
 
         if self.projectSignalsConnected:
-            self.project.readProject.disconnect(self.onReadProject)
+            self.project.readProjectWithContext.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
             self.project.removeAll.disconnect(self.onProjectClosing)
             self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
@@ -478,9 +478,9 @@ class Redistricting:
 
     # --------------------------------------------------------------------------
 
-    def onReadProject(self, doc: QDomDocument):
+    def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
         self.clear()
-        storage = ProjectStorage(self.project, doc)
+        storage = ProjectStorage(self.project, doc, context)
         self.redistrictingPlans.extend(storage.readRedistrictingPlans())
         for plan in self.redistrictingPlans:
             for err, level in plan.errors():
@@ -499,10 +499,8 @@ class Redistricting:
             return
 
         storage = ProjectStorage(self.project, doc)
-        for plan in self.redistrictingPlans:
-            storage.writePlan(plan)
-            if self.activePlan == plan:
-                storage.writeActivePlan(plan)
+        storage.writeRedistrictingPlans(self.redistrictingPlans)
+        storage.writeActivePlan(self.activePlan)
 
     def onProjectClosing(self):
         self.projectClosing = True

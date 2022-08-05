@@ -23,13 +23,11 @@
  ***************************************************************************/
 """
 from uuid import UUID
-from typing import Any, List, Sized
-from enum import Enum
+from typing import List
 import json
 from packaging import version
-from qgis.PyQt.QtXml import QDomDocument, QDomElement
+from qgis.PyQt.QtXml import QDomDocument
 from qgis.core import QgsProject, QgsReadWriteContext
-from .utils import tr
 from .Plan import RedistrictingPlan
 
 schemaVersion = version.parse('1.0.0')
@@ -40,9 +38,7 @@ class ProjectStorage:
         self._project = project
         self._doc = doc
         self._context = context
-        self._pnode = None
-        self._version = schemaVersion
-        self._getPluginNode()
+        self._version = self.getVersion() or schemaVersion
 
     def migrate(self):
         """Migrate plugin node in project file to new schema
@@ -50,138 +46,70 @@ class ProjectStorage:
             currently does nothing - here for the future in case 
             the json schema/storage format changes
         """
-        # perform migration
+        if self._version < schemaVersion:
+            # perform migration
+            pass
+
         self._version = schemaVersion
 
-    def _getPluginNode(self):
+    def getVersion(self):
         docNode = self._doc.documentElement()
-        props = docNode.namedItem('properties')
-        if props.isNull():
+        node = docNode.namedItem('properties')
+        if not node.isElement():
             return None
-        node = props.namedItem('redistricting')
-        if node.isElement():
-            self._pnode = node.toElement()
-            self._version = version.parse(self._pnode.attribute('version', '0.0.0'))
-            if self._version < schemaVersion:
-                self.migrate()
 
-        return None
+        node = node.namedItem('redistricting')
+        if not node.isElement():
+            return None
 
-    def _createPluginNode(self):
+        if not node.toElement().hasAttribute('version'):
+            return None
+
+        return version.parse(node.toElement().attribute('version'))
+
+    def setVersion(self):
         docNode = self._doc.documentElement()
-        props = docNode.namedItem('properties')
-        if props.isNull():
-            props = self._doc.createElement('properties')
-            docNode.appendChild(props)
-        node = props.namedItem('redistricting')
+        node = docNode.namedItem('properties')
         if node.isElement():
-            self._pnode = node.toElement()
-            self._version = version.parse(self._pnode.attribute('version', '0.0.0'))
-            if self._version < schemaVersion:
-                self.migrate()
-        else:
-            props.removeChild(node)
-            node = self._doc.createElement('redistricting')
-            node.setAttribute('version', str(schemaVersion))
-            props.appendChild(node)
-            self._pnode = node
-            self._version = schemaVersion
-            return node
+            node = node.namedItem('redistricting')
+            if node.isElement():
+                node.toElement().setAttribute('version', schemaVersion)
 
-    def _findPlanByUUID(self, uuid: UUID):
-        if self._pnode is None:
-            return None
-        nodes = self._pnode.elementsByTagName('redistricting-plan')
-        for i in range(0, nodes.length()):
-            node = nodes.item(i).toElement()
-            if node.hasAttribute('id') and node.attribute('id') == str(uuid):
-                return node
-        return None
-
-    def readPlan(self, planNode: QDomElement):
-        if not planNode.hasAttributes():
-            if self._context:
-                self._context.pushMessage(tr('Invalid redistricting plan found: plan has no attributes'))
-        else:
-            c = planNode.firstChild()
-            if c and c.isCDATASection():
-                planJson = json.loads(c.toCDATASection().data())
-                return RedistrictingPlan.deserialize(planJson, parent=self._project)
-
-        planNode.parentNode().removeChild(planNode)
-        return None
-
-    def serializeToNode(self, data: dict[str, Any], nodeName):
-        node = self._doc.createElement(nodeName)
-        for key, value in data.items():
-            if isinstance(value, Sized) and len(value) == 0:
-                continue
-
-            if isinstance(value, dict):
-                node.appendChild(self.serializeToNode(value, key))
-            elif isinstance(value, (list, set)):
-                if key[-1] == 's':
-                    childKey = key[:-1]
-                else:
-                    childKey = key
-                groupNode = self._doc.createElement(key)
-                for item in value:
-                    childNode = self.serializeToNode(item, childKey)
-                    groupNode.appendChild(childNode)
-
-                node.appendChild(groupNode)
-            elif isinstance(value, Enum):
-                node.setAttribute(key, int(value))
-            else:
-                node.setAttribute(key, str(value))
-
-        return node
-
-    def writePlan(self, plan: RedistrictingPlan):
-        pnode = self._createPluginNode()
-        data = plan.serialize()
-        jplan = json.dumps(data)
-        node = self._doc.createElement('redistricting-plan')
-        node.setAttribute('name', plan.name)
-        node.setAttribute('uuid', str(plan.id))
-        node.appendChild(self._doc.createCDATASection(jplan))
-
-        oldNode = self._findPlanByUUID(plan.id)
-        if oldNode is not None:
-            pnode.replaceChild(node, oldNode)
-        else:
-            pnode.appendChild(node)
+    def writeRedistrictingPlans(self, plans: List[RedistrictingPlan]):
+        l: List[str] = []
+        for p in plans:
+            data = p.serialize()
+            jsonPlan = json.dumps(data)
+            l.append(jsonPlan)
+        self._project.writeEntry('redistricting', 'redistricting-plans', l)
+        self.setVersion()
 
     def readRedistrictingPlans(self) -> List[RedistrictingPlan]:
-        if self._pnode is None:
-            return []
-
+        self.migrate()
         plans = []
-        nodes = self._pnode.elementsByTagName('redistricting-plan')
-        for n in range(nodes.length()):
-            node = nodes.item(n).toElement()
-            plan = self.readPlan(node)
-            if plan is not None:
-                plans.append(plan)
+        l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
+        if success:
+            for p in l:
+                planJson = json.loads(p)
+                plan = RedistrictingPlan.deserialize(planJson, parent=self._project)
+                if plan is not None:
+                    plans.append(plan)
         return plans
 
     def readActivePlan(self):
-        if self._pnode is None:
-            return False
-        anode = self._pnode.namedItem('active-plan')
-        if anode.isElement():
+        self.migrate()
+        uuid, found = self._project.readEntry('redistricting', 'active-plan', None)
+        if found:
             try:
-                uuid = UUID(anode.toElement().text())
-                return uuid
+                return UUID(uuid)
             except ValueError:
                 # ignore malformed uuids
                 pass
-
-        return False
+        return None
 
     def writeActivePlan(self, plan: RedistrictingPlan):
-        pnode = self._createPluginNode()
-        if pnode is not None:
-            anode = self._doc.createElement('active-plan')
-            anode.appendChild(self._doc.createTextNode(str(plan.id)))
-            pnode.appendChild(anode)
+        if plan is not None:
+            self._project.writeEntry('redistricting', 'active-plan', str(plan.id))
+        else:
+            self._project.removeEntry('redistricting', 'active-plan')
+        self.setVersion()
