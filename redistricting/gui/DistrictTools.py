@@ -284,14 +284,14 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
     def cmbTargetChanged(self, index):
         if index < 2:
-            self.targetChanged.emit(index-1)
+            self.targetChanged.emit(0 if index == 1 else None)
         elif index >= 3:
             dist = self._plan.districts[index-2]
             self.targetChanged.emit(dist.district)
 
     def cmbSourceChanged(self, index):
         if index < 2:
-            self.sourceChanged.emit(index-1)
+            self.sourceChanged.emit(0 if index == 1 else None)
         elif index >= 3:
             dist = self._plan.districts[index-2]
             self.sourceChanged.emit(dist.district)

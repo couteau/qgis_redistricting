@@ -536,7 +536,7 @@ class Redistricting:
     # --------------------------------------------------------------------------
 
     def setDistTarget(self, target):
-        if target == -1:
+        if target is None:
             target = self.createDistrict()
         self.mapTool.setTargetDistrict(target)
         if target is None:
