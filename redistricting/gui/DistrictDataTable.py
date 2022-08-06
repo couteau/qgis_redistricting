@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - A QDockWidget that shows selected demographic 
+"""QGIS Redistricting Plugin - A QDockWidget that shows selected demographic
         data for the active Redistricting Plan
 
         begin                : 2022-01-15
@@ -61,11 +61,11 @@ class StatsModel(QAbstractTableModel):
         self.beginResetModel()
         if self._plan:
             self._plan.planChanged.disconnect(self.planChanged)
-            self._plan.districts.updateComplete.disconnect(self.statsUpdated)
+            self._plan.stats.statsChanged.disconnect(self.statsUpdated)
         self._plan = value
         if self._plan:
             self._plan.planChanged.connect(self.planChanged)
-            self._plan.districts.updateComplete.connect(self.statsUpdated)
+            self._plan.stats.statsChanged.connect(self.statsUpdated)
         self.endResetModel()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
@@ -90,11 +90,10 @@ class StatsModel(QAbstractTableModel):
         return 1 if not parent.isValid() else 0
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
-        if orientation == Qt.Horizontal:
-            return None
-
-        if role == Qt.DisplayRole:
+        if orientation == Qt.Vertical and role == Qt.DisplayRole:
             return self.StatLabels[section] if section <= 5 else '   ' + self._plan.geoFields[section-6].caption
+
+        return None
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
         if self._plan is None or not index.isValid() or index.column() != 0:
