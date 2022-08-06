@@ -756,7 +756,7 @@ class Redistricting:
                 self.endProgress(progress)
 
     def exportPlan(self):
-        def planExported(plan: RedistrictingPlan):
+        def planExported():
             self.iface.messageBar().pushMessage(
                 "Success", f"Export of {plan.name} complete!", level=Qgis.Success)
 
@@ -765,8 +765,9 @@ class Redistricting:
 
         dlgExportPlan = DlgExportPlan(self.activePlan)
         if dlgExportPlan.exec_() == QDialog.Accepted:
+            plan = self.activePlan
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
-                export = PlanExporter(self.activePlan,
+                export = PlanExporter(plan,
                                       dlgExportPlan.equivalencyFileName if dlgExportPlan.exportEquivalency else None,
                                       dlgExportPlan.shapefileFileName if dlgExportPlan.exportShapefile else None,
                                       dlgExportPlan.equivalencyGeography,

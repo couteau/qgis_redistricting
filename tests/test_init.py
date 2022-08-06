@@ -16,6 +16,7 @@ from redistricting.gui import DlgEditPlan, DlgCopyPlan, DlgImportPlan, DlgImport
 
 
 class TestPluginInit:
+
     @pytest.fixture
     def plugin(self, qgis_iface, mocker: MockerFixture):
         settings = mocker.patch('redistricting.redistricting.QSettings')
@@ -40,11 +41,12 @@ class TestPluginInit:
         return plugin_with_gui
 
     @pytest.fixture
-    def plugin_with_project(self, plugin_with_gui, datadir, qtbot):
+    def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, qgis_new_project):  # pylint: disable=unused-argument
         project = QgsProject.instance()
-        with qtbot.waitSignal(project.readProjectWithContext):
+        with qtbot.waitSignal(project.readProject):
             project.read(str((datadir / 'test_project.qgs').resolve()))
-        return plugin_with_gui
+        yield plugin_with_gui
+        project.clear()
 
     @pytest.fixture
     def mock_builder(self, mocker: MockerFixture):
@@ -441,7 +443,6 @@ class TestPluginInit:
         mock_edit_dlg: MagicMock,
         mock_builder: MagicMock,
         qgis_iface,
-        qgis_new_project  # pylint: disable=unused-argument
     ):
         plugin_with_gui.newPlan()
         mock_edit_dlg.assert_not_called()

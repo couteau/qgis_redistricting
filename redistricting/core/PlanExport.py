@@ -22,24 +22,17 @@
  *                                                                         *
  ***************************************************************************/
 """
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.PyQt.QtWidgets import QProgressDialog
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsMessageLog,
-)
+from qgis.core import Qgis, QgsApplication
 from .utils import tr
+from .ErrorList import ErrorListMixin
 from .Field import Field
 from .Tasks import ExportRedistrictingPlanTask
-if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
+from .Plan import RedistrictingPlan
 
 
-class PlanExporter(QObject):
+class PlanExporter(ErrorListMixin, QObject):
     exportComplete = pyqtSignal()
     exportTerminated = pyqtSignal()
 
@@ -57,24 +50,13 @@ class PlanExporter(QObject):
         self._plan = plan
         self.equivalencyFile = equivalencyFile
         self.shapeFile = shapeFile
-        self.assignGeography = assignGeography
+        self.assignGeography = \
+            None if assignGeography is None or assignGeography.field == plan.geoIdField \
+            else assignGeography
         self.includeUnassigned = includeUnassigned
         self.includeDemographics = includeDemographics
         self.includeMetrics = includeMetrics
-        self._error = None
-        self._errorLevel = None
         self._exportTask = None
-
-    def error(self):
-        return (self._error, self._errorLevel)
-
-    def setError(self, error, level=Qgis.Warning):
-        self._error = error
-        self._errorLevel = level
-        QgsMessageLog.logMessage(error, 'Redistricting', level)
-
-    def clearError(self):
-        self._error = None
 
     def export(self, progress: QProgressDialog = None):
         def taskCompleted():
@@ -95,7 +77,7 @@ class PlanExporter(QObject):
             self._exportTask = None
             self.exportTerminated.emit()
 
-        self.clearError()
+        self.clearErrors()
 
         self._exportTask = ExportRedistrictingPlanTask(
             self._plan,
@@ -106,7 +88,7 @@ class PlanExporter(QObject):
             self.includeUnassigned,
             bool(self.equivalencyFile),
             self.equivalencyFile,
-            assignGeography=None if self.assignGeography.field == self._plan.geoIdField else self.assignGeography
+            self.assignGeography
         )
         if progress:
             self._exportTask.progressChanged.connect(lambda p: progress.setValue(int(p)))
