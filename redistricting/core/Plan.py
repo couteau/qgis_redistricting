@@ -88,9 +88,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._cvapField = None
         self._dataFields = FieldList(self)
 
-        self._stats = PlanStats(self)
-
         self._districts = DistrictList(self)
+        self._stats = PlanStats(self)
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -630,11 +629,13 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             self.setError(tr('Error creating new {} layer: {}').format(
                 tr('assignment'), assignLayer.lastError()), Qgis.Critical)
             return
+
         distLayer = QgsVectorLayer(f'{gpkgPath}|layername=districts', f'{self.name}_districts', 'ogr')
         if not distLayer.isValid():
             self.setError(tr('Error creating new {} layer: {}').format(
                 tr('district'), distLayer.lastError()), Qgis.Critical)
             return
+
         QgsProject.instance().addMapLayers([assignLayer, distLayer], False)
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)
