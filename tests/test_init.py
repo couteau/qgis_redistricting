@@ -336,35 +336,29 @@ class TestPluginInit:
         result = plugin_with_gui.checkActivePlan('test')
         assert result
 
-    def test_create_district(self, plugin_with_project, mocker: MockerFixture):
+    def test_create_district(self, plugin_with_plan, mocker: MockerFixture, qgis_iface):
+        result = plugin_with_plan.createDistrict()
+        assert result is None
+        assert "Oops!:Cannot create district: no active redistricting plan. Try creating a new plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+        plugin_with_plan.setActivePlan(plugin_with_plan.redistrictingPlans[0])
         dlgcls = mocker.patch('redistricting.redistricting.DlgNewDistrict')
         dlg = dlgcls.return_value
         dlg.exec_.return_value = QDialog.Accepted
-        add = mocker.patch.object(plugin_with_project.activePlan, 'addDistrict')
-        settarget = mocker.patch.object(plugin_with_project.dockwidget, 'setTargetDistrict')
-        result = plugin_with_project.createDistrict()
+        add = mocker.patch.object(plugin_with_plan.activePlan, 'addDistrict')
+        settarget = mocker.patch.object(plugin_with_plan.dockwidget, 'setTargetDistrict')
+        result = plugin_with_plan.createDistrict()
         assert result is not None
         add.assert_called_once()
         settarget.assert_called_once()
 
         dlg.exec_.return_value = QDialog.Rejected
+        result = plugin_with_plan.createDistrict()
+        assert result is None
+
+    def test_create_district_all_allocated(self, plugin_with_project, qgis_iface):
         result = plugin_with_project.createDistrict()
-        assert result is None
-
-    def test_create_district_all_allocated(self, plugin_with_gui, new_plan, qgis_iface):
-        new_plan.addDistrict(1, 'District 1')
-        new_plan.addDistrict(2, 'District 2')
-        new_plan.addDistrict(3, 'District 3')
-        new_plan.addDistrict(4, 'District 4')
-        new_plan.addDistrict(5, 'District 5')
-        plugin_with_gui.redistrictingPlans.append(new_plan)
-        result = plugin_with_gui.createDistrict()
-        assert result is None
-        assert "Oops!:Cannot create district: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
-
-        plugin_with_gui.setActivePlan(new_plan)
-        result = plugin_with_gui.createDistrict()
         assert result is None
         assert 'Warning:All districts have already been allocated' in qgis_iface.messageBar().get_messages(Qgis.Warning)
 
