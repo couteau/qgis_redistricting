@@ -52,15 +52,15 @@ class FieldListModel(QAbstractTableModel):
         else:
             self._data: FieldList = FieldList(self, fields)
         self._colCount = 3
-        if len(self._data) > 0:
+        if self._data:
             self.fieldType = type(self._data[0])
         else:
             self.fieldType = Field
         self._vapEnabled = True
         self._cvapEnabled = True
 
-    @property
-    def fields(self) -> List[Field]:
+    @pyqtProperty(list)
+    def fields(self):
         return list(self._data)
 
     @fields.setter
@@ -73,7 +73,7 @@ class FieldListModel(QAbstractTableModel):
             self.endRemoveRows()
         if value is not None and len(value):
             self.beginInsertRows(QModelIndex(), 0, len(value))
-            self._data.extend(value)
+            self._data = FieldList(self, value)
             self.fieldType = type(self._data[0])
             self.endInsertRows()
 
@@ -404,15 +404,16 @@ class RdsFieldTableView(QTableView):
         self.pressIndex = None
         return super().mouseReleaseEvent(e)
 
-    @pyqtProperty("QVariantList", notify=fieldsChanged)
+    @pyqtProperty(list, notify=fieldsChanged)
     def fields(self) -> List[Field]:
         m = self.model()
-        if hasattr(m, 'fields'):
-            return m.fields
-        return []
+        if not isinstance(m, FieldListModel):
+            return []
+
+        return m.fields
 
     @fields.setter
     def fields(self, value: list):
         m = self.model()
-        if hasattr(m, 'fields'):
+        if isinstance(m, FieldListModel):
             m.fields = value

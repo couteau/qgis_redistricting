@@ -85,8 +85,8 @@ class DlgEditPlan(QWizard):
             self.setField('vapField', plan.vapField)
             self.setField('cvapField', plan.cvapField)
             self.setField('sourceLayer', plan.sourceLayer)
-            self.setField('geoFields', QVariant(list(plan.geoFields)))
-            self.setField('dataFields', QVariant(list(plan.dataFields)))
+            self.setField('geoFields', list(plan.geoFields))
+            self.setField('dataFields', list(plan.dataFields))
         else:
             self.addPage(dlgEditPlanImportPage(self))
             self.setField('sourceLayer', iface.activeLayer())

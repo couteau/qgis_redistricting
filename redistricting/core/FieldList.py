@@ -38,8 +38,6 @@ class FieldList(QObject):
     def __init__(self, parent: QObject = None, fields: List[Union[Field, DataField]] = None):
         super().__init__(parent)
         self._fields: List[Field] = fields or []
-        for field in self._fields:
-            field.setParent(self)
 
     def __getitem__(self, key) -> Union[Field, DataField, FieldList]:
         if isinstance(key, str):
