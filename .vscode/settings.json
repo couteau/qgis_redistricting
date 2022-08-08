@@ -7,8 +7,8 @@
         "/Applications/QGIS.app/Contents/Resources/python/",
         "/Applications/QGIS.app/Contents/Resources/python/site-packages",
         "/Applications/QGIS.app/Contents/Resources/python/plugins",
-        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
-        "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
+        "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python",
+        "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
     ],
     "python.analysis.extraPaths": [
         "/Applications/QGIS.app/Contents/Resources/python/",
@@ -16,5 +16,11 @@
         "/Applications/QGIS.app/Contents/Resources/python/plugins",
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins"
+    ],
+    "qtForPython.rcc.args": [
+        "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}${fileBasenameNoExtension}.py\""
+    ],
+    "qtForPython.uic.args": [
+        "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${fileBasenameNoExtension}.py\""
     ],
 }

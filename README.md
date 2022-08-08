@@ -15,3 +15,8 @@ Features
     - Population deviation
 * Import plans from ESRI Shapefiles or geographic unit equivalency files
 * Export plans as ESRI Shapefiles and equivalency files
+
+Documentation
+-------------
+
+Please see the [online documentation](https://couteau.github.io/qgis_redistricting/) for more information.
