@@ -239,7 +239,7 @@ class ShapefileImporter(PlanImporter):
         return self
 
     def _createImportTask(self):
-        return ImportShapeFileTask(self._plan, self._file, self._distField)
+        return ImportShapeFileTask(self._plan, str(self._file), self._distField)
 
     def taskCompleted(self):
         districts = {}
