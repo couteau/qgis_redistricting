@@ -38,21 +38,21 @@
    </item>
    <item>
     <layout class="QGridLayout" name="gridLayout">
-     <item row="1" column="5">
-      <widget class="QPushButton" name="btnCancel">
-       <property name="text">
-        <string>Close</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="3">
+     <item row="2" column="3">
       <widget class="QPushButton" name="btnEdit">
        <property name="text">
         <string>Edit</string>
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
+     <item row="2" column="5">
+      <widget class="QPushButton" name="btnCancel">
+       <property name="text">
+        <string>Close</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="0">
       <widget class="QPushButton" name="btnOpen">
        <property name="enabled">
         <bool>false</bool>
@@ -65,10 +65,17 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="4">
+     <item row="2" column="4">
       <widget class="QPushButton" name="btnDelete">
        <property name="text">
         <string>Delete</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QPushButton" name="btnNew">
+       <property name="text">
+        <string>New </string>
        </property>
       </widget>
      </item>

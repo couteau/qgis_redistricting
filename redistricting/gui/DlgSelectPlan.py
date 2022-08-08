@@ -94,6 +94,7 @@ class PlanListModel(QAbstractTableModel):
 
 
 class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
+    newPlan = pyqtSignal()
     planSelected = pyqtSignal(RedistrictingPlan)
     planEdited = pyqtSignal(RedistrictingPlan)
     planDeleted = pyqtSignal(RedistrictingPlan)
@@ -113,6 +114,7 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
         self.lvwPlans.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.lvwPlans.clicked.connect(self.updateButtons)
         self.lvwPlans.doubleClicked.connect(self.selectPlan)
+        self.btnNew.clicked.connect(self.newPlanClicked)
         self.btnEdit.clicked.connect(self.editPlan)
         self.btnOpen.clicked.connect(self.selectPlan)
         self.btnDelete.clicked.connect(self.deletePlan)
@@ -134,20 +136,27 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
         index = self.lvwPlans.currentIndex()
         return self.model.plan(index)
 
+    def newPlanClicked(self):
+        self.accept()
+        self.newPlan.emit()
+
     def editPlan(self):
         plan = self.currentPlan
         if plan:
-            self.planEdited.emit(plan)
             self.accept()
+            self.planEdited.emit(plan)
 
     def selectPlan(self):
         plan = self.currentPlan
         if plan and plan.isValid():
-            self.planSelected.emit(plan)
             self.accept()
+            self.planSelected.emit(plan)
 
     def deletePlan(self):
         plan = self.currentPlan
         if plan:
             self.planDeleted.emit(plan)
-            self.model.planListUpdate()
+            self.updatePlanList()
+
+    def updatePlanList(self):
+        self.model.planListUpdate()
