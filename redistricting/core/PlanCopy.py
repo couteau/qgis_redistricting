@@ -52,6 +52,13 @@ class PlanCopier(ErrorListMixin, QObject):
         self._copyTask = None
 
     def copyPlan(self, planName, destGpkgPath, copyAssignments: bool = True, copyStyles: bool = True):
+
+        def planCreated():
+            if copyStyles:
+                PlanStyler(plan).copyStyles(self._plan)
+
+            self.copyComplete.emit(plan)
+
         if not destGpkgPath:
             raise ValueError(tr('Destination GeoPackage path required'))
 
@@ -63,7 +70,8 @@ class PlanCopier(ErrorListMixin, QObject):
         # if not copying assignments, emit the copyComplete signal
         # only after plan layers are created
         if not copyAssignments:
-            builder.layersCreated.connect(self.copyComplete)
+            builder.setGeoPackagePath(destGpkgPath)
+            builder.layersCreated.connect(planCreated)
 
         plan = builder.createPlan(QgsProject.instance(), not copyAssignments)
         if not plan:
@@ -73,10 +81,7 @@ class PlanCopier(ErrorListMixin, QObject):
         if copyAssignments:
             shutil.copyfile(self._plan.geoPackagePath, destGpkgPath)
             plan.addLayersFromGeoPackage(destGpkgPath)
-            self.copyComplete.emit(plan)
-
-        if copyStyles:
-            PlanStyler(plan).copyStyles(self._plan)
+            planCreated()
 
         return plan
 
