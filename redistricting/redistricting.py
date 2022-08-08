@@ -548,6 +548,7 @@ class Redistricting:
             target = self.createDistrict()
             self.mapTool.setTargetDistrict(target)
         if self.mapTool.canActivate():
+            self.activePlan.updateDistricts()
             self.canvas.setMapTool(self.mapTool)
 
     def startPaintDistricts(self):
@@ -573,6 +574,7 @@ class Redistricting:
     def showPlanManager(self):
         """Display the plan manager window"""
         dlg = DlgSelectPlan(self.redistrictingPlans, self.activePlan)
+        dlg.newPlan.connect(self.newPlan)
         dlg.planSelected.connect(self.onPlanSelected)
         dlg.planEdited.connect(self.editPlan)
         dlg.planDeleted.connect(self.deletePlan)

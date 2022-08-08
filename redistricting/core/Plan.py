@@ -601,6 +601,9 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def resetData(self, updateGeometry=False, districts: set[int] = None, immediate=False):
         self._districts.resetData(updateGeometry, districts, immediate)
 
+    def updateDistricts(self, force=False):
+        return self._districts.updateDistricts(force)
+
     def layerRemoved(self, layer):
         if layer == self._assignLayer:
             self._setAssignLayer(None)
