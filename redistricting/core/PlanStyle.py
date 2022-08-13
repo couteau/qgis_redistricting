@@ -52,7 +52,7 @@ class PlanStyler(QObject):
         self._numDistricts = plan.numDistricts
 
     @classmethod
-    def style(cls, plan, sourcePlan):
+    def style(cls, plan, sourcePlan=None):
         styler = cls(plan)
         if sourcePlan:
             styler.copyStyles(sourcePlan)
@@ -109,6 +109,18 @@ class PlanStyler(QObject):
         renderer = QgsCategorizedSymbolRenderer(self._distField, categoryList)
         self._distLayer.setRenderer(renderer)
 
+    def updateColors(self):
+        renderer = self._assignLayer.renderer()
+        oldCount = len(renderer.categories())
+        newCount = self._numDistricts + 1
+        if oldCount > newCount:
+            for c in range(newCount, oldCount+1):
+                renderer.deleteCategory(c)
+        elif oldCount < newCount:
+            # not sure if there's a good way to add distinctive colors
+            # to an existing random color ramp, so start over
+            self.createRenderer()
+
     def createLabels(self):
         bufferSettings = QgsTextBufferSettings()
         bufferSettings.setEnabled(True)
@@ -129,9 +141,15 @@ class PlanStyler(QObject):
         self._distLayer.setLabelsEnabled(True)
         self._distLayer.setLabeling(layerSettings)
 
-    def copyStyles(self, fromPlan: 'RedistrictingPlan'):
-        self._assignLayer.setRenderer(fromPlan.assignLayer.renderer().clone())
-        self._distLayer.setRenderer(fromPlan.distLayer.renderer().clone())
-        if fromPlan.distLayer.labelsEnabled():
-            self._distLayer.setLabelsEnabled(True)
-            self._distLayer.setLabeling(fromPlan.distLayer.labeling().clone())
+    def copyStyles(self, fromPlan: RedistrictingPlan):
+        if fromPlan.numDistricts < self._plan.numDistricts:
+            self.createRenderer()
+        else:
+            self._assignLayer.setRenderer(fromPlan.assignLayer.renderer().clone())
+            self._distLayer.setRenderer(fromPlan.distLayer.renderer().clone())
+            if fromPlan.distLayer.labelsEnabled():
+                self._distLayer.setLabelsEnabled(True)
+                self._distLayer.setLabeling(fromPlan.distLayer.labeling().clone())
+            if fromPlan.numDistricts > self._plan.numDistricts:
+                # remove unneeded colors
+                self.updateColors()

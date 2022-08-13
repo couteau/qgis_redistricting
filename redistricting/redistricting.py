@@ -434,6 +434,12 @@ class Redistricting:
 
     def progressCanceled(self):
         """Hide progress dialog and display message on cancel"""
+
+        # If cancel is called while there are still signals/events
+        # pending that call setValue, the dialog will reappear when
+        # progress is updated. Try to clear pending events.
+        QCoreApplication.instance().processEvents()
+
         if self.activePlan and self.activePlan.error():
             error, _ = self.activePlan.error()
         else:
@@ -445,6 +451,8 @@ class Redistricting:
         else:
             self.iface.messageBar().pushMessage(
                 self.tr("Canceled"), f'{self.dlg.labelText()} canceled', level=Qgis.Warning)
+        self.dlg.close()
+        self.dlg = None
 
     def startProgress(self, text=None, maximum=100, canCancel=True):
         """Create and initialize a progress dialog"""
@@ -459,22 +467,25 @@ class Redistricting:
             0, maximum,
             self.iface.mainWindow(),
             Qt.WindowStaysOnTopHint)
-        self.dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+        #self.dlg.setAttribute(Qt.WA_DeleteOnClose, True)
         if not canCancel:
             self.dlg.setCancelButton(None)
         else:
             self.dlg.canceled.connect(self.progressCanceled)
 
+        self.dlg.setValue(0)
+        # self.dlg.show()
         return self.dlg
 
     def endProgress(self, progress: QProgressDialog = None):
         if progress is None:
             progress = self.dlg
 
-        if progress is not None and not progress.wasCanceled():
+        if progress is not None:
             progress.canceled.disconnect(self.progressCanceled)
-            progress.cancel()
-            progress.hide()
+            progress.close()
+
+        self.dlg = None
 
     # --------------------------------------------------------------------------
 
@@ -613,6 +624,9 @@ class Redistricting:
 
             if builder.updatePlan():
                 self.project.setDirty()
+                if 'num-districts' in builder.modifiedFields:
+                    style = PlanStyler(plan)
+                    style.updateColors()
 
     def deletePlan(self, plan: RedistrictingPlan):
         if plan in self.redistrictingPlans:
@@ -713,6 +727,9 @@ class Redistricting:
         dlgCopyPlan = DlgCopyPlan(self.activePlan)
         if dlgCopyPlan.exec_() == QDialog.Accepted:
             copier = PlanCopier(self.activePlan)
+            progress = self.startProgress(self.tr('Creating plan layers...'))
+            copier.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(copier.cancel)
             copier.copyComplete.connect(self.appendPlan)
             copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
 
