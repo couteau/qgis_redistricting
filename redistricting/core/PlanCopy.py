@@ -49,11 +49,18 @@ class PlanCopier(ErrorListMixin, QObject):
     ):
         super().__init__(sourcePlan)
         self._plan = sourcePlan
-        self._copyTask = None
+        self._builder: PlanBuilder = None
+
+    def setProgress(self, progress: float):
+        self.progressChanged.emit(int(progress))
+
+    def cancel(self):
+        if self._builder:
+            self._builder.cancel()
 
     def copyPlan(self, planName, destGpkgPath, copyAssignments: bool = True, copyStyles: bool = True):
 
-        def planCreated():
+        def planCreated(plan):
             if copyStyles:
                 PlanStyler(plan).copyStyles(self._plan)
 
@@ -64,24 +71,25 @@ class PlanCopier(ErrorListMixin, QObject):
 
         self.clearErrors()
 
-        builder = PlanBuilder.fromPlan(self._plan)
-        builder.setName(planName)
+        self._builder = PlanBuilder.fromPlan(self._plan)
+        self._builder.setName(planName)
 
         # if not copying assignments, emit the copyComplete signal
         # only after plan layers are created
         if not copyAssignments:
-            builder.setGeoPackagePath(destGpkgPath)
-            builder.layersCreated.connect(planCreated)
+            self._builder.setGeoPackagePath(destGpkgPath)
+            self._builder.layersCreated.connect(planCreated)
+            self._builder.progressChanged.connect(self.setProgress)
 
-        plan = builder.createPlan(QgsProject.instance(), not copyAssignments)
+        plan = self._builder.createPlan(QgsProject.instance(), not copyAssignments)
         if not plan:
-            self._errors = builder.errors()
+            self._errors = self._builder.errors()
             return None
 
         if copyAssignments:
             shutil.copyfile(self._plan.geoPackagePath, destGpkgPath)
             plan.addLayersFromGeoPackage(destGpkgPath)
-            planCreated()
+            planCreated(plan)
 
         return plan
 

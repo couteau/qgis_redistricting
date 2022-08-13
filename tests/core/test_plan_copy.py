@@ -58,10 +58,10 @@ class TestPlanCopier:
         styler_class = mocker.patch('redistricting.core.PlanCopy.PlanStyler')
         styler = styler_class.return_value
 
-        plan = copier.copyPlan('copied', str(datadir / 'copied.gpkg'), False, True)
+        plan = copier.copyPlan('copied', str(datadir / 'copied.gpkg'), True, True)
         builder_class.fromPlan.assert_called_once()
         builder.setName.assert_called_once()
-        builder.createPlan.assert_called_once_with(QgsProject.instance(), True)
+        builder.createPlan.assert_called_once_with(QgsProject.instance(), False)
 
         styler_class.assert_called_once_with(plan)
         styler.copyStyles.assert_called_once()
