@@ -24,8 +24,13 @@
 """
 import sys
 
+DEBUG = True
+
 
 def debug_thread():
+    if not DEBUG:
+        return
+
     if 'unittest' in sys.modules:
         try:
             import debugpy  # pylint: disable=import-outside-toplevel

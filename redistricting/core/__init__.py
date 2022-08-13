@@ -23,7 +23,7 @@
  ***************************************************************************/
 """
 from .Plan import RedistrictingPlan
-from .utils import makeFieldName, tr, loadSpatialiteModule, showHelp
+from .utils import makeFieldName, tr, spatialite_connect, createGeoPackage, createGpkgTable, showHelp
 from .storage import ProjectStorage
 from .District import BaseDistrict, District
 from .DistrictList import DistrictList
@@ -42,7 +42,9 @@ from .PlanCopy import PlanCopier
 from .Exception import RdsException
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
-           'BaseDistrict', 'District', 'DistrictList', 'FieldList',
-           'Field', 'DataField', 'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
-           'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanCopier',
-           'PlanStyler', 'makeFieldName', 'tr', 'loadSpatialiteModule', 'showHelp', 'RdsException']
+           'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField',
+           'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
+           'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
+           'PlanCopier', 'PlanStyler',
+           'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
+           'showHelp', 'RdsException']

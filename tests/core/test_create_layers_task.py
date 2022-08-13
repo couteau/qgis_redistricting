@@ -27,6 +27,10 @@ from redistricting.core.Field import Field, DataField
 
 
 class TestCreateLayersTask:
+    @pytest.fixture(autouse=True)
+    def setQgisPrefixPath(self, qgis_app):
+        qgis_app.setPrefixPath('~/anaconda3/envs/qgis_plugin')
+
     @pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
         (['vap_apblack', 'vap_hispanic', 'vap_nh_white'], []),
@@ -46,7 +50,9 @@ class TestCreateLayersTask:
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
         task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid20')
         result = task.run()
+        assert task.exception is None
         assert result
+        assert task.totalPop == 227036
         assert gpkg.exists()
 
         a = QgsVectorLayer(f'{str(gpkg)}|layername=assignments')
@@ -59,7 +65,7 @@ class TestCreateLayersTask:
         d = QgsVectorLayer(f'{str(gpkg)}|layername=districts')
 
         assert d.isValid()
-        assert d.featureCount() == 0
+        assert d.featureCount() == 1
         for f in p.dataFields:
             assert d.fields().lookupField(f.fieldName) != -1
 
