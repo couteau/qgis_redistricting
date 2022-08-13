@@ -48,26 +48,31 @@ class TestPlanEditor:
             editor.setName('new name')
             editor.updatePlan()
         assert valid_plan.name == 'new name'
+        assert editor.modifiedFields == {'name'}
 
         with qtbot.waitSignals([valid_plan.dataFieldAdded, valid_plan.planChanged]):
             editor.appendDataField('vap_nh_black')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
+        assert editor.modifiedFields == {'data-fields'}
 
         with qtbot.waitSignals([valid_plan.dataFieldRemoved, valid_plan.planChanged]):
             editor.removeDataField('vap_nh_black')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 0
+        assert editor.modifiedFields == {'data-fields'}
 
         with qtbot.waitSignals([valid_plan.geoFieldAdded, valid_plan.planChanged]):
             editor.appendGeoField('vtdid20')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
+        assert editor.modifiedFields == {'geo-fields', 'plan-stats'}
 
         with qtbot.waitSignals([valid_plan.geoFieldRemoved, valid_plan.planChanged]):
             editor.removeGeoField(0)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 0
+        assert editor.modifiedFields == {'geo-fields', 'plan-stats'}
 
     def test_datafields_append_sets_parent(self, editor: PlanEditor, valid_plan: RedistrictingPlan):
         editor.appendDataField('vap_apblack', False, 'APBVAP')

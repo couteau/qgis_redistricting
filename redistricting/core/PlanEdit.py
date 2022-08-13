@@ -37,6 +37,11 @@ class PlanEditor(BasePlanBuilder):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
         self._updateAssignLayerTask = None
+        self._modifiedFields = set()
+
+    @property
+    def modifiedFields(self) -> Set[str]:
+        return self._modifiedFields
 
     def setProgress(self, progress: float):
         self.progressChanged.emit(int(progress))
@@ -128,6 +133,8 @@ class PlanEditor(BasePlanBuilder):
         if not self._plan or not self.validate():
             return None
 
+        a = self._plan.serialize()
+
         self._plan._setName(self._name)
         self._plan._setNumDistricts(self._numDistricts)
         self._plan._setNumSeats(self._numSeats)
@@ -184,5 +191,9 @@ class PlanEditor(BasePlanBuilder):
         self._plan._setPopField(self._popField)
         self._plan._setVAPField(self._vapField)
         self._plan._setCVAPField(self._cvapField)
+
+        b = self._plan.serialize()
+        self._modifiedFields = {k for k in b if k not in a or b[k] != a[k]}
+        self._modifiedFields |= {k for k in a if k not in b}
 
         return self._plan
