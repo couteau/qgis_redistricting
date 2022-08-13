@@ -87,7 +87,7 @@ class AggregateDataTask(QgsTask):
         if self.cvapField:
             cols.append(self.cvapField)
             getters.append(lambda f: f[self.cvapField])
-            aggs[self.vapField] = 'sum'
+            aggs[self.cvapField] = 'sum'
         for fld in self.dataFields:
             cols.append(fld.fieldName)
             getters.append(self.getFieldValue(fld, context))

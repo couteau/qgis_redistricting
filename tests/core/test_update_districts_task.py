@@ -31,3 +31,10 @@ class TestUpdatePendingChangesTask:
         t = AggregateDistrictDataTask(plan)
         t.run()
         assert t.districts is not None
+
+    def test_run_subset(self, plan: RedistrictingPlan):
+        t = AggregateDistrictDataTask(plan, [2, 3])
+        t.run()
+        assert t.districts is not None
+        assert len(t.districts.index) == 2
+        assert t.totalPop == 0

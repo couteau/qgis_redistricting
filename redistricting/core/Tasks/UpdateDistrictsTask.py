@@ -22,11 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from distutils.version import LooseVersion
 import math
+import sqlite3
 from typing import Iterable, List, Set, Union, TYPE_CHECKING
 from contextlib import closing
-import fiona
 import pandas as pd
 import geopandas as gpd
 from shapely import wkt
@@ -38,9 +37,9 @@ from qgis.core import (
     QgsAggregateCalculator,
     QgsTask
 )
-from qgis.utils import spatialite_connect
-from ..utils import tr
+from ..utils import tr, spatialite_connect
 from .UpdateTask import AggregateDataTask
+from .Sql import SqlAccess
 from ._debug import debug_thread
 from ._exception import CancelledError
 
@@ -48,7 +47,7 @@ if TYPE_CHECKING:
     from .. import RedistrictingPlan, Field
 
 
-class AggregateDistrictDataTask(AggregateDataTask):
+class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(
@@ -80,11 +79,53 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.calculateSplits = True
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        def getPopData(geoids: str):
+            nonlocal count
+
+            if self.isSQLCapable(self.popLayer):
+                table = self.getTableName(self.popLayer)
+                sql = f'SELECT SUM({self.popField}) AS {self.popField}'
+                if self.vapField:
+                    sql += f', SUM({self.vapField}) AS {self.vapField}'
+                if self.cvapField:
+                    sql += f', SUM({self.cvapField}) AS {self.cvapField}'
+                for f in self.dataFields:
+                    sql += f', SUM({f.field}) AS {f.fieldName}'
+                sql += f' FROM {table} WHERE {self.joinField} in ({geoids})'
+                cur = self.executeSql(self.popLayer, sql)
+                count += geoids.count(',') + 1
+                self.setProgress(90*count/total)
+                if self.isCanceled():
+                    raise CancelledError()
+                return dict(next(cur))
+
+            pop = {
+                self.popField: 0
+            }
+            if self.vapField:
+                pop[self.vapField] = 0
+            if self.cvapField:
+                pop[self.cvapField] = 0
+            for f in self.dataFields:
+                pop[f.fieldName] = 0
+
+            request.setFilterExpression(f'{self.joinField} in ({geoids})')
+            for f in self.popLayer.getFeatures(request):
+                for idx, fld in enumerate(pop):
+                    pop[fld] += getters[idx](f)
+                count += 1
+                self.setProgress(90*count/total)
+                if self.isCanceled():
+                    raise CancelledError()
+
+            return pop
+
         debug_thread()
 
         try:
             crs = self.assignLayer.crs()
 
+            count = 0
             if self.updateDistricts:
                 context = QgsExpressionContext()
                 context.appendScopes(
@@ -96,98 +137,65 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 agg = QgsAggregateCalculator(self.assignLayer)
                 agg.setFilter(flt)
-                self.total, success = agg.calculate(QgsAggregateCalculator.Count, self.geoIdField, context)
+                total, success = agg.calculate(QgsAggregateCalculator.Count, self.geoIdField, context)
                 if not success:
-                    self.total = 100
+                    total = self.assignLayer.featureCount()
 
-                if self.includeDemographics:
-                    self.total *= 2
-
-                fields = self.assignLayer.fields()
-                gIndex = fields.lookupField(self.geoIdField)
-                dIndex = fields.lookupField(self.distField)
-                cols = [self.geoIdField, self.distField]
-
-                request = QgsFeatureRequest()
-                if self.includeGeometry:
-                    cols.append('geometry')
-                else:
-                    request.setFlags(QgsFeatureRequest.NoGeometry)
-
-                request.setExpressionContext(context)
-                request.setFilterExpression(flt)
-                request.setSubsetOfAttributes(cols, fields)
-
-                if self.useBuffer:
-                    features = self.assignLayer.getFeatures(request)
-                else:
-                    features = self.assignLayer.dataProvider().getFeatures(request)
-
-                if self.includeGeometry:
-                    datagen = (self.getData([f[gIndex], f[dIndex], wkt.loads(f.geometry().asWkt())]) for f in features)
-                else:
-                    datagen = (self.getData([f[gIndex], f[dIndex]]) for f in features)
-                df = gpd.GeoDataFrame.from_records(datagen, index=self.geoIdField, columns=cols)
-                if self.includeGeometry:
-                    df.set_geometry(df.geometry, inplace=True, crs=crs.toWkt())
-                    self.setProgress(95)
             else:
-                cols = [self.geoIdField, self.distField]
                 total = self.assignLayer.featureCount()
-                self.total = total * 2 if self.includeDemographics else total
-                chunkSize = max(100, 10 ** (math.ceil(math.log10(total)) - 2))
-                self.count = 0
-                df: gpd.GeoDataFrame = None
-                while self.count < total:
-                    s = slice(self.count, min(self.count+chunkSize, total))
-                    f = gpd.read_file(
-                        self.geoPackagePath,
-                        layer='assignments',
-                        rows=s,
-                        geometry='geometry',
-                        include_fields=cols
-                    )
-                    df = f if df is None else pd.concat([df, f], copy=False)
-                    self.count = s.stop
-                    if self.isCanceled():
-                        raise CancelledError()
-                    self.setProgress(90 * self.count/self.total)
-                df.set_index(self.geoIdField, drop=True, inplace=True)
-                if LooseVersion(fiona.__version__) < LooseVersion('1.19'):
-                    cols.append('geometry')
-                    df.drop(columns=[col for col in df if col not in cols], inplace=True)
-
-            # convert null values to 0 if the "unassigned" district is among those being aggregated
-            if not self.updateDistricts or 0 in self.updateDistricts:  # pylint: disable=unsupported-membership-test
-                df[self.distField] = pd.to_numeric(df[self.distField], errors='coerce').fillna(0).astype(int)
 
             if self.includeDemographics:
                 context = QgsExpressionContext()
-                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+                context.appendScopes(
+                    QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer)
+                )
 
-                cols = [self.joinField]
-                getters = [lambda f: f[self.joinField]]
+                cols = []
+                getters = []
                 aggs = {}
                 self.addPopFields(cols, getters, aggs, context)
+                data = dict(zip(cols, [[] for _ in cols]))
+            else:
+                data = {}
 
-                request = QgsFeatureRequest()
-                if self.updateDistricts is not None:
-                    request.setExpressionContext(context)
-                    r = ','.join([f"'{geoid}'" for geoid in df.index])
-                    request.setFilterExpression(f'{self.joinField} in ({r})')
+            request = QgsFeatureRequest()
+            if not self.hasExpression():
+                request.setSubsetOfAttributes(cols, self.popLayer.fields())
+            request.setFlags(QgsFeatureRequest.NoGeometry)
 
-                if not self.hasExpression():
-                    request.setSubsetOfAttributes(cols, self.popLayer.fields())
+            with spatialite_connect(self.geoPackagePath) as db:
+                db.row_factory = sqlite3.Row
 
-                features = self.popLayer.getFeatures(request)
+                sql = f'SELECT {self.distField}, '
+                if self.includeGeometry:
+                    db.execute('SELECT EnableGpkgAmphibiousMode()')
+                    sql += 'ST_AsText(ST_UnaryUnion(ST_Collect(geometry))) as geometry, '
+                sql += f'GROUP_CONCAT(QUOTE({self.geoIdField})) AS geoids ' \
+                    'FROM assignments '
+                if self.updateDistricts:
+                    sql += f"WHERE {self.distField} IN ({','.join(str(d) for d in self.updateDistricts)}) "
+                sql += f'GROUP BY {self.distField}'
+                c = db.execute(sql)
 
-                datagen = (self.getData([getter(f) for getter in getters]) for f in features)
-                dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=cols)
-                df = pd.merge(df, dfpop, how='left', left_index=True, right_index=True, copy=False)
+                data['geometry'] = []
+                index = []
+                for r in c:
+                    index.append(r[self.distField])
+                    for p, v in getPopData(r['geoids']).items():
+                        data[p].append(v)
+                    if self.includeGeometry:
+                        data['geometry'].append(wkt.loads(r['geometry']))
 
             if self.includeGeometry:
-                self.districts: gpd.GeoDataFrame = df.dissolve(by=self.distField, aggfunc=aggs)
+                self.districts = gpd.GeoDataFrame(
+                    data, index=index,
+                    geometry='geometry',
+                    crs=crs.toWkt()
+                )
+            else:
+                self.districts = pd.DataFrame(data, index=self.distField, columns=cols)
 
+            if self.includeGeometry:
                 geo: gpd.GeoSeries = self.districts['geometry'].to_crs('+proj=cea')
                 area = geo.area
 
@@ -201,8 +209,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 self.districts['convexhull'] = area / \
                     geo.convex_hull.area
-            else:
-                self.districts = df.groupby(by=self.distField).agg(aggs)
 
             self.setProgress(99)
 
@@ -239,6 +245,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.districts.insert(1, 'members', members)
 
         with closing(spatialite_connect(self.geoPackagePath)) as db:
+            db.execute('SELECT EnableGpkgMode()')
+
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districts.columns)}
 
             sql = f"DELETE FROM districts WHERE NOT district IN ({','.join(self.districts.index.astype(str))})"
