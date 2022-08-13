@@ -74,7 +74,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         self._assignLayer: QgsVectorLayer = None
         self._geoIdField = None
-        self._geoDisplay = ''
+        self._geoDisplay = None
         self._distField = 'district'
 
         self._sourceLayer = None
@@ -397,9 +397,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return self._geoDisplay or self._geoIdField
 
     def _setGeoDisplay(self, value: str):
-        if self._geoDisplay != value:
-            oldValue = self._geoDisplay
-            self._geoDisplay = value
+        if (self._geoDisplay is None and value != self._geoIdField) \
+                or (value is None and self.geoDisplay != self._geoIdField):
+            oldValue = self.geoDisplay
+            if value == self._geoIdField:
+                self._geoDisplay = None
+            else:
+                self._geoDisplay = value
+
             self.planChanged.emit(self, 'geo-id-display', value, oldValue)
 
     @property
