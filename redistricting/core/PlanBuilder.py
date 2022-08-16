@@ -38,9 +38,11 @@ from .Plan import RedistrictingPlan
 class PlanBuilder(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
     layersCreated = pyqtSignal('PyQt_PyObject')
+    builderError = pyqtSignal('PyQt_PyObject')
 
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
+        self._isCancelled = False
         self._importer: PlanImporter = None
         self._createLayersTask = None
 
@@ -56,8 +58,12 @@ class PlanBuilder(BasePlanBuilder):
         self.progressChanged.emit(int(progress))
 
     def cancel(self):
+        self._isCancelled = True
         if self._createLayersTask:
             self._createLayersTask.cancel()
+
+    def isCancelled(self):
+        return self._isCancelled
 
     def setPlanImporter(self, value: PlanImporter):
         self._importer = value
@@ -82,8 +88,6 @@ class PlanBuilder(BasePlanBuilder):
             plan.addLayersFromGeoPackage(self._geoPackagePath)
             if self._importer:
                 self._importer.importPlan(plan)
-            else:
-                plan.resetData(updateGeometry=True)
             self.layersCreated.emit(plan)
 
         def taskTerminated():
@@ -96,6 +100,7 @@ class PlanBuilder(BasePlanBuilder):
                     Qgis.Critical
                 )
             self._createLayersTask = None
+            self.builderError.emit(self)
 
         if not plan:
             return None
@@ -115,6 +120,7 @@ class PlanBuilder(BasePlanBuilder):
 
     def createPlan(self, parent: QObject = None, createLayers=True):
         self.clearErrors()
+        self._isCancelled = False
 
         if createLayers:
             if not self._geoPackagePath:
