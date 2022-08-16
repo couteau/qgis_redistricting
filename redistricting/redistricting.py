@@ -27,7 +27,7 @@
  ***************************************************************************/
 """
 import pathlib
-from typing import List
+from typing import Iterable, List, Tuple
 from uuid import UUID
 from qgis.core import Qgis, QgsApplication, QgsProject, QgsField, QgsVectorLayer, QgsReadWriteContext
 from qgis.gui import QgisInterface
@@ -63,6 +63,18 @@ from .core import (
     ShapefileImporter,
     PlanCopier
 )
+
+
+class RdsProgressDialog(QProgressDialog):
+    """wrapper class to prevent dialog from being re-shown after it is
+    cancelled if updates arrive from another thread after cancel is called
+    """
+
+    def setValue(self, progress: int):
+        if self.wasCanceled():
+            return
+
+        return super().setValue(progress)
 
 
 class Redistricting:
@@ -434,50 +446,37 @@ class Redistricting:
 
     def progressCanceled(self):
         """Hide progress dialog and display message on cancel"""
-
-        # If cancel is called while there are still signals/events
-        # pending that call setValue, the dialog will reappear when
-        # progress is updated. Try to clear pending events.
-        QCoreApplication.instance().processEvents()
-
         if self.activePlan and self.activePlan.error():
-            error, _ = self.activePlan.error()
+            errors = self.activePlan.errors()
         else:
-            error = ''
+            errors = [(f'{self.dlg.labelText()} canceled', Qgis.Warning)]
 
-        if error:
-            self.iface.messageBar().pushMessage(
-                self.tr("Canceled"), error, level=Qgis.Warning)
-        else:
-            self.iface.messageBar().pushMessage(
-                self.tr("Canceled"), f'{self.dlg.labelText()} canceled', level=Qgis.Warning)
+        if errors:
+            self.pushErrors(errors, self.tr("Canceled"), Qgis.Warning)
+
+        self.dlg.canceled.disconnect(self.progressCanceled)
         self.dlg.close()
         self.dlg = None
 
     def startProgress(self, text=None, maximum=100, canCancel=True):
         """Create and initialize a progress dialog"""
         if self.dlg:
-            try:
-                self.dlg.canceled.disconnect(self.progressCanceled)
-            except:  # pylint: disable=bare-except
-                ...
-            self.dlg.close()
-        self.dlg = QProgressDialog(
+            self.dlg.cancel()
+        self.dlg = RdsProgressDialog(
             text, self.tr('Cancel'),
             0, maximum,
             self.iface.mainWindow(),
             Qt.WindowStaysOnTopHint)
-        #self.dlg.setAttribute(Qt.WA_DeleteOnClose, True)
         if not canCancel:
             self.dlg.setCancelButton(None)
         else:
             self.dlg.canceled.connect(self.progressCanceled)
 
         self.dlg.setValue(0)
-        # self.dlg.show()
         return self.dlg
 
     def endProgress(self, progress: QProgressDialog = None):
+        QCoreApplication.instance().processEvents()
         if progress is None:
             progress = self.dlg
 
@@ -487,6 +486,33 @@ class Redistricting:
 
         self.dlg = None
 
+    def pushErrors(self, errors: Iterable[Tuple[str, int]], title: str = None, level: int = None):
+        if not errors:
+            return
+
+        if title is None:
+            title = self.tr('Error')
+
+        msg, lvl = errors[0]
+        if level is None:
+            level = lvl
+
+        if len(errors) > 1:
+            self.iface.messageBar().pushMessage(
+                title,
+                msg,
+                showMore='\n'.join(e[0] for e in errors),
+                level=level,
+                duration=5
+            )
+        else:
+            self.iface.messageBar().pushMessage(
+                title,
+                msg,
+                level=level,
+                duration=5
+            )
+
     # --------------------------------------------------------------------------
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
@@ -494,8 +520,8 @@ class Redistricting:
         storage = ProjectStorage(self.project, doc, context)
         self.redistrictingPlans.extend(storage.readRedistrictingPlans())
         for plan in self.redistrictingPlans:
-            for err, level in plan.errors():
-                self.iface.messageBar().pushMessage(err, level)
+            if plan.hasErrors():
+                self.pushErrors(plan.errors())
             plan.planChanged.connect(self.planChanged)
 
         if len(self.redistrictingPlans) == 1:
@@ -648,19 +674,23 @@ class Redistricting:
             progress.setValue(value)
 
         def importStarted():
-            # not sure why pylint thinks this variable is used before assignement -- disable
-            self.endProgress(progress)  # pylint: disable=used-before-assignment
             progress = self.startProgress(self.tr('Importing assignments...'))
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
             self.layersCreated(plan)
+
+        def newPlanError(builder: PlanBuilder):
+            if not builder.isCancelled():
+                self.endProgress(progress)
+                self.pushErrors(builder.errors())
 
         if len(self.project.mapLayers()) == 0:
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"),
                 self.tr("Cannot create a redistricting plan for an "
                         "empty project. Try adding some layers."),
-                level=Qgis.Warning)
+                level=Qgis.Warning,
+                duration=5)
             return
 
         if self.project.isDirty():
@@ -669,7 +699,8 @@ class Redistricting:
                 self.tr("Wait!"),
                 self.tr("Please save your project before "
                         "creating a redistricting plan."),
-                level=Qgis.Warning
+                level=Qgis.Warning,
+                duration=5
             )
             return
 
@@ -714,11 +745,12 @@ class Redistricting:
                 builder.layersCreated.connect(importStarted)
             else:
                 builder.layersCreated.connect(self.layersCreated)
+            builder.layersCreated.connect(lambda _: self.endProgress(progress))
+            builder.builderError.connect(newPlanError)
 
             if not (plan := builder.createPlan(QgsProject.instance())):
                 self.endProgress(progress)
-                for msg, level in builder.errors():
-                    self.iface.messageBar().pushMessage(msg, level)
+                self.pushErrors(builder.errors())
 
     def copyPlan(self):
         if not self.checkActivePlan(self.tr('copy')):
