@@ -61,6 +61,8 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
 
+        self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
+
         self.geoFields: List['Field'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
         self.geoPackagePath = plan.geoPackagePath
@@ -168,7 +170,6 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
 
                 sql = f'SELECT {self.distField}, '
                 if self.includeGeometry:
-                    db.execute('SELECT EnableGpkgAmphibiousMode()')
                     sql += 'ST_AsText(ST_UnaryUnion(ST_Collect(geometry))) as geometry, '
                 sql += f'GROUP_CONCAT(QUOTE({self.geoIdField})) AS geoids ' \
                     'FROM assignments '
@@ -177,7 +178,9 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 sql += f'GROUP BY {self.distField}'
                 c = db.execute(sql)
 
-                data['geometry'] = []
+                if self.includeGeometry:
+                    data['geometry'] = []
+
                 index = []
                 for r in c:
                     index.append(r[self.distField])
@@ -193,7 +196,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                     crs=crs.toWkt()
                 )
             else:
-                self.districts = pd.DataFrame(data, index=self.distField, columns=cols)
+                self.districts = pd.DataFrame(data, index=index)
 
             if self.includeGeometry:
                 geo: gpd.GeoSeries = self.districts['geometry'].to_crs('+proj=cea')

@@ -24,6 +24,7 @@
 """
 from __future__ import annotations
 import pathlib
+from random import choice
 
 import sqlite3
 
@@ -312,10 +313,10 @@ def createGeoPackage(gpkg):
 
         with spatialite_connect(gpkg) as db:
             db.executescript(CREATE_GPKG_SQL)
-    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError):
-        return False
+    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+        return False, e
 
-    return True
+    return True, None
 
 
 def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
@@ -336,3 +337,10 @@ def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
         return False
 
     return True
+
+
+DFLT_ALLOWED_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+def random_id(length, allowed_chars=DFLT_ALLOWED_CHARS):
+    return ''.join(choice(allowed_chars) for _ in range(length))

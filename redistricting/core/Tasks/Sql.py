@@ -38,10 +38,19 @@ from qgis.core import (
     QgsVirtualLayerDefinition,
 )
 
-from ..utils import spatialite_connect
+from ..utils import random_id, spatialite_connect
 
 
 class SqlAccess:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        DEC2FLOAT = psycopg2.extensions.new_type(
+            psycopg2.extensions.DECIMAL.values,
+            'DEC2FLOAT',
+            lambda value, curs: float(value) if value is not None else None)
+
+        psycopg2.extensions.register_type(DEC2FLOAT)
+
     def getTableName(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
         if provider.name() == 'ogr':
@@ -71,11 +80,18 @@ class SqlAccess:
         provider = layer.dataProvider()
 
         if provider.name() == 'ogr':
-            # for other drivers, get the name of the first layer from gdal
-            database, _ = provider.dataSourceUri().split('|', 1)
+            database = provider.dataSourceUri().split('|')[0]
             ds: gdal.Dataset = gdal.OpenEx(database, gdal.OF_ALL)
             lyr: ogr.Layer = ds.GetLayerByName(table)
-            return lyr.GetGeometryColumn()
+            col = lyr.GetGeometryColumn()
+
+            # Shapefile and possibly other formats don't support
+            # GetGeometryColumn, but GDAL provides no obvious way to directly
+            # test whether the drivers support the GetGeometryColumn method -
+            # use GetGeomType == wkbNone to test
+            if not col and lyr.GetGeomType() not in (ogr.wkbUnknown, ogr.wkbNone):
+                col = 'GEOMETRY'
+            return col
 
         if provider.name() in ('spatialite', 'postgis', 'postgres'):
             if '.' in table:
@@ -118,7 +134,8 @@ class SqlAccess:
         conndata = dict(tuple(a.split('=')) for a in shlex.split(
             provider.dataSourceUri(True).replace(' (geometry', '')))
 
-        conndata = {k: v for k, v in conndata.items() if k in ('dbname', 'host', 'port', 'sslmode', 'user', 'password')}
+        conndata = {k: v for k, v in conndata.items()
+                    if k in ('dbname', 'host', 'port', 'sslmode', 'user', 'password')}
 
         params = {'dsn': ' '.join(['='.join(e) for e in zip(conndata.keys(), conndata.values())])}
         if as_dict:
@@ -131,64 +148,60 @@ class SqlAccess:
 
             return cur
 
-    def _executeSqlOgr(self, provider: QgsVectorDataProvider, sql: str, as_dict) -> Union[Iterable[Dict[str, Any]], None]:
-        database, _ = provider.dataSourceUri().split('|')
+    def createVirtualLayer(
+        self,
+        srcLayer: Union[QgsVectorLayer, Iterable[QgsVectorLayer]],
+        sql: str,
+        table=None
+    ) -> QgsVectorLayer:
+        try:
+            iter(srcLayer)
+        except TypeError:
+            srcLayer = [srcLayer]
 
-        flags = gdal.OF_ALL
-        if not re.match(r'\s*select', sql, re.I):
-            flags |= gdal.OF_UPDATE
-
-        ds: gdal.Dataset = gdal.OpenEx(database, flags)
-        lyr: ogr.Layer = ds.ExecuteSQL(sql)
-        if not lyr:
-            return None
-
-        if as_dict:
-            if lyr.GetGeometryColumn():
-                gen = (f.items() | {lyr.GetGeometryColumn(): f.geometry().ExportToWkt()} for f in lyr)
-            else:
-                gen = (f.items() for f in lyr)
-        else:
-            if lyr.GetGeometryColumn():
-                gen = (list(f) + [f.geometry().ExportToWkt()] for f in lyr)
-            else:
-                gen = lyr
-
-        return gen
-
-    def _executeSqlVirtualLayer(self, layer: QgsVectorLayer, sql: str, as_dict: bool, table=None) -> Iterable[Dict[str, Any]]:
         # virtual layer only supports SELECT statements
         if not re.match(r'\s*select', sql, re.IGNORECASE):
             return None
 
-        lyr = layer.clone()
-        if table is None:
-            if m := re.search(r'from\s+(?: \w +\.)?(\w+)', sql, re.IGNORECASE):
-                table = m.groups()[0]
-            else:
-                table = layer.name()
-
-        QgsProject.instance().addMapLayer(lyr, False)
         try:
+            if table is None:
+                if m := re.search(r'from\s+(?: \w +\.)?(\w+)', sql, re.IGNORECASE):
+                    table = m.groups()[1]
+
+            layers = []
             df = QgsVirtualLayerDefinition()
-            df.addSource(table, lyr.id())
+            for lyr in srcLayer:
+                lyr = lyr.clone()
+
+                QgsProject.instance().addMapLayer(lyr, False)
+                layers.append(lyr)
+
+                if table is None:
+                    table = lyr.name()
+                df.addSource(table, lyr.id())
+                table = None
+
             df.setQuery(sql)
 
-            vl = QgsVectorLayer(df.toString(), f'tmp_{lyr.id()}', "virtual")
-            if as_dict:
-                return (dict(zip(f.fields().names(), f.attributes())) for f in vl.getFeatures())
-
-            return (f.attributes() for f in vl.getFeatures())
+            return QgsVectorLayer(df.toString(), f'tmp_{random_id(6)}', 'virtual')
         finally:
-            QgsProject.instance().removeMapLayer(lyr.id())
+            for lyr in layers:
+                QgsProject.instance().removeMapLayer(lyr.id())
+
+    def _executeSqlVirtualLayer(self, layer: QgsVectorLayer, sql: str,
+                                as_dict: bool, table=None) -> Iterable[Dict[str, Any]]:
+        # virtual layer only supports SELECT statements
+        vl = self.createVirtualLayer(layer, sql, table)
+        if as_dict:
+            return (dict(zip(f.fields().names(), f.attributes())) for f in vl.getFeatures())
+
+        return (f.attributes() for f in vl.getFeatures())
 
     def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
         provider = layer.dataProvider()
         if provider.name() == 'ogr':
             if provider.storageType() in ('GPKG', 'SQLite'):
                 return self._executeSqlOgrSqlite(provider, sql, as_dict)
-
-            return self._executeSqlOgr(provider, sql, as_dict)
         elif provider.name() == 'spatialite':
             return self._executeSqlNativeSqlite(provider, sql, as_dict)
         elif provider.name() in ('postgis', 'postgres'):
@@ -198,4 +211,7 @@ class SqlAccess:
 
     def isSQLCapable(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
-        return provider.name() in ('ogr', 'spatialite', 'postgis', 'postgres')
+        if provider.name() == 'ogr':
+            return provider.storageType() in ('GPKG', 'SQLite')
+
+        return provider.name() in ('spatialite', 'postgis', 'postgres')

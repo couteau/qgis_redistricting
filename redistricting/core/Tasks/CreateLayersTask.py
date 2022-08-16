@@ -269,7 +269,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
     def importSourceData(self):
         total = self.srcLayer.featureCount()
         count = 0
-        with closing(spatialite_connect(self.path)) as db:
+        with spatialite_connect(self.path) as db:
             gen = None
             if self.isSQLCapable(self.srcLayer):
                 table = self.getTableName(self.srcLayer)
@@ -279,7 +279,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                     for f in self.geoFields:
                         if f.fieldName in self.assignFields:
                             sql += f'{f.field} as {f.fieldName}, '
-                    sql += f'ST_AsText({geocol}) FROM {table}'
+                    sql += f'ST_AsText({geocol}) as geometry FROM {table}'
                     gen = self.executeSql(self.srcLayer, sql, False)
 
             if not gen:
@@ -295,6 +295,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             sql = f'INSERT INTO assignments ({",".join(self.assignFields)}, geometry) ' \
                 f'VALUES({",".join("?" * len(self.assignFields))}, GeomFromText(?))'
             chunkSize = max(1, total if total < 100 else total // 100)
+
             while count < total:
                 s = islice(gen, chunkSize)
                 if self.isCanceled():
@@ -313,7 +314,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             self.makeSourceLayers()
             self.setProgress(1)
 
-            if not createGeoPackage(self.path):
+            success, error = createGeoPackage(self.path)
+            if not success:
+                self.exception = error
                 return False
 
             if self.createDistLayer():
