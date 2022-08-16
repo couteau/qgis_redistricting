@@ -25,22 +25,46 @@ from redistricting.core.Tasks.CreateLayersTask import CreatePlanLayersTask
 from redistricting.core.Plan import RedistrictingPlan
 from redistricting.core.Field import Field, DataField
 
+# pylint: disable=protected-access
+
 
 class TestCreateLayersTask:
     @pytest.fixture(autouse=True)
     def setQgisPrefixPath(self, qgis_app):
         qgis_app.setPrefixPath('~/anaconda3/envs/qgis_plugin')
 
-    @pytest.mark.parametrize(('datafields', 'geofields'), [
+    @pytest.mark.parametrize(('sourcefile', 'pop_field', 'geoid_field'), [
+        ('tuscaloosa_blocks.gpkg|layername=plans', 'pop_total', 'geoid20'),
+        ('tuscaloosa_pl2020_b.shp', 'P0010001', 'GEOID20'),
+        ('tuscaloosa_pl2020_b.geojson', 'P0010001', 'GEOID20')
+    ])
+    def test_create_layers_formats(self, datadir: pathlib.Path, sourcefile, pop_field, geoid_field):
+        path = datadir / sourcefile
+        layer = QgsVectorLayer(str(path), 'blocks', 'ogr')
+        p = RedistrictingPlan('test_create_layers', 5)
+        p._geoIdField = geoid_field
+        p._popLayer = layer
+        p._joinField = geoid_field
+        p._popField = pop_field
+        p._sourceLayer = layer
+        p._sourceIdField = geoid_field
+        gpkg = (datadir / 'test_create_layers.gpkg').resolve()
+        task = CreatePlanLayersTask(p, str(gpkg), layer, geoid_field)
+        result = task.run()
+        assert task.exception is None
+        assert result
+        assert task.totalPop == 227036
+        assert gpkg.exists()
+
+    @ pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
         (['vap_apblack', 'vap_hispanic', 'vap_nh_white'], []),
         (['vap_apblack - vap_nh_black'], []),
         ([], ['countyid20', 'vtdid20']),
         ([], ['statefp20 || countyfp20']),
     ])
-    def test_create_layers(self, block_layer, datadir: pathlib.Path, datafields, geofields):
+    def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
         p = RedistrictingPlan('test_create_layers', 5)
-        # pylint: disable=protected-access
         p._popLayer = block_layer
         p._geoIdField = 'geoid20'
         p._popField = 'pop_total'
