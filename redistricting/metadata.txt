@@ -3,7 +3,7 @@
 name=QGIS Redistricting
 qgisMinimumVersion=3.18
 description=Tool for drawing districting plans from geographic units
-version=0.0.1
+version=0.0.2-alpha
 author=Cryptodira
 email=stuart@cryptodira.org
 
@@ -20,11 +20,11 @@ hasProcessingProvider=no
 # changelog=
 
 # Tags are comma separated with spaces allowed
-tags=python
+tags=districting,redistricting,democracy,gerrymandering
 
 homepage=https://github.com/couteau/qgis_redistricting
 help=https://couteau.github.io/qgis_redistricting/
-icon=../resources/icon.png
+icon=icon.png
 
 # experimental flag
 experimental=True
