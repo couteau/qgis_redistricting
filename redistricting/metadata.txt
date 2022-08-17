@@ -7,7 +7,7 @@ version=0.0.1
 author=Cryptodira
 email=stuart@cryptodira.org
 
-about=Create redistricting plans from geographic units. Calculation of cut edges score requires installation of GerryChain python package. See https://github.com/mggg/gerrychain.
+about=Create redistricting plans from geographic units. Calculation of cut edges score requires installation of GeoPandas and GerryChain python package. See https://github.com/mggg/gerrychain.
 
 tracker=https://github.com/couteau/qgis_redistricting/issues
 repository=https://github.com/couteau/qgis_redistricting/tree/main/redistricting

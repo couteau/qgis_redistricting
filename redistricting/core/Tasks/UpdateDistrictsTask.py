@@ -24,11 +24,13 @@
 """
 import math
 import sqlite3
-from typing import Iterable, List, Set, Union, TYPE_CHECKING
+from typing import Dict, Iterable, List, Set, TYPE_CHECKING
 from contextlib import closing
 import pandas as pd
-import geopandas as gpd
+import pyproj
 from shapely import wkt
+from shapely.geometry import MultiPolygon
+from shapely.ops import transform
 from qgis.core import (
     QgsGeometry,
     QgsFeatureRequest,
@@ -75,7 +77,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.includeDemographics = includeDemographics
         self.useBuffer = useBuffer
 
-        self.districts: Union[pd.DataFrame, gpd.GeoDataFrame] = None
+        self.districts: pd.DataFrame = None
         self.totalPop = 0
         self.splits = {}
         self.calculateSplits = True
@@ -189,29 +191,23 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                     if self.includeGeometry:
                         data['geometry'].append(wkt.loads(r['geometry']))
 
+            self.districts = pd.DataFrame(data, index=index)
+            pp: Dict[int, float] = {}
+            reock: Dict[int, float] = {}
+            ch: Dict[int, float] = {}
             if self.includeGeometry:
-                self.districts = gpd.GeoDataFrame(
-                    data, index=index,
-                    geometry='geometry',
-                    crs=crs.toWkt()
-                )
-            else:
-                self.districts = pd.DataFrame(data, index=index)
-
-            if self.includeGeometry:
-                geo: gpd.GeoSeries = self.districts['geometry'].to_crs('+proj=cea')
-                area = geo.area
-
-                self.districts['polsbypopper'] = 4 * math.pi * area / (geo.length**2)
-
-                self.districts['reock'] = geo.apply(
-                    lambda g:
-                        g.area /
-                        QgsGeometry.fromWkt(g.wkt).minimalEnclosingCircle()[0].area()
-                )
-
-                self.districts['convexhull'] = area / \
-                    geo.convex_hull.area
+                from_crs = pyproj.CRS(crs.authid())
+                to_crs = pyproj.CRS('+proj=cea')
+                project = pyproj.Transformer.from_crs(from_crs, to_crs, always_xy=True).transform
+                for index, geom in self.districts['geometry'].iteritems():
+                    geom: MultiPolygon
+                    cea: MultiPolygon = transform(project, geom)
+                    pp[index] = 4 * math.pi * cea.area / (cea.length**2)
+                    reock[index] = cea.area / QgsGeometry.fromWkt(cea.wkt).minimalEnclosingCircle()[0].area()
+                    ch[index] = cea.area / cea.convex_hull.area
+                self.districts['polsbypopper'] = pd.Series(pp, dtype=float)
+                self.districts['reock'] = pd.Series(reock, dtype=float)
+                self.districts['convexhull'] = pd.Series(ch, dtype=float)
 
             self.setProgress(99)
 
@@ -298,6 +294,11 @@ class CalculateCutEdgesTask(QgsTask):
 
     def run(self):
         try:
+            # pylint: disable=import-outside-toplevel
+            from gerrychain import Graph, Partition, updaters  # type: ignore
+            import geopandas as gpd
+            # pylint: enable=import-outside-toplevel
+
             if self.useBuffer:
                 features = self.assignLayer.getFeatures()
             else:
@@ -322,20 +323,15 @@ class CalculateCutEdgesTask(QgsTask):
             if self.geoField:
                 df = df.dissolve(by=self.geoField)
 
-            try:
-                # pylint: disable=import-outside-toplevel
-                from gerrychain import Graph, Partition, updaters  # type: ignore
-                # pylint: enable=import-outside-toplevel
-
-                graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
-                partition = Partition(
-                    graph,
-                    assignment=self.distField,
-                    updaters={"cut_edges": updaters.cut_edges}
-                )
-                self.cutEdges = partition['cut_edges']
-            except ImportError:
-                pass
+            graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
+            partition = Partition(
+                graph,
+                assignment=self.distField,
+                updaters={"cut_edges": updaters.cut_edges}
+            )
+            self.cutEdges = partition['cut_edges']
+        except ImportError:
+            pass
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e
             return False

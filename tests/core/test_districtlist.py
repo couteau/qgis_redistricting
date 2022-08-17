@@ -17,7 +17,7 @@
  ***************************************************************************/
 """
 import pytest
-import geopandas as gpd
+import pandas as pd
 from redistricting.core.DistrictList import DistrictList
 from redistricting.core.District import District, Unassigned
 
@@ -39,10 +39,8 @@ class TestDistrictList:
 
     @pytest.fixture
     def dataframe(self, datadir):
-        df: gpd.GeoDataFrame = gpd.read_file(
-            str((datadir / 'test.json').resolve()),
-            index='district',
-            geometry='geometry'
+        df: pd.DataFrame = pd.read_json(
+            str((datadir / 'test.json').resolve())
         )
         df.set_index('district', inplace=True)
         return df
