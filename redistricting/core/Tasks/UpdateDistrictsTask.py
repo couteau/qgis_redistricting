@@ -199,7 +199,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 from_crs = pyproj.CRS(crs.authid())
                 to_crs = pyproj.CRS('+proj=cea')
                 project = pyproj.Transformer.from_crs(from_crs, to_crs, always_xy=True).transform
-                for index, geom in self.districts['geometry'].iteritems():
+                for index, geom in self.districts['geometry'].items():
                     geom: MultiPolygon
                     cea: MultiPolygon = transform(project, geom)
                     pp[index] = 4 * math.pi * cea.area / (cea.length**2)
