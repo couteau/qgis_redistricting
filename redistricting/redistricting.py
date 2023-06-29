@@ -27,9 +27,20 @@
  ***************************************************************************/
 """
 import pathlib
+from re import S
 from typing import Iterable, List, Tuple
 from uuid import UUID
-from qgis.core import Qgis, QgsApplication, QgsProject, QgsField, QgsVectorLayer, QgsReadWriteContext
+from qgis.core import (
+    Qgis, 
+    QgsApplication, 
+    QgsProject, 
+    QgsField, 
+    QgsGroupLayer,
+    QgsVectorLayer, 
+    QgsReadWriteContext, 
+    QgsMapLayer, 
+    QgsLayerTreeLayer
+)
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import Qt, QCoreApplication, QTranslator, QSettings
 from qgis.PyQt.QtGui import QIcon
@@ -202,6 +213,8 @@ class Redistricting:
 
             self.projectSignalsConnected = True
 
+        self.iface.layerTreeView().clicked.connect(self.layerChanged)
+
         self.menu = QMenu(self.menuName, self.iface.mainWindow())
         self.menu.setIcon(self.icon)
 
@@ -355,6 +368,8 @@ class Redistricting:
             self.project.layersAdded.disconnect(self.updateNewPlanAction)
             self.project.layersRemoved.disconnect(self.updateNewPlanAction)
             self.projectSignalsConnected = False
+
+        self.iface.layerTreeView().clicked.disconnect(self.layerChanged)
 
         self.iface.removeDockWidget(self.dockwidget)
         self.dockwidget.destroy()
@@ -515,6 +530,13 @@ class Redistricting:
 
     # --------------------------------------------------------------------------
 
+    def layerChanged(self, layer: QgsMapLayer):
+        g = self.iface.layerTreeView().currentGroupNode()
+        if g.isVisible():
+            p = g.customProperty('redistricting-plan-id', None)
+            if p is not None and p != str(self.activePlan.id):
+                self.setActivePlan(UUID(p))
+
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
         self.clear()
         storage = ProjectStorage(self.project, doc, context)
@@ -534,6 +556,9 @@ class Redistricting:
     def onWriteProject(self, doc: QDomDocument):
         if len(self.redistrictingPlans) == 0:
             return
+        
+        rg = self.project.layerTreeRoot()
+        rg.setHasCustomLayerOrder(False)
 
         storage = ProjectStorage(self.project, doc)
         storage.writeRedistrictingPlans(self.redistrictingPlans)
@@ -907,6 +932,50 @@ class Redistricting:
             return False
 
         return True
+    
+    def bringPlanToTop(self, plan: RedistrictingPlan):
+        rg = self.project.layerTreeRoot()
+        rg.setHasCustomLayerOrder(False)
+        order = rg.layerOrder()
+        groups = [g for g in rg.findGroups() if g.customProperty('redistricting-plan-id', None) is not None]
+        for g in groups:
+            if g.customProperty('redistricting-plan-id') == str(plan.id):
+                groups.remove(g)
+                groups.insert(0, g)
+                break
+        
+        new_order = []
+        gi = None
+        for index, layer in enumerate(order):
+            if isinstance(layer, QgsGroupLayer):
+                if group := rg.findGroup(layer.name()):
+                    for l in group.children():
+                        if isinstance(l, QgsLayerTreeLayer):
+                            new_order.append(l.layer())
+                    continue
+
+            node = rg.findLayer(layer)
+            if node:
+                group = node.parent()
+                planid = group.customProperty('redistricting-plan-id', None)
+                if group is not rg and planid is not None:
+                    for l in group.children():
+                        if isinstance(l, QgsLayerTreeLayer) and isinstance(l.layer(), QgsVectorLayer):
+                            l.layer().setLabelsEnabled(planid == str(plan.id))
+                    if gi is None:
+                        gi = index
+                    continue
+
+            new_order.append(layer)
+        
+        if gi is not None:
+            for g in groups:
+                for l in g.children():
+                    new_order.insert(gi, l.layer())
+                    gi += 1
+        
+        rg.setHasCustomLayerOrder(True)
+        rg.setCustomLayerOrder(new_order)
 
     def setActivePlan(self, plan):
         if isinstance(plan, UUID):
@@ -928,6 +997,7 @@ class Redistricting:
                     self.editingStarted)
 
             self.activePlan = plan
+            
 
             self.mapTool.plan = self.activePlan
             self.dockwidget.plan = self.activePlan
@@ -935,6 +1005,8 @@ class Redistricting:
             self.pendingChangesWidget.plan = self.activePlan
 
             if self.activePlan and self.activePlan.assignLayer:
+                self.bringPlanToTop(self.activePlan)
+
                 self.activePlan.assignLayer.editingStarted.connect(
                     self.editingStarted)
                 self.activePlan.assignLayer.editingStopped.connect(
