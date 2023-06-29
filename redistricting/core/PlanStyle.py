@@ -68,11 +68,10 @@ class PlanStyler(QObject):
 
         categoryList: List[QgsRendererCategory] = []
         for dist in range(0, self._numDistricts+1):
-            category = QgsRendererCategory(
-                None if dist == 0 else dist,
-                symbol.clone(),
-                str(dist)
-            )
+            category = QgsRendererCategory()
+            category.setValue( None if dist == 0 else dist)
+            category.setSymbol(symbol.clone())
+            category.setLabel(str(dist))
             categoryList.append(category)
 
         ramp = QgsRandomColorRamp()
@@ -98,11 +97,10 @@ class PlanStyler(QObject):
             color = QColor(d.symbol().color())
             sym = symbol.clone()
             sym.symbolLayer(0).setFillColor(color)
-            category = QgsRendererCategory(
-                None if dist == 0 else dist,
-                sym,
-                str(dist)
-            )
+            category = QgsRendererCategory()
+            category.setValue(None if dist == 0 else dist)
+            category.setSymbol(sym)
+            category.setLabel(str(dist))
             categoryList.append(category)
         categoryList[0].setRenderState(False)
 
