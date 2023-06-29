@@ -136,6 +136,9 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
     @plan.setter
     def plan(self, value: RedistrictingPlan):
+        if self._plan:
+            self._plan.planChanged.disconnect(self.planChanged)
+
         self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
         self._plan = value
         self._model.plan = value
@@ -149,6 +152,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             self.btnAddFields.setEnabled(True)
             self.btnRecalculate.setEnabled(True)
             self.lblPlanName.setText(self._plan.name)
+            if self._plan:
+                self._plan.planChanged.connect(self.planChanged)
 
     def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
         super().__init__(parent)
@@ -184,6 +189,13 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.btnHelp.clicked.connect(self.btnHelpClicked)
         self._plan: RedistrictingPlan = None
         self.plan = plan
+
+    def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
+        if plan != self._plan:
+            return
+        
+        if prop == 'name':
+            self.lblPlanName.setText(newValue)
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)

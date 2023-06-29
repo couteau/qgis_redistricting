@@ -156,8 +156,8 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
     _plan: RedistrictingPlan = None
     geoFieldChanged = pyqtSignal(str)
-    sourceChanged = pyqtSignal(int)
-    targetChanged = pyqtSignal(int)
+    sourceChanged = pyqtSignal(object)
+    targetChanged = pyqtSignal(object)
 
     @property
     def plan(self) -> RedistrictingPlan:
@@ -268,6 +268,8 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             else:
                 field = model.fields[index].fieldName
             self.geoFieldChanged.emit(field)
+        elif prop == 'name':
+            self.lblPlanName.setText(self._plan.name)
 
     def cmbGeoFieldChanged(self, index):
         if index == -1:
