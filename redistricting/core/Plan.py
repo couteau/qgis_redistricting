@@ -39,7 +39,7 @@ from .DistrictList import DistrictList
 from .District import BaseDistrict, District
 from .PlanGroup import PlanGroup
 from .utils import tr
-from .PlanStats import PlanStats
+from .PlanStats import PlanStatistics
 
 
 class RedistrictingPlan(ErrorListMixin, QObject):
@@ -89,7 +89,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._dataFields = FieldList(self)
 
         self._districts = DistrictList(self)
-        self._stats = PlanStats(self)
+        self._stats = PlanStatistics(self)
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -180,7 +180,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         plan._sourceIdField = data.get('src-id-field')
 
-        plan._stats = PlanStats.deserialize(plan, data.get('plan-stats', {}))
+        plan._stats = PlanStatistics.deserialize(plan, data.get('plan-stats', {}))
         if plan._totalPopulation == 0:
             plan._districts.resetData()
 
@@ -548,7 +548,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                                   self._totalPopulation, oldValue)
 
     @property
-    def stats(self) -> PlanStats:
+    def stats(self) -> PlanStatistics:
         return self._stats
 
     @property

@@ -29,6 +29,7 @@ from .District import BaseDistrict, District
 from .DistrictList import DistrictList
 from .Field import Field, DataField, BasePopulation
 from .FieldList import FieldList
+from .PlanStats import PlanStatistics
 from .PlanStyle import PlanStyler
 from .PlanAssignments import PlanAssignmentEditor
 from .DistrictDataModel import DistrictDataModel
@@ -47,4 +48,4 @@ __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',
            'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
-           'showHelp', 'RdsException']
+           'showHelp', 'RdsException', 'PlanStatistics']

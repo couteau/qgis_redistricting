@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from .Field import Field
 
 
-class PlanStats(QObject):
+class PlanStatistics(QObject):
     statsChanged = pyqtSignal()
 
     def __init__(self, plan: RedistrictingPlan):

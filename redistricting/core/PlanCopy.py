@@ -34,7 +34,7 @@ from qgis.core import Qgis, QgsProject
 from qgis.utils import spatialite_connect
 from .utils import tr
 from .ErrorList import ErrorListMixin
-from . import PlanStyler, PlanBuilder, PlanStats
+from . import PlanStyler, PlanBuilder, PlanStatistics
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
@@ -92,7 +92,7 @@ class PlanCopier(ErrorListMixin, QObject):
             districts = [dist.serialize() for dist in self._plan.districts if dist.district != 0]
             for dist in districts:
                 plan.districts.deserializeDistrict(dist)
-            plan._stats = PlanStats.deserialize(plan, self._plan._stats.serialize())
+            plan._stats = PlanStatistics.deserialize(plan, self._plan._stats.serialize())
 
             self.setProgress(100)
             planCreated(plan)            
