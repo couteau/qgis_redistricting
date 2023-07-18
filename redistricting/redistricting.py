@@ -28,26 +28,53 @@
 """
 import pathlib
 from re import S
-from typing import Iterable, List, Tuple
+from typing import (
+    Iterable,
+    List,
+    Tuple
+)
 from uuid import UUID
+
 from qgis.core import (
-    Qgis, 
-    QgsApplication, 
-    QgsProject, 
-    QgsField, 
+    Qgis,
+    QgsApplication,
+    QgsField,
     QgsGroupLayer,
-    QgsVectorLayer, 
-    QgsReadWriteContext, 
-    QgsMapLayer, 
-    QgsLayerTreeLayer
+    QgsLayerTreeLayer,
+    QgsMapLayer,
+    QgsProject,
+    QgsReadWriteContext,
+    QgsVectorLayer
 )
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import Qt, QCoreApplication, QTranslator, QSettings
+from qgis.PyQt.QtCore import (
+    QCoreApplication,
+    QSettings,
+    Qt,
+    QTranslator
+)
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QDialog, QAction, QToolBar, QMenu, QToolButton, QProgressDialog
+from qgis.PyQt.QtWidgets import (
+    QAction,
+    QDialog,
+    QMenu,
+    QProgressDialog,
+    QToolBar,
+    QToolButton
+)
 from qgis.PyQt.QtXml import QDomDocument
 
-from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from .core import (
+    AssignmentImporter,
+    PlanBuilder,
+    PlanCopier,
+    PlanEditor,
+    PlanExporter,
+    PlanStyler,
+    ProjectStorage,
+    RedistrictingPlan,
+    ShapefileImporter
+)
 from .gui import (
     DlgConfirmDelete,
     DlgCopyPlan,
@@ -57,23 +84,13 @@ from .gui import (
     DlgImportShape,
     DlgNewDistrict,
     DlgSelectPlan,
-    DockRedistrictingToolbox,
     DockDistrictDataTable,
     DockPendingChanges,
+    DockRedistrictingToolbox,
     PaintDistrictsTool,
     PaintMode
 )
-from .core import (
-    ProjectStorage,
-    RedistrictingPlan,
-    PlanBuilder,
-    PlanEditor,
-    PlanStyler,
-    PlanExporter,
-    AssignmentImporter,
-    ShapefileImporter,
-    PlanCopier
-)
+from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
 
 class RdsProgressDialog(QProgressDialog):
