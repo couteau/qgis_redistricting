@@ -26,19 +26,31 @@
 import re
 import shlex
 import sqlite3
-from typing import Any, Dict, Iterable, Union
-import psycopg2
-from psycopg2.extras import RealDictConnection
-from osgeo import gdal, ogr
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Union
+)
 
+import psycopg2
+from osgeo import (
+    gdal,
+    ogr
+)
+from psycopg2.extras import RealDictConnection
 from qgis.core import (
+    QgsCredentials,
     QgsProject,
     QgsVectorDataProvider,
     QgsVectorLayer,
-    QgsVirtualLayerDefinition,
+    QgsVirtualLayerDefinition
 )
 
-from ..utils import random_id, spatialite_connect
+from ..utils import (
+    random_id,
+    spatialite_connect
+)
 
 
 class SqlAccess:
@@ -69,7 +81,7 @@ class SqlAccess:
 
         if provider.name() in ('spatialite', 'postgis', 'postgres'):
             params = dict(pair.split('=', 1) for pair in shlex.split(
-                provider.dataSourceUri(True).replace(' (geometry)', '')))
+                re.sub(r' \(\w+\)', '', provider.dataSourceUri(True))))
             return params['table']
 
         return None
@@ -120,8 +132,7 @@ class SqlAccess:
             return cur
 
     def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
-        conndata = dict(tuple(a.split('=')) for a in shlex.split(
-            provider.dataSourceUri(True).replace(' (geometry)', '')))
+        conndata = dict(tuple(a.split('=')) for a in shlex.split( provider.uri().connectionInfo(True)))
         return self._executeSqlSqlite(conndata['dbname'], sql, as_dict)
 
     def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
@@ -131,13 +142,22 @@ class SqlAccess:
     def _executeSqlPostgre(
         self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
     ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
-        conndata = dict(tuple(a.split('=')) for a in shlex.split(
-            provider.dataSourceUri(True).replace(' (geometry', '')))
-
-        conndata = {k: v for k, v in conndata.items()
-                    if k in ('dbname', 'host', 'port', 'sslmode', 'user', 'password')}
-
-        params = {'dsn': ' '.join(['='.join(e) for e in zip(conndata.keys(), conndata.values())])}
+        uri = provider.uri()
+        connInfo = uri.connectionInfo(True)
+        user = uri.username()
+        if not user or not uri.password():            
+            c = QgsCredentials.instance()
+            c.lock()
+            try:
+                (success, user, passwd) = c.get(connInfo, user, None)
+                if not success:
+                    return None
+                uri.setUsername(user)
+                uri.setPassword(passwd)
+                connInfo = uri.connectionInfo(True)
+            finally:
+                c.unlock()
+        params = {'dsn': connInfo}
         if as_dict:
             params['connection_factory'] = RealDictConnection if as_dict else None
         with psycopg2.connect(**params) as db:

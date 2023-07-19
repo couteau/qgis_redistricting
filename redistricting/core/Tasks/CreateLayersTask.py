@@ -23,30 +23,43 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from itertools import islice
-from typing import List, TYPE_CHECKING
-from contextlib import closing
 
-from qgis.PyQt.QtCore import QVariant
+from contextlib import closing
+from itertools import islice
+from typing import (
+    TYPE_CHECKING,
+    List
+)
+
 from qgis.core import (
     Qgis,
     QgsAggregateCalculator,
-    QgsMessageLog,
-    QgsTask,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
     QgsField,
+    QgsMessageLog,
+    QgsTask,
     QgsVectorLayer
 )
+from qgis.PyQt.QtCore import QVariant
 
-from .Sql import SqlAccess
-from ._exception import CancelledError
+from ..utils import (
+    createGeoPackage,
+    createGpkgTable,
+    spatialite_connect,
+    tr
+)
 from ._debug import debug_thread
-from ..utils import tr, spatialite_connect, createGeoPackage, createGpkgTable
+from ._exception import CancelledError
+from .Sql import SqlAccess
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, Field, DataField
+    from .. import (
+        DataField,
+        Field,
+        RedistrictingPlan
+    )
 
 
 class CreatePlanLayersTask(SqlAccess, QgsTask):
@@ -56,25 +69,21 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         self.assignFields = []
 
-        self.srcLayer: QgsVectorLayer = None
+        self.srcLayer: QgsVectorLayer = srcLayer # None
         self.srcField: QgsField = None
         self.srcGeoIdField = srcGeoIdField
         self.geoFields: List[Field] = list(plan.geoFields)
-        self.srcUri = srcLayer.dataProvider().dataSourceUri(True)
-        self.srcDrv = srcLayer.providerType()
 
         authid = srcLayer.sourceCrs().authid()
         _, srid = authid.split(':', 1)
         self.srid = int(srid)
 
-        self.popLayer: QgsVectorLayer = None
+        self.popLayer: QgsVectorLayer = plan.popLayer
         self.joinField = plan.joinField
         self.dataFields: List[DataField] = list(plan.dataFields)
         self.popField = plan.popField
         self.vapField = plan.vapField
         self.cvapField = plan.cvapField
-        self.popUri = plan.popLayer.dataProvider().dataSourceUri(True)
-        self.popDrv = plan.popLayer.providerType()
 
         self.geoIdField = plan.geoIdField
         self.distField = plan.distField
@@ -83,6 +92,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.popTotals = {}
         self.totalPop = 0
         # self.getPopFieldTotals(plan.popLayer)
+        self.setDependentLayers(l for l in (self.srcLayer,self.popLayer) if l is not None)
 
     def validatePopFields(self, popLayer):
         popFields = popLayer.fields()
@@ -140,19 +150,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return self.getPopFieldTotalsAggregate(popLayer)
 
     def makeSourceLayers(self):
-        self.srcLayer = QgsVectorLayer(self.srcUri, '__redistricting__srclayer__', self.srcDrv)
-        if not self.srcLayer.isValid():
-            raise ValueError(f'Could not open source layer: {self.srcUri}')
         self.srcField = self.srcLayer.fields().field(self.srcGeoIdField)
         if not self.srcField:
             raise ValueError(f'Source ID Field not found: {self.srcField}')
-
-        if self.popUri == self.srcUri:
-            self.popLayer = self.srcLayer
-        else:
-            self.popLayer = QgsVectorLayer(self.popUri, '__redistricting__poplayer__', self.popDrv)
-            if not self.popLayer.isValid():
-                raise ValueError(f'Could not open population layer: {self.popUri}')
 
         self.validatePopFields(self.popLayer)
 
