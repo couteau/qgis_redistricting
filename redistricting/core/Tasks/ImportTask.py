@@ -24,22 +24,23 @@
 """
 from __future__ import annotations
 
-import os
-from typing import TYPE_CHECKING
 import csv
+import os
 from contextlib import closing
+from typing import TYPE_CHECKING
+
 from osgeo import gdal
 from qgis.core import (
     Qgis,
-    QgsTask,
     QgsMessageLog,
+    QgsTask,
     QgsVectorLayer
 )
 from qgis.utils import spatialite_connect
 
-from ._exception import CancelledError
-from ._debug import debug_thread
 from ..utils import tr
+from ._debug import debug_thread
+from ._exception import CancelledError
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan
@@ -59,6 +60,8 @@ class ImportAssignmentFileTask(QgsTask):
         super().__init__(tr('Import assignment file'), QgsTask.AllFlags)
 
         self.assignLayer: QgsVectorLayer = plan.assignLayer
+        self.setDependentLayers((self.assignLayer,))
+
         self.distField: str = plan.distField
         self.geoIdField: str = plan.geoIdField
         self.geoPackagePath: str = plan.geoPackagePath
@@ -99,7 +102,7 @@ class ImportAssignmentFileTask(QgsTask):
                     else 'OGR_ODS_HEADERS'
                 oldHeaders = gdal.GetConfigOption(headerConfigKey)
                 gdal.SetConfigOption(headerConfigKey, 'FORCE' if self.headerRow else 'DISABLE')
-                l = QgsVectorLayer(self.equivalencyFile, '__import', 'ogr')
+                l = QgsVectorLayer(str(self.equivalencyFile), '__import', 'ogr')
                 total = l.featureCount()
                 generator = (makeTuple((f[self.distColumn], f[self.geoColumn])) for f in l.getFeatures())
             elif ext in ('.csv', '.txt'):
