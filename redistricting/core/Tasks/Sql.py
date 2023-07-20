@@ -62,6 +62,10 @@ class SqlAccess:
             lambda value, curs: float(value) if value is not None else None)
 
         psycopg2.extensions.register_type(DEC2FLOAT)
+        self._uri = None
+        self._connInfo = None
+        self._user = None
+        self._passwd = None
 
     def getTableName(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
@@ -142,22 +146,25 @@ class SqlAccess:
     def _executeSqlPostgre(
         self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
     ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
-        uri = provider.uri()
-        connInfo = uri.connectionInfo(True)
-        user = uri.username()
-        if not user or not uri.password():            
-            c = QgsCredentials.instance()
-            c.lock()
-            try:
-                (success, user, passwd) = c.get(connInfo, user, None)
-                if not success:
-                    return None
-                uri.setUsername(user)
-                uri.setPassword(passwd)
-                connInfo = uri.connectionInfo(True)
-            finally:
-                c.unlock()
-        params = {'dsn': connInfo}
+        if self._uri != provider.uri():
+            self._uri = provider.uri()
+            self._connInfo = self._uri.connectionInfo(True)
+            connDict = dict(tuple(a.split('=')) for a in shlex.split(self._connInfo))
+            self._user = connDict['user']
+            self._passwd = connDict['password']
+            if not self._user or not self._passwd:
+                c = QgsCredentials.instance()
+                c.lock()
+                try:
+                    (success, self._user, self._passwd) = c.get(self._connInfo, self._user, self._passwd)
+                    if not success:
+                        return None
+                    self._uri.setUsername(self._user)
+                    self._uri.setPassword(self._passwd)
+                    self._connInfo = self._uri.connectionInfo(True)
+                finally:
+                    c.unlock()
+        params = {'dsn': self._connInfo}
         if as_dict:
             params['connection_factory'] = RealDictConnection if as_dict else None
         with psycopg2.connect(**params) as db:
