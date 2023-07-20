@@ -27,6 +27,7 @@
  ***************************************************************************/
 """
 import pathlib
+from functools import partial
 from re import S
 from typing import (
     Iterable,
@@ -55,7 +56,9 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
+    QWidget,
     QAction,
+    QActionGroup,
     QDialog,
     QMenu,
     QProgressDialog,
@@ -151,6 +154,8 @@ class Redistricting:
         self.icon = QIcon(':/plugins/redistricting/icon.png')
 
         self.menu = None
+        self.planMenu = None
+        self.planActions = None
         self.toolbar = None
         self.menuButton = None
         self.toolBtnAction = None
@@ -361,6 +366,9 @@ class Redistricting:
             enabledFlag=False,
             parent=self.iface.mainWindow()
         )
+
+        self.planMenu = self.menu.addMenu(self.icon, self.tr('&Redistricting Plans'))
+        self.planActions = QActionGroup(self.iface.mainWindow())
         # pylint: enable=attribute-defined-outside-init
 
         self.mapTool = PaintDistrictsTool(self.canvas)
@@ -562,6 +570,7 @@ class Redistricting:
             if plan.hasErrors():
                 self.pushErrors(plan.errors())
             plan.planChanged.connect(self.planChanged)
+            self.addPlanToMenu(plan)
 
         if len(self.redistrictingPlans) == 1:
             self.setActivePlan(self.redistrictingPlans[0])
@@ -569,6 +578,8 @@ class Redistricting:
             uuid = storage.readActivePlan()
             if uuid:
                 self.setActivePlan(uuid)
+            elif len(self.redistrictingPlans) != 0:
+                self.setActivePlan(self.redistrictingPlans[0])
 
     def onWriteProject(self, doc: QDomDocument):
         if len(self.redistrictingPlans) == 0:
@@ -905,9 +916,34 @@ class Redistricting:
 
     # --------------------------------------------------------------------------
 
+    def activatePlan(self, checked):
+        if checked:
+            action: QAction = self.planActions.checkedAction()
+            plan = action.data()
+            if plan != self.activePlan:            
+                self.setActivePlan(plan)
+                self.project.setDirty()
+        
+    def addPlanToMenu(self, plan: RedistrictingPlan):
+        action = QAction(text=plan.name, parent=self.planActions)
+        action.setObjectName(plan.name)
+        action.setToolTip(plan.description)
+        action.setCheckable(True)
+        action.setData(plan)
+        action.triggered.connect(self.activatePlan)
+        self.planMenu.addAction(action)
+
+    def removePlanFromMenu(self, plan: RedistrictingPlan):
+        action = self.planActions.findChild(QAction, plan.name)
+        if action:
+            action.triggered.disconnect(self.activatePlan)
+            self.planMenu.removeAction(action)
+            self.planActions.removeAction(action)
+    
     def appendPlan(self, plan: RedistrictingPlan):
         self.redistrictingPlans.append(plan)
         plan.planChanged.connect(self.planChanged)
+        self.addPlanToMenu(plan)
         self.project.setDirty()
         self.setActivePlan(plan)
 
@@ -915,6 +951,7 @@ class Redistricting:
         if plan in self.redistrictingPlans:
             if plan == self.activePlan:
                 self.setActivePlan(None)
+            self.removePlanFromMenu(plan)
             self.redistrictingPlans.remove(plan)
 
             if removeLayers:
@@ -933,6 +970,9 @@ class Redistricting:
     def clear(self):
         self.setActivePlan(None)
         self.redistrictingPlans.clear()
+        self.planMenu.clear()
+        del self.planActions
+        self.planActions = QActionGroup(self.iface.mainWindow())
         if not self.projectClosing:
             self.actionNewPlan.setEnabled(
                 any(isinstance(layer, QgsVectorLayer)
@@ -952,6 +992,9 @@ class Redistricting:
     
     def bringPlanToTop(self, plan: RedistrictingPlan):
         rg = self.project.layerTreeRoot()
+
+        # setting a custom layer order will make the project dirty, which we don't want
+        dirty = self.project.isDirty()
         rg.setHasCustomLayerOrder(False)
         order = rg.layerOrder()
         groups = [g for g in rg.findGroups() if g.customProperty('redistricting-plan-id', None) is not None]
@@ -993,6 +1036,7 @@ class Redistricting:
         
         rg.setHasCustomLayerOrder(True)
         rg.setCustomLayerOrder(new_order)
+        self.project.setDirty(dirty)
 
     def setActivePlan(self, plan):
         if isinstance(plan, UUID):
@@ -1014,12 +1058,16 @@ class Redistricting:
                     self.editingStarted)
 
             self.activePlan = plan
-            
 
             self.mapTool.plan = self.activePlan
             self.dockwidget.plan = self.activePlan
             self.dataTableWidget.plan = self.activePlan
             self.pendingChangesWidget.plan = self.activePlan
+
+            if self.activePlan:
+                action = self.planActions.findChild(QAction, self.activePlan.name)
+                if action:
+                    action.setChecked(True)
 
             if self.activePlan and self.activePlan.assignLayer:
                 self.bringPlanToTop(self.activePlan)
