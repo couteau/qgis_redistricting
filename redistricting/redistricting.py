@@ -816,7 +816,7 @@ class Redistricting:
             copier.progressChanged.connect(progress.setValue)
             progress.canceled.connect(copier.cancel)
             copier.copyComplete.connect(self.appendPlan)
-            copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
+            copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
 
     def importPlan(self):
         if not self.checkActivePlan(self.tr('import')):

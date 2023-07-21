@@ -58,7 +58,7 @@ class PlanCopier(ErrorListMixin, QObject):
         if self._builder:
             self._builder.cancel()
 
-    def copyPlan(self, planName, destGpkgPath, copyAssignments: bool = True, copyStyles: bool = True):
+    def copyPlan(self, planName, description, destGpkgPath, copyAssignments: bool = True, copyStyles: bool = True):
 
         def planCreated(plan):
             if copyStyles:
@@ -73,6 +73,7 @@ class PlanCopier(ErrorListMixin, QObject):
 
         self._builder = PlanBuilder.fromPlan(self._plan)
         self._builder.setName(planName)
+        self._builder.setDescription(description)
 
         # if not copying assignments, emit the copyComplete signal
         # only after plan layers are created

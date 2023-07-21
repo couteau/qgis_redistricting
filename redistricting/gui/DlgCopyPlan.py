@@ -43,6 +43,7 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
         self.cbxCopyAssignments.setText(tr('Copy {geography} assignments').format(geography=plan.geoDisplay.lower()))
         self.inpPlanName.editingFinished.connect(self.planNameChanged)
         self.inpPlanName.textChanged.connect(self.updateButtonBox)
+        self.txtDescription.setPlainText(plan.description)
         self.fwGeoPackage.fileChanged.connect(self.updateButtonBox)
         self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
 
@@ -57,6 +58,10 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
     @property
     def copyAssignments(self) -> bool:
         return self.cbxCopyAssignments.isChecked()
+    
+    @property
+    def description(self) -> str:
+        return self.txtDescription.toPlainText()
 
     def planNameChanged(self):
         if self.planName and not self.fwGeoPackage.path and QgsProject.instance().absolutePath() != ' ':
