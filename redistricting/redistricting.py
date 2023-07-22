@@ -634,7 +634,7 @@ class Redistricting:
 
     def activateMapTool(self, mode):
         self.mapTool.paintMode = mode
-        if self.mapTool.targetDistrict is None:
+        if self.mapTool.targetDistrict() is None:
             target = self.createDistrict()
             self.mapTool.setTargetDistrict(target)
         if self.mapTool.canActivate():
