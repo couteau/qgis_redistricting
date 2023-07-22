@@ -22,10 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
+import os
 import sys
 
-DEBUG = True
-
+DEBUG = os.getenv("DEBUG")
 
 def debug_thread():
     if not DEBUG:
