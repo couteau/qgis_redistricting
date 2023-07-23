@@ -633,6 +633,15 @@ class Redistricting:
             self.canvas.unsetMapTool(self.mapTool)
 
     def activateMapTool(self, mode):
+        if not self.project.layerTreeRoot().findLayer(self.activePlan.assignLayer).isVisible():
+            self.iface.messageBar().pushMessage(
+                self.tr("Oops!"),
+                self.tr("Cannot paint districts for a plan that is not visible. "
+                        f"Please toggle the visibility of plan {self.activePlan.name}'s assignment layer."),
+                level=Qgis.Warning,
+                duration=5)
+            return
+        
         self.mapTool.paintMode = mode
         if self.mapTool.targetDistrict() is None:
             target = self.createDistrict()
@@ -1039,6 +1048,8 @@ class Redistricting:
         self.project.setDirty(dirty)
 
     def setActivePlan(self, plan):
+        self.canvas.unsetMapTool(self.mapTool)
+
         if isinstance(plan, UUID):
             for p in self.redistrictingPlans:
                 if p.id == plan:
