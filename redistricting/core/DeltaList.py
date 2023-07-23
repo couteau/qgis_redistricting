@@ -92,6 +92,9 @@ class DeltaList(QObject):
         self.updateComplete.emit(self._plan)
 
     def updateDistricts(self, data: pd.DataFrame):
+        for d in self._districts:
+            d.delta = None
+            
         for dist, delta in data.iterrows():
             d = self._districts[str(dist)]
             if d is None:

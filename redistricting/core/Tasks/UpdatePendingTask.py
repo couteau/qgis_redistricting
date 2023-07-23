@@ -82,9 +82,9 @@ class AggregatePendingChangesTask(AggregateDataTask):
             del new
             del old
 
-            if len(pending) == 0:
-                self.data = pending
-                return True
+            #if len(pending) == 0:
+            #    self.data = pending
+            #    return True
 
             context = QgsExpressionContext()
             context.appendScopes(
@@ -94,6 +94,11 @@ class AggregatePendingChangesTask(AggregateDataTask):
             getters = [lambda f: f[self.joinField]]
             aggs = {}
             self.addPopFields(cols, getters, aggs, context)
+
+            if len(pending) == 0:
+                pending[cols] = None
+                self.data = pending
+                return True
 
             request = QgsFeatureRequest()
             request.setExpressionContext(context)
