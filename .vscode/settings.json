@@ -17,6 +17,12 @@
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins"
     ],
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true,
+        },
+    },
     "qtForPython.rcc.args": [
         "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}${fileBasenameNoExtension}.py\""
     ],
