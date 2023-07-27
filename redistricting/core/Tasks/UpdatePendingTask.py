@@ -24,14 +24,20 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict, TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict
+)
+
 import pandas as pd
 from qgis.core import (
-    QgsTask,
-    QgsFeatureRequest,
     QgsExpressionContext,
     QgsExpressionContextUtils,
+    QgsFeatureRequest,
+    QgsTask
 )
+
 from ..utils import tr
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
@@ -82,36 +88,25 @@ class AggregatePendingChangesTask(AggregateDataTask):
             del new
             del old
 
-            #if len(pending) == 0:
-            #    self.data = pending
-            #    return True
-
-            context = QgsExpressionContext()
-            context.appendScopes(
-                QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-
-            cols = [self.joinField]
-            getters = [lambda f: f[self.joinField]]
-            aggs = {}
-            self.addPopFields(cols, getters, aggs, context)
+            self.addPopFields()
 
             if len(pending) == 0:
-                pending[cols] = None
+                pending[self.cols] = None
                 self.data = pending
                 return True
 
             request = QgsFeatureRequest()
-            request.setExpressionContext(context)
+            request.setExpressionContext(self.context)
             r = ','.join([f"'{geoid}'" for geoid in pending.index])
             request.setFilterExpression(f'{self.joinField} in ({r})')
 
-            datagen = ([getter(f) for getter in getters]
+            datagen = ([getter(f) for getter in self.getters]
                        for f in self.popLayer.getFeatures(request))
-            dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=cols)
+            dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=self.cols)
             pending = pd.merge(pending, dfpop, how='left', left_index=True, right_index=True)
 
-            newdist = pending.groupby(f'new_{self.distField}').agg(aggs)
-            olddist = pending.groupby(f'old_{self.distField}').agg(aggs)
+            newdist = pending.groupby(f'new_{self.distField}').agg(self.aggs)
+            olddist = pending.groupby(f'old_{self.distField}').agg(self.aggs)
             del pending
 
             self.data = newdist.sub(olddist, fill_value=0)

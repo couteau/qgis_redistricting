@@ -23,18 +23,28 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import Dict, TYPE_CHECKING
+
+from typing import (
+    TYPE_CHECKING,
+    Dict
+)
+
 from qgis.core import (
     Qgis,
     QgsExpressionContext,
+    QgsExpressionContextUtils,
     QgsMessageLog,
     QgsTask,
     QgsVectorLayer
 )
+
 from ._exception import CancelledError
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, DataField
+    from .. import (
+        DataField,
+        RedistrictingPlan
+    )
 
 
 class AggregateDataTask(QgsTask):
@@ -55,6 +65,10 @@ class AggregateDataTask(QgsTask):
         self.count = 0
         self.total = 1
         self.exception = None
+        self.cols = []
+        self.getters = []
+        self.aggs = {}
+        self.context: QgsExpressionContext = None
 
     def hasExpression(self):
         for f in self.dataFields:
@@ -76,22 +90,26 @@ class AggregateDataTask(QgsTask):
     def getFieldValue(self, fld: 'DataField', context: QgsExpressionContext):
         return lambda f: fld.getValue(f, context)
 
-    def addPopFields(self, cols: list, getters: list, aggs: Dict[str, str], context: QgsExpressionContext):
-        cols.append(self.popField)
-        getters.append(lambda f: f[self.popField])
-        aggs[self.popField] = 'sum'
+    def addPopFields(self):
+        self.context = QgsExpressionContext()
+        self.context.appendScopes(
+            QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer)
+        )
+        self.cols.append(self.popField)
+        self.getters.append(lambda f: f[self.popField])
+        self.aggs[self.popField] = 'sum'
         if self.vapField:
-            cols.append(self.vapField)
-            getters.append(lambda f: f[self.vapField])
-            aggs[self.vapField] = 'sum'
+            self.cols.append(self.vapField)
+            self.getters.append(lambda f: f[self.vapField])
+            self.aggs[self.vapField] = 'sum'
         if self.cvapField:
-            cols.append(self.cvapField)
-            getters.append(lambda f: f[self.cvapField])
-            aggs[self.cvapField] = 'sum'
+            self.cols.append(self.cvapField)
+            self.getters.append(lambda f: f[self.cvapField])
+            self.aggs[self.cvapField] = 'sum'
         for fld in self.dataFields:
-            cols.append(fld.fieldName)
-            getters.append(self.getFieldValue(fld, context))
-            aggs[fld.fieldName] = 'sum' if fld.isNumeric else 'first'
+            self.cols.append(fld.fieldName)
+            self.getters.append(self.getFieldValue(fld, self.context))
+            self.aggs[fld.fieldName] = 'sum' if fld.isNumeric else 'first'
 
     def finished(self, result: bool):
         if not result:
