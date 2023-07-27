@@ -22,16 +22,28 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox, QVBoxLayout
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QVBoxLayout,
+    QWidget
+)
+
 from ..core import RedistrictingPlan
+from ..core.utils import tr
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
 
 
 class DlgImportPlan(QDialog):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
+        self.setWindowTitle(tr("Import Equivalency File"))
         self.page = dlgEditPlanImportPage(self)
         self.buttonBox = QDialogButtonBox(
             QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
@@ -44,7 +56,6 @@ class DlgImportPlan(QDialog):
         layout.addWidget(self.page)
         layout.addWidget(self.buttonBox)
         self.setLayout(layout)
-        self.setBaseSize(446, 510)
 
         self.page.initializePage()
         self.page.cmbJoinField.setLayer(plan.assignLayer)
