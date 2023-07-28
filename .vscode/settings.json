@@ -27,6 +27,14 @@
         "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}${fileBasenameNoExtension}.py\""
     ],
     "qtForPython.uic.args": [
-        "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${fileBasenameNoExtension}.py\""
+        "-o",
+        "${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${fileBasenameNoExtension}.py"
     ],
+    "qtForPython.uic.options": [
+        "-o",
+        "${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${resourceBasenameNoExtension}.py"
+    ],
+    "editor.formatOnPaste": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnType": true,
 }
