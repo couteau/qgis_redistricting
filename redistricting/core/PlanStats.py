@@ -23,13 +23,22 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+
 from statistics import fmean
-from typing import TYPE_CHECKING, Any, Dict
-from qgis.PyQt.QtCore import QObject, pyqtSignal
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict
+)
+
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
 if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
     from .Field import Field
+    from .Plan import RedistrictingPlan
 
 
 class PlanStatistics(QObject):
@@ -39,17 +48,17 @@ class PlanStatistics(QObject):
         super().__init__(plan)
         self._plan = plan
         self._cutEdges = 0
-        self.updateSplits()
+        self.initSplits()
         self._plan.planChanged.connect(self.planChanged)
         self._plan.districts.updateComplete.connect(self.statsChanged)
 
     def planChanged(self, plan, field, oldValue, newValue):  # pylint: disable=unused-argument
         if field == 'geo-fields':
-            self.updateSplits()
+            self.initSplits()
             self.statsChanged.emit()
 
-    def updateSplits(self):
-        self._splits: Dict[Field, int] = {
+    def initSplits(self):
+        self._splits: Dict[Field, list[dict]] = {
             f: [] for f in self._plan.geoFields
         }
 
@@ -109,7 +118,7 @@ class PlanStatistics(QObject):
         return self._cutEdges
 
     @property
-    def splits(self) -> Dict[Field, int]:
+    def splits(self) -> Dict[Field, list[dict]]:
         return self._splits
 
     def update(self, cutEdges, splits):

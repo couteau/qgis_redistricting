@@ -24,29 +24,52 @@
 """
 import math
 import sqlite3
-from typing import Dict, Iterable, List, Set, TYPE_CHECKING
 from contextlib import closing
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Iterable,
+    List,
+    Set
+)
+
 import pandas as pd
 import pyproj
+from qgis.core import (
+    QgsAggregateCalculator,
+    QgsExpressionContext,
+    QgsExpressionContextUtils,
+    QgsFeatureRequest,
+    QgsGeometry,
+    QgsTask
+)
 from shapely import wkt
 from shapely.geometry import MultiPolygon
 from shapely.ops import transform
-from qgis.core import (
-    QgsGeometry,
-    QgsFeatureRequest,
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
-    QgsAggregateCalculator,
-    QgsTask
+
+from ..utils import (
+    spatialite_connect,
+    tr
 )
-from ..utils import tr, spatialite_connect
-from .UpdateTask import AggregateDataTask
-from .Sql import SqlAccess
 from ._debug import debug_thread
 from ._exception import CancelledError
+from .Sql import SqlAccess
+from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, Field
+    from .. import (
+        Field,
+        RedistrictingPlan
+    )
+
+class Config:
+    @staticmethod
+    def calculateSplits():
+        return True
+    
+    @staticmethod
+    def splitPopulation():
+        return True
 
 
 class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
@@ -80,55 +103,106 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.districts: pd.DataFrame = None
         self.totalPop = 0
         self.splits = {}
-        self.calculateSplits = True
+
+    def getPopData(self, geoids: str, geoField=None, request: QgsFeatureRequest = None, cb = None):
+        if geoField is None:
+            geoField = self.joinField
+
+        if self.isSQLCapable(self.popLayer):
+            table = self.getTableName(self.popLayer)
+            sql = f'SELECT SUM({self.popField}) AS {self.popField}'
+            if self.vapField:
+                sql += f', SUM({self.vapField}) AS {self.vapField}'
+            if self.cvapField:
+                sql += f', SUM({self.cvapField}) AS {self.cvapField}'
+            for f in self.dataFields:
+                sql += f', SUM({f.field}) AS {f.fieldName}'
+            sql += f' FROM {table} WHERE {geoField} in ({geoids})'
+            cur = self.executeSql(self.popLayer, sql)
+            if cb: 
+                cb(geoids.count(',') + 1)
+            return dict(next(cur))
+
+        if request is None:
+            request = QgsFeatureRequest()
+            if not self.hasExpression():
+                request.setSubsetOfAttributes(self.cols, self.popLayer.fields())
+            request.setFlags(QgsFeatureRequest.NoGeometry)
+
+        pop = {
+            self.popField: 0
+        }
+        if self.vapField:
+            pop[self.vapField] = 0
+        if self.cvapField:
+            pop[self.cvapField] = 0
+        for f in self.dataFields:
+            pop[f.fieldName] = 0
+
+        request.setFilterExpression(f'{geoField} in ({geoids})')
+        for f in self.popLayer.getFeatures(request):
+            for idx, fld in enumerate(pop):
+                pop[fld] += self.getters[idx](f)
+            if cb:
+                cb(1)
+
+        return pop
+    
+    def doSplits(self):
+        self.splits = {}
+        if Config.calculateSplits():
+            with closing(spatialite_connect(self.geoPackagePath)) as db:
+                for field in self.geoFields:
+                    sql = f'SELECT {field.fieldName}, GROUP_CONCAT(DISTINCT QUOTE({self.distField})) AS districts, COUNT(DISTINCT {self.distField}) AS splits ' \
+                        f'FROM assignments GROUP BY {field.fieldName} HAVING splits > 1'
+                    
+                    #s = pd.read_sql(sql, db, field.fieldName)
+                    s = [dict(zip((field.fieldName, "districts", "splits"), row)) for row in db.execute(sql)]
+
+                    if Config.splitPopulation():
+                        for group in s:
+                            g = group[field.fieldName]
+                            pop = {}
+                            for d in group["districts"].split(','):
+                                sql = f"SELECT GROUP_CONCAT(QUOTE({self.geoIdField})) AS geoids FROM assignments WHERE {field.fieldName} = '{g}' AND {self.distField} = {d} GROUP BY {field.fieldName}, {self.distField}"
+                                geoids = db.execute(sql).fetchone()[0]
+                                pop[d] = self.getPopData(geoids)
+                            group["districts"] = pop
+
+                    self.splits[field.fieldName] = s
+
+    def doMetrics(self):
+        crs = self.assignLayer.crs()
+            
+        pp: Dict[int, float] = {}
+        reock: Dict[int, float] = {}
+        ch: Dict[int, float] = {}
+
+        from_crs = pyproj.CRS(crs.authid())
+        to_crs = pyproj.CRS('+proj=cea')
+        project = pyproj.Transformer.from_crs(from_crs, to_crs, always_xy=True).transform
+        for index, geom in self.districts['geometry'].items():
+            geom: MultiPolygon
+            cea: MultiPolygon = transform(project, geom)
+            pp[index] = 4 * math.pi * cea.area / (cea.length**2)
+            reock[index] = cea.area / QgsGeometry.fromWkt(cea.wkt).minimalEnclosingCircle()[0].area()
+            ch[index] = cea.area / cea.convex_hull.area
+        self.districts['polsbypopper'] = pd.Series(pp, dtype=float)
+        self.districts['reock'] = pd.Series(reock, dtype=float)
+        self.districts['convexhull'] = pd.Series(ch, dtype=float)
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-        def getPopData(geoids: str):
+        def updateProgress(increment):
             nonlocal count
+            count += increment
 
-            if self.isSQLCapable(self.popLayer):
-                table = self.getTableName(self.popLayer)
-                sql = f'SELECT SUM({self.popField}) AS {self.popField}'
-                if self.vapField:
-                    sql += f', SUM({self.vapField}) AS {self.vapField}'
-                if self.cvapField:
-                    sql += f', SUM({self.cvapField}) AS {self.cvapField}'
-                for f in self.dataFields:
-                    sql += f', SUM({f.field}) AS {f.fieldName}'
-                sql += f' FROM {table} WHERE {self.joinField} in ({geoids})'
-                cur = self.executeSql(self.popLayer, sql)
-                count += geoids.count(',') + 1
-                self.setProgress(90*count/total)
-                if self.isCanceled():
-                    raise CancelledError()
-                return dict(next(cur))
-
-            pop = {
-                self.popField: 0
-            }
-            if self.vapField:
-                pop[self.vapField] = 0
-            if self.cvapField:
-                pop[self.cvapField] = 0
-            for f in self.dataFields:
-                pop[f.fieldName] = 0
-
-            request.setFilterExpression(f'{self.joinField} in ({geoids})')
-            for f in self.popLayer.getFeatures(request):
-                for idx, fld in enumerate(pop):
-                    pop[fld] += getters[idx](f)
-                count += 1
-                self.setProgress(90*count/total)
-                if self.isCanceled():
-                    raise CancelledError()
-
-            return pop
+            self.setProgress(90*count/total)
+            if self.isCanceled():
+                raise CancelledError()
 
         debug_thread()
 
         try:
-            crs = self.assignLayer.crs()
-
             count = 0
             if self.updateDistricts:
                 context = QgsExpressionContext()
@@ -149,22 +223,14 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 total = self.assignLayer.featureCount()
 
             if self.includeDemographics:
-                context = QgsExpressionContext()
-                context.appendScopes(
-                    QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer)
-                )
-
-                cols = []
-                getters = []
-                aggs = {}
-                self.addPopFields(cols, getters, aggs, context)
-                data = dict(zip(cols, [[] for _ in cols]))
+                self.addPopFields()
+                data = dict(zip(self.cols, [[] for _ in self.cols]))
             else:
                 data = {}
 
             request = QgsFeatureRequest()
             if not self.hasExpression():
-                request.setSubsetOfAttributes(cols, self.popLayer.fields())
+                request.setSubsetOfAttributes(self.cols, self.popLayer.fields())
             request.setFlags(QgsFeatureRequest.NoGeometry)
 
             with spatialite_connect(self.geoPackagePath) as db:
@@ -186,28 +252,15 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 index = []
                 for r in c:
                     index.append(r[self.distField])
-                    for p, v in getPopData(r['geoids']).items():
-                        data[p].append(v)
+                    if self.includeDemographics:
+                        for p, v in self.getPopData(r['geoids'], request=request, cb=updateProgress).items():
+                            data[p].append(v)
                     if self.includeGeometry:
                         data['geometry'].append(wkt.loads(r['geometry']))
 
             self.districts = pd.DataFrame(data, index=index)
-            pp: Dict[int, float] = {}
-            reock: Dict[int, float] = {}
-            ch: Dict[int, float] = {}
             if self.includeGeometry:
-                from_crs = pyproj.CRS(crs.authid())
-                to_crs = pyproj.CRS('+proj=cea')
-                project = pyproj.Transformer.from_crs(from_crs, to_crs, always_xy=True).transform
-                for index, geom in self.districts['geometry'].items():
-                    geom: MultiPolygon
-                    cea: MultiPolygon = transform(project, geom)
-                    pp[index] = 4 * math.pi * cea.area / (cea.length**2)
-                    reock[index] = cea.area / QgsGeometry.fromWkt(cea.wkt).minimalEnclosingCircle()[0].area()
-                    ch[index] = cea.area / cea.convex_hull.area
-                self.districts['polsbypopper'] = pd.Series(pp, dtype=float)
-                self.districts['reock'] = pd.Series(reock, dtype=float)
-                self.districts['convexhull'] = pd.Series(ch, dtype=float)
+                self.doMetrics()
 
             self.setProgress(99)
 
@@ -215,14 +268,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
             if self.includeDemographics and self.updateDistricts is None:
                 self.totalPop = int(self.districts[self.popField].sum())
 
-            self.splits = {}
-            if self.calculateSplits:
-                with closing(spatialite_connect(self.geoPackagePath)) as db:
-                    for field in self.geoFields:
-                        sql = f'SELECT {field.fieldName}, COUNT(DISTINCT {self.distField}) AS splits ' \
-                            f'FROM assignments GROUP BY {field.fieldName} HAVING splits > 1'
-                        s = db.execute(sql).fetchall()
-                        self.splits[field.fieldName] = s
+            self.doSplits()
 
             self.setProgress(100)
         except Exception as e:  # pylint: disable=broad-except
@@ -295,8 +341,13 @@ class CalculateCutEdgesTask(QgsTask):
     def run(self):
         try:
             # pylint: disable=import-outside-toplevel
-            from gerrychain import Graph, Partition, updaters  # type: ignore
             import geopandas as gpd
+            from gerrychain import (  # type: ignore
+                Graph,
+                Partition,
+                updaters
+            )
+
             # pylint: enable=import-outside-toplevel
 
             if self.useBuffer:

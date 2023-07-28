@@ -23,18 +23,44 @@
  *                                                                         *
  ***************************************************************************/
 """
-import os
-import io
 import csv
-from typing import Any, Dict, Optional
-from qgis.PyQt.QtCore import Qt, QObject, QCoreApplication, QEvent, QModelIndex, QAbstractTableModel
-from qgis.PyQt.QtGui import QKeySequence, QFont
-from qgis.PyQt.QtWidgets import QWidget, QDockWidget
+import io
+import os
+from typing import (
+    Any,
+    Dict,
+    Optional
+)
+
 from qgis.core import QgsApplication
-from ..core import RedistrictingPlan, DistrictDataModel, Field, tr, showHelp
+from qgis.PyQt.QtCore import (
+    QAbstractTableModel,
+    QCoreApplication,
+    QEvent,
+    QModelIndex,
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtGui import (
+    QFont,
+    QKeySequence
+)
+from qgis.PyQt.QtWidgets import (
+    QDockWidget,
+    QWidget
+)
+
+from ..core import (
+    DistrictDataModel,
+    Field,
+    RedistrictingPlan,
+    showHelp,
+    tr
+)
+from .DlgEditFields import DlgEditFields
+from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
-from .DlgEditFields import DlgEditFields
 
 
 class StatsModel(QAbstractTableModel):
@@ -139,6 +165,10 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         if self._plan:
             self._plan.planChanged.disconnect(self.planChanged)
 
+        if self._dlgSplits:
+            self._dlgSplits.close()
+            self._dlgSplits = None
+
         self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
         self._plan = value
         self._model.plan = value
@@ -173,6 +203,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._statsModel = StatsModel(plan)
         self.tblPlanStats.setModel(self._statsModel)
         self.tblPlanStats.verticalHeader()
+        self.tblPlanStats.doubleClicked.connect(self.statsDoubleClicked)
         self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
 
         self.btnCopy.setIcon(
@@ -187,6 +218,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
         self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
+        self._dlgSplits: DlgSplitDetail = None
+
         self._plan: RedistrictingPlan = None
         self.plan = plan
 
@@ -252,3 +285,13 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
     def btnHelpClicked(self):
         showHelp('usage/data_table.html')
+
+    def statsDoubleClicked(self, index: QModelIndex):
+        row = index.row()
+        if row >= 6:
+            field = self._plan.geoFields[row-6]
+            if self._dlgSplits:
+                self._dlgSplits.geoField = field
+            else:
+                self._dlgSplits = DlgSplitDetail(self._plan, field, self.parent())
+            self._dlgSplits.show()
