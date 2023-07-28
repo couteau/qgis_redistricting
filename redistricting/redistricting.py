@@ -56,7 +56,6 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
-    QWidget,
     QAction,
     QActionGroup,
     QDialog,
@@ -442,7 +441,6 @@ class Redistricting:
             callback=dockwidget.toggleViewAction(),
             parent=self.iface.mainWindow())
 
-        dockwidget.hide()
         return dockwidget
 
     def setupDataTableDockWidget(self):
@@ -461,7 +459,6 @@ class Redistricting:
             callback=dockwidget.toggleViewAction(),
             parent=self.iface.mainWindow())
 
-        dockwidget.hide()
         return dockwidget
 
     def setupPendingChangesWidget(self):
@@ -479,7 +476,6 @@ class Redistricting:
             callback=dockwidget.toggleViewAction(),
             parent=self.iface.mainWindow())
 
-        dockwidget.hide()
         return dockwidget
 
     # --------------------------------------------------------------------------
