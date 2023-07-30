@@ -22,18 +22,57 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Any
-from qgis.PyQt.QtCore import QObject, QVariant, Qt, QAbstractListModel, QModelIndex
+from typing import (
+    Any,
+    Optional
+)
+
 from qgis.core import QgsApplication
-from . import RedistrictingPlan, Field
+from qgis.PyQt.QtCore import (
+    QAbstractListModel,
+    QModelIndex,
+    QObject,
+    Qt,
+    QVariant
+)
+
+from . import (
+    Field,
+    RedistrictingPlan,
+    tr
+)
 
 
 class GeoFieldsModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._data = list(plan.geoFields)
+        self._data: list[Field] = list(plan.geoFields)
         self._data.insert(0, Field(plan.assignLayer, plan.geoIdField,
-                          False, plan.geoDisplay, self))
+                          False, plan.geoIdCaption, self))
+
+    def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
+        return len(self._data)
+
+    def data(self, index: QModelIndex, role: int = ...) -> Any:
+        row = index.row()
+
+        if role in (Qt.DisplayRole, Qt.EditRole):
+            return self._data[row].caption
+        if role == Qt.DecorationRole:
+            return QgsApplication.getThemeIcon('/mIconVector.svg')
+
+        return QVariant()
+
+    @property
+    def fields(self):
+        return self._data
+
+class PopFieldsModel(QAbstractListModel):
+    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self._data: list[Field] = list(plan.popFields)
+        self._data.insert(0, Field(plan.popLayer, plan.popField,
+                          False, tr("Total Population"), self))
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self._data)

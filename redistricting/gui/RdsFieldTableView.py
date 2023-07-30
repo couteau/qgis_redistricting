@@ -23,41 +23,74 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Type, Union, Iterable, List
+from typing import (
+    Iterable,
+    List,
+    Type,
+    Union
+)
 
-from qgis.PyQt.QtCore import Qt, QAbstractTableModel, QCoreApplication, QModelIndex, QVariant, pyqtSignal, pyqtProperty
-from qgis.PyQt.QtWidgets import QWidget, QTableView, QAbstractItemView, QProxyStyle, QStyleOption
-from qgis.PyQt.QtGui import QDropEvent, QDragMoveEvent, QMouseEvent
-from qgis.core import Qgis, QgsApplication
+from qgis.core import (
+    Qgis,
+    QgsApplication
+)
+from qgis.PyQt.QtCore import (
+    QAbstractTableModel,
+    QCoreApplication,
+    QModelIndex,
+    Qt,
+    QVariant,
+    pyqtProperty,
+    pyqtSignal
+)
+from qgis.PyQt.QtGui import (
+    QDragMoveEvent,
+    QDropEvent,
+    QMouseEvent
+)
+from qgis.PyQt.QtWidgets import (
+    QAbstractItemView,
+    QProxyStyle,
+    QStyleOption,
+    QTableView,
+    QWidget
+)
 from qgis.utils import iface
-from ..core import Field, DataField, FieldList, BasePopulation, RdsException, tr
+
+from ..core import (
+    BasePopulation,
+    DataField,
+    Field,
+    FieldList,
+    RdsException,
+    tr
+)
 
 # TODO: come up with an accessible method for reordering without the mouse
 
 
 class FieldListModel(QAbstractTableModel):
 
-    _headings = [QCoreApplication.translate('Redistricting', 'Field'),
-                 QCoreApplication.translate('Redistricting', 'Caption'),
-                 QCoreApplication.translate('Redistricting', '∑'),
-                 QCoreApplication.translate('Redistricting', '%Pop'),
-                 QCoreApplication.translate('Redistricting', '%VAP'),
-                 QCoreApplication.translate('Redistricting', '%CVAP')]
+    _headings = [
+        QCoreApplication.translate('Redistricting', 'Field'),
+        QCoreApplication.translate('Redistricting', 'Caption'),
+        QCoreApplication.translate('Redistricting', '∑'),
+        QCoreApplication.translate('Redistricting', '%')
+    ]
 
-    def __init__(self, fields: Union[FieldList, List[Field]] = None, parent=None):
+    def __init__(self, fields: Union[FieldList, List[Field]] = None, popFields: Union[FieldList, List[Field]] = None, parent=None):
         super().__init__(parent)
         if isinstance(fields, FieldList):
             self._data: FieldList = fields[:]
             self._data.setParent(self)
         else:
             self._data: FieldList = FieldList(self, fields)
+        self.popFields = popFields
         self._colCount = 3
         if self._data:
             self.fieldType = type(self._data[0])
         else:
             self.fieldType = Field
-        self._vapEnabled = True
-        self._cvapEnabled = True
 
     @pyqtProperty(list)
     def fields(self):
@@ -78,29 +111,26 @@ class FieldListModel(QAbstractTableModel):
             self.endInsertRows()
 
     @property
-    def vapEnabled(self) -> bool:
-        return self._vapEnabled
-
-    @vapEnabled.setter
-    def vapEnabled(self, value: bool):
-        self._vapEnabled = value
-
-    @property
-    def cvapEnabled(self) -> bool:
-        return self._cvapEnabled
-
-    @cvapEnabled.setter
-    def cvapEnabled(self, value: bool):
-        self._cvapEnabled = value
-
-    @property
     def fieldType(self):
         return self._fieldType
 
     @fieldType.setter
     def fieldType(self, value: Type[Field]):
         self._fieldType = value
-        self.setColCount(7 if self._fieldType == DataField else 3)
+        self.setColCount(5 if self._fieldType == DataField else 3)
+
+    @property
+    def popFields(self):
+        return self._popFields
+    
+    @popFields.setter
+    def popFields(self, value: Union[FieldList, List[Field]]):
+        if value is None:
+            self._popFields = FieldList(self)
+        elif isinstance(value, FieldList):
+            self._popFields: FieldList = value
+        else:
+            self._popFields: FieldList = FieldList(self, value)
 
     def setColCount(self, value):
         if value != self._colCount:
@@ -132,6 +162,8 @@ class FieldListModel(QAbstractTableModel):
                 value = self._data[row].field
             elif col == 1:
                 value = self._data[row].caption
+            elif col == 3:
+                value = str(self._data[row].pctbase)
             else:
                 value = QVariant()
         elif role == Qt.DecorationRole:
@@ -147,12 +179,6 @@ class FieldListModel(QAbstractTableModel):
                 value = QVariant()
             elif col == 2:
                 value = Qt.Checked if field.sum else Qt.Unchecked
-            elif col == 3:
-                value = Qt.Checked if field.pctbase == BasePopulation.TOTALPOP else Qt.Unchecked
-            elif col == 4:
-                value = Qt.Checked if field.pctbase == BasePopulation.VAP and self._vapEnabled else Qt.Unchecked
-            elif col == 5:
-                value = Qt.Checked if field.pctbase == BasePopulation.CVAP and self._cvapEnabled else Qt.Unchecked
             else:
                 value = QVariant()
         elif role == Qt.TextAlignmentRole:
@@ -171,21 +197,8 @@ class FieldListModel(QAbstractTableModel):
             elif col == 3:
                 value = QCoreApplication.translate(
                     'Redistricting',
-                    'Display field {field} as percent of total population is {checkstate}'). \
-                    format(field=field.fieldName,
-                           checkstate='checked' if field.pctbase == BasePopulation.TOTALPOP else 'unchecked')
-            elif col == 4:
-                value = QCoreApplication.translate(
-                    'Redistricting',
-                    'Display field {field} as percent of voting age population is {checkstate}'). \
-                    format(field=field.fieldName,
-                           checkstate='checked' if field.pctbase == BasePopulation.VAP else 'unchecked')
-            elif col == 5:
-                value = QCoreApplication.translate(
-                    'Redistricting',
-                    'Display field {field} as percent of citizen voting age population is {checkstate}'). \
-                    format(field=field.fieldName,
-                           checkstate='checked' if field.pctbase == BasePopulation.CVAP else 'unchecked')
+                    'Display field {field} as percent of {basefield}'). \
+                    format(field=field.fieldName, basefield='total population')
             else:
                 value = QVariant()
         else:
@@ -209,58 +222,19 @@ class FieldListModel(QAbstractTableModel):
             return False
 
         field = self._data[index.row()]
-        if role == Qt.EditRole and index.column() == 1:
-            field.caption = value
-            return True
+        if role == Qt.EditRole:
+            if index.column() == 1:
+                field.caption = value
+                return True
+            
+            if index.column() == 3:
+                if 0 <= value < len(self._popFields):
+                    field.pctbase = self._popFields[value]
+                    return True
 
         if role == Qt.CheckStateRole:
             if index.column() == 2:
                 field.sum = bool(value)
-                return True
-
-            if index.column() == 3:
-                if value:
-                    if field.pctbase == BasePopulation.VAP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 4),
-                                              self.createIndex(index.row(), 4),
-                                              [Qt.CheckStateRole])
-                    elif field.pctbase == BasePopulation.CVAP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 5),
-                                              self.createIndex(index.row(), 5),
-                                              [Qt.CheckStateRole])
-                    field.pctbase = BasePopulation.TOTALPOP
-                elif field.pctbase == BasePopulation.TOTALPOP:
-                    field.pctbase = BasePopulation.NOPCT
-                return True
-
-            if index.column() == 4 and self._vapEnabled:
-                if value:
-                    if field.pctbase == BasePopulation.TOTALPOP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 3),
-                                              self.createIndex(index.row(), 3),
-                                              [Qt.CheckStateRole])
-                    elif field.pctbase == BasePopulation.CVAP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 5),
-                                              self.createIndex(index.row(), 5),
-                                              [Qt.CheckStateRole])
-                    field.pctbase = BasePopulation.VAP
-                elif field.pctbase == BasePopulation.VAP:
-                    field.pctbase = BasePopulation.NOPCT
-                return True
-
-            if index.column() == 5 and self._cvapEnabled:
-                if value:
-                    if field.pctbase == BasePopulation.TOTALPOP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 3),
-                                              self.createIndex(index.row(), 3),
-                                              [Qt.CheckStateRole])
-                    elif field.pctbase == BasePopulation.VAP:
-                        self.dataChanged.emit(self.createIndex(index.row(), 4),
-                                              self.createIndex(index.row(), 4),
-                                              [Qt.CheckStateRole])
-                    field.pctbase = BasePopulation.CVAP
-                elif field.pctbase == BasePopulation.CVAP:
-                    field.pctbase = BasePopulation.NOPCT
                 return True
 
         return False
@@ -279,18 +253,10 @@ class FieldListModel(QAbstractTableModel):
         if index.column() == 1:
             f = f | Qt.ItemIsEditable
         elif self._data[index.row()].isNumeric:
-            if index.column() == 2 or index.column() == 3:
+            if index.column() == 2:
                 f = f | Qt.ItemIsUserCheckable
-            elif index.column() == 4:
-                if self._vapEnabled:
-                    f = f | Qt.ItemIsUserCheckable
-                else:
-                    f = f & ~Qt.ItemIsEnabled
-            elif index.column() == 5:
-                if self._cvapEnabled:
-                    f = f | Qt.ItemIsUserCheckable
-                else:
-                    f = f & ~Qt.ItemIsEnabled
+            elif index.column() == 3:
+                f = f | Qt.ItemIsEditable
 
         return f
 

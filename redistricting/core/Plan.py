@@ -22,27 +22,56 @@
  *                                                                         *
  ***************************************************************************/
 """
-from numbers import Number
 import pathlib
-from typing import Any, Dict, Set, List, Optional, Union, overload
-from math import ceil, floor
-from uuid import UUID, uuid4
+from math import (
+    ceil,
+    floor
+)
+from numbers import Number
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Union,
+    overload
+)
+from uuid import (
+    UUID,
+    uuid4
+)
 
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import Qgis, QgsProject, QgsVectorLayer
+from qgis.core import (
+    Qgis,
+    QgsProject,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
-from .Exception import RdsException
-from .ErrorList import ErrorListMixin
-from .FieldList import FieldList
-from .Field import Field, DataField
+from .District import (
+    BaseDistrict,
+    District
+)
 from .DistrictList import DistrictList
-from .District import BaseDistrict, District
+from .ErrorList import ErrorListMixin
+from .Exception import RdsException
+from .Field import (
+    DataField,
+    Field
+)
+from .FieldList import FieldList
 from .PlanGroup import PlanGroup
-from .utils import tr
 from .PlanStats import PlanStatistics
+from .utils import tr
 
 
 class RedistrictingPlan(ErrorListMixin, QObject):
+    popFieldAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
+    popFieldRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
     dataFieldAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
     dataFieldRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
     geoFieldAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
@@ -70,22 +99,21 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._numSeats = numDistricts
         self._deviation = 0.0
 
-        self._distLayer: QgsVectorLayer = None
+        self._geoLayer = None
+        self._geoJoinField = None
+
+        self._popLayer: QgsVectorLayer = None
+        self._popJoinField = None
 
         self._assignLayer: QgsVectorLayer = None
         self._geoIdField = None
-        self._geoDisplay = None
+        self._geoIdCaption = None
         self._distField = 'district'
-
-        self._sourceLayer = None
-        self._sourceIdField = None
         self._geoFields = FieldList(self)
 
-        self._popLayer: QgsVectorLayer = None
-        self._joinField = None
+        self._distLayer: QgsVectorLayer = None
         self._popField = None
-        self._vapField = None
-        self._cvapField = None
+        self._popFields = FieldList(self)
         self._dataFields = FieldList(self)
 
         self._districts = DistrictList(self)
@@ -112,20 +140,23 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             'num-districts': self._numDistricts,
             'num-seats': self.numSeats if self.numSeats != self._numDistricts else None,
             'deviation': self._deviation,
+
             'pop-layer': self._popLayer.id() if self._popLayer else None,
+            'pop-join-field': self._popJoinField,
+
+            'geo-layer': self._geoLayer.id() if self._geoLayer else None,
+            'geo-join-field': self._geoJoinField,
+
             'assign-layer': self._assignLayer.id() if self._assignLayer else None,
-            'dist-layer': self._distLayer.id() if self._distLayer else None,
             'geo-id-field': self._geoIdField,
-            'geo-id-display': self._geoDisplay,
+            'geo-id-caption': self._geoIdCaption,
             'dist-field': self._distField,
-            'join-field': self._joinField,
-            'pop-field': self._popField,
-            'vap-field': self._vapField,
-            'cvap-field': self._cvapField,
-            'src-layer': self._sourceLayer.id() if self._sourceLayer else None,
-            'src-id-field': self._sourceIdField,
-            'data-fields': [field.serialize() for field in self._dataFields],
             'geo-fields': [field.serialize() for field in self._geoFields],
+
+            'dist-layer': self._distLayer.id() if self._distLayer else None,
+            'pop-field': self._popField,
+            'data-fields': [field.serialize() for field in self._dataFields],
+
             'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
             'plan-stats': self._stats.serialize()
         }
@@ -149,12 +180,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         plan._distField = data.get('dist-field', plan._distField)
         plan._geoIdField = data.get('geo-id-field')
-        plan._geoDisplay = data.get('geo-id-display', '')
+        plan._geoIdCaption = data.get('geo-id-caption', '') or data.get('geo-id-display', '')
 
-        plan._joinField = data.get('join-field')
+        plan._popJoinField = data.get('pop-join-field', '') or data.get('join-field')
         plan._popField = data.get('pop-field')
-        plan._vapField = data.get('vap-field')
-        plan._cvapField = data.get('cvap-field')
+        for field in data.get('pop-fields', []):
+            f = DataField.deserialize(field, plan.popFields)
+            if f:
+                plan._popFields.append(f)
         plan._setPopLayer(QgsProject.instance().mapLayer(data.get('pop-layer')))
 
         for field in data.get('data-fields', []):
@@ -174,11 +207,11 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
-        if 'src-layer' in data:
-            layer = QgsProject.instance().mapLayer(data['src-layer'])
-            plan._sourceLayer = layer
+        if 'geo-layer' in data or 'src-layer' in data:
+            layer = QgsProject.instance().mapLayer(data.get('geo-layer') or data.get('src-layer'))
+            plan._geoLayer = layer
 
-        plan._sourceIdField = data.get('src-id-field')
+        plan._geoJoinField = data.get('geo-join-field') or data.get('src-id-field')
 
         plan._stats = PlanStatistics.deserialize(plan, data.get('plan-stats', {}))
         if plan._totalPopulation == 0:
@@ -295,32 +328,32 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             self.planChanged.emit('dist-field', self._distField, oldValue)
 
     @property
-    def sourceLayer(self) -> QgsVectorLayer:
-        return self._sourceLayer or self._popLayer
+    def geoLayer(self) -> QgsVectorLayer:
+        return self._geoLayer or self._popLayer
 
-    def _setSourceLayer(self, value: QgsVectorLayer):
-        if self.sourceLayer != value or (value is None and self.sourceLayer != self._popLayer):
+    def _setGeoLayer(self, value: QgsVectorLayer):
+        if self.geoLayer != value or (value is None and self.geoLayer != self._popLayer):
             if value == self._popLayer:
-                self._sourceLayer = None
+                self._geoLayer = None
             else:
-                self._sourceLayer = value
+                self._geoLayer = value
 
             for f in self._geoFields:
-                f.setLayer(self.sourceLayer)
+                f.setLayer(self.geoLayer)
 
     @ property
-    def sourceIdField(self) -> str:
-        return self._sourceIdField or self._geoIdField
+    def geoJoinField(self) -> str:
+        return self._geoJoinField or self._geoIdField
 
-    def _setSourceIdField(self, value: str):
-        if (self._sourceIdField is None and value != self._geoIdField) \
-                or (value is None and self.sourceIdField != self._geoIdField):
-            oldValue = self.sourceIdField
+    def _setGeoJoinField(self, value: str):
+        if (self._geoJoinField is None and value != self._geoIdField) \
+                or (value is None and self.geoJoinField != self._geoIdField):
+            oldValue = self.geoJoinField
             if value == self._geoIdField:
-                self._sourceIdField = None
+                self._geoJoinField = None
             else:
-                self._sourceIdField = value
-            self.planChanged.emit(self, 'src-id-field', self.sourceIdField, oldValue)
+                self._geoJoinField = value
+            self.planChanged.emit(self, 'src-id-field', self.geoJoinField, oldValue)
 
     @property
     def popLayer(self) -> QgsVectorLayer:
@@ -331,30 +364,30 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             for f in self._dataFields:
                 f.setLayer(self._popLayer)
 
-            syncSrcLayer = self._sourceLayer is None
-            if syncSrcLayer:
-                self._setSourceLayer(value)
+            syncGeoLayer = self._geoLayer is None
+            if syncGeoLayer:
+                self._setGeoLayer(value)
 
             self._popLayer = value
 
-            if syncSrcLayer:
-                self._sourceLayer = None
+            if syncGeoLayer:
+                self._geoLayer = None
 
             self._districts.resetData()
 
     @property
-    def joinField(self) -> str:
-        return self._joinField or self._geoIdField
+    def popJoinField(self) -> str:
+        return self._popJoinField or self._geoIdField
 
-    def _setJoinField(self, value: str):
-        if (self._joinField is None and value != self._geoIdField) \
-                or (value is None and self.joinField != self._geoIdField):
-            oldValue = self.joinField
+    def _setPopJoinField(self, value: str):
+        if (self._popJoinField is None and value != self._geoIdField) \
+                or (value is None and self.popJoinField != self._geoIdField):
+            oldValue = self.popJoinField
             if value == self._geoIdField:
-                self._joinField = None
+                self._popJoinField = None
             else:
-                self._joinField = value
-            self.planChanged.emit(self, 'join-field', self.joinField, oldValue)
+                self._popJoinField = value
+            self.planChanged.emit(self, 'join-field', self.popJoinField, oldValue)
 
     @property
     def popField(self) -> str:
@@ -369,41 +402,17 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             self.planChanged.emit(self, 'pop-field', value, oldValue)
 
     @property
-    def vapField(self) -> str:
-        return self._vapField
+    def geoIdCaption(self) -> str:
+        return self._geoIdCaption or self._geoIdField
 
-    def _setVAPField(self, value: str):
-        if value != self._vapField:
-            oldValue = self._vapField
-            self._vapField = value
-            self._districts.updateDistrictFields()
-            self._districts.resetData()
-            self.planChanged.emit(self, 'vap-field', value, oldValue)
-
-    @property
-    def cvapField(self) -> str:
-        return self._cvapField
-
-    def _setCVAPField(self, value: str):
-        if value != self._cvapField:
-            oldValue = self._cvapField
-            self._cvapField = value
-            self._districts.updateDistrictFields()
-            self._districts.resetData()
-            self.planChanged.emit(self, 'cvap-field', value, oldValue)
-
-    @property
-    def geoDisplay(self) -> str:
-        return self._geoDisplay or self._geoIdField
-
-    def _setGeoDisplay(self, value: str):
-        if (self._geoDisplay is None and value != self._geoIdField) \
-                or (value is None and self.geoDisplay != self._geoIdField):
-            oldValue = self.geoDisplay
+    def _setGeoIdCaption(self, value: str):
+        if (self._geoIdCaption is None and value != self._geoIdField) \
+                or (value is None and self.geoIdCaption != self._geoIdField):
+            oldValue = self.geoIdCaption
             if value == self._geoIdField:
-                self._geoDisplay = None
+                self._geoIdCaption = None
             else:
-                self._geoDisplay = value
+                self._geoIdCaption = value
 
             self.planChanged.emit(self, 'geo-id-display', value, oldValue)
 
@@ -483,6 +492,33 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             districts = {dist.district: dist for dist in districts}
         self._districts.update(districts)
         self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
+
+    @property
+    def popFields(self) -> FieldList:
+        return self._popFields
+
+    def _setPopFields(self, value: Union[FieldList, List[Field]]):
+        if self._popFields == value:
+            return
+
+        oldFields = self._popFields
+
+        newFields: Set[Field] = set(value) - set(oldFields)
+        removedFields: Set[Field] = set(oldFields) - set(value)
+
+        self._popFields.clear()
+        self._popFields.extend(value)
+
+        self._districts.updateDistrictFields()
+        self._districts.resetData()
+
+        for f in removedFields:
+            self.popFieldRemoved.emit(self, f)
+
+        for f in newFields:
+            self.popFieldAdded.emit(self, f)
+
+        self.planChanged.emit(self, 'pop-fields', self._popFields, oldFields)
 
     @property
     def dataFields(self) -> FieldList:
@@ -616,8 +652,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             self._setDistLayer(None)
         elif layer == self._popLayer:
             self._popLayer = None
-        elif self._sourceLayer:
-            self._sourceLayer = None
+        elif self._geoLayer:
+            self._geoLayer = None
 
     def _updateLayerNames(self):
         if self._assignLayer:

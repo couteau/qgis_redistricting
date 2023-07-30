@@ -24,11 +24,25 @@
 """
 from numbers import Number
 from typing import Any
-from qgis.PyQt.QtCore import Qt, QVariant, QObject, QAbstractTableModel, QModelIndex
-from qgis.PyQt.QtGui import QBrush, QColor
+
+from qgis.PyQt.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    Qt,
+    QVariant
+)
+from qgis.PyQt.QtGui import (
+    QBrush,
+    QColor
+)
+
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
-from .utils import tr, makeFieldName
+from .utils import (
+    makeFieldName,
+    tr
+)
 
 
 class DistrictDataModel(QAbstractTableModel):
@@ -86,13 +100,10 @@ class DistrictDataModel(QAbstractTableModel):
             tr('%Deviation')
         ]
 
-        if self._plan.vapField:
-            self._keys.append(self._plan.vapField)
-            self._headings.append(tr('VAP'))
-
-        if self._plan.cvapField:
-            self._keys.append(self._plan.cvapField)
-            self._headings.append(tr('CVAP'))
+        for field in self._plan.popFields:
+            self._keys.append(field.fieldName)
+            self._headings.append(field.caption)
+                
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
             if field.sum:
@@ -101,6 +112,7 @@ class DistrictDataModel(QAbstractTableModel):
             if field.pctbase:
                 self._keys.append(f'pct_{fn}')
                 self._headings.append(f'%{field.caption}')
+                
         self._keys += ['polsbyPopper', 'reock', 'convexHull']
         self._headings += [
             tr('Polsby-Popper'),

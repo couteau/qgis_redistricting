@@ -23,17 +23,28 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+
 import pathlib
-from typing import List, Union, overload, TypeVar
 from numbers import Number
+from typing import (
+    List,
+    TypeVar,
+    Union,
+    overload
+)
+
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
+
 from .defaults import MAX_DISTRICTS
-from .utils import tr
-from .PlanValidate import PlanValidator
-from .Field import Field, DataField
+from .Field import (
+    DataField,
+    Field
+)
 from .FieldList import FieldList
 from .Plan import RedistrictingPlan
+from .PlanValidate import PlanValidator
+from .utils import tr
 
 Self = TypeVar("Self", bound="BasePlanBuilder")
 
@@ -98,15 +109,15 @@ class BasePlanBuilder(PlanValidator):
         self._geoIdField = value
         if self._sourceIdField is None:
             self._sourceIdField = self._geoIdField
-        if self._joinField is None:
-            self._joinField = self._geoIdField
+        if self._popJoinField is None:
+            self._popJoinField = self._geoIdField
         return self
 
     def setGeoDisplay(self, value: str):
         if value is not None and not isinstance(value, str):
             raise ValueError(tr('Geography label must be a string'))
 
-        self._geoDisplay = value
+        self._geoIdCaption = value
         return self
 
     def setDistField(self, value: str):
@@ -121,15 +132,15 @@ class BasePlanBuilder(PlanValidator):
             raise ValueError(tr('Source layer must be a vector layer'))
 
         if value is None and self._popLayer is not None:
-            self._sourceLayer = self._popLayer
+            self._geoLayer = self._popLayer
         else:
-            self._sourceLayer = value
+            self._geoLayer = value
 
         if self._popLayer is None:
             self.setPopLayer(value)
 
         for f in self._geoFields:
-            f.setLayer(self._sourceLayer)
+            f.setLayer(self._geoLayer)
 
         return self
 
@@ -144,12 +155,12 @@ class BasePlanBuilder(PlanValidator):
         if value is not None and not isinstance(value, QgsVectorLayer):
             raise ValueError(tr('Population layer must be a vector layer'))
 
-        if value is None and self._sourceLayer is not None:
-            self._popLayer = self._sourceLayer
+        if value is None and self._geoLayer is not None:
+            self._popLayer = self._geoLayer
         else:
             self._popLayer = value
 
-        if self._sourceLayer is None:
+        if self._geoLayer is None:
             self.setSourceLayer(value)
 
         for f in self._dataFields:
@@ -161,7 +172,7 @@ class BasePlanBuilder(PlanValidator):
         if value is not None and not isinstance(value, str):
             raise ValueError(tr('Population join field must be a string'))
 
-        self._joinField = value if value is not None else self._geoIdField
+        self._popJoinField = value if value is not None else self._geoIdField
         return self
 
     def setPopField(self, value: str):
@@ -171,25 +182,22 @@ class BasePlanBuilder(PlanValidator):
         self._popField = value
         return self
 
-    def setVAPField(self, value: str):
-        if value is not None and not isinstance(value, str):
-            raise ValueError(tr('VAP field must be a string'))
-
-        self._vapField = value
-        return self
-
-    def setCVAPField(self, value: str):
-        if value is not None and not isinstance(value, str):
-            raise ValueError(tr('CVAP field must be a string'))
-
-        self._cvapField = value
-        return self
-
     def _checkNotDuplicate(self, field: Field, fieldList: FieldList):
         if any(f.field == field.field for f in fieldList):
             return False
 
         return True
+
+    def setPopFields(self, popFields: Union[List[Field], FieldList]):
+        l = FieldList()
+        for f in popFields:
+            if not self._checkNotDuplicate(f, l):
+                raise ValueError(tr('Field list contains duplicate fields'))
+
+            f.setLayer(self._popLayer)
+            l.append(f)
+        self._popFields = l
+        return self
 
     def setDataFields(self, dataFields: Union[List[DataField], FieldList]):
         l = FieldList()
@@ -273,7 +281,7 @@ class BasePlanBuilder(PlanValidator):
             if not self._checkNotDuplicate(f, l):
                 raise ValueError(tr('Field list contains duplicate fields'))
 
-            f.setLayer(self._sourceLayer)
+            f.setLayer(self._geoLayer)
             l.append(f)
 
         self._geoFields = l
@@ -289,7 +297,7 @@ class BasePlanBuilder(PlanValidator):
 
     def appendGeoField(self, field, isExpression=False, caption=None) -> Self:
         if isinstance(field, str):
-            field = Field(self._sourceLayer, field, isExpression, caption)
+            field = Field(self._geoLayer, field, isExpression, caption)
         elif not isinstance(field, Field):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').

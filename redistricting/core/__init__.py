@@ -22,30 +22,51 @@
  *                                                                         *
  ***************************************************************************/
 """
-from .Plan import RedistrictingPlan
-from .utils import makeFieldName, tr, spatialite_connect, createGeoPackage, createGpkgTable, showHelp
-from .storage import ProjectStorage
-from .District import BaseDistrict, District
-from .DistrictList import DistrictList
-from .Field import Field, DataField, BasePopulation
-from .FieldList import FieldList
-from .PlanStats import PlanStatistics
-from .PlanStyle import PlanStyler
-from .PlanAssignments import PlanAssignmentEditor
-from .DistrictDataModel import DistrictDataModel
-from .GeoFieldsModel import GeoFieldsModel
 from .DeltaListModel import DeltaListModel
+from .District import (
+    BaseDistrict,
+    District
+)
+from .DistrictDataModel import DistrictDataModel
+from .DistrictList import DistrictList
+from .Exception import RdsException
+from .Field import (
+    BasePopulation,
+    DataField,
+    Field
+)
+from .FieldList import FieldList
+from .FieldListModels import (
+    GeoFieldsModel,
+    PopFieldsModel
+)
+from .Plan import RedistrictingPlan
+from .PlanAssignments import PlanAssignmentEditor
 from .PlanBuilder import PlanBuilder
+from .PlanCopy import PlanCopier
 from .PlanEdit import PlanEditor
 from .PlanExport import PlanExporter
-from .PlanImport import AssignmentImporter, ShapefileImporter
-from .PlanCopy import PlanCopier
-from .Exception import RdsException
+from .PlanImport import (
+    AssignmentImporter,
+    ShapefileImporter
+)
+from .PlanStats import PlanStatistics
+from .PlanStyle import PlanStyler
+from .storage import ProjectStorage
+from .utils import (
+    createGeoPackage,
+    createGpkgTable,
+    makeFieldName,
+    showHelp,
+    spatialite_connect,
+    tr
+)
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField',
-           'BasePopulation', 'DistrictDataModel', 'GeoFieldsModel', 'DeltaListModel',
+           'BasePopulation', 'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',
            'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
-           'showHelp', 'RdsException', 'PlanStatistics']
+           'showHelp', 'RdsException', 'PlanStatistics',
+           'GeoFieldsModel', 'PopFieldsModel']

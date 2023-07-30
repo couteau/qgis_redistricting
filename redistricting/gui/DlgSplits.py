@@ -141,13 +141,6 @@ class SplitsModel(QAbstractItemModel):
             tr('Population')
         ]
 
-        if self._plan.vapField:
-            self._subkeys.append(self._plan.vapField)
-            self._headings.append(tr('VAP'))
-
-        if self._plan.cvapField:
-            self._subkeys.append(self._plan.cvapField)
-            self._headings.append(tr('CVAP'))
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
             if field.sum:
@@ -158,7 +151,7 @@ class SplitsModel(QAbstractItemModel):
                 self._headings.append(f'%{field.caption}')
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
-        if prop in ('districts', 'data-fields', 'pop-field', 'vap-field', 'cvap-field'):
+        if prop in ('districts', 'data-fields', 'pop-field', 'pop-fields'):
             self.beginResetModel()
             self.updateColumnKeys()
             self.endResetModel()
@@ -205,12 +198,8 @@ class SplitsModel(QAbstractItemModel):
                         k = key[5:]
                         f = self.plan.dataFields[k]
                         v = split_detail.values()[k]
-                        if f.pctbase == BasePopulation.TOTALPOP:
+                        if f.pctbase == self.plan.popField:
                             base = split_detail[self.plan.popField]
-                        elif f.pctbase == BasePopulation.VAP and self.plan.vapField:
-                            base = split_detail[self.plan.vapField]
-                        elif f.pctbase == BasePopulation.CVAP and self.plan.cvapField:
-                            base = split_detail[self.plan.cvapField]
                         else:
                             return "N/A"
                         if base != 0:
@@ -304,27 +293,19 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
                 for district, pop in s["districts"].items():
                     children = [QStandardItem(""), QStandardItem(district), QStandardItem(f"{pop[self._plan.popField]:,}")]
 
-                    if self._plan.vapField:
-                        children.append(QStandardItem(f"{pop[self._plan.vapField]:,}"))
+                    for field in self._plan.popFields:
+                        children.append(QStandardItem(f"{pop[field.fieldName]:,}"))
                         if h:
-                            headings.append(tr('VAP'))
-                    if self._plan.cvapField:
-                        children.append(QStandardItem(f"{pop[self._plan.cvapField]:,}"))
-                        if h:
-                            headings.append(tr('CVAP'))
+                            headings.append(field.caption)
                     for field in self._plan.dataFields:
                         v = pop[field.fieldName]
                         if field.sum:
                             children.append(QStandardItem(f"{v:,}"))
                             if h:
                                 headings.append(field.caption)
-                        if field.pctbase != BasePopulation.NOPCT:
-                            if field.pctbase == BasePopulation.TOTALPOP:
+                        if field.pctbase is not None:
+                            if field.pctbase == self._plan.popField:
                                 base = pop[self.plan.popField]
-                            elif field.pctbase == BasePopulation.VAP and self.plan.vapField:
-                                base = pop[self.plan.vapField]
-                            elif field.pctbase == BasePopulation.CVAP and self.plan.cvapField:
-                                base = pop[self.plan.cvapField]
                             else:
                                 continue
                             

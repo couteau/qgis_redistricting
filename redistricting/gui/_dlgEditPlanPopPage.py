@@ -22,8 +22,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsVectorLayer, QgsFieldProxyModel
+from qgis.core import (
+    QgsFieldProxyModel,
+    QgsVectorLayer
+)
 from qgis.PyQt.QtWidgets import QWizardPage
+
 from ..core import defaults
 from ..core.utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
@@ -40,8 +44,6 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.registerField('popField*', self.cmbPopField)
         self.registerField('deviation', self.sbxMaxDeviation,
                            'value', self.sbxMaxDeviation.valueChanged)
-        self.registerField('vapField', self.cmbVAPField)
-        self.registerField('cvapField', self.cmbCVAPField)
 
         # Annoyingly, loading the UI sets the layer property of a QgsLayerCombo to
         # the first layer in the project, even if allowEmptyLayer is set to true.
@@ -52,8 +54,6 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.btnUseGeoLayer.toggled.connect(self.updatePopLayer)
 
         self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
-        self.cmbVAPField.setFilters(QgsFieldProxyModel.Numeric)
-        self.cmbCVAPField.setFilters(QgsFieldProxyModel.Numeric)
 
         self.setFinalPage(True)
 
@@ -86,8 +86,6 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         if not layer:
             self.cmbJoinField.setLayer(None)
             self.cmbPopField.setLayer(None)
-            self.cmbVAPField.setLayer(None)
-            self.cmbCVAPField.setLayer(None)
             return
 
         if layer != self.cmbJoinField.layer():
@@ -105,17 +103,3 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
                 self.cmbPopField.setField(popField)
             else:
                 self.cmbPopField.setField(getDefaultField(layer, defaults.POP_FIELDS))
-
-            vapField = self.field('vapField')
-            self.cmbVAPField.setLayer(layer)
-            if vapField and layer.fields().lookupField(vapField) != -1:
-                self.cmbVAPField.setField(vapField)
-            else:
-                self.cmbVAPField.setField(getDefaultField(layer, defaults.VAP_FIELDS))
-
-            cvapField = self.field('cvapField')
-            self.cmbCVAPField.setLayer(layer)
-            if cvapField and layer.fields().lookupField(cvapField) != -1:
-                self.cmbCVAPField.setField(cvapField)
-            else:
-                self.cmbCVAPField.setField(getDefaultField(layer, defaults.CVAP_FIELDS))

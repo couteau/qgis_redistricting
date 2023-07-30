@@ -23,12 +23,25 @@
  ***************************************************************************/
 """
 from typing import Optional
-from qgis.PyQt.QtCore import Qt, QObject, QVariant, QAbstractTableModel, QModelIndex
 
-from .Plan import RedistrictingPlan
+from qgis.PyQt.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    QObject,
+    Qt,
+    QVariant
+)
+
 from .DeltaList import DeltaList
-from .Field import DataField
-from .utils import tr, makeFieldName
+from .Field import (
+    DataField,
+    Field
+)
+from .Plan import RedistrictingPlan
+from .utils import (
+    makeFieldName,
+    tr
+)
 
 
 class DeltaListModel(QAbstractTableModel):
@@ -81,30 +94,18 @@ class DeltaListModel(QAbstractTableModel):
             }
         ]
 
-        if self._plan.vapField:
+        field: Field
+        for field in self._plan.popFields:
+            fn = makeFieldName(field)
             self._fields.extend([
                 {
-                    'name': f'new_{self._plan.vapField}',
-                    'caption': tr('VAP'),
+                    'name': f'new_{fn}',
+                    'caption': field.caption,
                     'format': '{:,}'
                 },
                 {
-                    'name': self._plan.vapField,
-                    'caption': tr('VAP') + ' - ' + tr('Change'),
-                    'format': '{:+,}'
-                }
-            ])
-
-        if self._plan.cvapField:
-            self._fields.extend([
-                {
-                    'name': f'new_{self._plan.cvapField}',
-                    'caption': tr('CVAP'),
-                    'format': '{:,}'
-                },
-                {
-                    'name': self._plan.cvapField,
-                    'caption': tr('CVAP') + ' - ' + tr('Change'),
+                    'name': fn,
+                    'caption': field.caption + ' - ' + tr('Change'),
                     'format': '{:+,}'
                 }
             ])

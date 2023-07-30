@@ -607,8 +607,8 @@ class Redistricting:
                         deletePlans.add(plan)
                     elif plan.distLayer.id() == layer:
                         deletePlans.add(plan)
-                    elif plan.sourceLayer.id() == layer:
-                        plan.sourceLayer = None
+                    elif plan.geoLayer.id() == layer:
+                        plan.geoLayer = None
 
             for plan in deletePlans:
                 self.removePlan(plan)
@@ -701,8 +701,7 @@ class Redistricting:
                 .setPopLayer(dlgEditPlan.popLayer()) \
                 .setJoinField(dlgEditPlan.joinField()) \
                 .setPopField(dlgEditPlan.popField()) \
-                .setVAPField(dlgEditPlan.vapField()) \
-                .setCVAPField(dlgEditPlan.cvapField()) \
+                .setPopFields(dlgEditPlan.popFields()) \
                 .setDataFields(dlgEditPlan.dataFields()) \
                 .setGeoFields(dlgEditPlan.geoFields())
 
@@ -776,8 +775,7 @@ class Redistricting:
                 .setPopLayer(dlgNewPlan.popLayer()) \
                 .setJoinField(dlgNewPlan.joinField()) \
                 .setPopField(dlgNewPlan.popField()) \
-                .setVAPField(dlgNewPlan.vapField()) \
-                .setCVAPField(dlgNewPlan.cvapField()) \
+                .setPopFields(dlgNewPlan.popFields()) \
                 .setDataFields(dlgNewPlan.dataFields()) \
                 .setGeoFields(dlgNewPlan.geoFields()) \
                 .setGeoPackagePath(dlgNewPlan.gpkgPath())

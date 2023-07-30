@@ -23,13 +23,18 @@
  ***************************************************************************/
 """
 from numbers import Number
-from qgis.core import Qgis, QgsVectorLayer
+
+from qgis.core import (
+    Qgis,
+    QgsVectorLayer
+)
 from qgis.PyQt.QtCore import QObject
-from .utils import tr
+
 from .defaults import MAX_DISTRICTS
 from .ErrorList import ErrorListMixin
 from .FieldList import FieldList
 from .Plan import RedistrictingPlan
+from .utils import tr
 
 
 class PlanValidator(ErrorListMixin, QObject):
@@ -44,18 +49,17 @@ class PlanValidator(ErrorListMixin, QObject):
         self._deviation = 0.0
 
         self._geoIdField = None
-        self._geoDisplay = ''
+        self._geoIdCaption = ''
         self._distField = 'district'
 
-        self._sourceLayer: QgsVectorLayer = None
-        self._sourceIdField = None
+        self._geoLayer: QgsVectorLayer = None
+        self._geoJoinField = None
         self._geoFields = FieldList(self)
 
         self._popLayer: QgsVectorLayer = None
-        self._joinField = None
+        self._popJoinField = None
         self._popField = None
-        self._vapField = None
-        self._cvapField = None
+        self._popFields = FieldList(self)
         self._dataFields = FieldList(self)
 
         self._assignLayer: QgsVectorLayer = None
@@ -73,18 +77,17 @@ class PlanValidator(ErrorListMixin, QObject):
         instance._deviation = plan.deviation
 
         instance._geoIdField = plan.geoIdField
-        instance._geoDisplay = plan.geoDisplay
+        instance._geoIdCaption = plan.geoIdCaption
         instance._distField = plan.distField
 
-        instance._sourceLayer = plan.sourceLayer
-        instance._sourceIdField = plan.sourceIdField
+        instance._geoLayer = plan.geoLayer
+        instance._geoJoinField = plan.geoJoinField
         instance._geoFields = plan.geoFields[:]
 
         instance._popLayer = plan.popLayer
-        instance._joinField = plan.joinField
+        instance._popJoinField = plan.popJoinField
         instance._popField = plan.popField
-        instance._vapField = plan.vapField
-        instance._cvapField = plan.cvapField
+        instance._popFields = plan.popFields[:]
         instance._dataFields = plan.dataFields[:]
 
         instance._assignLayer = plan.assignLayer
@@ -119,21 +122,21 @@ class PlanValidator(ErrorListMixin, QObject):
         return result
 
     def _validateSourceLayer(self):
-        if result := self._validateLayer(self._sourceLayer, tr('source')):
-            if self._sourceIdField:
-                if self._sourceLayer.fields().lookupField(self._sourceIdField) == -1:
+        if result := self._validateLayer(self._geoLayer, tr('source')):
+            if self._geoJoinField:
+                if self._geoLayer.fields().lookupField(self._geoJoinField) == -1:
                     self.pushError(
                         tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
                             fieldname=tr('join').capitalize(),
-                            field=self._sourceIdField,
+                            field=self._geoJoinField,
                             layertype=tr('source'),
-                            layername=self._sourceLayer.name()
+                            layername=self._geoLayer.name()
                         )
                     )
                     result = False
 
             for f in self._geoFields:
-                if not f.validate(self._sourceLayer):
+                if not f.validate(self._geoLayer):
                     self.pushError(f.error())
                     result = False
 
@@ -171,11 +174,11 @@ class PlanValidator(ErrorListMixin, QObject):
 
     def _validatePopLayer(self):
         if result := self._validateLayer(self._popLayer, tr('population'), geometryRequired=False):
-            if self._joinField and self._popLayer.fields().lookupField(self._joinField) == -1:
+            if self._popJoinField and self._popLayer.fields().lookupField(self._popJoinField) == -1:
                 self.pushError(
                     tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
                         fieldname=tr('join').capitalize(),
-                        field=self._joinField,
+                        field=self._popJoinField,
                         layertype=tr('population'),
                         layername=self._popLayer.name()
                     ),
@@ -186,11 +189,8 @@ class PlanValidator(ErrorListMixin, QObject):
             if self._popField:
                 result = result and self._validatePopField(self._popField, tr('population').capitalize())
 
-            if self._vapField:
-                result = result and self._validatePopField(self._vapField, tr('VAP'))
-
-            if self._cvapField:
-                result = result and self._validatePopField(self._cvapField, tr('CVAP'))
+            for f in self._popFields:
+                result = result and self._validatePopField(f.field, f.caption)
 
             for f in self._dataFields:
                 if not f.validate(self._popLayer):
@@ -311,10 +311,10 @@ class PlanValidator(ErrorListMixin, QObject):
         result = True
 
         result = self._name \
-            and self._sourceLayer \
+            and self._geoLayer \
             and self._popLayer \
-            and self._sourceIdField \
-            and self._joinField \
+            and self._geoJoinField \
+            and self._popJoinField \
             and self._geoIdField \
             and self._distField \
             and self._popField \
@@ -345,10 +345,10 @@ class PlanValidator(ErrorListMixin, QObject):
         if not self._distField:
             self.pushError(tr('{field} field is required').format(field=tr('District')), Qgis.Critical)
 
-        if not self._sourceIdField:
+        if not self._geoJoinField:
             self.pushError(tr('{field} field is required').format(field=tr('Source ID')), Qgis.Critical)
 
-        if not self._joinField:
+        if not self._popJoinField:
             self.pushError(tr('{field} field is required').format(field=tr('Population Join')), Qgis.Critical)
 
         if not self._popField:

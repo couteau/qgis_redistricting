@@ -23,20 +23,38 @@
  ***************************************************************************/
 """
 from enum import IntEnum
-from typing import Any, Dict, Optional
-from qgis.PyQt.QtCore import QObject, pyqtSignal, QVariant
-from qgis.PyQt.QtGui import QIcon
+from typing import (
+    Any,
+    Dict,
+    Optional,
+    Union
+)
+
 from qgis.core import (
     QgsApplication,
-    QgsProject,
     QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsVectorLayer,
     QgsFeature,
-    QgsField)
-from .utils import makeFieldName, tr
+    QgsField,
+    QgsProject,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    QVariant,
+    pyqtSignal
+)
+from qgis.PyQt.QtGui import QIcon
+
+from redistricting.core import FieldList
+from redistricting.core.Plan import RedistrictingPlan
+
 from .Exception import RdsException
+from .utils import (
+    makeFieldName,
+    tr
+)
 
 
 class Field(QObject):
@@ -228,7 +246,8 @@ class BasePopulation(IntEnum):
 
 class DataField(Field):
     def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
-                 caption=None, sumfield=None, pctbase=None, parent: Optional['QObject'] = None):
+                 caption: str = None, sumfield: bool = None, pctbase: Union[Field, str] = None, 
+                 parent: Optional['QObject'] = None):
         super().__init__(layer, field, isExpression, caption, parent)
 
         if self._isExpression:
@@ -256,12 +275,8 @@ class DataField(Field):
             f[:3] == 'vap' or f[-3:] == 'vap' or f[:4] == 'p003' or f[:4] == 'p004')
 
         if not self.isNumeric or isExpression:
-            pctbase = BasePopulation.NOPCT
-        elif pctbase is None:
-            pctbase = BasePopulation.CVAP if cvap \
-                else BasePopulation.VAP if vap \
-                else BasePopulation.TOTALPOP
-
+            pctbase = None
+        
         self._pctbase = pctbase
 
     @property
@@ -278,53 +293,32 @@ class DataField(Field):
             self.fieldChanged.emit(self)
 
     @property
-    def pctbase(self) -> BasePopulation:
+    def pctbase(self) -> Union[str, Field]:
         return self._pctbase
 
     @pctbase.setter
-    def pctbase(self, value: BasePopulation):
-        if not self.isNumeric and value != BasePopulation.NOPCT:
+    def pctbase(self, value: Union[str, Field]):
+        if not self.isNumeric and value is not None:
             return
 
         if self._pctbase != value:
             self._pctbase = value
             self.fieldChanged.emit(self)
 
-    @property
-    def pctpop(self) -> bool:
-        return self._pctbase == BasePopulation.TOTALPOP
-
-    @pctpop.setter
-    def pctpop(self, value: bool):
-        self.pctbase = BasePopulation.TOTALPOP if value and self.isNumeric else BasePopulation.NOPCT
-
-    @property
-    def pctvap(self) -> bool:
-        return self._pctbase == BasePopulation.VAP
-
-    @pctvap.setter
-    def pctvap(self, value: bool):
-        self.pctbase = BasePopulation.VAP if value and self.isNumeric else BasePopulation.NOPCT
-
-    @property
-    def pctcvap(self) -> bool:
-        return self._pctbase == BasePopulation.CVAP
-
-    @pctcvap.setter
-    def pctcvap(self, value: bool):
-        self.pctbase = BasePopulation.CVAP if value and self.isNumeric else BasePopulation.NOPCT
-
     def serialize(self):
+        if isinstance(self.pctbase, Field):
+            pctbase = self.pctbase.fieldName
+        else: 
+            pctbase = self.pctbase
         return super().serialize() | {
             'sum': self.sum,
-            'pctbase': self.pctbase,
+            'pctbase': pctbase,
         }
 
     @classmethod
     def deserialize(cls, data, parent: Optional['QObject'] = None):
         if field := super().deserialize(data, parent):
             field.sum = data.get('sum', field.sum) if field.isNumeric else False
-            field.pctbase = BasePopulation(data.get('pctbase', field.pctbase)) \
-                if field.isNumeric else BasePopulation.NOPCT
+            field.pctbase = data.get('pctbase')
 
         return field

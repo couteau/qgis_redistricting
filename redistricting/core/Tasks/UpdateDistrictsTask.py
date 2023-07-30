@@ -106,17 +106,15 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
 
     def getPopData(self, geoids: str, geoField=None, request: QgsFeatureRequest = None, cb = None):
         if geoField is None:
-            geoField = self.joinField
+            geoField = self.popJoinField
 
         if self.isSQLCapable(self.popLayer):
             table = self.getTableName(self.popLayer)
             sql = f'SELECT SUM({self.popField}) AS {self.popField}'
-            if self.vapField:
-                sql += f', SUM({self.vapField}) AS {self.vapField}'
-            if self.cvapField:
-                sql += f', SUM({self.cvapField}) AS {self.cvapField}'
-            for f in self.dataFields:
-                sql += f', SUM({f.field}) AS {f.fieldName}'
+            for field in self.popFields:
+                sql += f', SUM({field.field}) AS {field.fieldName}'
+            for field in self.dataFields:
+                sql += f', SUM({field.field}) AS {field.fieldName}'
             sql += f' FROM {table} WHERE {geoField} in ({geoids})'
             cur = self.executeSql(self.popLayer, sql)
             if cb: 
@@ -132,17 +130,15 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         pop = {
             self.popField: 0
         }
-        if self.vapField:
-            pop[self.vapField] = 0
-        if self.cvapField:
-            pop[self.cvapField] = 0
-        for f in self.dataFields:
-            pop[f.fieldName] = 0
+        for field in self.popFields:
+            pop[field.fieldName] = 0 
+        for field in self.dataFields:
+            pop[field.fieldName] = 0
 
         request.setFilterExpression(f'{geoField} in ({geoids})')
-        for f in self.popLayer.getFeatures(request):
+        for field in self.popLayer.getFeatures(request):
             for idx, fld in enumerate(pop):
-                pop[fld] += self.getters[idx](f)
+                pop[fld] += self.getters[idx](field)
             if cb:
                 cb(1)
 

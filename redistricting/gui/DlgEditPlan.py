@@ -22,20 +22,26 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.utils import iface
 from qgis.core import QgsProject
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
+from qgis.utils import iface
+
+from ..core import (
+    FieldList,
+    RedistrictingPlan,
+    showHelp,
+    tr
+)
 from ._dlgEditPlanDetailsPage import dlgEditPlanDetailsPage
-from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
-from ._dlgEditPlanPopPage import dlgEditPlanPopPage
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
+from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
+from ._dlgEditPlanPopPage import dlgEditPlanPopPage
 from .RdsFieldComboBox import RdsFieldComboBox
-from .RdsMapLayerComboBox import RdsMapLayerComboBox
 from .RdsFieldTableView import RdsFieldTableView
-from ..core import RedistrictingPlan, tr, showHelp
+from .RdsMapLayerComboBox import RdsMapLayerComboBox
 
 iface: QgisInterface
 
@@ -77,14 +83,12 @@ class DlgEditPlan(QWizard):
             self.setField('numSeats', plan.numSeats)
             self.setField('deviation', plan.deviation * 100)
             self.setField('geoIdField', plan.geoIdField)
-            self.setField('geoCaption', plan.geoDisplay)
+            self.setField('geoCaption', plan.geoIdCaption)
             self.setField('gpkgPath', plan.geoPackagePath)
             self.setField('popLayer', plan.popLayer)
-            self.setField('joinField', plan.joinField)
+            self.setField('joinField', plan.popJoinField)
             self.setField('popField', plan.popField)
-            self.setField('vapField', plan.vapField)
-            self.setField('cvapField', plan.cvapField)
-            self.setField('sourceLayer', plan.sourceLayer)
+            self.setField('sourceLayer', plan.geoLayer)
             self.setField('geoFields', list(plan.geoFields))
             self.setField('dataFields', list(plan.dataFields))
         else:
@@ -132,11 +136,8 @@ class DlgEditPlan(QWizard):
     def deviation(self):
         return self.field('deviation') / 100
 
-    def vapField(self):
-        return self.field('vapField')
-
-    def cvapField(self):
-        return self.field('cvapField')
+    def popFields(self):
+        return FieldList()
 
     def dataFields(self):
         return self.field('dataFields')
@@ -181,15 +182,13 @@ class DlgEditPlan(QWizard):
         plan.numDistricts = self.field('numDistricts')
         plan.numSeats = self.field('numSeats')
         plan.description = self.field('description')
-        plan.sourceLayer = self.field('sourceLayer')
+        plan.geoLayer = self.field('sourceLayer')
         plan.geoIdField = self.field('geoIdField')
-        plan.geoDisplay = self.field('geoCaption')
+        plan.geoIdCaption = self.field('geoCaption')
         plan.geoFields = self.field('geoFields')
         plan.popLayer = self.field('popLayer')
         plan.popField = self.field('popField')
         plan.deviation = self.field('deviation') / 100
-        plan.vapField = self.field('vapField') or None
-        plan.cvapField = self.field('cvapField') or None
         plan.dataFields = self.field('dataFields')
         return True
 
@@ -200,13 +199,11 @@ class DlgEditPlan(QWizard):
             'planName'), numDistricts=self.field('numDistricts'))
         plan.numSeats = self.field('numSeats')
         plan.description = self.field('description')
-        plan.sourceLayer = self.field('sourceLayer')
+        plan.geoLayer = self.field('sourceLayer')
         plan.geoIdField = self.field('geoIdField')
-        plan.geoDisplay = self.field('geoCaption')
+        plan.geoIdCaption = self.field('geoCaption')
         plan.popLayer = self.field('popLayer')
         plan.popField = self.field('popField')
-        plan.vapField = self.field('vapField') or None
-        plan.cvapField = self.field('cvapField') or None
         plan.deviation = self.field('deviation') / 100
         plan.dataFields = self.field('dataFields')
         plan.geoFields = self.field('geoFields')

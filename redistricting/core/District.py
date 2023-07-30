@@ -24,15 +24,32 @@
 """
 from __future__ import annotations
 
-from typing import Dict, Union, TYPE_CHECKING
 from abc import abstractmethod
-import pandas as pd
-from qgis.PyQt.QtGui import QColor, QPalette
-from qgis.core import QgsFeature, QgsCategorizedSymbolRenderer
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Union
+)
 
-from .Field import DataField, BasePopulation
-from .utils import makeFieldName, tr
+import pandas as pd
+from qgis.core import (
+    QgsCategorizedSymbolRenderer,
+    QgsFeature
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QPalette
+)
+
 from .Delta import Delta
+from .Field import (
+    DataField,
+    Field
+)
+from .utils import (
+    makeFieldName,
+    tr
+)
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -57,10 +74,8 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
         setattr(self, key, value)
 
     def baseField(self, fld: DataField):
-        return self._plan.popField if fld.pctbase == BasePopulation.TOTALPOP \
-            else self._plan.vapField if fld.pctbase == BasePopulation.VAP \
-            else self._plan.cvapField if fld.pctbase == BasePopulation.CVAP \
-            else None
+        return self._plan.popField if fld.pctbase == self._plan.popField \
+            else fld.pctbase.fieldName
 
     def getPctValue(self, fn: str):
         fld: DataField = self._plan.dataFields[fn]
@@ -100,12 +115,9 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
 
     def updateFields(self):
         keys = {makeFieldName(field) for field in self._plan.dataFields}
+        keys |= {makeFieldName(field) for field in self._plan.popFields}
         if self._plan.popField:
             keys.add(self._plan.popField)
-        if self._plan.vapField:
-            keys.add(self._plan.vapField)
-        if self._plan.cvapField:
-            keys.add(self._plan.cvapField)
         deletedKeys = set(self._data) - keys
         for k in deletedKeys:
             del self._data[k]
@@ -116,11 +128,9 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
     def clear(self):
         if self._plan.popField:
             self._data[self._plan.popField] = 0
-        if self._plan.vapField:
-            self._data[self._plan.vapField] = 0
-        if self._plan.cvapField:
-            self._data[self._plan.cvapField] = 0
-
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            self._data[fn] = 0
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
             self._data[fn] = 0
@@ -167,14 +177,6 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
         return self._data.get(self._plan.popField) if self._plan.popField else 0
 
     @property
-    def vap(self):
-        return self._data.get(self._plan.vapField) if self._plan.vapField else 0
-
-    @property
-    def cvap(self):
-        return self._data.get(self._plan.cvapField) if self._plan.cvapField else 0
-
-    @property
     def delta(self):
         return self._delta
 
@@ -219,10 +221,10 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
     def update(self, data: Union[pd.Series, Dict[str, Union[int, float]]]):
         if self._plan.popField in data:
             self._data[self._plan.popField] = int(data[self._plan.popField] or 0)
-        if self._plan.vapField and self._plan.vapField in data:
-            self._data[self._plan.vapField] = int(data[self._plan.vapField] or 0)
-        if self._plan.cvapField and self._plan.cvapField in data:
-            self._data[self._plan.cvapField] = int(data[self._plan.cvapField] or 0)
+        for field in self._plan.popFields:
+            fn = makeFieldName(field)
+            if fn in data:
+                self._data[fn] = float(data[fn] or 0)
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
             if fn in data:

@@ -19,6 +19,7 @@
 import pytest
 from pytest_mock.plugin import MockerFixture
 from qgis.core import QgsTask
+
 from redistricting.core import PlanBuilder
 from redistricting.core.PlanBuilder import QgsApplication
 
@@ -46,9 +47,9 @@ class TestPlanCreator:
 
         assert creator.validate()
         assert creator._numSeats == 5
-        assert creator._sourceLayer == block_layer
+        assert creator._geoLayer == block_layer
         assert creator._sourceIdField == 'geoid20'
-        assert creator._joinField == 'geoid20'
+        assert creator._popJoinField == 'geoid20'
 
     def test_createlayers_triggers_background_task_when_plan_is_valid(
         self,

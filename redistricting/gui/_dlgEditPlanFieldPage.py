@@ -22,10 +22,60 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtWidgets import QWizardPage
 from qgis.core import QgsApplication
-from ..core import DataField
+from qgis.PyQt.QtCore import (
+    QModelIndex,
+    Qt
+)
+from qgis.PyQt.QtWidgets import (
+    QComboBox,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+    QWizardPage
+)
+
+from ..core import (
+    DataField,
+    tr
+)
+from .RdsFieldTableView import FieldListModel
 from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
+
+
+class PopFieldDelegate(QStyledItemDelegate):
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        if index.column() == 1:
+            editor = QComboBox(parent)
+            editor.setFrame(False)
+            rect = option.rect
+            editor.setGeometry(rect)
+            editor.setEditable(True)
+            editor.addItem(tr("Total Population"))
+            # TODO: add other population fields
+            return editor
+        return super().createEditor(parent, option, index)
+
+    def setEditorData(self, editor: QComboBox, index: QModelIndex):
+        if index.column() == 1:
+            text = index.model().data(index, Qt.EditRole)
+            editor.setCurrentText(text)
+        else:
+            super().setEditorData(editor, index)
+
+    def setModelData(self, editor: QComboBox, model: FieldListModel, index: QModelIndex):
+        if index.column() == 1:
+            fldidx = editor.currentIndex()
+            model.setData(index, fldidx, Qt.EditRole)
+        else:
+            super().setModelData(editor, model, index)
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
+        if index.column() == 1:
+            rect = option.rect
+            editor.setGeometry(rect)
+        else:
+            super().updateEditorGeometry(editor, option, index)
 
 
 class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
@@ -36,8 +86,10 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         self.setupUi(self)
         self.fieldsModel = self.tblDataFields.model()
         self.fieldsModel.fieldType = DataField
+        self.fieldsModel.popFields = [self.field("popField")]
         #self.fieldsModel = DataFieldsModel(self)
         # self.tblDataFields.setModel(self.fieldsModel)
+        self.tblDataFields.setItemDelegateForColumn(3, PopFieldDelegate(self))
 
         self.registerField('dataFields', self.tblDataFields, 'fields', self.tblDataFields.fieldsChanged)
         self.tblDataFields.setEnableDragRows(True)
@@ -57,8 +109,6 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         self.tblDataFields.setColumnWidth(5, 48)
         self.tblDataFields.setColumnWidth(6, 32)
         self.fexDataField.setLayer(self.field('popLayer') or self.field('sourceLayer'))
-        self.fieldsModel.vapEnabled = bool(self.field('vapField'))
-        self.fieldsModel.cvapEnabled = bool(self.field('cvapField'))
         if hasattr(self.wizard(), "isComplete"):
             self.setFinalPage(self.wizard().isComplete())
         else:
