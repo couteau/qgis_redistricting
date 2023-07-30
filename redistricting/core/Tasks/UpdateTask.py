@@ -100,7 +100,7 @@ class AggregateDataTask(QgsTask):
         for fld in self.popFields:
             self.cols.append(fld.fieldName)
             self.getters.append(self.getFieldValue(fld, self.context))
-            self.aggs[fld.fieldName] = 'sum' if fld.isNumeric else 'first'
+            self.aggs[fld.fieldName] = 'sum'
         for fld in self.dataFields:
             self.cols.append(fld.fieldName)
             self.getters.append(self.getFieldValue(fld, self.context))

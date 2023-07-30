@@ -73,10 +73,6 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
-    def baseField(self, fld: DataField):
-        return self._plan.popField if fld.pctbase == self._plan.popField \
-            else fld.pctbase.fieldName
-
     def getPctValue(self, fn: str):
         fld: DataField = self._plan.dataFields[fn]
         if not fld.pctbase:
@@ -84,9 +80,8 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
 
         value = self._data[fn]
         if isinstance(value, (int, float)):
-            baseField = self.baseField(fld)
-            if baseField:
-                total = getattr(self, baseField)
+            if fld.pctbase:
+                total = getattr(self, fld.pctbase, None)
                 return value / total if total else 0
 
         return None
