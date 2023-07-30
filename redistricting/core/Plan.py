@@ -257,10 +257,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def _setNumDistricts(self, value: int):
         if self._numDistricts != value:
             oldValue = self._numDistricts
-            if self._numDistricts < oldValue:
+            if value < oldValue:
                 for i in range(value + 1, oldValue):
                     del self._districts[str(i)]
-            self._numDistricts = self._numDistricts
+            self._numDistricts = value
             self.planChanged.emit(self, 'num-districts', self._numDistricts, oldValue)
 
     @property

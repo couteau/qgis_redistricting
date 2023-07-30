@@ -22,7 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsProject
+from qgis.core import (
+    QgsProject,
+    QgsVectorLayer
+)
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
@@ -93,7 +96,17 @@ class DlgEditPlan(QWizard):
             self.setField('dataFields', list(plan.dataFields))
         else:
             self.addPage(dlgEditPlanImportPage(self))
-            self.setField('sourceLayer', iface.activeLayer())
+            l = iface.activeLayer()
+            if not isinstance(l, QgsVectorLayer):
+                l = None
+                for _, lyr in QgsProject.instance().mapLayers(True).items():
+                    if isinstance(lyr, QgsVectorLayer):
+                        l = lyr
+                        break
+            if l is None:
+                raise ValueError(tr("No vector layer found in project"))
+            
+            self.setField('sourceLayer', l)
 
     def showHelp(self):
         showHelp(f'usage/create_plan.html#page-{self.currentId()+1}')
