@@ -22,24 +22,51 @@
  *                                                                         *
  ***************************************************************************/
 """
-from numbers import Number
 import pathlib
-from typing import Any, Dict, Set, List, Optional, Union, overload
-from math import ceil, floor
-from uuid import UUID, uuid4
+from math import (
+    ceil,
+    floor
+)
+from numbers import Number
+from typing import (
+    Any,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Union,
+    overload
+)
+from uuid import (
+    UUID,
+    uuid4
+)
 
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import Qgis, QgsProject, QgsVectorLayer
+from qgis.core import (
+    Qgis,
+    QgsProject,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
-from .Exception import RdsException
-from .ErrorList import ErrorListMixin
-from .FieldList import FieldList
-from .Field import Field, DataField
+from .District import (
+    BaseDistrict,
+    District
+)
 from .DistrictList import DistrictList
-from .District import BaseDistrict, District
+from .ErrorList import ErrorListMixin
+from .Exception import RdsException
+from .Field import (
+    DataField,
+    Field
+)
+from .FieldList import FieldList
 from .PlanGroup import PlanGroup
-from .utils import tr
 from .PlanStats import PlanStatistics
+from .utils import tr
 
 
 class RedistrictingPlan(ErrorListMixin, QObject):
@@ -224,10 +251,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def _setNumDistricts(self, value: int):
         if self._numDistricts != value:
             oldValue = self._numDistricts
-            if self._numDistricts < oldValue:
+            if value < oldValue:
                 for i in range(value + 1, oldValue):
                     del self._districts[str(i)]
-            self._numDistricts = self._numDistricts
+            self._numDistricts = value
             self.planChanged.emit(self, 'num-districts', self._numDistricts, oldValue)
 
     @property
