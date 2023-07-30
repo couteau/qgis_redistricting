@@ -47,9 +47,6 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QIcon
 
-from redistricting.core import FieldList
-from redistricting.core.Plan import RedistrictingPlan
-
 from .Exception import RdsException
 from .utils import (
     makeFieldName,
@@ -301,6 +298,9 @@ class DataField(Field):
         if not self.isNumeric and value is not None:
             return
 
+        if isinstance(value, Field):
+            value = value.fieldName
+            
         if self._pctbase != value:
             self._pctbase = value
             self.fieldChanged.emit(self)

@@ -36,11 +36,9 @@ from qgis.PyQt.QtCore import (
     QVariant
 )
 
-from . import (
-    Field,
-    RedistrictingPlan,
-    tr
-)
+from .Field import Field
+from .Plan import RedistrictingPlan
+from .utils import tr
 
 
 class GeoFieldsModel(QAbstractListModel):
