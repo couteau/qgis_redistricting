@@ -26,15 +26,25 @@ from __future__ import annotations
 
 import shutil
 import sqlite3
-from typing import TYPE_CHECKING
 from contextlib import closing
+from typing import TYPE_CHECKING
 
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import Qgis, QgsProject
+from qgis.core import (
+    Qgis,
+    QgsProject
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 from qgis.utils import spatialite_connect
-from .utils import tr
+
 from .ErrorList import ErrorListMixin
-from . import PlanStyler, PlanBuilder, PlanStatistics
+from .PlanBuilder import PlanBuilder
+from .PlanStats import PlanStatistics
+from .PlanStyle import PlanStyler
+from .utils import tr
+
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
