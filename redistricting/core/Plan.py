@@ -180,15 +180,16 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         plan._distField = data.get('dist-field', plan._distField)
         plan._geoIdField = data.get('geo-id-field')
-        plan._geoIdCaption = data.get('geo-id-caption', '') or data.get('geo-id-display', '')
+        plan._geoIdCaption = data.get('geo-id-caption', '')
 
-        plan._popJoinField = data.get('pop-join-field', '') or data.get('join-field')
+        popLayer = QgsProject.instance().mapLayer(data.get('pop-layer'))
+        plan._popJoinField = data.get('pop-join-field', '')
         plan._popField = data.get('pop-field')
+        plan._setPopLayer(popLayer)
         for field in data.get('pop-fields', []):
-            f = DataField.deserialize(field, plan.popFields)
+            f = Field.deserialize(field, plan.popFields)
             if f:
                 plan._popFields.append(f)
-        plan._setPopLayer(QgsProject.instance().mapLayer(data.get('pop-layer')))
 
         for field in data.get('data-fields', []):
             f = DataField.deserialize(field, plan.dataFields)
@@ -207,11 +208,11 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
-        if 'geo-layer' in data or 'src-layer' in data:
-            layer = QgsProject.instance().mapLayer(data.get('geo-layer') or data.get('src-layer'))
+        if 'geo-layer' in data:
+            layer = QgsProject.instance().mapLayer(data['geo-layer'])
             plan._geoLayer = layer
 
-        plan._geoJoinField = data.get('geo-join-field') or data.get('src-id-field')
+        plan._geoJoinField = data.get('geo-join-field')
 
         plan._stats = PlanStatistics.deserialize(plan, data.get('plan-stats', {}))
         if plan._totalPopulation == 0:
@@ -360,7 +361,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return self._popLayer
 
     def _setPopLayer(self, value: QgsVectorLayer):
+
         if self._popLayer != value:
+            for f in self._popFields:
+                f.setLayer(self._popLayer)
             for f in self._dataFields:
                 f.setLayer(self._popLayer)
 
