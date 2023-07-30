@@ -22,15 +22,22 @@
  *                                                                         *
  ***************************************************************************/
 """
-from uuid import UUID
-from typing import List
 import json
-from packaging import version
-from qgis.PyQt.QtXml import QDomDocument
-from qgis.core import QgsProject, QgsReadWriteContext
-from .Plan import RedistrictingPlan
+from typing import List
+from uuid import UUID
 
-schemaVersion = version.parse('1.0.0')
+from packaging import version
+from qgis.core import (
+    QgsProject,
+    QgsReadWriteContext
+)
+from qgis.PyQt.QtXml import QDomDocument
+
+from .Plan import RedistrictingPlan
+from .schema import (
+    checkMigrateSchema,
+    schemaVersion
+)
 
 
 class ProjectStorage:
@@ -41,14 +48,16 @@ class ProjectStorage:
         self._version = self.getVersion() or schemaVersion
 
     def migrate(self):
-        """Migrate plugin node in project file to new schema
-
-            currently does nothing - here for the future in case 
-            the json schema/storage format changes
-        """
+        """Migrate plugin node in project file to new schema"""
+        l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
+        if not success:
+            return
+        
         if self._version < schemaVersion:
-            # perform migration
-            pass
+            for i, d in enumerate(l):
+                data = json.loads(d)
+                l[i] = json.dumps(checkMigrateSchema(data, self._version))
+            self._project.writeEntry('redistricting', 'redistricting-plans', l)
 
         self._version = schemaVersion
 
@@ -73,7 +82,7 @@ class ProjectStorage:
         if node.isElement():
             node = node.namedItem('redistricting')
             if node.isElement():
-                node.toElement().setAttribute('version', schemaVersion)
+                node.toElement().setAttribute('version', str(schemaVersion))
 
     def writeRedistrictingPlans(self, plans: List[RedistrictingPlan]):
         l: List[str] = []
@@ -85,8 +94,8 @@ class ProjectStorage:
         self.setVersion()
 
     def readRedistrictingPlans(self) -> List[RedistrictingPlan]:
-        self.migrate()
         plans = []
+        self.migrate()
         l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
         if success:
             for p in l:
