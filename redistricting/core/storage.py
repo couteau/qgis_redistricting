@@ -22,12 +22,17 @@
  *                                                                         *
  ***************************************************************************/
 """
-from uuid import UUID
-from typing import List
 import json
+from typing import List
+from uuid import UUID
+
 from packaging import version
+from qgis.core import (
+    QgsProject,
+    QgsReadWriteContext
+)
 from qgis.PyQt.QtXml import QDomDocument
-from qgis.core import QgsProject, QgsReadWriteContext
+
 from .Plan import RedistrictingPlan
 
 schemaVersion = version.parse('1.0.0')
@@ -53,27 +58,11 @@ class ProjectStorage:
         self._version = schemaVersion
 
     def getVersion(self):
-        docNode = self._doc.documentElement()
-        node = docNode.namedItem('properties')
-        if not node.isElement():
-            return None
-
-        node = node.namedItem('redistricting')
-        if not node.isElement():
-            return None
-
-        if not node.toElement().hasAttribute('version'):
-            return None
-
-        return version.parse(node.toElement().attribute('version'))
+        v, _ = self._project.readEntry('redistricting', 'schema-version', str(schemaVersion))
+        return version.parse(v)
 
     def setVersion(self):
-        docNode = self._doc.documentElement()
-        node = docNode.namedItem('properties')
-        if node.isElement():
-            node = node.namedItem('redistricting')
-            if node.isElement():
-                node.toElement().setAttribute('version', schemaVersion)
+        self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
     def writeRedistrictingPlans(self, plans: List[RedistrictingPlan]):
         l: List[str] = []
