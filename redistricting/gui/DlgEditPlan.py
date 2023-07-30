@@ -22,20 +22,26 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.utils import iface
+from pytest_qgis import QgsVectorLayer
 from qgis.core import QgsProject
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
+from qgis.utils import iface
+
+from ..core import (
+    RedistrictingPlan,
+    showHelp,
+    tr
+)
 from ._dlgEditPlanDetailsPage import dlgEditPlanDetailsPage
-from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
-from ._dlgEditPlanPopPage import dlgEditPlanPopPage
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
+from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
+from ._dlgEditPlanPopPage import dlgEditPlanPopPage
 from .RdsFieldComboBox import RdsFieldComboBox
-from .RdsMapLayerComboBox import RdsMapLayerComboBox
 from .RdsFieldTableView import RdsFieldTableView
-from ..core import RedistrictingPlan, tr, showHelp
+from .RdsMapLayerComboBox import RdsMapLayerComboBox
 
 iface: QgisInterface
 
@@ -89,7 +95,17 @@ class DlgEditPlan(QWizard):
             self.setField('dataFields', list(plan.dataFields))
         else:
             self.addPage(dlgEditPlanImportPage(self))
-            self.setField('sourceLayer', iface.activeLayer())
+            l = iface.activeLayer()
+            if not isinstance(l, QgsVectorLayer):
+                l = None
+                for _, lyr in QgsProject.instance().mapLayers(True).items():
+                    if isinstance(lyr, QgsVectorLayer):
+                        l = lyr
+                        break
+            if l is None:
+                raise ValueError(tr("No vector layer found in project"))
+            
+            self.setField('sourceLayer', l)
 
     def showHelp(self):
         showHelp(f'usage/create_plan.html#page-{self.currentId()+1}')
