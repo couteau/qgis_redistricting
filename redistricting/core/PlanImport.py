@@ -28,17 +28,28 @@ import mimetypes
 import pathlib
 from typing import Union
 
-from qgis.PyQt.QtCore import QObject, pyqtSignal, NULL
 from qgis.core import (
     Qgis,
     QgsApplication,
     QgsTask,
     QgsVectorLayer
 )
-from .utils import tr
+from qgis.PyQt.QtCore import (
+    NULL,
+    QObject,
+    pyqtSignal
+)
+
+from . import (
+    District,
+    RedistrictingPlan
+)
 from .ErrorList import ErrorListMixin
-from .Tasks import ImportAssignmentFileTask, ImportShapeFileTask
-from . import District, RedistrictingPlan
+from .Tasks import (
+    ImportAssignmentFileTask,
+    ImportShapeFileTask
+)
+from .utils import tr
 
 
 class PlanImporter(ErrorListMixin, QObject):
@@ -173,7 +184,7 @@ class AssignmentImporter(PlanImporter):
 
             mimetype, _ = mimetypes.guess_type(self._file)
             result = mimetype.startswith((
-                'text/plan',
+                'text/plain',
                 'text/csv',
                 'application/vnd.ms-excel',
                 'application/vnd.openxmlformats-officedocument.spreadsheetml',
