@@ -49,11 +49,11 @@ class ProjectStorage:
 
     def migrate(self):
         """Migrate plugin node in project file to new schema"""
-        l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
-        if not success:
-            return
-        
         if self._version < schemaVersion:
+            l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
+            if not success:
+                return
+        
             for i, d in enumerate(l):
                 data = json.loads(d)
                 l[i] = json.dumps(checkMigrateSchema(data, self._version))

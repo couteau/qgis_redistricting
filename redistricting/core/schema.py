@@ -124,10 +124,10 @@ def migrateSchema1_0_0_to_1_0_1(data: dict):
     _renameField(data, 'src-layer', 'geo-layer')
     _renameField(data, 'src-id-field', 'geo-join-field')
 
-    vap = data.get('cvap-field')
+    vap = data.get('vap-field')
     if vap:
         if 'pop-fields' not in data:
-            data['pop-field'] = []
+            data['pop-fields'] = []
 
         data['pop-fields'].append(
             fieldSchema(
@@ -142,7 +142,7 @@ def migrateSchema1_0_0_to_1_0_1(data: dict):
     cvap = data.get('cvap-field')
     if cvap:
         if 'pop-fields' not in data:
-            data['pop-field'] = []
+            data['pop-fields'] = []
 
         data['pop-fields'].append(
             fieldSchema(
@@ -181,6 +181,6 @@ def checkMigrateSchema(data: dict, v: version.Version):
     
     while v < schemaVersion:
         migrate = migrations[v]
-        data, v == migrate(data)
+        data, v = migrate(data)
 
     return data
