@@ -121,15 +121,15 @@ class PlanValidator(ErrorListMixin, QObject):
 
         return result
 
-    def _validateSourceLayer(self):
-        if result := self._validateLayer(self._geoLayer, tr('source')):
+    def _validateGeoLayer(self):
+        if result := self._validateLayer(self._geoLayer, tr('geogrpahy')):
             if self._geoJoinField:
                 if self._geoLayer.fields().lookupField(self._geoJoinField) == -1:
                     self.pushError(
                         tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
                             fieldname=tr('join').capitalize(),
                             field=self._geoJoinField,
-                            layertype=tr('source'),
+                            layertype=tr('geography'),
                             layername=self._geoLayer.name()
                         )
                     )
@@ -346,7 +346,7 @@ class PlanValidator(ErrorListMixin, QObject):
             self.pushError(tr('{field} field is required').format(field=tr('District')), Qgis.Critical)
 
         if not self._geoJoinField:
-            self.pushError(tr('{field} field is required').format(field=tr('Source ID')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(field=tr('Geograph Join')), Qgis.Critical)
 
         if not self._popJoinField:
             self.pushError(tr('{field} field is required').format(field=tr('Population Join')), Qgis.Critical)
@@ -355,7 +355,7 @@ class PlanValidator(ErrorListMixin, QObject):
             self.pushError(tr('{field} field is required').format(field=tr('Population')), Qgis.Critical)
 
         result = result \
-            and self._validateSourceLayer() \
+            and self._validateGeoLayer() \
             and self._validatePopLayer() \
             and self._validateAssignLayer(strict) \
             and self._validateDistLayer(strict)

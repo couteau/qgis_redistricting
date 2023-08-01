@@ -107,8 +107,8 @@ class BasePlanBuilder(PlanValidator):
             raise ValueError(tr('Geography ID field must be a string'))
 
         self._geoIdField = value
-        if self._sourceIdField is None:
-            self._sourceIdField = self._geoIdField
+        if self._geoJoinField is None:
+            self._geoJoinField = self._geoIdField
         if self._popJoinField is None:
             self._popJoinField = self._geoIdField
         return self
@@ -127,9 +127,9 @@ class BasePlanBuilder(PlanValidator):
         self._distField = value
         return self
 
-    def setSourceLayer(self, value: QgsVectorLayer):
+    def setGeoLayer(self, value: QgsVectorLayer):
         if value is not None and not isinstance(value, QgsVectorLayer):
-            raise ValueError(tr('Source layer must be a vector layer'))
+            raise ValueError(tr('Geography layer must be a vector layer'))
 
         if value is None and self._popLayer is not None:
             self._geoLayer = self._popLayer
@@ -144,11 +144,11 @@ class BasePlanBuilder(PlanValidator):
 
         return self
 
-    def setSourceIdField(self, value: str):
+    def setGeoJoinField(self, value: str):
         if value is not None and not isinstance(value, str):
-            raise ValueError(tr('Source geography ID field must be a string'))
+            raise ValueError(tr('Geography join field must be a string'))
 
-        self._sourceIdField = value if value is not None else self._geoIdField
+        self._geoJoinField = value if value is not None else self._geoIdField
         return self
 
     def setPopLayer(self, value: QgsVectorLayer):
@@ -161,7 +161,7 @@ class BasePlanBuilder(PlanValidator):
             self._popLayer = value
 
         if self._geoLayer is None:
-            self.setSourceLayer(value)
+            self.setGeoLayer(value)
 
         for f in self._dataFields:
             f.setLayer(self._popLayer)

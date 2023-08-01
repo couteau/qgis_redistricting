@@ -117,7 +117,7 @@ class PlanBuilder(BasePlanBuilder):
             plan,
             str(self._geoPackagePath),
             self._geoLayer,
-            self._sourceIdField)
+            self._geoJoinField)
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
         self._createLayersTask.progressChanged.connect(self.setProgress)
@@ -178,7 +178,7 @@ class PlanBuilder(BasePlanBuilder):
             'pop-join-field': self._popJoinField if self._popJoinField != self._geoIdField else None,
             'pop-field': self._popField,
             'geo-layer': self._geoLayer.id() if self._geoLayer != self._popLayer else None,
-            'geo-join-field': self._sourceIdField if self._sourceIdField != self._geoIdField else None,
+            'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
             'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],
             'geo-fields': [field.serialize() for field in self._geoFields],

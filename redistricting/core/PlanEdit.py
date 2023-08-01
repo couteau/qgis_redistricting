@@ -138,7 +138,7 @@ class PlanEditor(BasePlanBuilder):
             self._plan.assignLayer,
             self._geoLayer,
             geoField,
-            self._sourceIdField,
+            self._geoJoinField,
             self._geoIdField
         )
         self._updateAssignLayerTask.taskCompleted.connect(cleanup)
@@ -223,7 +223,7 @@ class PlanEditor(BasePlanBuilder):
         self._plan._setGeoIdCaption(self._geoIdCaption)
 
         self._plan._setGeoLayer(self._geoLayer)
-        self._plan._setGeoJoinField(self._sourceIdField)
+        self._plan._setGeoJoinField(self._geoJoinField)
 
         self._plan._setPopLayer(self._popLayer)
         self._plan._setPopJoinField(self._popJoinField)
