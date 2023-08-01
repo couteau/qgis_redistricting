@@ -46,7 +46,6 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..core import (
-    BasePopulation,
     Field,
     RedistrictingPlan
 )

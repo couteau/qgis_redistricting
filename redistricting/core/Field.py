@@ -233,14 +233,6 @@ class Field(QObject):
 
         return result
 
-
-class BasePopulation(IntEnum):
-    NOPCT = 0
-    TOTALPOP = 1
-    VAP = 2
-    CVAP = 3
-
-
 class DataField(Field):
     def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
                  caption: str = None, sumfield: bool = None, pctbase: Union[Field, str] = None, 
@@ -267,14 +259,14 @@ class DataField(Field):
         self._sum = self.isNumeric if sumfield is None else (sumfield and self.isNumeric)
 
         f = field.lower()
-        cvap = not isExpression and (f[:4] == 'cvap' or f[-4:] == 'cvap')
-        vap = not isExpression and not cvap and (
-            f[:3] == 'vap' or f[-3:] == 'vap' or f[:4] == 'p003' or f[:4] == 'p004')
 
         if not self.isNumeric or isExpression:
             pctbase = None
-        
-        self._pctbase = pctbase
+        else:
+            if isinstance(pctbase, Field):
+                self._pctbase = pctbase.fieldName
+            else:
+                self._pctbase = pctbase
 
     @property
     def sum(self) -> bool:

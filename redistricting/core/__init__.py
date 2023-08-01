@@ -31,7 +31,6 @@ from .DistrictDataModel import DistrictDataModel
 from .DistrictList import DistrictList
 from .Exception import RdsException
 from .Field import (
-    BasePopulation,
     DataField,
     Field
 )
@@ -64,7 +63,7 @@ from .utils import (
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField',
-           'BasePopulation', 'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
+           'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',
            'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
