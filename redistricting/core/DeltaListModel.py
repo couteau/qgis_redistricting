@@ -135,7 +135,7 @@ class DeltaListModel(QAbstractTableModel):
                 })
 
     def planChanged(self, plan, field, new, old):  # pylint: disable=unused-argument
-        if field in {'pop-field', 'vap-field', 'cvap-field', 'data-fields'}:
+        if field in {'pop-field', 'pop-fields', 'data-fields'}:
             self.beginResetModel()
             self.updateFields()
             self.endResetModel()

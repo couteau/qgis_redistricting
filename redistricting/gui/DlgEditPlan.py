@@ -93,6 +93,7 @@ class DlgEditPlan(QWizard):
             self.setField('popField', plan.popField)
             self.setField('sourceLayer', plan.geoLayer)
             self.setField('geoFields', list(plan.geoFields))
+            self.setField('popFields', list(plan.popFields))
             self.setField('dataFields', list(plan.dataFields))
         else:
             self.addPage(dlgEditPlanImportPage(self))
@@ -150,8 +151,8 @@ class DlgEditPlan(QWizard):
         return self.field('deviation') / 100
 
     def popFields(self):
-        return FieldList()
-
+        return self.field('popFields')
+    
     def dataFields(self):
         return self.field('dataFields')
 

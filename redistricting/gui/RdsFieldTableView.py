@@ -58,7 +58,6 @@ from qgis.PyQt.QtWidgets import (
 from qgis.utils import iface
 
 from ..core import (
-    BasePopulation,
     DataField,
     Field,
     FieldList,
@@ -78,7 +77,7 @@ class FieldListModel(QAbstractTableModel):
         QCoreApplication.translate('Redistricting', '%')
     ]
 
-    def __init__(self, fields: Union[FieldList, List[Field]] = None, popFields: Union[FieldList, List[Field]] = None, parent=None):
+    def __init__(self, fields: Union[FieldList, List[Field]] = None, popFields: Union[FieldList, list[Field]] = None, parent=None):
         super().__init__(parent)
         if isinstance(fields, FieldList):
             self._data: FieldList = fields[:]
@@ -120,17 +119,17 @@ class FieldListModel(QAbstractTableModel):
         self.setColCount(5 if self._fieldType == DataField else 3)
 
     @property
-    def popFields(self):
+    def popFields(self) -> FieldList:
         return self._popFields
     
     @popFields.setter
-    def popFields(self, value: Union[FieldList, List[Field]]):
+    def popFields(self, value: Union[FieldList, list[Field]]):
         if value is None:
             self._popFields = FieldList(self)
         elif isinstance(value, FieldList):
-            self._popFields: FieldList = value
+            self._popFields = value
         else:
-            self._popFields: FieldList = FieldList(self, value)
+            self._popFields = FieldList(self, value)
 
     def setColCount(self, value):
         if value != self._colCount:
@@ -163,7 +162,11 @@ class FieldListModel(QAbstractTableModel):
             elif col == 1:
                 value = self._data[row].caption
             elif col == 3:
-                value = str(self._data[row].pctbase)
+                pctbase = self._data[row].pctbase
+                if pctbase and pctbase in self.popFields:
+                    value = self.popFields[self._data[row].pctbase].caption
+                else:
+                    value = QVariant()
             else:
                 value = QVariant()
         elif role == Qt.DecorationRole:
@@ -182,7 +185,7 @@ class FieldListModel(QAbstractTableModel):
             else:
                 value = QVariant()
         elif role == Qt.TextAlignmentRole:
-            if col in range(2, 6):
+            if col in {2,4}:
                 value = Qt.AlignCenter
             else:
                 value = QVariant()
@@ -195,10 +198,21 @@ class FieldListModel(QAbstractTableModel):
                 value = QCoreApplication.translate('Redistricting', 'Display sum for field {field} is {checkstate}'). \
                     format(field=field.fieldName, checkstate='checked' if field.sum else 'unchecked')
             elif col == 3:
-                value = QCoreApplication.translate(
-                    'Redistricting',
-                    'Display field {field} as percent of {basefield}'). \
-                    format(field=field.fieldName, basefield='total population')
+                pctbase = self._data[row].pctbase
+                if pctbase and pctbase in self.popFields:
+                    basefield = self.popFields[self._data[row].pctbase].caption
+                else:
+                    basefield = None
+                if basefield is None:
+                    value = QCoreApplication.translate(
+                        'Redistricting',
+                        'Do not display field {field} as a percentage'). \
+                        format(field=field.fieldName, basefield=basefield)
+                else:
+                    value = QCoreApplication.translate(
+                        'Redistricting',
+                        'Display field {field} as percent of {basefield}'). \
+                        format(field=field.fieldName, basefield=basefield)
             else:
                 value = QVariant()
         else:
@@ -212,6 +226,11 @@ class FieldListModel(QAbstractTableModel):
                 value = self._headings[section]
             else:
                 value = str(section+1)
+        elif role == Qt.TextAlignmentRole:
+            if section in range(2,4):
+                value = Qt.AlignCenter
+            else:
+                value = QVariant()        
         else:
             value = QVariant()
 
@@ -229,7 +248,7 @@ class FieldListModel(QAbstractTableModel):
             
             if index.column() == 3:
                 if 0 <= value < len(self._popFields):
-                    field.pctbase = self._popFields[value]
+                    field.pctbase = self._popFields[value].fieldName
                     return True
 
         if role == Qt.CheckStateRole:
@@ -263,17 +282,18 @@ class FieldListModel(QAbstractTableModel):
     def appendField(self, layer, field, isExpression=False, caption=None):
         for f in self._data:
             if f.field == field:
-                return
+                return None
 
         try:
             fld = self._fieldType(layer, field, isExpression, caption)
         except RdsException as e:
             iface.messageBar().pushMessage(tr('Error'), str(e), level=Qgis.Critical)
-            return
+            return None
 
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
         self._data.append(fld)
         self.endInsertRows()
+        return fld
 
     def deleteField(self, row):
         self.beginRemoveRows(QModelIndex(), row, row)

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>606</width>
-    <height>419</height>
+    <width>604</width>
+    <height>450</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -133,11 +133,11 @@
    <item row="3" column="0" colspan="2">
     <widget class="QGroupBox" name="gbxPopFields">
      <property name="title">
-      <string>Additional Population Fields</string>
+      <string>Additional Population Totals</string>
      </property>
      <layout class="QGridLayout" name="gridLayout_3">
       <item row="0" column="0">
-       <widget class="QgsFieldExpressionWidget" name="mFieldExpressionWidget"/>
+       <widget class="QgsFieldExpressionWidget" name="cmbAddlPopField"/>
       </item>
       <item row="0" column="1">
        <widget class="QToolButton" name="btnAddAddlPopField">

@@ -23,12 +23,19 @@
  ***************************************************************************/
 """
 from qgis.core import (
+    QgsApplication,
     QgsFieldProxyModel,
     QgsVectorLayer
 )
-from qgis.PyQt.QtWidgets import QWizardPage
+from qgis.PyQt.QtWidgets import (
+    QHeaderView,
+    QWizardPage
+)
 
-from ..core import defaults
+from ..core import (
+    Field,
+    defaults
+)
 from ..core.utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
@@ -44,6 +51,9 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.registerField('popField*', self.cmbPopField)
         self.registerField('deviation', self.sbxMaxDeviation,
                            'value', self.sbxMaxDeviation.valueChanged)
+        self.registerField('popFields', self.tblAddlPopulation, 'fields', self.tblAddlPopulation.fieldsChanged)
+
+        self.fieldsModel = self.tblAddlPopulation.model()
 
         # Annoyingly, loading the UI sets the layer property of a QgsLayerCombo to
         # the first layer in the project, even if allowEmptyLayer is set to true.
@@ -54,6 +64,15 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.btnUseGeoLayer.toggled.connect(self.updatePopLayer)
 
         self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbAddlPopField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbAddlPopField.fieldChanged.connect(self.fieldChanged)
+        self.btnAddAddlPopField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
+        self.btnAddAddlPopField.clicked.connect(self.addField)
+        
+        self.tblAddlPopulation.setEnableDragRows(True)  
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
         self.setFinalPage(True)
 
@@ -71,6 +90,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
         self.cmbPopLayer.setLayer(popLayer)
         self.setPopLayer(popLayer)
+        self.cmbAddlPopField.setLayer(popLayer)
         self.cmbPopField.setFocus()
         self.setFinalPage(self.wizard().isComplete())
 
@@ -86,6 +106,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         if not layer:
             self.cmbJoinField.setLayer(None)
             self.cmbPopField.setLayer(None)
+            self.cmbAddlPopField.setLayer(None)
             return
 
         if layer != self.cmbJoinField.layer():
@@ -103,3 +124,20 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
                 self.cmbPopField.setField(popField)
             else:
                 self.cmbPopField.setField(getDefaultField(layer, defaults.POP_FIELDS))
+            
+            self.cmbAddlPopField.setLayer(layer)
+            popFields: list[Field] = self.field('popFields')
+            for f in popFields:
+                f.setLayer(layer)
+
+    def fieldChanged(self, field):
+        self.btnAddAddlPopField.setEnabled(field != '' and (
+            not self.cmbAddlPopField.isExpression() or self.cmbAddlPopField.isValidExpression()))
+
+    def addField(self):
+        field, isExpression, isValid = self.cmbAddlPopField.currentField()
+        if not isValid:
+            return
+
+        layer = self.field('popLayer')
+        self.fieldsModel.appendField(layer, field, isExpression)
