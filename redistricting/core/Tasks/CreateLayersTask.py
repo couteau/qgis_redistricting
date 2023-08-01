@@ -214,7 +214,8 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         if createGpkgTable(self.path, 'districts', sql, srid=self.srid):
             with closing(spatialite_connect(self.path)) as db:
                 db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
-                
+
+        return True        
 
     def createUnassigned(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
