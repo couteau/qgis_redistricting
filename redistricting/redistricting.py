@@ -44,6 +44,7 @@ from qgis.core import (
     QgsLayerTreeLayer,
     QgsMapLayer,
     QgsProject,
+    QgsProjectDirtyBlocker,
     QgsReadWriteContext,
     QgsVectorLayer
 )
@@ -559,30 +560,38 @@ class Redistricting:
                 self.setActivePlan(UUID(p))
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
-        self.clear()
-        storage = ProjectStorage(self.project, doc, context)
-        self.redistrictingPlans.extend(storage.readRedistrictingPlans())
-        for plan in self.redistrictingPlans:
-            if plan.hasErrors():
-                self.pushErrors(plan.errors())
-            plan.planChanged.connect(self.planChanged)
-            self.addPlanToMenu(plan)
+        dirtyBlocker = QgsProjectDirtyBlocker(self.project)
+        try:
+            self.clear()
+            storage = ProjectStorage(self.project, doc, context)
+            self.redistrictingPlans.extend(storage.readRedistrictingPlans())
+            for plan in self.redistrictingPlans:
+                if plan.hasErrors():
+                    self.pushErrors(plan.errors())
+                plan.planChanged.connect(self.planChanged)
+                self.addPlanToMenu(plan)
 
-        if len(self.redistrictingPlans) == 1:
-            self.setActivePlan(self.redistrictingPlans[0])
-        else:
-            uuid = storage.readActivePlan()
-            if uuid:
-                self.setActivePlan(uuid)
-            elif len(self.redistrictingPlans) != 0:
+            if len(self.redistrictingPlans) == 1:
                 self.setActivePlan(self.redistrictingPlans[0])
+            else:
+                uuid = storage.readActivePlan()
+                if uuid:
+                    self.setActivePlan(uuid)
+                elif len(self.redistrictingPlans) != 0:
+                    self.setActivePlan(self.redistrictingPlans[0])
+        finally:
+            del dirtyBlocker
 
     def onWriteProject(self, doc: QDomDocument):
         if len(self.redistrictingPlans) == 0:
             return
         
-        rg = self.project.layerTreeRoot()
-        rg.setHasCustomLayerOrder(False)
+        dirtyBlocker = QgsProjectDirtyBlocker(self.project)
+        try:
+            rg = self.project.layerTreeRoot()
+            rg.setHasCustomLayerOrder(False)
+        finally:
+            del dirtyBlocker
 
         storage = ProjectStorage(self.project, doc)
         storage.writeRedistrictingPlans(self.redistrictingPlans)
@@ -697,7 +706,7 @@ class Redistricting:
                 .setDeviation(dlgEditPlan.deviation()) \
                 .setGeoIdField(dlgEditPlan.geoIdField()) \
                 .setGeoDisplay(dlgEditPlan.geoIdDisplay()) \
-                .setSourceLayer(dlgEditPlan.sourceLayer()) \
+                .setGeoLayer(dlgEditPlan.sourceLayer()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
                 .setJoinField(dlgEditPlan.joinField()) \
                 .setPopField(dlgEditPlan.popField()) \
@@ -771,7 +780,7 @@ class Redistricting:
                 .setDeviation(dlgNewPlan.deviation()) \
                 .setGeoIdField(dlgNewPlan.geoIdField()) \
                 .setGeoDisplay(dlgNewPlan.geoIdDisplay()) \
-                .setSourceLayer(dlgNewPlan.sourceLayer()) \
+                .setGeoLayer(dlgNewPlan.sourceLayer()) \
                 .setPopLayer(dlgNewPlan.popLayer()) \
                 .setJoinField(dlgNewPlan.joinField()) \
                 .setPopField(dlgNewPlan.popField()) \
@@ -895,7 +904,7 @@ class Redistricting:
 
     def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
         self.project.setDirty()
-        if prop in ['total-population', 'deviation', 'pop-field', 'vap-field', 'cvap-field', 'data-fields']:
+        if prop in ['total-population', 'deviation', 'pop-field', 'pop-fields', 'data-fields']:
             self.dataTableWidget.tblDataTable.update()
 
     def createDistrict(self):
@@ -994,52 +1003,52 @@ class Redistricting:
         return True
     
     def bringPlanToTop(self, plan: RedistrictingPlan):
-        rg = self.project.layerTreeRoot()
-
-        # setting a custom layer order will make the project dirty, which we don't want
-        dirty = self.project.isDirty()
-        rg.setHasCustomLayerOrder(False)
-        order = rg.layerOrder()
-        groups = [g for g in rg.findGroups() if g.customProperty('redistricting-plan-id', None) is not None]
-        for g in groups:
-            if g.customProperty('redistricting-plan-id') == str(plan.id):
-                groups.remove(g)
-                groups.insert(0, g)
-                break
-        
-        new_order = []
-        gi = None
-        for index, layer in enumerate(order):
-            if isinstance(layer, QgsGroupLayer):
-                if group := rg.findGroup(layer.name()):
-                    for l in group.children():
-                        if isinstance(l, QgsLayerTreeLayer):
-                            new_order.append(l.layer())
-                    continue
-
-            node = rg.findLayer(layer)
-            if node:
-                group = node.parent()
-                planid = group.customProperty('redistricting-plan-id', None)
-                if group is not rg and planid is not None:
-                    for l in group.children():
-                        if isinstance(l, QgsLayerTreeLayer) and isinstance(l.layer(), QgsVectorLayer):
-                            l.layer().setLabelsEnabled(planid == str(plan.id))
-                    if gi is None:
-                        gi = index
-                    continue
-
-            new_order.append(layer)
-        
-        if gi is not None:
+        dirtyBlocker = QgsProjectDirtyBlocker(self.project)
+        try:
+            rg = self.project.layerTreeRoot()
+            rg.setHasCustomLayerOrder(False)
+            order = rg.layerOrder()
+            groups = [g for g in rg.findGroups() if g.customProperty('redistricting-plan-id', None) is not None]
             for g in groups:
-                for l in g.children():
-                    new_order.insert(gi, l.layer())
-                    gi += 1
-        
-        rg.setHasCustomLayerOrder(True)
-        rg.setCustomLayerOrder(new_order)
-        self.project.setDirty(dirty)
+                if g.customProperty('redistricting-plan-id') == str(plan.id):
+                    groups.remove(g)
+                    groups.insert(0, g)
+                    break
+            
+            new_order = []
+            gi = None
+            for index, layer in enumerate(order):
+                if isinstance(layer, QgsGroupLayer):
+                    if group := rg.findGroup(layer.name()):
+                        for l in group.children():
+                            if isinstance(l, QgsLayerTreeLayer):
+                                new_order.append(l.layer())
+                        continue
+
+                node = rg.findLayer(layer)
+                if node:
+                    group = node.parent()
+                    planid = group.customProperty('redistricting-plan-id', None)
+                    if group is not rg and planid is not None:
+                        for l in group.children():
+                            if isinstance(l, QgsLayerTreeLayer) and isinstance(l.layer(), QgsVectorLayer):
+                                l.layer().setLabelsEnabled(planid == str(plan.id))
+                        if gi is None:
+                            gi = index
+                        continue
+
+                new_order.append(layer)
+            
+            if gi is not None:
+                for g in groups:
+                    for l in g.children():
+                        new_order.insert(gi, l.layer())
+                        gi += 1
+            
+            rg.setHasCustomLayerOrder(True)
+            rg.setCustomLayerOrder(new_order)
+        finally:
+            del dirtyBlocker
 
     def setActivePlan(self, plan):
         self.canvas.unsetMapTool(self.mapTool)
