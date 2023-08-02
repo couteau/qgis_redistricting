@@ -79,11 +79,11 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
     def initializePage(self):
         super().initializePage()
         popLayer = self.field('popLayer') or None
-        sourceLayer = self.field('sourceLayer') or None
+        geoLayer = self.field('sourceLayer') or None
         if popLayer is None:
-            popLayer = sourceLayer
+            popLayer = geoLayer
 
-        if popLayer == sourceLayer:
+        if popLayer == geoLayer:
             self.btnUseGeoLayer.setChecked(True)
         else:
             self.btnOtherPopLayer.setChecked(True)
@@ -99,8 +99,8 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
     def updatePopLayer(self):
         if self.btnUseGeoLayer.isChecked():
-            sourceLayer = self.field('sourceLayer') or None
-            self.cmbPopLayer.setLayer(sourceLayer)
+            geoLayer = self.field('sourceLayer') or None
+            self.cmbPopLayer.setLayer(geoLayer)
 
     def setPopLayer(self, layer: QgsVectorLayer):
         if not layer:
@@ -123,7 +123,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
             if popField and layer.fields().lookupField(popField) != -1:
                 self.cmbPopField.setField(popField)
             else:
-                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_FIELDS))
+                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_TOTAL_FIELDS))
             
             self.cmbAddlPopField.setLayer(layer)
             popFields: list[Field] = self.field('popFields')

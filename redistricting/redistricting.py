@@ -705,8 +705,8 @@ class Redistricting:
                 .setDescription(dlgEditPlan.description()) \
                 .setDeviation(dlgEditPlan.deviation()) \
                 .setGeoIdField(dlgEditPlan.geoIdField()) \
-                .setGeoDisplay(dlgEditPlan.geoIdDisplay()) \
-                .setGeoLayer(dlgEditPlan.sourceLayer()) \
+                .setGeoDisplay(dlgEditPlan.geoIdCaption()) \
+                .setGeoLayer(dlgEditPlan.geoLayer()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
                 .setJoinField(dlgEditPlan.joinField()) \
                 .setPopField(dlgEditPlan.popField()) \
@@ -779,8 +779,8 @@ class Redistricting:
                 .setDescription(dlgNewPlan.description()) \
                 .setDeviation(dlgNewPlan.deviation()) \
                 .setGeoIdField(dlgNewPlan.geoIdField()) \
-                .setGeoDisplay(dlgNewPlan.geoIdDisplay()) \
-                .setGeoLayer(dlgNewPlan.sourceLayer()) \
+                .setGeoDisplay(dlgNewPlan.geoIdCaption()) \
+                .setGeoLayer(dlgNewPlan.geoLayer()) \
                 .setPopLayer(dlgNewPlan.popLayer()) \
                 .setJoinField(dlgNewPlan.joinField()) \
                 .setPopField(dlgNewPlan.popField()) \

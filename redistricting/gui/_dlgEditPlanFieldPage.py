@@ -38,6 +38,9 @@ from qgis.PyQt.QtWidgets import (
     QWizardPage
 )
 
+from redistricting.core import defaults
+from redistricting.core.utils import matchField
+
 from ..core import (
     DataField,
     Field,
@@ -136,15 +139,15 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
             return
 
         f = self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
-        if f and not isExpression:
-            if (field[:4] == 'cvap' or field[-4:] == 'cvap'):
+        if f and f.isNumeric and not isExpression:
+            if matchField(f, self.fexDataField.layer(), defaults.VAP_FIELDS):
                 for p in self.fieldsModel.popFields:
-                    if (p.field[:4] == 'cvap' or p.field[-4:] == 'cvap'):
+                    if matchField(p.field, None, defaults.VAP_TOTAL_FIELDS):
                         f.pctbase = p.fieldName
 
-            elif field[:3] == 'vap' or field[-3:] == 'vap' or field[:4] == 'p003' or field[:4] == 'p004':
+            elif matchField(f, self.fexDataField.layer(), defaults.CVAP_FIELDS):
                 for p in self.fieldsModel.popFields:
-                    if (p.field[:3] == 'vap' or p.field[-3:] == 'vap') or p.field[:4] == 'p003' or p.field[:4] == 'p004':
+                    if matchField(p.field, None, defaults.CVAP_TOTAL_FIELDS):
                         f.pctbase = p.fieldName
 
             else:

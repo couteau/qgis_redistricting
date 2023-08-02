@@ -23,18 +23,29 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+
 import pathlib
-from random import choice
-
-import sqlite3
-
 import re
-from typing import TYPE_CHECKING, List, Union, Type
-from processing.algs.gdal.GdalUtils import GdalUtils
-from osgeo import gdal
+import sqlite3
+from random import choice
+from typing import (
+    TYPE_CHECKING,
+    List,
+    Type,
+    Union
+)
 
-from qgis.core import QgsVectorLayer, QgsDataSourceUri, QgsMessageLog
-from qgis.PyQt.QtCore import QCoreApplication, QUrl
+from osgeo import gdal
+from processing.algs.gdal.GdalUtils import GdalUtils
+from qgis.core import (
+    QgsDataSourceUri,
+    QgsMessageLog,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QCoreApplication,
+    QUrl
+)
 from qgis.PyQt.QtGui import QDesktopServices
 
 if TYPE_CHECKING:
@@ -83,6 +94,14 @@ def getDefaultField(layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern
 
     return None
 
+def matchField(field: str, layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern]]) -> bool:
+    for f in fieldList:
+        if isinstance(f, str):
+            if field == f:
+                return layer is None or layer.fields().lookupField(field) != -1
+        elif isinstance(f, re.Pattern):
+            if f.match(field):
+                return layer is None or layer.fields().lookupField(field) != -1
 
 def showHelp(helpPage='index.html'):
     """Display application help to the user."""

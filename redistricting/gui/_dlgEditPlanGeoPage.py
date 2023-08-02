@@ -22,13 +22,29 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import Qt, QVariant, QModelIndex
-from qgis.PyQt.QtWidgets import QWidget, QWizardPage, QHeaderView, QComboBox, QStyledItemDelegate, QStyleOptionViewItem
-from qgis.core import QgsApplication, QgsVectorLayer, QgsMapLayerProxyModel
+from qgis.core import (
+    QgsApplication,
+    QgsMapLayerProxyModel,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QModelIndex,
+    Qt,
+    QVariant
+)
+from qgis.PyQt.QtWidgets import (
+    QComboBox,
+    QHeaderView,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+    QWizardPage
+)
+
 from ..core import defaults
 from ..core.utils import getDefaultField
-from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 from .RdsFieldTableView import FieldListModel
+from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 
 
 class GeoFieldDelegate(QStyledItemDelegate):
@@ -82,7 +98,7 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         # the first layer in the project, even if allowEmptyLayer is set to true.
         # Clear it to put it into a sane default state.
         self.cmbSourceLayer.setLayer(None)
-        self.cmbSourceLayer.layerChanged.connect(self.setSourceLayer)
+        self.cmbSourceLayer.layerChanged.connect(self.setGeoLayer)
 
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
@@ -101,19 +117,19 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.cmbSourceLayer.setFilters(
             QgsMapLayerProxyModel.Filter.VectorLayer)
 
-        sourceLayer = self.field('sourceLayer')
-        if isinstance(sourceLayer, QVariant) and sourceLayer.isNull():
-            sourceLayer = None
-        self.cmbSourceLayer.setLayer(sourceLayer)
-        self.cmbGeoIDField.setLayer(sourceLayer)
-        self.cmbAddlGeoField.setLayer(sourceLayer)
-        self.setSourceLayer(sourceLayer)
+        geoLayer = self.field('sourceLayer')
+        if isinstance(geoLayer, QVariant) and geoLayer.isNull():
+            geoLayer = None
+        self.cmbSourceLayer.setLayer(geoLayer)
+        self.cmbGeoIDField.setLayer(geoLayer)
+        self.cmbAddlGeoField.setLayer(geoLayer)
+        self.setGeoLayer(geoLayer)
         self.setFinalPage(self.wizard().isComplete())
 
     def cleanupPage(self):
         ...  # prevent fields from being reset
 
-    def setSourceLayer(self, layer: QgsVectorLayer):
+    def setGeoLayer(self, layer: QgsVectorLayer):
         if self.cmbGeoIDField.layer() != layer:
             field = self.field('geoIdField')
             self.cmbGeoIDField.setLayer(layer)

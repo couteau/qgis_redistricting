@@ -279,7 +279,7 @@ class FieldListModel(QAbstractTableModel):
 
         return f
 
-    def appendField(self, layer, field, isExpression=False, caption=None):
+    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[Field,DataField,None]:
         for f in self._data:
             if f.field == field:
                 return None

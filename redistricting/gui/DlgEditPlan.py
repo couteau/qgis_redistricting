@@ -124,14 +124,14 @@ class DlgEditPlan(QWizard):
     def numSeats(self):
         return self.field('numSeats')
 
-    def sourceLayer(self):
+    def geoLayer(self):
         layer = self.field('sourceLayer')
         return None if isinstance(layer, QVariant) else layer
 
     def geoIdField(self):
         return self.field('geoIdField')
 
-    def geoIdDisplay(self):
+    def geoIdCaption(self):
         return self.field('geoCaption')
 
     def geoFields(self):

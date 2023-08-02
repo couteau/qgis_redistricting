@@ -162,7 +162,7 @@ class PlanEditor(BasePlanBuilder):
         self._plan._setDescription(self._description)
         self._plan._setDeviation(self._deviation)
 
-        if self._popFields != self._plan.popFieldsFields:
+        if self._popFields != self._plan.popFields:
             if self._plan.distLayer:
                 layer = self._plan.distLayer
                 addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
