@@ -213,7 +213,8 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._plan != value:
             self._plan = value
             self._layer = self._plan.assignLayer if self._plan is not None else None
-            self.inTransaction = self._layer.isEditable()
+            if self._layer:
+                self.inTransaction = self._layer.isEditable()
 
             self._assignmentEditor = None
             if self._plan and self._plan.geoFields and self._geoField not in self._plan.geoFields:
@@ -221,13 +222,13 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._distTarget = None
             self._distSource = None
 
-    def targetDistrict(self, buttons = Qt.LeftButton):
+    def targetDistrict(self, buttons=Qt.LeftButton):
         if buttons & Qt.RightButton != Qt.NoButton:
             return self._distSource
 
         return self._distTarget
 
-    def sourceDistrict(self, buttons = Qt.LeftButton):
+    def sourceDistrict(self, buttons=Qt.LeftButton):
         if buttons & Qt.RightButton != Qt.NoButton:
             return self._distTarget
 
@@ -259,7 +260,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             target = str(self.targetDistrict())
         self._layer.beginEditCommand(tr('Assign features to district {}').format(target))
 
-    def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit = True):
+    def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit=True):
         if self._geoField is not None and self._geoField != self._plan.geoIdField:
             values = {str(feature.attribute(self._geoField)) for feature in features}
             features = self._assignmentEditor.getDistFeatures(
@@ -306,10 +307,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
         if e.buttons() & self.buttonsPressed != Qt.NoButton:
             return
-        
+
         if self.buttonsPressed & (Qt.LeftButton | Qt.RightButton) == Qt.NoButton:
             return
-        
+
         if self.targetDistrict(self.buttonsPressed) is None:
             return
 
@@ -325,10 +326,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 else:
                     self._layer.destroyEditCommand()
                 return
-            
+
             self._paintFeatures(
-                (r.mFeature for r in results), 
-                self.targetDistrict(self.buttonsPressed), 
+                (r.mFeature for r in results),
+                self.targetDistrict(self.buttonsPressed),
                 self.sourceDistrict(self.buttonsPressed)
             )
             self._dragging = False
@@ -351,17 +352,17 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                                   [self._layer], QgsMapToolIdentify.VectorLayer)
                 if self._paintMode == PaintMode.SelectByGeography:
                     self._selectFeatures(
-                        (r.mFeature for r in results), 
-                        self.targetDistrict(self.buttonsPressed), 
+                        (r.mFeature for r in results),
+                        self.targetDistrict(self.buttonsPressed),
                         self.sourceDistrict(self.buttonsPressed)
                     )
                 else:
                     self._paintFeatures(
-                        (r.mFeature for r in results), 
-                        self.targetDistrict(self.buttonsPressed), 
+                        (r.mFeature for r in results),
+                        self.targetDistrict(self.buttonsPressed),
                         self.sourceDistrict(self.buttonsPressed)
                     )
-                    
+
         self.buttonsPressed = Qt.NoButton
 
     def canvasMoveEvent(self, e: QgsMapMouseEvent):
@@ -378,11 +379,11 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
             if not results:
                 return
-            
+
             self._dragging = True
             self._paintFeatures(
                 (r.mFeature for r in results),
-                self.targetDistrict(buttons), 
+                self.targetDistrict(buttons),
                 self.sourceDistrict(buttons),
                 False
             )
@@ -423,4 +424,3 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 self._plan.geoFields and value not in self._plan.geoFields:
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
         self._geoField = value
-

@@ -121,7 +121,7 @@ class PlanAssignmentEditor(QObject):
         features: Iterable[QgsFeature],
         district,
         oldDistrict=None,
-        inTransaction = None
+        inTransaction=None
     ):
         self._clearError()
 
