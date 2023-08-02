@@ -55,13 +55,18 @@ Self = TypeVar("Self", bound="BasePlanBuilder")
 class BasePlanBuilder(PlanValidator):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
-        self._geoPackagePath: pathlib.Path = None
         self._vap = None
         self._cvap = None
+        self._geoPackagePath: pathlib.Path = None
 
     @classmethod
     def fromPlan(cls, plan: RedistrictingPlan, parent: QObject = None):
         instance = super().fromPlan(plan, parent)
+        for f in instance._popFields:
+            if instance._isVAP(f.field):
+                instance._vap = f
+            if instance._isCVAP(f.field):
+                instance._cvap = f
         instance._geoPackagePath = plan.geoPackagePath  # pylint: disable=protected-access
         return instance
 
@@ -168,6 +173,9 @@ class BasePlanBuilder(PlanValidator):
         if self._geoLayer is None:
             self.setGeoLayer(value)
 
+        for f in self._popFields:
+            f.setLayer(self._popLayer)
+
         for f in self._dataFields:
             f.setLayer(self._popLayer)
 
@@ -199,6 +207,10 @@ class BasePlanBuilder(PlanValidator):
             if not self._checkNotDuplicate(f, l):
                 raise ValueError(tr('Field list contains duplicate fields'))
 
+            if self._isVAP(f.field):
+                self._vap = f
+            if self._isCVAP(f.field):
+                self._cvap = f
             f.setLayer(self._popLayer)
             l.append(f)
         self._popFields = l
@@ -228,7 +240,7 @@ class BasePlanBuilder(PlanValidator):
             )
 
         if self._checkNotDuplicate(field, self._popFields):
-            self._popFields.append(field) 
+            self._popFields.append(field)
             if self._isVAP(field.field):
                 self._vap = field
             if self._isCVAP(field.field):

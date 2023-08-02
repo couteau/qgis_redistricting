@@ -233,9 +233,10 @@ class Field(QObject):
 
         return result
 
+
 class DataField(Field):
     def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
-                 caption: str = None, sumfield: bool = None, pctbase: Union[Field, str] = None, 
+                 caption: str = None, sumfield: bool = None, pctbase: Union[Field, str] = None,
                  parent: Optional['QObject'] = None):
         super().__init__(layer, field, isExpression, caption, parent)
 
@@ -261,7 +262,7 @@ class DataField(Field):
         f = field.lower()
 
         if not self.isNumeric or isExpression:
-            pctbase = None
+            self._pctbase = None
         else:
             if isinstance(pctbase, Field):
                 self._pctbase = pctbase.fieldName
@@ -282,7 +283,7 @@ class DataField(Field):
             self.fieldChanged.emit(self)
 
     @property
-    def pctbase(self) -> Union[str, Field]:
+    def pctbase(self) -> str:
         return self._pctbase
 
     @pctbase.setter
@@ -292,19 +293,15 @@ class DataField(Field):
 
         if isinstance(value, Field):
             value = value.fieldName
-            
+
         if self._pctbase != value:
             self._pctbase = value
             self.fieldChanged.emit(self)
 
     def serialize(self):
-        if isinstance(self.pctbase, Field):
-            pctbase = self.pctbase.fieldName
-        else: 
-            pctbase = self.pctbase
         return super().serialize() | {
             'sum': self.sum,
-            'pctbase': pctbase,
+            'pctbase': self.pctbase,
         }
 
     @classmethod
