@@ -24,11 +24,16 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Dict
+
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict
+)
 
 if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
     from .District import BaseDistrict
+    from .Plan import RedistrictingPlan
 
 
 class Delta:  # pylint: disable=too-few-public-methods
@@ -73,7 +78,7 @@ class Delta:  # pylint: disable=too-few-public-methods
 
                 if key.startswith('pct_'):
                     f = self._plan.dataFields[attr]
-                    totalField = self._district.baseField(f)
+                    totalField = f.pctbase
                     if totalField and totalField in self._delta:
                         totalPop = getattr(self._district, totalField) + self._delta[totalField]
                         value = value/totalPop if totalPop else None

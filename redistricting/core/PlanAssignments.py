@@ -23,18 +23,29 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, Union
-from qgis.PyQt.QtCore import QVariant, QObject, pyqtSignal
+
+from typing import (
+    TYPE_CHECKING,
+    Iterable,
+    Union
+)
+
 from qgis.core import (
     Qgis,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
     QgsFeatureRequest,
-    QgsMessageLog,
+    QgsMessageLog
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    QVariant,
+    pyqtSignal
 )
 
 from .utils import tr
+
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
@@ -88,17 +99,16 @@ class PlanAssignmentEditor(QObject):
         else:
             flt = ' and '.join(f'{field} = {v}' for v in value)
 
-        if targetDistrict is not None:
-            if targetDistrict == 0:
-                flt += f' and ({self._distField} is not null and {self._distField} != 0)'
-            else:
-                flt += f' and {self._distField} != {targetDistrict}'
-
         if sourceDistrict is not None:
             if sourceDistrict == 0:
                 flt += f' and ({self._distField} = 0 or {self._distField} is null)'
             else:
                 flt += f' and {self._distField} = {sourceDistrict}'
+        elif targetDistrict is not None:
+            if targetDistrict == 0:
+                flt += f' and ({self._distField} is not null and {self._distField} != 0)'
+            else:
+                flt += f' and {self._distField} != {targetDistrict}'
 
         request.setExpressionContext(context)
         request.setFilterExpression(flt)
@@ -110,7 +120,8 @@ class PlanAssignmentEditor(QObject):
         self,
         features: Iterable[QgsFeature],
         district,
-        oldDistrict=None
+        oldDistrict=None,
+        inTransaction = None
     ):
         self._clearError()
 
@@ -122,10 +133,8 @@ class PlanAssignmentEditor(QObject):
             )
             return
 
-        inTransaction = self._assignLayer.isEditable()
-        if not inTransaction:
-            self._assignLayer.startEditing()
-            self._assignLayer.undoStack()
+        if inTransaction is None:
+            inTransaction = self._assignLayer.isEditable()
 
         try:
             for f in features:

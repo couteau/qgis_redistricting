@@ -32,8 +32,6 @@ from typing import (
 
 import pandas as pd
 from qgis.core import (
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
     QgsFeatureRequest,
     QgsTask
 )
@@ -88,6 +86,8 @@ class AggregatePendingChangesTask(AggregateDataTask):
             del new
             del old
 
+            self.cols = [self.popJoinField]
+            self.getters = [lambda f: f[self.popJoinField]] 
             self.addPopFields()
 
             if len(pending) == 0:

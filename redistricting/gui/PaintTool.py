@@ -23,13 +23,39 @@
  ***************************************************************************/
 """
 from enum import IntEnum
-from typing import Iterable, List
+from typing import (
+    Iterable,
+    List
+)
 
-from qgis.gui import QgsMapCanvas, QgsMapMouseEvent, QgsMapToolIdentify, QgsRubberBand
-from qgis.core import QgsFeature, QgsWkbTypes, QgsGeometry, QgsVectorLayer
-from qgis.PyQt.QtCore import Qt, QRect
-from qgis.PyQt.QtGui import QKeyEvent, QCursor, QPixmap, QColor
-from ..core import RedistrictingPlan, PlanAssignmentEditor, tr
+from qgis.core import (
+    QgsFeature,
+    QgsGeometry,
+    QgsVectorLayer,
+    QgsWkbTypes
+)
+from qgis.gui import (
+    QgsMapCanvas,
+    QgsMapMouseEvent,
+    QgsMapToolIdentify,
+    QgsRubberBand
+)
+from qgis.PyQt.QtCore import (
+    QRect,
+    Qt
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QCursor,
+    QKeyEvent,
+    QPixmap
+)
+
+from ..core import (
+    PlanAssignmentEditor,
+    RedistrictingPlan,
+    tr
+)
 
 
 class PaintMode(IntEnum):
@@ -162,6 +188,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._geoField = None
         self._distTarget = None
         self._distSource = None
+        self.inTransaction = False
 
         pixmap = QPixmap(PaintDistrictsTool.PAINT_CURSOR24)
         self.setCursor(QCursor(
@@ -186,6 +213,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._plan != value:
             self._plan = value
             self._layer = self._plan.assignLayer if self._plan is not None else None
+            self.inTransaction = self._layer.isEditable()
 
             self._assignmentEditor = None
             if self._plan and self._plan.geoFields and self._geoField not in self._plan.geoFields:
@@ -223,14 +251,25 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def paintMode(self, value):
         self._paintMode = value
 
-    def _paintFeatures(self, features: Iterable[QgsFeature], target, source):
+    def _startPaintFeatures(self, target: str = None):
+        if not self._layer.isEditable():
+            self._layer.startEditing()
+            self._layer.undoStack()
+        if target is None:
+            target = str(self.targetDistrict())
+        self._layer.beginEditCommand(tr('Assign features to district {}').format(target))
+
+    def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit = True):
         if self._geoField is not None and self._geoField != self._plan.geoIdField:
             values = {str(feature.attribute(self._geoField)) for feature in features}
             features = self._assignmentEditor.getDistFeatures(
                 self._geoField, values, target, source)
 
-        self._assignmentEditor.assignFeaturesToDistrict(features, target, source)
+        self._assignmentEditor.assignFeaturesToDistrict(features, target, source, self.inTransaction)
+        self.inTransaction = True
         self._layer.triggerRepaint()
+        if endEdit:
+            self._layer.endEditCommand()
 
     def _selectFeatures(
         self,
@@ -257,8 +296,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._paintMode == PaintMode.PaintByGeography:
             r = self.searchRadiusMU(self.canvas())
             self.setCanvasPropertiesOverrides(r/4)
-            self._layer.beginEditCommand(tr('Assign features to district {}').format(
-                str(self.targetDistrict(self.buttonsPressed))))
+            self._startPaintFeatures(str(self.targetDistrict(self.buttonsPressed)))
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             self._selectRect.setRect(e.x(), e.y(), e.x()+1, e.y()+1)
 
@@ -281,14 +319,19 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             results: List[QgsMapToolIdentify.IdentifyResult] = \
                 self.identify(e.x(), e.y(), [self._layer])
             if not results:
-                self._layer.destroyEditCommand()
+                if self._dragging:
+                    self._dragging = False
+                    self._layer.endEditCommand()
+                else:
+                    self._layer.destroyEditCommand()
                 return
+            
             self._paintFeatures(
                 (r.mFeature for r in results), 
                 self.targetDistrict(self.buttonsPressed), 
                 self.sourceDistrict(self.buttonsPressed)
             )
-            self._layer.endEditCommand()
+            self._dragging = False
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if self._dragging:
                 self._dragging = False
@@ -333,10 +376,15 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             results: List[QgsMapToolIdentify.IdentifyResult] = \
                 self.identify(e.x(), e.y(), [self._layer])
 
+            if not results:
+                return
+            
+            self._dragging = True
             self._paintFeatures(
                 (r.mFeature for r in results),
                 self.targetDistrict(buttons), 
-                self.sourceDistrict(buttons)
+                self.sourceDistrict(buttons),
+                False
             )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if not self._dragging:
