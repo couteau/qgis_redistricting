@@ -1,19 +1,19 @@
 {
     "python.testing.pytestEnabled": true,
-    "python.formatting.autopep8Path": "~/anaconda3/envs/qgis_plugin/bin/autopep8",
-    "python.linting.pylintPath": "~/anaconda3/envs/qgis_plugin/bin/pylint",
     "python.testing.pytestPath": "~/anaconda3/envs/qgis_plugin/bin/pytest",
+    "python.experiments.optInto": [
+        "pythonTestAdapter"
+    ],
     "python.autoComplete.extraPaths": [
-        "/Applications/QGIS.app/Contents/Resources/python/",
-        "/Applications/QGIS.app/Contents/Resources/python/site-packages",
-        "/Applications/QGIS.app/Contents/Resources/python/plugins",
+        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/",
+        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/plugins",
         "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python",
         "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
     ],
     "python.analysis.extraPaths": [
-        "/Applications/QGIS.app/Contents/Resources/python/",
-        "/Applications/QGIS.app/Contents/Resources/python/site-packages",
-        "/Applications/QGIS.app/Contents/Resources/python/plugins",
+        "~/anaconda3/envs/qgis_plugin/lib/python3.11/site-packages/PyQt5-stubs",
+        "~/anaconda3/envs/qgis_plugin/share/qgis/python/",
+        "~/anaconda3/envs/qgis_plugin/share/qgis/python/plugins",
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python",
         "~/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins"
     ],
@@ -37,4 +37,7 @@
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
+    "pylint.path": [
+        "/Users/stuart/anaconda3/envs/qgis_plugin/bin/pylint"
+    ],
 }
