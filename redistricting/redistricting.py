@@ -27,8 +27,6 @@
  ***************************************************************************/
 """
 import pathlib
-from functools import partial
-from re import S
 from typing import (
     Iterable,
     List,
@@ -585,7 +583,7 @@ class Redistricting:
     def onWriteProject(self, doc: QDomDocument):
         if len(self.redistrictingPlans) == 0:
             return
-        
+
         dirtyBlocker = QgsProjectDirtyBlocker(self.project)
         try:
             rg = self.project.layerTreeRoot()
@@ -646,7 +644,7 @@ class Redistricting:
                 level=Qgis.Warning,
                 duration=5)
             return
-        
+
         self.mapTool.paintMode = mode
         if self.mapTool.targetDistrict() is None:
             target = self.createDistrict()
@@ -828,7 +826,8 @@ class Redistricting:
             copier.progressChanged.connect(progress.setValue)
             progress.canceled.connect(copier.cancel)
             copier.copyComplete.connect(self.appendPlan)
-            copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
+            copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
+                            dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
 
     def importPlan(self):
         if not self.checkActivePlan(self.tr('import')):
@@ -932,10 +931,10 @@ class Redistricting:
         if checked:
             action: QAction = self.planActions.checkedAction()
             plan = action.data()
-            if plan != self.activePlan:            
+            if plan != self.activePlan:
                 self.setActivePlan(plan)
                 self.project.setDirty()
-        
+
     def addPlanToMenu(self, plan: RedistrictingPlan):
         action = QAction(text=plan.name, parent=self.planActions)
         action.setObjectName(plan.name)
@@ -951,7 +950,7 @@ class Redistricting:
             action.triggered.disconnect(self.activatePlan)
             self.planMenu.removeAction(action)
             self.planActions.removeAction(action)
-    
+
     def appendPlan(self, plan: RedistrictingPlan):
         self.redistrictingPlans.append(plan)
         plan.planChanged.connect(self.planChanged)
@@ -1001,7 +1000,7 @@ class Redistricting:
             return False
 
         return True
-    
+
     def bringPlanToTop(self, plan: RedistrictingPlan):
         dirtyBlocker = QgsProjectDirtyBlocker(self.project)
         try:
@@ -1014,7 +1013,7 @@ class Redistricting:
                     groups.remove(g)
                     groups.insert(0, g)
                     break
-            
+
             new_order = []
             gi = None
             for index, layer in enumerate(order):
@@ -1038,13 +1037,13 @@ class Redistricting:
                         continue
 
                 new_order.append(layer)
-            
+
             if gi is not None:
                 for g in groups:
                     for l in g.children():
                         new_order.insert(gi, l.layer())
                         gi += 1
-            
+
             rg.setHasCustomLayerOrder(True)
             rg.setCustomLayerOrder(new_order)
         finally:
