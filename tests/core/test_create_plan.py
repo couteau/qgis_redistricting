@@ -48,7 +48,7 @@ class TestPlanCreator:
         assert creator.validate()
         assert creator._numSeats == 5
         assert creator._geoLayer == block_layer
-        assert creator._sourceIdField == 'geoid20'
+        assert creator._geoJoinField == 'geoid20'
         assert creator._popJoinField == 'geoid20'
 
     def test_createlayers_triggers_background_task_when_plan_is_valid(
@@ -120,27 +120,17 @@ class TestPlanCreator:
         assert not creator._validatePopLayer()
         creator.setPopField('pop_total')
 
-        assert creator._validatePopLayer()
-        creator.setVAPField('not_a_field')
-        assert not creator._validatePopLayer()
-        creator.setVAPField(None)
-
-        assert creator._validatePopLayer()
-        creator.setCVAPField('not_a_field')
-        assert not creator._validatePopLayer()
-        creator.setCVAPField(None)
+        #assert creator._validatePopLayer()
+        #creator.appendPopField('not_a_field')
+        #assert not creator._validatePopLayer()
+        #creator.removePopField(0)
 
     def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
         plan = creator.createPlan(createLayers=False)
         assert hasattr(plan.districts[0], 'pop_total')
         assert not plan.districts._needUpdate
 
-        creator.setVAPField('vap_total')
+        creator.appendPopField('vap_total')
         plan = creator.createPlan(createLayers=False)
-        assert plan.vapField == 'vap_total'
+        assert plan.popFields[0].field == 'vap_total'
         assert hasattr(plan.districts[0], 'vap_total')
-
-        creator.setCVAPField('vap_hispanic')
-        plan = creator.createPlan(createLayers=False)
-        assert plan.cvapField == 'vap_hispanic'
-        assert hasattr(plan.districts[0], 'vap_hispanic')

@@ -81,8 +81,7 @@ class TestPlan:
         assert plan.distField == 'district'
         assert plan.geoIdField is None
         assert plan.popField is None
-        assert plan.vapField is None
-        assert plan.cvapField is None
+        assert len(plan.popFields) == 0
         assert plan.geoIdCaption is None
         assert plan.deviation == 0
         assert plan.totalPopulation == 0

@@ -18,8 +18,12 @@
 """
 import pytest
 from qgis.PyQt.QtCore import QVariant
-from redistricting.core.Field import BasePopulation, DataField, Field
+
 from redistricting.core.Exception import RdsException
+from redistricting.core.Field import (
+    DataField,
+    Field
+)
 
 # pylint: disable=no-self-use
 
@@ -99,7 +103,7 @@ class TestField:
 class TestDataField:
     @pytest.fixture
     def data_field(self, block_layer) -> DataField:
-        return DataField(block_layer, 'vap_apblack')
+        return DataField(block_layer, 'vap_apblack', pctbase='vap_total')
 
     @pytest.fixture
     def data_field_expr(self, block_layer) -> DataField:
@@ -107,16 +111,16 @@ class TestDataField:
             block_layer,
             'vap_nh_apblack + vap_nh_asian + vap_nh_amind_aknative + vap_hispanic',
             caption='Dream Team',
-            pctbase=BasePopulation.VAP
+            pctbase='vap_total'
         )
 
     def test_create(self, block_layer):
-        field = DataField(block_layer, 'vap_apblack')
-        assert field.field == 'vap_apblack' and field.sum and field.pctbase == BasePopulation.VAP
+        field = DataField(block_layer, 'vap_apblack', pctbase='vap_total')
+        assert field.field == 'vap_apblack' and field.sum and field.pctbase == 'vap_total'
 
     def test_create_expr(self, block_layer):
         field = DataField(block_layer, 'vap_nh_apblack + vap_hispanic', True)
-        assert field.field == 'vap_nh_apblack + vap_hispanic' and field.sum and field.pctbase == BasePopulation.NOPCT
+        assert field.field == 'vap_nh_apblack + vap_hispanic' and field.sum and field.pctbase is None
 
     def test_serialize(self, block_layer, data_field):
         data = data_field.serialize()
@@ -126,7 +130,7 @@ class TestDataField:
             'expression': False,
             'caption': 'vap_apblack',
             'sum': True,
-            'pctbase': BasePopulation.VAP
+            'pctbase': 'vap_total'
         }
 
     def test_deserialize(self, block_layer):
@@ -135,7 +139,7 @@ class TestDataField:
             'field': 'vap_apblack',
             'expression': False,
             'caption': 'APBVAP',
-            'pctbase': 2
+            'pctbase': 'vap_total'
         }
         field = DataField.deserialize(data)
         assert field.field == 'vap_apblack'
@@ -143,7 +147,7 @@ class TestDataField:
         assert not field.isExpression
         assert field.caption == 'APBVAP'
         assert field.sum
-        assert field.pctbase == BasePopulation.VAP
+        assert field.pctbase == 'vap_total'
 
     def test_makeqgsfield_field(self, data_field):
         qf = data_field.makeQgsField()

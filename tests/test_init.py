@@ -1,18 +1,38 @@
 """Test redististricting plugin initialization"""
-import pathlib
 import configparser
+import pathlib
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from pytestqt.plugin import QtBot
 from pytest_mock.plugin import MockerFixture
-from qgis.core import Qgis, QgsProject, QgsVectorLayer
-from qgis.PyQt.QtCore import Qt, QObject
-from qgis.PyQt.QtWidgets import QDialog, QProgressDialog, QPushButton
-from redistricting import redistricting, classFactory
+from pytestqt.plugin import QtBot
+from qgis.core import (
+    Qgis,
+    QgsProject,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QProgressDialog,
+    QPushButton
+)
+
+from redistricting import (
+    classFactory,
+    redistricting
+)
 from redistricting.core import FieldList
-from redistricting.gui import DlgEditPlan, DlgCopyPlan, DlgImportPlan, DlgImportShape
+from redistricting.gui import (
+    DlgCopyPlan,
+    DlgEditPlan,
+    DlgImportPlan,
+    DlgImportShape
+)
 
 
 class TestPluginInit:
@@ -26,6 +46,7 @@ class TestPluginInit:
         qgis_iface.addPluginToVectorMenu = mocker.MagicMock()
         qgis_iface.removeDockWidget = mocker.MagicMock()
         qgis_iface.removePluginVectorMenu = mocker.MagicMock()
+        qgis_iface.layerTreeView = mocker.MagicMock()
 
         return classFactory(qgis_iface)
 
@@ -59,12 +80,11 @@ class TestPluginInit:
         builder.setDeviation.return_value = builder
         builder.setGeoIdField.return_value = builder
         builder.setGeoDisplay.return_value = builder
-        builder.setSourceLayer.return_value = builder
+        builder.setGeoLayer.return_value = builder
         builder.setPopLayer.return_value = builder
         builder.setJoinField.return_value = builder
         builder.setPopField.return_value = builder
-        builder.setVAPField.return_value = builder
-        builder.setCVAPField.return_value = builder
+        builder.setPopFields.return_value = builder
         builder.setDataFields.return_value = builder
         builder.setGeoFields.return_value = builder
         builder.setGeoPackagePath.return_value = builder
@@ -82,12 +102,11 @@ class TestPluginInit:
         builder.setDeviation.return_value = builder
         builder.setGeoIdField.return_value = builder
         builder.setGeoDisplay.return_value = builder
-        builder.setSourceLayer.return_value = builder
+        builder.setGeoLayer.return_value = builder
         builder.setPopLayer.return_value = builder
         builder.setJoinField.return_value = builder
         builder.setPopField.return_value = builder
-        builder.setVAPField.return_value = builder
-        builder.setCVAPField.return_value = builder
+        builder.setPopFields.return_value = builder
         builder.setDataFields.return_value = builder
         builder.setGeoFields.return_value = builder
         return builder_class
@@ -101,14 +120,13 @@ class TestPluginInit:
         dlg.numSeats.return_value = 5
         dlg.description.return_value = 'mocked edit dialog plan'
         dlg.deviation.return_value = 0.03
-        dlg.sourceLayer.return_value = None
+        dlg.geoLayer.return_value = None
         dlg.popLayer.return_value = None
         dlg.geoIdField.return_value = 'geoid20'
-        dlg.geoIdDisplay.return_value = 'Block'
+        dlg.geoIdCaption.return_value = 'Block'
         dlg.joinField.return_value = 'geoid20'
         dlg.popField.return_value = 'pop_total'
-        dlg.vapField.return_value = 'vap_total'
-        dlg.cvapField.return_value = None
+        dlg.popFields.return_value = FieldList()
         dlg.dataFields.return_value = FieldList()
         dlg.geoFields.return_value = FieldList()
         dlg.gpkgPath.return_value = datadir / 'test_plan.gpkg'
@@ -266,10 +284,10 @@ class TestPluginInit:
         assert not plugin_with_plan.actionExportPlan.isEnabled()
         assert not plugin_with_plan.actionCopyPlan.isEnabled()
 
-    def test_set_active_invalid_plan(self, plugin, minimal_plan):
-        plugin.appendPlan(minimal_plan)
-        plugin.setActivePlan(minimal_plan)
-        assert plugin.activePlan is None
+    def test_set_active_invalid_plan(self, plugin_with_gui, minimal_plan):
+        plugin_with_gui.appendPlan(minimal_plan)
+        plugin_with_gui.setActivePlan(minimal_plan)
+        assert plugin_with_gui.activePlan is None
 
     def test_remove_layer(self, plugin_with_gui, block_layer, qtbot: QtBot):
         with qtbot.wait_signal(QgsProject.instance().layersRemoved):
@@ -459,6 +477,7 @@ class TestPluginInit:
     ):
         dlg = mocker.patch('redistricting.redistricting.DlgCopyPlan', spec=DlgCopyPlan)
         dlg.return_value.planName = 'copied'
+        dlg.return_value.description = 'copy of plan'
         dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
         dlg.return_value.copyAssignments = False
         dlg.return_value.exec_.return_value = QDialog.Accepted
@@ -476,7 +495,8 @@ class TestPluginInit:
         dlg.assert_called_once()
         cpy.assert_called_once()
         dlg.return_value.exec_.assert_called_once()
-        cpy.return_value.copyPlan.assert_called_once_with('copied', str(datadir / 'test_plan.gpkg'), False)
+        cpy.return_value.copyPlan.assert_called_once_with(
+            'copied', 'copy of plan', str(datadir / 'test_plan.gpkg'), False)
 
     def test_import_plan(
         self,
