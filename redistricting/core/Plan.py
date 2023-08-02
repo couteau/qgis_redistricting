@@ -155,6 +155,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
             'dist-layer': self._distLayer.id() if self._distLayer else None,
             'pop-field': self._popField,
+            'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],
 
             'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
