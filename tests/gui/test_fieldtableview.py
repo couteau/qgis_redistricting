@@ -1,12 +1,19 @@
 """QGIS Redistricting Plugin - unit tests for RdsFieldTableView class"""
+import pyautogui
 import pytest
 from pytestqt.plugin import QtBot
-import pyautogui
-
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
-from redistricting.gui.RdsFieldTableView import RdsFieldTableView, FieldListModel
-from redistricting.core import Field, DataField, FieldList
+
+from redistricting.core import (
+    DataField,
+    Field,
+    FieldList
+)
+from redistricting.gui.RdsFieldTableView import (
+    FieldListModel,
+    RdsFieldTableView
+)
 
 
 class TestFieldTableView:
@@ -75,7 +82,7 @@ class TestFieldTableView:
         assert data == 'vap_nh_white'
         data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.DecorationRole)
         assert isinstance(data, QIcon)
-        data = datafield_list_model.data(datafield_list_model.createIndex(0, 4), Qt.CheckStateRole)
+        data = datafield_list_model.data(datafield_list_model.createIndex(0, 2), Qt.CheckStateRole)
         assert data == Qt.Checked
 
     def test_set_data(self, datafield_list_model: FieldListModel):
@@ -86,9 +93,6 @@ class TestFieldTableView:
     def test_flags(self, datafield_list_model: FieldListModel):
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 1)) & Qt.ItemIsEditable
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 2)) & Qt.ItemIsUserCheckable
-        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 5)) & Qt.ItemIsEnabled
-        datafield_list_model.cvapEnabled = False
-        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 5)) & Qt.ItemIsEnabled == Qt.NoItemFlags
 
     @pytest.mark.gui
     def test_drag_field(self, field_table_view: RdsFieldTableView, qtbot: QtBot):

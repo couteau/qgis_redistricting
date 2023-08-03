@@ -63,27 +63,26 @@ if TYPE_CHECKING:
 
 
 class CreatePlanLayersTask(SqlAccess, QgsTask):
-    def __init__(self, plan: RedistrictingPlan, gpkgPath, srcLayer: QgsVectorLayer, srcGeoIdField: str):
+    def __init__(self, plan: RedistrictingPlan, gpkgPath, geoLayer: QgsVectorLayer, geoJoinField: str):
         super().__init__(tr('Create assignments layer'), QgsTask.AllFlags)
         self.path = gpkgPath
 
         self.assignFields = []
 
-        self.srcLayer: QgsVectorLayer = srcLayer # None
-        self.srcField: QgsField = None
-        self.srcGeoIdField = srcGeoIdField
+        self.geoLayer: QgsVectorLayer = geoLayer # None
+        self.geoField: QgsField = None
+        self.geoJoinField = geoJoinField
         self.geoFields: List[Field] = list(plan.geoFields)
 
-        authid = srcLayer.sourceCrs().authid()
+        authid = geoLayer.sourceCrs().authid()
         _, srid = authid.split(':', 1)
         self.srid = int(srid)
 
         self.popLayer: QgsVectorLayer = plan.popLayer
-        self.joinField = plan.joinField
+        self.popJoinField = plan.popJoinField
+        self.popFields: List[Field] = list(plan.popFields)
         self.dataFields: List[DataField] = list(plan.dataFields)
         self.popField = plan.popField
-        self.vapField = plan.vapField
-        self.cvapField = plan.cvapField
 
         self.geoIdField = plan.geoIdField
         self.distField = plan.distField
@@ -92,18 +91,17 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.popTotals = {}
         self.totalPop = 0
         # self.getPopFieldTotals(plan.popLayer)
-        self.setDependentLayers(l for l in (self.srcLayer,self.popLayer) if l is not None)
+        self.setDependentLayers(l for l in (self.geoLayer,self.popLayer) if l is not None)
 
-    def validatePopFields(self, popLayer):
+    def validatePopFields(self, popLayer: QgsVectorLayer):
         popFields = popLayer.fields()
-        if popFields.lookupField(self.joinField) == -1:
-            raise ValueError((f'Could not find field {self.joinField} in population layer'))
+        if popFields.lookupField(self.popJoinField) == -1:
+            raise ValueError((f'Could not find field {self.popJoinField} in population layer'))
         if popFields.lookupField(self.popField) == -1:
             raise ValueError((f'Could not find field {self.popField} in population layer'))
-        if self.vapField and popFields.lookupField(self.vapField) == -1:
-            raise ValueError((f'Could not find field {self.vapField} in population layer'))
-        if self.cvapField and popFields.lookupField(self.cvapField) == -1:
-            raise ValueError((f'Could not find field {self.cvapField} in population layer'))
+        for field in self.popFields:
+            if not field.validate(popLayer):
+                raise ValueError(field.error())
         for field in self.dataFields:
             if not field.validate(popLayer):
                 raise ValueError(field.error())
@@ -114,25 +112,21 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         d = {self.distField: 0, 'name': 'Unassigned'}
         d[self.popField], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, self.popField, context=context)
-        if self.vapField:
-            d[self.vapField], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, self.vapField, context=context)
-        if self.cvapField:
-            d[self.cvapField], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, self.cvapField, context=context)
-        for fld in self.dataFields:
-            d[fld.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, fld.field, context=context)
+        for field in self.popFields:
+            d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
+        for field in self.dataFields:
+            d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
 
         return d
 
     def makePopTotalsSqlSelect(self, table):
         sql = f'SELECT 0 as {self.distField}, \'{tr("Unassigned")}\' as name, SUM({self.popField}) as {self.popField}'
 
-        if self.vapField:
-            sql += f', SUM({self.vapField}) as {self.vapField}'
-        if self.cvapField:
-            sql += f', SUM({self.cvapField}) as {self.cvapField}'
+        for field in self.popFields:
+            sql += f', SUM({field.field}) as {field.fieldName}'
 
-        for f in self.dataFields:
-            sql += f', SUM({f.field}) as {f.fieldName}'
+        for field in self.dataFields:
+            sql += f', SUM({field.field}) as {field.fieldName}'
 
         sql += f' FROM {table}'
 
@@ -150,9 +144,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return self.getPopFieldTotalsAggregate(popLayer)
 
     def makeSourceLayers(self):
-        self.srcField = self.srcLayer.fields().field(self.srcGeoIdField)
-        if not self.srcField:
-            raise ValueError(f'Source ID Field not found: {self.srcField}')
+        self.geoField = self.geoLayer.fields().field(self.geoJoinField)
+        if not self.geoField:
+            raise ValueError(f'Source ID Field not found: {self.geoField}')
 
         self.validatePopFields(self.popLayer)
 
@@ -166,19 +160,12 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         fieldNames = {self.distField, 'name', 'members', self.popField}
 
-        if self.vapField and self.vapField not in fieldNames:
-            sql += f'{self.vapField} REAL DEFAULT 0,'
-            fieldNames.add(self.vapField)
-        if self.cvapField and self.cvapField not in fieldNames:
-            sql += f'{self.cvapField} REAL DEFAULT 0,'
-            fieldNames.add(self.cvapField)
-
         context = None
-        for f in self.dataFields:
+        for f in self.popFields:
             if f.fieldName in fieldNames:
                 continue
 
-            if f.isExpression:
+            if f.isExpression and not context:
                 context = QgsExpressionContext()
                 context.appendScopes(
                     QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
@@ -198,11 +185,37 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             sql += f'{f.fieldName} {tp},'
             fieldNames.add(f.fieldName)
 
+        for f in self.dataFields:
+            if f.fieldName in fieldNames:
+                continue
+
+            if f.isExpression and not context:
+                context = QgsExpressionContext()
+                context.appendScopes(
+                    QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+                context.setFeature(next(self.popLayer.getFeatures()))
+
+            t = f.fieldType(context, self.popLayer)
+            if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
+                     QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
+                tp = 'INTEGER'
+            elif t == QVariant.Double:
+                tp = 'REAL'
+            else:
+                continue
+
+            sql += f'{f.fieldName} {tp},'
+            fieldNames.add(f.fieldName)
+
         sql += 'polsbypopper REAL,' \
             'reock REAL,' \
             'convexhull REAL)'
 
-        return createGpkgTable(self.path, 'districts', sql, srid=self.srid)
+        if createGpkgTable(self.path, 'districts', sql, srid=self.srid):
+            with closing(spatialite_connect(self.path)) as db:
+                db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
+
+        return True        
 
     def createUnassigned(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
@@ -220,7 +233,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return True
 
     def createAssignLayer(self):
-        t = QgsField(self.srcField).type()
+        t = QgsField(self.geoField).type()
         if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong):
             tp = 'INTEGER'
         elif t in (QVariant.String, QVariant.ByteArray):
@@ -236,13 +249,13 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         fieldNames = [self.geoIdField, self.distField]
 
         context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.srcLayer))
-        context.setFeature(next(self.srcLayer.getFeatures()))
+        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.geoLayer))
+        context.setFeature(next(self.geoLayer.getFeatures()))
         for f in self.geoFields:
             if f.fieldName in fieldNames:
                 continue
 
-            t = f.fieldType(context, self.srcLayer)
+            t = f.fieldType(context, self.geoLayer)
             if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong):
                 tp = 'INTEGER'
             elif t in (QVariant.String, QVariant.ByteArray):
@@ -267,29 +280,29 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return True
 
     def importSourceData(self):
-        total = self.srcLayer.featureCount()
+        total = self.geoLayer.featureCount()
         count = 0
         with spatialite_connect(self.path) as db:
             gen = None
-            if self.isSQLCapable(self.srcLayer):
-                table = self.getTableName(self.srcLayer)
-                geocol = self.getGeometryColumn(self.srcLayer, table)
+            if self.isSQLCapable(self.geoLayer):
+                table = self.getTableName(self.geoLayer)
+                geocol = self.getGeometryColumn(self.geoLayer, table)
                 if table and geocol:
-                    sql = f'SELECT {self.srcGeoIdField}, 0 as district, '
+                    sql = f'SELECT {self.geoJoinField}, 0 as district, '
                     for f in self.geoFields:
                         if f.fieldName in self.assignFields:
                             sql += f'{f.field} as {f.fieldName}, '
                     sql += f'ST_AsText({geocol}) as geometry FROM {table}'
-                    gen = self.executeSql(self.srcLayer, sql, False)
+                    gen = self.executeSql(self.geoLayer, sql, False)
 
             if not gen:
                 context = QgsExpressionContext()
-                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.srcLayer))
+                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.geoLayer))
                 gen = (
-                    [f[self.srcGeoIdField], 0] +
+                    [f[self.geoJoinField], 0] +
                     [field.getValue(f, context) for field in self.geoFields] +
                     [f.geometry().asWkt()]
-                    for f in self.srcLayer.getFeatures()
+                    for f in self.geoLayer.getFeatures()
                 )
 
             sql = f'INSERT INTO assignments ({",".join(self.assignFields)}, geometry) ' \
@@ -336,7 +349,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             return False
         finally:
             self.popLayer = None
-            self.srcLayer = None
+            self.geoLayer = None
 
         self.setProgress(100)
         return True

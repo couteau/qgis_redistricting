@@ -22,11 +22,70 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtWidgets import QWizardPage
+from typing import Optional
+
 from qgis.core import QgsApplication
-from ..core import DataField
+from qgis.PyQt.QtCore import (
+    QModelIndex,
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtWidgets import (
+    QComboBox,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QWidget,
+    QWizardPage
+)
+
+from redistricting.core import defaults
+from redistricting.core.utils import matchField
+
+from ..core import (
+    DataField,
+    Field,
+    tr
+)
+from .RdsFieldTableView import FieldListModel
 from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
 
+
+class PopFieldDelegate(QStyledItemDelegate):
+    def __init__(self, parent: Optional[QObject] = None) -> None:
+        super().__init__(parent)
+        self._popFields: list[Field] = []
+
+    def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
+        if index.column() == 3:
+            editor = QComboBox(parent)
+            editor.setFrame(False)
+            rect = option.rect
+            editor.setGeometry(rect)
+            editor.setEditable(False)
+            editor.addItems([f.caption for f in self._popFields])
+            return editor
+        return super().createEditor(parent, option, index)
+
+    def setEditorData(self, editor: QComboBox, index: QModelIndex):
+        if index.column() == 3:
+            text = index.model().data(index, Qt.EditRole)
+            editor.setCurrentText(text)
+        else:
+            super().setEditorData(editor, index)
+
+    def setModelData(self, editor: QComboBox, model: FieldListModel, index: QModelIndex):
+        if index.column() == 3:
+            idx = editor.currentIndex()
+            model.setData(index, idx, Qt.EditRole)
+        else:
+            super().setModelData(editor, model, index)
+
+    def updateEditorGeometry(self, editor: QWidget, option: QStyleOptionViewItem, index: QModelIndex):
+        if index.column() == 1:
+            rect = option.rect
+            editor.setGeometry(rect)
+        else:
+            super().updateEditorGeometry(editor, option, index)
 
 class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
     fields = None
@@ -36,8 +95,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         self.setupUi(self)
         self.fieldsModel = self.tblDataFields.model()
         self.fieldsModel.fieldType = DataField
-        #self.fieldsModel = DataFieldsModel(self)
-        # self.tblDataFields.setModel(self.fieldsModel)
+        self.tblDataFields.setItemDelegateForColumn(3, PopFieldDelegate(self))
 
         self.registerField('dataFields', self.tblDataFields, 'fields', self.tblDataFields.fieldsChanged)
         self.tblDataFields.setEnableDragRows(True)
@@ -49,16 +107,20 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
 
     def initializePage(self):
         super().initializePage()
+        popLayer = self.field("popLayer") or self.field("sourceLayer")
+        popField = Field(popLayer, self.field("popField"), False, tr("Total Population"))
+        popFields: list[Field] = [popField, *self.field("popFields")]
+        self.fieldsModel.popFields = popFields
+
+        delegate: PopFieldDelegate = self.tblDataFields.itemDelegateForColumn(3)
+        delegate._popFields = popFields
+                
         self.tblDataFields.setColumnWidth(0, 120)
         self.tblDataFields.setColumnWidth(1, 120)
-        self.tblDataFields.setColumnWidth(2, 30)
-        self.tblDataFields.setColumnWidth(3, 48)
-        self.tblDataFields.setColumnWidth(4, 48)
-        self.tblDataFields.setColumnWidth(5, 48)
+        self.tblDataFields.setColumnWidth(2, 32)
+        self.tblDataFields.setColumnWidth(3, 120)
         self.tblDataFields.setColumnWidth(6, 32)
-        self.fexDataField.setLayer(self.field('popLayer') or self.field('sourceLayer'))
-        self.fieldsModel.vapEnabled = bool(self.field('vapField'))
-        self.fieldsModel.cvapEnabled = bool(self.field('cvapField'))
+        self.fexDataField.setLayer(popLayer)
         if hasattr(self.wizard(), "isComplete"):
             self.setFinalPage(self.wizard().isComplete())
         else:
@@ -76,4 +138,17 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         if not isValid:
             return
 
-        self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
+        f = self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
+        if f and f.isNumeric and not isExpression:
+            if matchField(f, self.fexDataField.layer(), defaults.VAP_FIELDS):
+                for p in self.fieldsModel.popFields:
+                    if matchField(p.field, None, defaults.VAP_TOTAL_FIELDS):
+                        f.pctbase = p.fieldName
+
+            elif matchField(f, self.fexDataField.layer(), defaults.CVAP_FIELDS):
+                for p in self.fieldsModel.popFields:
+                    if matchField(p.field, None, defaults.CVAP_TOTAL_FIELDS):
+                        f.pctbase = p.fieldName
+
+            else:
+                f.pctbase = self.field("popField")

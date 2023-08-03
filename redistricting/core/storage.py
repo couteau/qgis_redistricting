@@ -34,8 +34,10 @@ from qgis.core import (
 from qgis.PyQt.QtXml import QDomDocument
 
 from .Plan import RedistrictingPlan
-
-schemaVersion = version.parse('1.0.0')
+from .schema import (
+    checkMigrateSchema,
+    schemaVersion
+)
 
 
 class ProjectStorage:
@@ -46,14 +48,16 @@ class ProjectStorage:
         self._version = self.getVersion() or schemaVersion
 
     def migrate(self):
-        """Migrate plugin node in project file to new schema
-
-            currently does nothing - here for the future in case 
-            the json schema/storage format changes
-        """
+        """Migrate plugin node in project file to new schema"""
         if self._version < schemaVersion:
-            # perform migration
-            pass
+            l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
+            if not success:
+                return
+        
+            for i, d in enumerate(l):
+                data = json.loads(d)
+                l[i] = json.dumps(checkMigrateSchema(data, self._version))
+            self._project.writeEntry('redistricting', 'redistricting-plans', l)
 
         self._version = schemaVersion
 
@@ -74,8 +78,8 @@ class ProjectStorage:
         self.setVersion()
 
     def readRedistrictingPlans(self) -> List[RedistrictingPlan]:
-        self.migrate()
         plans = []
+        self.migrate()
         l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
         if success:
             for p in l:

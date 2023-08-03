@@ -26,9 +26,8 @@ from __future__ import annotations
 
 import csv
 from contextlib import closing
-
 from typing import TYPE_CHECKING
-from qgis.PyQt.QtCore import QVariant
+
 from qgis.core import (
     QgsExpression,
     QgsExpressionContext,
@@ -44,13 +43,18 @@ from qgis.core import (
     QgsVectorLayer,
     QgsWkbTypes
 )
+from qgis.PyQt.QtCore import QVariant
 from qgis.utils import spatialite_connect
-from ..utils import tr
+
 from ..Exception import RdsException
+from ..utils import tr
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from .. import RedistrictingPlan, Field
+    from .. import (
+        Field,
+        RedistrictingPlan
+    )
 
 
 def makeDbfFieldName(fieldName, fields: QgsFields):
@@ -97,10 +101,9 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         self.distLayer = plan.distLayer
 
+        self.popJoinField = plan.popJoinField
         self.popField = plan.popField
-        self.vapField = plan.vapField
-        self.cvapField = plan.cvapField
-        self.joinField = plan.joinField
+        self.popFields = plan.popFields
         self.dataFields = plan.dataFields
 
         self.districts = plan.districts
@@ -124,12 +127,16 @@ class ExportRedistrictingPlanTask(QgsTask):
             fields.append(QgsField('deviation', QVariant.Double))
             fields.append(QgsField('pct_dev', QVariant.Double))
 
-            if self.vapField:
-                fieldNames[self.vapField] = makeDbfFieldName(self.vapField, fields)
-                fields.append(QgsField(fieldNames[self.vapField], QVariant.LongLong, 'Integer64', 18, 0))
-            if self.cvapField:
-                fieldNames[self.cvapField] = makeDbfFieldName(self.cvapField, fields)
-                fields.append(QgsField(fieldNames[self.cvapField], QVariant.LongLong, 'Integer64', 18, 0))
+            for f in self.popFields:
+                fn = f.fieldName
+                fieldNames[fn] = makeDbfFieldName(fn, fields)
+                field = f.makeQgsField(context, name=fieldNames[fn])
+                if field.type() in (QVariant.LongLong, QVariant.ULongLong):
+                    field.setTypeName('Integer64')
+                    field.setLength(20)
+                    field.setPrecision(0)
+                fields.append(field)
+
             for f in self.dataFields:
                 fn = f.fieldName
                 fieldNames[fn] = makeDbfFieldName(fn, fields)

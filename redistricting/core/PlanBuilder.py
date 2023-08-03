@@ -22,17 +22,25 @@
  *                                                                         *
  ***************************************************************************/
 """
-from copy import deepcopy
 import pathlib
+from copy import deepcopy
 from typing import Union
 from uuid import uuid4
-from qgis.core import Qgis, QgsApplication
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from .utils import tr
-from .Tasks import CreatePlanLayersTask
+
+from qgis.core import (
+    Qgis,
+    QgsApplication
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
+
 from .BasePlanBuilder import BasePlanBuilder
-from .PlanImport import PlanImporter
 from .Plan import RedistrictingPlan
+from .PlanImport import PlanImporter
+from .Tasks import CreatePlanLayersTask
+from .utils import tr
 
 
 class PlanBuilder(BasePlanBuilder):
@@ -108,8 +116,8 @@ class PlanBuilder(BasePlanBuilder):
         self._createLayersTask = CreatePlanLayersTask(
             plan,
             str(self._geoPackagePath),
-            self._sourceLayer,
-            self._sourceIdField)
+            self._geoLayer,
+            self._geoJoinField)
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
         self._createLayersTask.progressChanged.connect(self.setProgress)
@@ -164,15 +172,14 @@ class PlanBuilder(BasePlanBuilder):
             'num-seats': self._numSeats if self._numSeats > self._numDistricts else None,
             'deviation': self._deviation,
             'geo-id-field': self._geoIdField,
-            'geo-id-display': self._geoDisplay,
+            'geo-id-caption': self._geoIdCaption,
             'dist-field': self._distField,
             'pop-layer': self._popLayer.id(),
-            'join-field': self._joinField if self._joinField != self._geoIdField else None,
+            'pop-join-field': self._popJoinField if self._popJoinField != self._geoIdField else None,
             'pop-field': self._popField,
-            'vap-field': self._vapField,
-            'cvap-field': self._cvapField,
-            'src-layer': self._sourceLayer.id() if self._sourceLayer != self._popLayer else None,
-            'src-id-field': self._sourceIdField if self._sourceIdField != self._geoIdField else None,
+            'geo-layer': self._geoLayer.id() if self._geoLayer != self._popLayer else None,
+            'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
+            'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],
             'geo-fields': [field.serialize() for field in self._geoFields],
         }

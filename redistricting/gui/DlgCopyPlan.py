@@ -24,12 +24,24 @@
 """
 import os
 import re
-from typing import Optional, Union
-from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.core import QgsProject
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QWidget
+)
+
+from ..core import (
+    RedistrictingPlan,
+    tr
+)
 from .ui.DlgCopyPlan import Ui_dlgCopyPlan
-from ..core import RedistrictingPlan, tr
 
 
 class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
@@ -40,7 +52,7 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
         self.setTabOrder(self.inpPlanName, self.fwGeoPackage.lineEdit())
 
         self.lblSourcePlan.setText(tr('Copy from <b>{plan}</b>').format(plan=plan.name))
-        self.cbxCopyAssignments.setText(tr('Copy {geography} assignments').format(geography=plan.geoDisplay.lower()))
+        self.cbxCopyAssignments.setText(tr('Copy {geography} assignments').format(geography=plan.geoIdCaption.lower()))
         self.inpPlanName.editingFinished.connect(self.planNameChanged)
         self.inpPlanName.textChanged.connect(self.updateButtonBox)
         self.txtDescription.setPlainText(plan.description)

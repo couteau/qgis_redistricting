@@ -18,12 +18,16 @@
  ***************************************************************************/
 """
 import pathlib
-import pytest
 
+import pytest
 from qgis.core import QgsVectorLayer
-from redistricting.core.Tasks.CreateLayersTask import CreatePlanLayersTask
+
+from redistricting.core.Field import (
+    DataField,
+    Field
+)
 from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.Field import Field, DataField
+from redistricting.core.Tasks.CreateLayersTask import CreatePlanLayersTask
 
 # pylint: disable=protected-access
 
@@ -44,10 +48,10 @@ class TestCreateLayersTask:
         p = RedistrictingPlan('test_create_layers', 5)
         p._geoIdField = geoid_field
         p._popLayer = layer
-        p._joinField = geoid_field
+        p._popJoinField = geoid_field
         p._popField = pop_field
-        p._sourceLayer = layer
-        p._sourceIdField = geoid_field
+        p._geoLayer = layer
+        p._geoJoinField = geoid_field
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
         task = CreatePlanLayersTask(p, str(gpkg), layer, geoid_field)
         result = task.run()

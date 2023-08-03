@@ -1,17 +1,22 @@
 """QGIS Redistricting Plugin test fixtures"""
 
-import shutil
 import pathlib
+import shutil
+
 import pytest
 from pytest_mock.plugin import MockerFixture
-from qgis.core import QgsProject, QgsVectorLayer
-from redistricting.core.Plan import RedistrictingPlan
+from qgis.core import (
+    QgsProject,
+    QgsVectorLayer
+)
+
 from redistricting.core.DistrictList import DistrictList
 from redistricting.core.FieldList import FieldList
+from redistricting.core.Plan import RedistrictingPlan
 from redistricting.core.PlanBuilder import PlanBuilder
 
-
 # pylint: disable=redefined-outer-name, unused-argument
+
 
 @pytest.fixture
 def datadir(tmp_path: pathlib.Path):
@@ -78,7 +83,12 @@ def plan(block_layer, assign_layer, dist_layer):
         'geo-id-field': 'geoid20',
         'dist-field': 'district',
         'pop-field': 'pop_total',
-        'vap-field': 'vap_total',
+        'pop-fields': [
+            {'layer': block_layer.id(),
+             'field': 'vap_total',
+             'expression': False,
+             'caption': 'VAP'}
+        ],
         'total-population': 227036,
         'assign-layer': assign_layer.id(),
         'dist-layer': dist_layer.id(),
@@ -93,19 +103,19 @@ def plan(block_layer, assign_layer, dist_layer):
              'expression': False,
              'caption': 'APBVAP',
              'sum': True,
-             'pctvap': True},
+             'pctbase': 'vap_total'},
             {'layer': block_layer.id(),
              'field': 'vap_nh_white',
              'expression': False,
              'caption': 'WVAP',
              'sum': True,
-             'pctvap': True},
+             'pctbase': 'vap_total'},
             {'layer': block_layer.id(),
              'field': 'vap_hispanic',
              'expression': False,
              'caption': 'HVAP',
              'sum': True,
-             'pctvap': True},
+             'pctbase': 'vap_total'},
         ],
         'geo-fields': [
             {'layer': assign_layer.id(),
@@ -123,7 +133,7 @@ def plan(block_layer, assign_layer, dist_layer):
 def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
     dst = (datadir / 'tuscaloosa_new_plan.gpkg')
 
-    p = PlanBuilder() \
+    p: RedistrictingPlan = PlanBuilder() \
         .setName('test') \
         .setNumDistricts(5) \
         .setDeviation(0.025) \
@@ -131,7 +141,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .setGeoIdField('geoid20') \
         .setDistField('district') \
         .setPopField('pop_total') \
-        .setVAPField('vap_total') \
+        .appendPopField('vap_total', caption='VAP') \
         .appendDataField('vap_nh_black', caption='BVAP') \
         .appendDataField('vap_apblack', caption='APBVAP') \
         .appendDataField('vap_nh_white', caption='WVAP') \
@@ -157,18 +167,19 @@ def mock_plan(mocker: MockerFixture, assign_layer, dist_layer, block_layer):
     type(plan).assignLayer = mocker.PropertyMock(return_value=assign_layer)
     type(plan).distLayer = mocker.PropertyMock(return_value=dist_layer)
     type(plan).popLayer = mocker.PropertyMock(return_value=block_layer)
-    type(plan).sourceLayer = mocker.PropertyMock(return_value=block_layer)
+    type(plan).geoLayer = mocker.PropertyMock(return_value=block_layer)
     type(plan).distField = mocker.PropertyMock(return_value='district')
     type(plan).geoIdField = mocker.PropertyMock(return_value='geoid20')
-    type(plan).sourceIdField = mocker.PropertyMock(return_value='geoid20')
-    type(plan).joinField = mocker.PropertyMock(return_value='geoid20')
+    type(plan).geoJoinField = mocker.PropertyMock(return_value='geoid20')
+    type(plan).popJoinField = mocker.PropertyMock(return_value='geoid20')
     type(plan).popField = mocker.PropertyMock(return_value='pop_total')
-    type(plan).vapField = mocker.PropertyMock(return_value='vap_total')
-    type(plan).cvapField = mocker.PropertyMock(return_value=None)
     type(plan).numDistricts = mocker.PropertyMock(return_value=5)
 
     districts = mocker.create_autospec(spec=DistrictList, spec_set=True, instance=True)
     type(plan).districts = mocker.PropertyMock(return_value=districts)
+
+    pop_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
+    type(plan).popFields = mocker.PropertyMock(return_value=pop_fields)
 
     data_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
     type(plan).dataFields = mocker.PropertyMock(return_value=data_fields)

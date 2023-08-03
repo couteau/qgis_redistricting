@@ -57,10 +57,9 @@ class AggregateDataTask(QgsTask):
         self.popLayer: QgsVectorLayer = plan.popLayer
         self.distField: str = plan.distField
         self.geoIdField: str = plan.geoIdField
-        self.joinField: str = plan.joinField
+        self.popJoinField: str = plan.popJoinField
         self.popField: str = plan.popField
-        self.vapField: str = plan.vapField
-        self.cvapField: str = plan.cvapField
+        self.popFields = plan.popFields
         self.dataFields = plan.dataFields
         self.count = 0
         self.total = 1
@@ -98,14 +97,10 @@ class AggregateDataTask(QgsTask):
         self.cols.append(self.popField)
         self.getters.append(lambda f: f[self.popField])
         self.aggs[self.popField] = 'sum'
-        if self.vapField:
-            self.cols.append(self.vapField)
-            self.getters.append(lambda f: f[self.vapField])
-            self.aggs[self.vapField] = 'sum'
-        if self.cvapField:
-            self.cols.append(self.cvapField)
-            self.getters.append(lambda f: f[self.cvapField])
-            self.aggs[self.cvapField] = 'sum'
+        for fld in self.popFields:
+            self.cols.append(fld.fieldName)
+            self.getters.append(self.getFieldValue(fld, self.context))
+            self.aggs[fld.fieldName] = 'sum'
         for fld in self.dataFields:
             self.cols.append(fld.fieldName)
             self.getters.append(self.getFieldValue(fld, self.context))

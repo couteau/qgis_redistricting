@@ -1,10 +1,14 @@
 """QGIS Redistricting Plugin - unit tests for RdsFieldTableView class"""
 import pytest
 from pytestqt.plugin import QtBot
-
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QBrush
-from redistricting.core import DistrictDataModel, RedistrictingPlan, PlanEditor
+
+from redistricting.core import (
+    DistrictDataModel,
+    PlanEditor,
+    RedistrictingPlan
+)
 
 # pylint: disable=no-self-use
 
@@ -57,7 +61,7 @@ class TestDistrictDataModel:
 
         with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):
             e = PlanEditor.fromPlan(plan)
-            e.setVAPField(None)
+            e.removePopField('vap_total')
             e.updatePlan()
 
         with qtbot.waitSignals([district_model.rowsAboutToBeInserted, district_model.rowsInserted]):

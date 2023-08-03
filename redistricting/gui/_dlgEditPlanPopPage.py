@@ -22,9 +22,20 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import QgsVectorLayer, QgsFieldProxyModel
-from qgis.PyQt.QtWidgets import QWizardPage
-from ..core import defaults
+from qgis.core import (
+    QgsApplication,
+    QgsFieldProxyModel,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtWidgets import (
+    QHeaderView,
+    QWizardPage
+)
+
+from ..core import (
+    Field,
+    defaults
+)
 from ..core.utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
@@ -40,8 +51,9 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.registerField('popField*', self.cmbPopField)
         self.registerField('deviation', self.sbxMaxDeviation,
                            'value', self.sbxMaxDeviation.valueChanged)
-        self.registerField('vapField', self.cmbVAPField)
-        self.registerField('cvapField', self.cmbCVAPField)
+        self.registerField('popFields', self.tblAddlPopulation, 'fields', self.tblAddlPopulation.fieldsChanged)
+
+        self.fieldsModel = self.tblAddlPopulation.model()
 
         # Annoyingly, loading the UI sets the layer property of a QgsLayerCombo to
         # the first layer in the project, even if allowEmptyLayer is set to true.
@@ -52,25 +64,33 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.btnUseGeoLayer.toggled.connect(self.updatePopLayer)
 
         self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
-        self.cmbVAPField.setFilters(QgsFieldProxyModel.Numeric)
-        self.cmbCVAPField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbAddlPopField.setFilters(QgsFieldProxyModel.Numeric)
+        self.cmbAddlPopField.fieldChanged.connect(self.fieldChanged)
+        self.btnAddAddlPopField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
+        self.btnAddAddlPopField.clicked.connect(self.addField)
+        
+        self.tblAddlPopulation.setEnableDragRows(True)  
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
 
         self.setFinalPage(True)
 
     def initializePage(self):
         super().initializePage()
         popLayer = self.field('popLayer') or None
-        sourceLayer = self.field('sourceLayer') or None
+        geoLayer = self.field('sourceLayer') or None
         if popLayer is None:
-            popLayer = sourceLayer
+            popLayer = geoLayer
 
-        if popLayer == sourceLayer:
+        if popLayer == geoLayer:
             self.btnUseGeoLayer.setChecked(True)
         else:
             self.btnOtherPopLayer.setChecked(True)
 
         self.cmbPopLayer.setLayer(popLayer)
         self.setPopLayer(popLayer)
+        self.cmbAddlPopField.setLayer(popLayer)
         self.cmbPopField.setFocus()
         self.setFinalPage(self.wizard().isComplete())
 
@@ -79,15 +99,14 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
     def updatePopLayer(self):
         if self.btnUseGeoLayer.isChecked():
-            sourceLayer = self.field('sourceLayer') or None
-            self.cmbPopLayer.setLayer(sourceLayer)
+            geoLayer = self.field('sourceLayer') or None
+            self.cmbPopLayer.setLayer(geoLayer)
 
     def setPopLayer(self, layer: QgsVectorLayer):
         if not layer:
             self.cmbJoinField.setLayer(None)
             self.cmbPopField.setLayer(None)
-            self.cmbVAPField.setLayer(None)
-            self.cmbCVAPField.setLayer(None)
+            self.cmbAddlPopField.setLayer(None)
             return
 
         if layer != self.cmbJoinField.layer():
@@ -104,18 +123,21 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
             if popField and layer.fields().lookupField(popField) != -1:
                 self.cmbPopField.setField(popField)
             else:
-                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_FIELDS))
+                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_TOTAL_FIELDS))
+            
+            self.cmbAddlPopField.setLayer(layer)
+            popFields: list[Field] = self.field('popFields')
+            for f in popFields:
+                f.setLayer(layer)
 
-            vapField = self.field('vapField')
-            self.cmbVAPField.setLayer(layer)
-            if vapField and layer.fields().lookupField(vapField) != -1:
-                self.cmbVAPField.setField(vapField)
-            else:
-                self.cmbVAPField.setField(getDefaultField(layer, defaults.VAP_FIELDS))
+    def fieldChanged(self, field):
+        self.btnAddAddlPopField.setEnabled(field != '' and (
+            not self.cmbAddlPopField.isExpression() or self.cmbAddlPopField.isValidExpression()))
 
-            cvapField = self.field('cvapField')
-            self.cmbCVAPField.setLayer(layer)
-            if cvapField and layer.fields().lookupField(cvapField) != -1:
-                self.cmbCVAPField.setField(cvapField)
-            else:
-                self.cmbCVAPField.setField(getDefaultField(layer, defaults.CVAP_FIELDS))
+    def addField(self):
+        field, isExpression, isValid = self.cmbAddlPopField.currentField()
+        if not isValid:
+            return
+
+        layer = self.field('popLayer')
+        self.fieldsModel.appendField(layer, field, isExpression)

@@ -22,13 +22,39 @@
  *                                                                         *
  ***************************************************************************/
  """
-from typing import List, Optional, Any
-from qgis.PyQt.QtGui import QPixmap, QIcon, QColor
+from typing import (
+    Any,
+    List,
+    Optional
+)
+
+from qgis.core import (
+    QgsApplication,
+    QgsFieldModel
+)
+from qgis.PyQt.QtCore import (
+    QAbstractListModel,
+    QModelIndex,
+    QObject,
+    Qt,
+    QVariant,
+    pyqtSignal
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QIcon,
+    QPixmap
+)
 from qgis.PyQt.QtWidgets import QDockWidget
-from qgis.PyQt.QtCore import Qt, QObject, QVariant, pyqtSignal, QAbstractListModel, QModelIndex
-from qgis.core import QgsApplication, QgsFieldModel
+
+from ..core import (
+    BaseDistrict,
+    GeoFieldsModel,
+    RedistrictingPlan,
+    showHelp,
+    tr
+)
 from .ui.DistrictTools import Ui_qdwDistrictTools
-from ..core import BaseDistrict, RedistrictingPlan, GeoFieldsModel, tr, showHelp
 
 
 class DistrictSelectModel(QAbstractListModel):
@@ -126,7 +152,7 @@ class SourceDistrictModel(DistrictSelectModel):
         if index.row() == 2 and \
                 self._plan.assignLayer.selectedFeatureCount() == 0 and \
                 self._plan.popLayer.selectedFeatureCount() == 0 and \
-                self._plan.sourceLayer.selectedFeatureCount() == 0:
+                self._plan.geoLayer.selectedFeatureCount() == 0:
             flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
         return flags
 

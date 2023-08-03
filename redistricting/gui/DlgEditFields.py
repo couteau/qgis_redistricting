@@ -22,9 +22,19 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox, QVBoxLayout
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QVBoxLayout,
+    QWidget
+)
+
 from ..core import RedistrictingPlan
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
 
@@ -52,9 +62,7 @@ class DlgEditFields(QDialog):
         self.setBaseSize(446, 510)
 
         self.page.initializePage()
-        self.page.fexDataField.setLayer(plan.popLayer or plan.sourceLayer)
-        self.page.fieldsModel.vapEnabled = bool(plan.vapField)
-        self.page.fieldsModel.cvapEnabled = bool(plan.cvapField)
+        self.page.fexDataField.setLayer(plan.popLayer or plan.geoLayer)
 
     def accept(self):
         self.plan.dataFields = self.page.field('dataFields')

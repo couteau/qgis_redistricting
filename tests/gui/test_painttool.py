@@ -1,11 +1,18 @@
 """Test redististricting plugin district painter maptool"""
 import pytest
-from pytestqt.plugin import QtBot
 from pytest_mock.plugin import MockerFixture
-from qgis.PyQt.QtCore import Qt, QPoint
-from qgis.PyQt.QtGui import QMouseEvent
+from pytestqt.plugin import QtBot
 from qgis.gui import QgsMapCanvas
-from redistricting.gui import PaintDistrictsTool, PaintMode
+from qgis.PyQt.QtCore import (
+    QPoint,
+    Qt
+)
+from qgis.PyQt.QtGui import QMouseEvent
+
+from redistricting.gui import (
+    PaintDistrictsTool,
+    PaintMode
+)
 
 
 class TestPaintTool:
@@ -34,18 +41,18 @@ class TestPaintTool:
 
     def test_set_fields(self, tool: PaintDistrictsTool):
         tool.setTargetDistrict(2)
-        assert tool.targetDistrict == 2
+        assert tool.targetDistrict() == 2
         tool.setSourceDistrict(0)
-        assert tool.sourceDistrict == 0
+        assert tool.sourceDistrict() == 0
         tool.setGeoField('geoid20')
         assert tool.geoField == 'geoid20'
 
         tool.setGeoField(None)
         assert tool.geoField is None
         tool.setSourceDistrict(None)
-        assert tool.sourceDistrict is None
+        assert tool.sourceDistrict() is None
         tool.setTargetDistrict(None)
-        assert tool.targetDistrict is None
+        assert tool.targetDistrict() is None
 
     def test_set_invalid_geofield_throws_exception(self, tool: PaintDistrictsTool, plan):
         with pytest.raises(ValueError):
@@ -57,7 +64,7 @@ class TestPaintTool:
     def test_activate(self, tool: PaintDistrictsTool, qgis_canvas: QgsMapCanvas, qtbot: QtBot, mocker: MockerFixture):
         cls = mocker.patch('redistricting.gui.PaintTool.PlanAssignmentEditor')
         tool.setTargetDistrict(2)
-        assert tool.targetDistrict == 2
+        assert tool.targetDistrict() == 2
 
         with qtbot.wait_signal(tool.activated):
             qgis_canvas.setMapTool(tool)

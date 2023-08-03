@@ -22,13 +22,34 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import List, Set, Union, Iterable, overload
-from qgis.core import Qgis, QgsApplication, QgsField, QgsVectorDataProvider, QgsVectorLayer
-from qgis.PyQt.QtCore import QObject, QVariant, pyqtSignal
-from .utils import tr
-from .Field import Field, DataField
+from typing import (
+    Iterable,
+    List,
+    Set,
+    Union,
+    overload
+)
+
+from qgis.core import (
+    Qgis,
+    QgsApplication,
+    QgsField,
+    QgsVectorDataProvider,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    QVariant,
+    pyqtSignal
+)
+
 from .BasePlanBuilder import BasePlanBuilder
+from .Field import (
+    DataField,
+    Field
+)
 from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
+from .utils import tr
 
 
 class PlanEditor(BasePlanBuilder):
@@ -115,9 +136,9 @@ class PlanEditor(BasePlanBuilder):
         self._updateAssignLayerTask = AddGeoFieldToAssignmentLayerTask(
             self._geoPackagePath,
             self._plan.assignLayer,
-            self._sourceLayer,
+            self._geoLayer,
             geoField,
-            self._sourceIdField,
+            self._geoJoinField,
             self._geoIdField
         )
         self._updateAssignLayerTask.taskCompleted.connect(cleanup)
@@ -140,6 +161,24 @@ class PlanEditor(BasePlanBuilder):
         self._plan._setNumSeats(self._numSeats)
         self._plan._setDescription(self._description)
         self._plan._setDeviation(self._deviation)
+
+        if self._popFields != self._plan.popFields:
+            if self._plan.distLayer:
+                layer = self._plan.distLayer
+                addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
+                if addedFields:
+                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+
+                removedFields: Set[Field] = set(self._plan.popFields) - set(self._popFields)
+                if removedFields:
+                    provider = layer.dataProvider()
+                    for f in removedFields:
+                        findex = layer.fields().lookupField(f.fieldName)
+                        if findex != -1:
+                            provider.deleteAttributes([findex])
+                    layer.updateFields()
+
+            self._plan._setPopFields(self._popFields)
 
         if self._dataFields != self._plan.dataFields:
             if self._plan.distLayer:
@@ -181,16 +220,14 @@ class PlanEditor(BasePlanBuilder):
             self._plan._setGeoFields(self._geoFields)
 
         self._plan._setGeoIdField(self._geoIdField)
-        self._plan._setGeoDisplay(self._geoDisplay)
+        self._plan._setGeoIdCaption(self._geoIdCaption)
 
-        self._plan._setSourceLayer(self._sourceLayer)
-        self._plan._setSourceIdField(self._sourceIdField)
+        self._plan._setGeoLayer(self._geoLayer)
+        self._plan._setGeoJoinField(self._geoJoinField)
 
         self._plan._setPopLayer(self._popLayer)
-        self._plan._setJoinField(self._joinField)
+        self._plan._setPopJoinField(self._popJoinField)
         self._plan._setPopField(self._popField)
-        self._plan._setVAPField(self._vapField)
-        self._plan._setCVAPField(self._cvapField)
 
         b = self._plan.serialize()
         self._modifiedFields = {k for k in b if k not in a or b[k] != a[k]}

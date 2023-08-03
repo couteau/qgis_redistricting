@@ -23,13 +23,17 @@
  ***************************************************************************/
 """
 import re
+
 from .utils import tr
 
 MAX_DISTRICTS = 1000
 
-POP_FIELDS = ['pop_total', 'p0010001']
-VAP_FIELDS = ['vap_total', 'p0030001']
-CVAP_FIELDS = ['cvap_total', re.compile(r'^cvap_(?:\d{4}_)total$')]
+POP_TOTAL_FIELDS = ['pop_total', 'p0010001']
+VAP_TOTAL_FIELDS = ['vap_total', 'p0030001']
+CVAP_TOTAL_FIELDS = ['cvap_total', re.compile(r'^cvap_(?:\d{4}_)total$')]
+
+CVAP_FIELDS = [re.compile(r'^cvap_(?:\d{4}_)?\w+$'), re.compile(r'^\w+(?:\d{4}_)?cvap(?:_\d{4})?$')]
+VAP_FIELDS = [re.compile(r'^vap_(?:\d{4}_)?\w+$'), re.compile(r'^\w+(?:\d{4}_)?vap(?:_\d{4})?$')]
 
 GEOID_FIELDS = ['geoid20', 'geoid30', 'geoid10', 'geoid', 'block', 'block_id']
 

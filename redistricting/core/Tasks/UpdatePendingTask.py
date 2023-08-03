@@ -32,8 +32,6 @@ from typing import (
 
 import pandas as pd
 from qgis.core import (
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
     QgsFeatureRequest,
     QgsTask
 )
@@ -88,6 +86,8 @@ class AggregatePendingChangesTask(AggregateDataTask):
             del new
             del old
 
+            self.cols = [self.popJoinField]
+            self.getters = [lambda f: f[self.popJoinField]] 
             self.addPopFields()
 
             if len(pending) == 0:
@@ -98,11 +98,11 @@ class AggregatePendingChangesTask(AggregateDataTask):
             request = QgsFeatureRequest()
             request.setExpressionContext(self.context)
             r = ','.join([f"'{geoid}'" for geoid in pending.index])
-            request.setFilterExpression(f'{self.joinField} in ({r})')
+            request.setFilterExpression(f'{self.popJoinField} in ({r})')
 
             datagen = ([getter(f) for getter in self.getters]
                        for f in self.popLayer.getFeatures(request))
-            dfpop = pd.DataFrame.from_records(datagen, index=self.joinField, columns=self.cols)
+            dfpop = pd.DataFrame.from_records(datagen, index=self.popJoinField, columns=self.cols)
             pending = pd.merge(pending, dfpop, how='left', left_index=True, right_index=True)
 
             newdist = pending.groupby(f'new_{self.distField}').agg(self.aggs)

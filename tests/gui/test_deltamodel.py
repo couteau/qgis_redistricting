@@ -1,9 +1,14 @@
 """QGIS Redistricting Plugin - unit tests for DeltaList class"""
-import pytest
 import pandas as pd
+import pytest
 from qgis.PyQt.QtCore import Qt
+
+from redistricting.core import (
+    DataField,
+    PlanEditor,
+    RedistrictingPlan
+)
 from redistricting.core.DeltaListModel import DeltaListModel
-from redistricting.core import RedistrictingPlan, DataField, PlanEditor
 
 # pylint: disable=no-self-use
 
@@ -42,7 +47,7 @@ class TestDeltaModel:
 
     def test_update_fields(self, empty_model, plan: RedistrictingPlan, block_layer):
         e = PlanEditor.fromPlan(plan)
-        e.appendDataField(DataField(block_layer, 'vap_nh_black'))
+        e.appendDataField('vap_nh_black')
         e.updatePlan()
         assert empty_model.rowCount() == 18
 

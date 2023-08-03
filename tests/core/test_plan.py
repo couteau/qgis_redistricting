@@ -17,11 +17,19 @@
  ***************************************************************************/
 """
 from uuid import UUID
+
 import pytest
 from pytestqt.plugin import QtBot
-from qgis.core import Qgis, QgsProject
-from redistricting.core import RedistrictingPlan, Field, DataField
+from qgis.core import (
+    Qgis,
+    QgsProject
+)
 
+from redistricting.core import (
+    DataField,
+    Field,
+    RedistrictingPlan
+)
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -67,15 +75,14 @@ class TestPlan:
         assert plan.assignLayer is None
         assert plan.distLayer is None
         assert plan.popLayer is None
-        assert plan.joinField is None
-        assert plan.sourceLayer is None
-        assert plan.sourceIdField is None
+        assert plan.popJoinField is None
+        assert plan.geoLayer is None
+        assert plan.geoJoinField is None
         assert plan.distField == 'district'
         assert plan.geoIdField is None
         assert plan.popField is None
-        assert plan.vapField is None
-        assert plan.cvapField is None
-        assert plan.geoDisplay is None
+        assert len(plan.popFields) == 0
+        assert plan.geoIdCaption is None
         assert plan.deviation == 0
         assert plan.totalPopulation == 0
         assert len(plan.geoFields) == 0
