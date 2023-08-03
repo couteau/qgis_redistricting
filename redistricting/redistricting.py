@@ -675,7 +675,7 @@ class Redistricting:
 
     def showPlanManager(self):
         """Display the plan manager window"""
-        dlg = DlgSelectPlan(self.redistrictingPlans, self.activePlan)
+        dlg = DlgSelectPlan(self.redistrictingPlans, self.activePlan, self.iface.mainWindow())
         dlg.newPlan.connect(self.newPlan)
         dlg.planSelected.connect(self.onPlanSelected)
         dlg.planEdited.connect(self.editPlan)
@@ -694,7 +694,7 @@ class Redistricting:
         if not plan:
             return
 
-        dlgEditPlan = DlgEditPlan(plan, None)
+        dlgEditPlan = DlgEditPlan(plan, self.iface.mainWindow())
         if dlgEditPlan.exec_() == QDialog.Accepted:
             builder = PlanEditor.fromPlan(plan) \
                 .setName(dlgEditPlan.planName()) \
@@ -720,7 +720,7 @@ class Redistricting:
 
     def deletePlan(self, plan: RedistrictingPlan):
         if plan in self.redistrictingPlans:
-            dlg = DlgConfirmDelete(plan)
+            dlg = DlgConfirmDelete(plan, self.iface.mainWindow())
             if dlg.exec_() == QDialog.Accepted:
                 self.removePlan(plan, dlg.removeLayers(), dlg.deleteGeoPackage())
 
@@ -768,7 +768,7 @@ class Redistricting:
             )
             return
 
-        dlgNewPlan = DlgEditPlan()
+        dlgNewPlan = DlgEditPlan(parent=self.iface.mainWindow())
         if dlgNewPlan.exec_() == QDialog.Accepted:
             builder = PlanBuilder() \
                 .setName(dlgNewPlan.planName()) \
@@ -819,7 +819,7 @@ class Redistricting:
         if not self.checkActivePlan(self.tr('copy')):
             return
 
-        dlgCopyPlan = DlgCopyPlan(self.activePlan)
+        dlgCopyPlan = DlgCopyPlan(self.activePlan, self.iface.mainWindow())
         if dlgCopyPlan.exec_() == QDialog.Accepted:
             copier = PlanCopier(self.activePlan)
             progress = self.startProgress(self.tr('Creating plan layers...'))
@@ -833,7 +833,7 @@ class Redistricting:
         if not self.checkActivePlan(self.tr('import')):
             return
 
-        dlgImportPlan = DlgImportPlan(self.activePlan)
+        dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec_() == QDialog.Accepted:
             importer = AssignmentImporter(self.iface) \
                 .setSourceFile(dlgImportPlan.equivalencyFileName) \
@@ -855,7 +855,7 @@ class Redistricting:
         if not self.checkActivePlan(self.tr('import')):
             return
 
-        dlgImportPlan = DlgImportShape(self.activePlan)
+        dlgImportPlan = DlgImportShape(self.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec_() == QDialog.Accepted:
             importer = ShapefileImporter(self.iface) \
                 .setSourceFile(dlgImportPlan.shapefileFileName) \
@@ -878,7 +878,7 @@ class Redistricting:
         if not self.checkActivePlan(self.tr('export')):
             return
 
-        dlgExportPlan = DlgExportPlan(self.activePlan)
+        dlgExportPlan = DlgExportPlan(self.activePlan, self.iface.mainWindow())
         if dlgExportPlan.exec_() == QDialog.Accepted:
             plan = self.activePlan
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
