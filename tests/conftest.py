@@ -6,6 +6,7 @@ import shutil
 import pytest
 from pytest_mock.plugin import MockerFixture
 from qgis.core import (
+    QgsApplication,
     QgsProject,
     QgsVectorLayer
 )
@@ -16,6 +17,11 @@ from redistricting.core.Plan import RedistrictingPlan
 from redistricting.core.PlanBuilder import PlanBuilder
 
 # pylint: disable=redefined-outer-name, unused-argument
+
+
+@pytest.fixture(autouse=True)
+def setup_qgis(qgis_app: QgsApplication):
+    QgsApplication.setPrefixPath("./qgis", True)
 
 
 @pytest.fixture

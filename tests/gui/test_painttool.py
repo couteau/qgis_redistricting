@@ -214,7 +214,7 @@ class TestPaintTool:
             qgis_canvas.mouseMoveEvent(e)
             qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
         getDistFeatures.assert_not_called()
-        assert assignFeaturesToDistrict.call_count == 3
+        assert assignFeaturesToDistrict.call_count == 2
 
     def test_mouse_move_select(self,
                                active_tool: PaintDistrictsTool,

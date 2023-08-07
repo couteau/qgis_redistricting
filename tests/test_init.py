@@ -42,6 +42,8 @@ class TestPluginInit:
         settings = mocker.patch('redistricting.redistricting.QSettings')
         settings_obj = settings.return_value
         settings_obj.value.return_value = 'en_US'
+        qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
+        qgis_iface.addCustomActionForLayer = mocker.MagicMock()
         qgis_iface.vectorMenu = mocker.MagicMock()
         qgis_iface.addPluginToVectorMenu = mocker.MagicMock()
         qgis_iface.removeDockWidget = mocker.MagicMock()

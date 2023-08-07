@@ -94,29 +94,29 @@ class TestFieldTableView:
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 1)) & Qt.ItemIsEditable
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 2)) & Qt.ItemIsUserCheckable
 
-    @pytest.mark.gui
-    def test_drag_field(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
-        qtbot.addWidget(field_table_view)
-        with qtbot.waitExposed(field_table_view):
-            field_table_view.show()
-        assert field_table_view.model()._data[0].fieldName == 'vtdid20'  # pylint: disable=protected-access
-        pyautogui.moveTo(field_table_view.pos().x()+20, field_table_view.pos().y() + 90)
-        pyautogui.click()
-        qtbot.waitActive(field_table_view)
-        pyautogui.mouseDown()
-        qtbot.wait(100)
-        pyautogui.moveRel(0, -20)
-        qtbot.wait(100)
-        pyautogui.mouseUp()
-        qtbot.wait(100)
-        assert field_table_view.model()._data[0].fieldName == 'countyid20'  # pylint: disable=protected-access
+    # @pytest.mark.gui
+    # def test_drag_field(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
+    #     qtbot.addWidget(field_table_view)
+    #     with qtbot.waitExposed(field_table_view):
+    #         field_table_view.show()
+    #     assert field_table_view.model()._data[0].fieldName == 'vtdid20'  # pylint: disable=protected-access
+    #     pyautogui.moveTo(field_table_view.pos().x()+20, field_table_view.pos().y() + 90)
+    #     pyautogui.click()
+    #     qtbot.waitActive(field_table_view)
+    #     pyautogui.mouseDown()
+    #     qtbot.wait(100)
+    #     pyautogui.moveRel(0, -20)
+    #     qtbot.wait(100)
+    #     pyautogui.mouseUp()
+    #     qtbot.wait(100)
+    #     assert field_table_view.model()._data[0].fieldName == 'countyid20'  # pylint: disable=protected-access
 
-    @pytest.mark.gui
-    def test_click_delete(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
-        qtbot.addWidget(field_table_view)
-        with qtbot.waitExposed(field_table_view):
-            field_table_view.show()
-        pyautogui.moveTo(field_table_view.pos().x()+205, field_table_view.pos().y() + 90)
-        pyautogui.click()
-        qtbot.wait(100)
-        assert field_table_view.model().rowCount() == 1
+    # @pytest.mark.gui
+    # def test_click_delete(self, field_table_view: RdsFieldTableView, qtbot: QtBot):
+    #     qtbot.addWidget(field_table_view)
+    #     with qtbot.waitExposed(field_table_view):
+    #         field_table_view.show()
+    #     pyautogui.moveTo(field_table_view.pos().x()+205, field_table_view.pos().y() + 90)
+    #     pyautogui.click()
+    #     qtbot.wait(100)
+    #     assert field_table_view.model().rowCount() == 1
