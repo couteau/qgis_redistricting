@@ -28,9 +28,11 @@
 """
 import pathlib
 from typing import (
+    Callable,
     Iterable,
     List,
-    Tuple
+    Tuple,
+    Union
 )
 from uuid import UUID
 
@@ -91,6 +93,7 @@ from .gui import (
     PaintDistrictsTool,
     PaintMode
 )
+from .gui.MenuProvider import PlanMenuProvider
 from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
 
@@ -167,9 +170,9 @@ class Redistricting:
 
     def addAction(
             self,
-            iconPath,
-            text,
-            callback,
+            iconPath=None,
+            text=None,
+            callback=None,
             enabledFlag=True,
             addToMenu=False,
             addToToolbar=False,
@@ -177,21 +180,27 @@ class Redistricting:
             statusTip=None,
             parent=None) -> QAction:
 
-        if isinstance(iconPath, QIcon):
+        if isinstance(iconPath, QIcon) or iconPath is None:
             icon = iconPath
         else:
             icon = QIcon(iconPath)
 
+        if not parent:
+            parent = self.iface.mainWindow()
+
         if isinstance(callback, QAction):
             action = callback
-            action.setIcon(icon)
             action.setParent(parent)
-            action.setText(text)
-            action.setEnabled(enabledFlag)
         else:
-            action = QAction(icon, text, parent)
-            action.triggered.connect(callback)
-            action.setEnabled(enabledFlag)
+            action = QAction(parent)
+            if isinstance(callback, Callable):
+                action.triggered.connect(callback)
+
+        if icon:
+            action.setIcon(icon)
+        if text:
+            action.setText(text)
+        action.setEnabled(enabledFlag)
 
         if statusTip is not None:
             action.setStatusTip(statusTip)
@@ -250,6 +259,41 @@ class Redistricting:
         self.toolBtnAction = self.toolbar.addWidget(self.menuButton)
         m: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
         m.addMenu(self.menuButton.menu())
+
+        self.contextAction = QAction(
+            QIcon(':/plugins/redistricting/icon.png'),
+            self.tr('Redistricting'),
+            self.iface.mainWindow()
+        )
+        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Group, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Vector, False)
+
+        self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
+        self.contextMenu.addAction(self.addAction(
+            iconPath=':/plugins/redistricting/activateplan.svg',
+            text=self.tr('Activate Plan'),
+            callback=self.contextMenuActivatePlan,
+            addToMenu=False,
+            addToToolbar=False,
+            parent=self.iface.mainWindow()
+        ))
+        self.contextMenu.addAction(self.addAction(
+            iconPath=':/plugins/redistricting/editplan.svg',
+            text=self.tr('Edit Plan'),
+            callback=self.contextMenuSlot(self.editPlan),
+            addToMenu=False,
+            addToToolbar=False,
+            parent=self.iface.mainWindow()
+        ))
+        self.contextMenu.addAction(self.addAction(
+            iconPath=':/plugins/redistricting/exportplan.svg',
+            text=self.tr('Export Plan'),
+            callback=self.contextMenuSlot(self.exportPlan),
+            addToMenu=False,
+            addToToolbar=False,
+            parent=self.iface.mainWindow()
+        ))
+        self.contextAction.setMenu(self.contextMenu)
 
         # pylint: disable=attribute-defined-outside-init
         self.actionShowPlanManager = self.addAction(
@@ -925,6 +969,22 @@ class Redistricting:
         self.dockwidget.setTargetDistrict(dist)
         return dist.district
 
+    def contextMenuSlot(self, action):
+        def trigger():
+            group = self.iface.layerTreeView().currentGroupNode()
+            id = group.customProperty('redistricting-plan-id', None)
+            plan = self.planById(id)
+            if plan:
+                action(plan)
+
+        return trigger
+
+    def contextMenuActivatePlan(self):
+        group = self.iface.layerTreeView().currentGroupNode()
+        id = group.customProperty('redistricting-plan-id', None)
+        if id:
+            self.setActivePlan(id)
+
     # --------------------------------------------------------------------------
 
     def activatePlan(self, checked):
@@ -943,6 +1003,9 @@ class Redistricting:
         action.setData(plan)
         action.triggered.connect(self.activatePlan)
         self.planMenu.addAction(action)
+
+        self.iface.addCustomActionForLayer(self.contextAction, plan.assignLayer)
+        self.iface.addCustomActionForLayer(self.contextAction, plan.distLayer)
 
     def removePlanFromMenu(self, plan: RedistrictingPlan):
         action = self.planActions.findChild(QAction, plan.name)
@@ -1049,16 +1112,35 @@ class Redistricting:
         finally:
             del dirtyBlocker
 
+    def planById(self, id: Union[UUID, str]):
+        if isinstance(id, str):
+            try:
+                id = UUID(id)
+            except ValueError:
+                return None
+
+        for p in self.redistrictingPlans:
+            if p.id == id:
+                return p
+
+        return None
+
     def setActivePlan(self, plan):
         self.canvas.unsetMapTool(self.mapTool)
 
-        if isinstance(plan, UUID):
-            for p in self.redistrictingPlans:
-                if p.id == plan:
-                    plan = p
-                    break
-            else:
+        if isinstance(plan, str):
+            try:
+                plan = UUID(plan)
+            except ValueError:
                 return
+
+        if isinstance(plan, UUID):
+            plan = self.planById(plan)
+            if not plan:
+                return
+
+        if plan is not None and not isinstance(plan, RedistrictingPlan):
+            return
 
         if plan is not None and not plan.isValid():
             return

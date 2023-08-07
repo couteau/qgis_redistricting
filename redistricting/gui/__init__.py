@@ -23,20 +23,22 @@
  ***************************************************************************/
 """
 
+from .DistrictDataTable import DockDistrictDataTable
+from .DistrictTools import DockRedistrictingToolbox
+from .DlgConfirmDelete import DlgConfirmDelete
+from .DlgCopyPlan import DlgCopyPlan
 # Dialogs and Dock Widgets
 from .DlgEditPlan import DlgEditPlan
-from .DlgCopyPlan import DlgCopyPlan
-from .DlgSelectPlan import DlgSelectPlan
 from .DlgExportPlan import DlgExportPlan
 from .DlgImportPlan import DlgImportPlan
 from .DlgImportShape import DlgImportShape
 from .DlgNewDistrict import DlgNewDistrict
-from .DlgConfirmDelete import DlgConfirmDelete
-from .DistrictDataTable import DockDistrictDataTable
-from .DistrictTools import DockRedistrictingToolbox
+from .DlgSelectPlan import DlgSelectPlan
+from .PaintTool import (
+    PaintDistrictsTool,
+    PaintMode
+)
 from .PendingChanges import DockPendingChanges
-
-from .PaintTool import PaintDistrictsTool, PaintMode
 
 __all__ = [
     'DlgEditPlan',
@@ -50,6 +52,6 @@ __all__ = [
     'DockRedistrictingToolbox',
     'DockDistrictDataTable',
     'DockPendingChanges',
-    'PaintTool',
-    'PaintMode'
+    'PaintDistrictsTool',
+    'PaintMode',
 ]

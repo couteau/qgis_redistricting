@@ -2,7 +2,9 @@
   <qresource prefix="/plugins/redistricting">
     <file alias="icon.png">icon.png</file>
     <file alias="icon.svg">icon.svg</file>
+    <file alias="activateplan.svg">activateplan.svg</file>
     <file alias="addplan.svg">addplan.svg</file>
+    <file alias="editplan.svg">editplan.svg</file>
     <file alias="copyplan.svg">copyplan.svg</file>
     <file alias="importplan.svg">importplan.svg</file>
     <file alias="exportplan.svg">exportplan.svg</file>
