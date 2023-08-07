@@ -3,7 +3,7 @@
 name=QGIS Redistricting
 qgisMinimumVersion=3.18
 description=Tool for drawing districting plans from geographic units
-version=0.0.3-alpha
+version=0.0.4-alpha
 author=Cryptodira
 email=stuart@cryptodira.org
 
