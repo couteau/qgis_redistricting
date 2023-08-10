@@ -219,9 +219,6 @@ class Redistricting:
         self.actions.append(action)
         return action
 
-    def dirtySet(self):
-        pass
-
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
         if not self.projectSignalsConnected:
@@ -242,7 +239,6 @@ class Redistricting:
 
             self.project.layersAdded.connect(self.updateNewPlanAction)
             self.project.layersRemoved.connect(self.updateNewPlanAction)
-            self.project.dirtySet.connect(self.dirtySet)
 
             self.projectSignalsConnected = True
 

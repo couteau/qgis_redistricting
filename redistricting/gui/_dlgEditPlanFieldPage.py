@@ -87,6 +87,7 @@ class PopFieldDelegate(QStyledItemDelegate):
         else:
             super().updateEditorGeometry(editor, option, index)
 
+
 class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
     fields = None
 
@@ -114,7 +115,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
 
         delegate: PopFieldDelegate = self.tblDataFields.itemDelegateForColumn(3)
         delegate._popFields = popFields
-                
+
         self.tblDataFields.setColumnWidth(0, 120)
         self.tblDataFields.setColumnWidth(1, 120)
         self.tblDataFields.setColumnWidth(2, 32)
@@ -140,12 +141,12 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
 
         f = self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
         if f and f.isNumeric and not isExpression:
-            if matchField(f, self.fexDataField.layer(), defaults.VAP_FIELDS):
+            if matchField(f.field, self.fexDataField.layer(), defaults.VAP_FIELDS):
                 for p in self.fieldsModel.popFields:
                     if matchField(p.field, None, defaults.VAP_TOTAL_FIELDS):
                         f.pctbase = p.fieldName
 
-            elif matchField(f, self.fexDataField.layer(), defaults.CVAP_FIELDS):
+            elif matchField(f.field, self.fexDataField.layer(), defaults.CVAP_FIELDS):
                 for p in self.fieldsModel.popFields:
                     if matchField(p.field, None, defaults.CVAP_TOTAL_FIELDS):
                         f.pctbase = p.fieldName
