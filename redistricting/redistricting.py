@@ -43,6 +43,7 @@ from qgis.core import (
     QgsGroupLayer,
     QgsLayerTreeLayer,
     QgsMapLayer,
+    QgsMapLayerType,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext,
@@ -93,7 +94,6 @@ from .gui import (
     PaintDistrictsTool,
     PaintMode
 )
-from .gui.MenuProvider import PlanMenuProvider
 from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
 
@@ -169,17 +169,17 @@ class Redistricting:
         return QCoreApplication.translate('redistricting', message)
 
     def addAction(
-            self,
-            iconPath=None,
-            text=None,
-            callback=None,
-            enabledFlag=True,
-            addToMenu=False,
-            addToToolbar=False,
-            addToToolbarMenu=False,
-            statusTip=None,
-            parent=None) -> QAction:
-
+        self,
+        iconPath=None,
+        text=None,
+        callback=None,
+        enabledFlag=True,
+        addToMenu=False,
+        addToToolbar=False,
+        addToToolbarMenu=False,
+        statusTip=None,
+        parent=None
+    ) -> QAction:
         if isinstance(iconPath, QIcon) or iconPath is None:
             icon = iconPath
         else:
@@ -219,6 +219,9 @@ class Redistricting:
         self.actions.append(action)
         return action
 
+    def dirtySet(self):
+        pass
+
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
         if not self.projectSignalsConnected:
@@ -239,6 +242,7 @@ class Redistricting:
 
             self.project.layersAdded.connect(self.updateNewPlanAction)
             self.project.layersRemoved.connect(self.updateNewPlanAction)
+            self.project.dirtySet.connect(self.dirtySet)
 
             self.projectSignalsConnected = True
 
@@ -265,8 +269,8 @@ class Redistricting:
             self.tr('Redistricting'),
             self.iface.mainWindow()
         )
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Group, False)
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Vector, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.GroupLayer, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.VectorLayer, False)
 
         self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
         self.contextMenu.addAction(self.addAction(
@@ -982,8 +986,9 @@ class Redistricting:
     def contextMenuActivatePlan(self):
         group = self.iface.layerTreeView().currentGroupNode()
         id = group.customProperty('redistricting-plan-id', None)
-        if id:
+        if id and id != self.activePlan.id:
             self.setActivePlan(id)
+            self.project.setDirty()
 
     # --------------------------------------------------------------------------
 

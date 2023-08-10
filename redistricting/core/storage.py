@@ -23,7 +23,10 @@
  ***************************************************************************/
 """
 import json
-from typing import List
+from typing import (
+    Iterable,
+    List
+)
 from uuid import UUID
 
 from packaging import version
@@ -53,7 +56,7 @@ class ProjectStorage:
             l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
             if not success:
                 return
-        
+
             for i, d in enumerate(l):
                 data = json.loads(d)
                 l[i] = json.dumps(checkMigrateSchema(data, self._version))
@@ -62,13 +65,16 @@ class ProjectStorage:
         self._version = schemaVersion
 
     def getVersion(self):
-        v, _ = self._project.readEntry('redistricting', 'schema-version', str(schemaVersion))
+        v, success = self._project.readEntry('redistricting', 'schema-version', None)
+        if not success or v is None:
+            return version.parse('1.0.0')
+
         return version.parse(v)
 
     def setVersion(self):
         self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
-    def writeRedistrictingPlans(self, plans: List[RedistrictingPlan]):
+    def writeRedistrictingPlans(self, plans: Iterable[RedistrictingPlan]):
         l: List[str] = []
         for p in plans:
             data = p.serialize()
