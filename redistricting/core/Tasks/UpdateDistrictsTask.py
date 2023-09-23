@@ -62,11 +62,12 @@ if TYPE_CHECKING:
         RedistrictingPlan
     )
 
+
 class Config:
     @staticmethod
     def calculateSplits():
         return True
-    
+
     @staticmethod
     def splitPopulation():
         return True
@@ -104,7 +105,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.totalPop = 0
         self.splits = {}
 
-    def getPopData(self, geoids: str, geoField=None, request: QgsFeatureRequest = None, cb = None):
+    def getPopData(self, geoids: str, geoField=None, request: QgsFeatureRequest = None, cb=None):
         if geoField is None:
             geoField = self.popJoinField
 
@@ -117,7 +118,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 sql += f', SUM({field.field}) AS {field.fieldName}'
             sql += f' FROM {table} WHERE {geoField} in ({geoids})'
             cur = self.executeSql(self.popLayer, sql)
-            if cb: 
+            if cb:
                 cb(geoids.count(',') + 1)
             return dict(next(cur))
 
@@ -131,7 +132,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
             self.popField: 0
         }
         for field in self.popFields:
-            pop[field.fieldName] = 0 
+            pop[field.fieldName] = 0
         for field in self.dataFields:
             pop[field.fieldName] = 0
 
@@ -143,16 +144,16 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 cb(1)
 
         return pop
-    
+
     def doSplits(self):
         self.splits = {}
         if Config.calculateSplits():
             with closing(spatialite_connect(self.geoPackagePath)) as db:
                 for field in self.geoFields:
                     sql = f'SELECT {field.fieldName}, GROUP_CONCAT(DISTINCT QUOTE({self.distField})) AS districts, COUNT(DISTINCT {self.distField}) AS splits ' \
-                        f'FROM assignments GROUP BY {field.fieldName} HAVING splits > 1'
-                    
-                    #s = pd.read_sql(sql, db, field.fieldName)
+                        f'FROM assignments WHERE {field.fieldName} IS NOT NULL GROUP BY {field.fieldName} HAVING splits > 1'
+
+                    # s = pd.read_sql(sql, db, field.fieldName)
                     s = [dict(zip((field.fieldName, "districts", "splits"), row)) for row in db.execute(sql)]
 
                     if Config.splitPopulation():
@@ -169,7 +170,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
 
     def doMetrics(self):
         crs = self.assignLayer.crs()
-            
+
         pp: Dict[int, float] = {}
         reock: Dict[int, float] = {}
         ch: Dict[int, float] = {}
