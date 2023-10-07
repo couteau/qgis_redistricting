@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    Dict
+    Sequence
 )
 
 from qgis.core import (
@@ -43,6 +43,7 @@ from ._exception import CancelledError
 if TYPE_CHECKING:
     from .. import (
         DataField,
+        Field,
         RedistrictingPlan
     )
 
@@ -59,8 +60,8 @@ class AggregateDataTask(QgsTask):
         self.geoIdField: str = plan.geoIdField
         self.popJoinField: str = plan.popJoinField
         self.popField: str = plan.popField
-        self.popFields = plan.popFields
-        self.dataFields = plan.dataFields
+        self.popFields: Sequence['Field'] = plan.popFields
+        self.dataFields: Sequence['DataField'] = plan.dataFields
         self.count = 0
         self.total = 1
         self.exception = None
