@@ -23,21 +23,33 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-from typing import TYPE_CHECKING, List
 
-from qgis.PyQt.QtCore import Qt, QObject
-from qgis.PyQt.QtGui import QColor, QFont
-from qgis.core import (
-    QgsSymbol,
-    QgsCategorizedSymbolRenderer,
-    QgsRendererCategory,
-    QgsRandomColorRamp,
-    QgsPalLayerSettings,
-    QgsTextFormat,
-    QgsTextBufferSettings,
-    QgsVectorLayerSimpleLabeling,
-    QgsSimpleLineSymbolLayer,
+from typing import (
+    TYPE_CHECKING,
+    List
 )
+
+from qgis.core import (
+    QgsCategorizedSymbolRenderer,
+    QgsLimitedRandomColorRamp,
+    QgsPalLayerSettings,
+    QgsRandomColorRamp,
+    QgsRendererCategory,
+    QgsSimpleLineSymbolLayer,
+    QgsSymbol,
+    QgsTextBufferSettings,
+    QgsTextFormat,
+    QgsVectorLayerSimpleLabeling
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QFont
+)
+
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
@@ -69,13 +81,14 @@ class PlanStyler(QObject):
         categoryList: List[QgsRendererCategory] = []
         for dist in range(0, self._numDistricts+1):
             category = QgsRendererCategory()
-            category.setValue( None if dist == 0 else dist)
+            category.setValue(None if dist == 0 else dist)
             category.setSymbol(symbol.clone())
             category.setLabel(str(dist))
             categoryList.append(category)
 
-        ramp = QgsRandomColorRamp()
-        ramp.setTotalColorCount(self._numDistricts+1)
+        ramp = QgsLimitedRandomColorRamp(count=self._numDistricts+1, satMin=50, satMax=100)
+        # ramp = QgsRandomColorRamp()
+        # ramp.setTotalColorCount(self._numDistricts+1)
 
         renderer = QgsCategorizedSymbolRenderer(self._distField, categoryList)
         renderer.updateColorRamp(ramp)
