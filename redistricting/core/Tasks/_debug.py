@@ -27,6 +27,7 @@ import sys
 
 DEBUG = os.getenv("DEBUG")
 
+
 def debug_thread():
     if not DEBUG:
         return
@@ -40,8 +41,13 @@ def debug_thread():
             pass
     else:
         try:
-            import ptvsd  # pylint: disable=import-outside-toplevel
-            if ptvsd.is_attached():
-                ptvsd.debug_this_thread()
+            import debugpy  # pylint: disable=import-outside-toplevel
+            if debugpy.is_client_connected():
+                debugpy.debug_this_thread()
         except:  # pylint: disable=bare-except
-            pass
+            try:
+                import ptvsd  # pylint: disable=import-outside-toplevel
+                if ptvsd.is_attached():
+                    ptvsd.debug_this_thread()
+            except:  # pylint: disable=bare-except
+                pass
