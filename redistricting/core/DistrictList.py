@@ -24,16 +24,32 @@
 """
 from __future__ import annotations
 
-from typing import Dict, List, Union, TYPE_CHECKING, overload
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    List,
+    Union,
+    overload
+)
+
 import pandas as pd
-from qgis.PyQt.QtCore import QObject, pyqtSignal, NULL
 from qgis.core import (
     Qgis,
     QgsApplication,
-    QgsTask,
+    QgsTask
+)
+from qgis.PyQt.QtCore import (
+    NULL,
+    QObject,
+    pyqtSignal
+)
+
+from .District import (
+    BaseDistrict,
+    District,
+    Unassigned
 )
 from .Tasks import AggregateDistrictDataTask
-from .District import BaseDistrict, Unassigned, District
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -239,6 +255,7 @@ class DistrictList(QObject):
             self._plan.setError(
                 f'{self._updateTask.exception!r}', Qgis.Critical)
         self._updateTask = None
+        self._needUpdate = False
         self.updateTerminated.emit()
 
     def waitForUpdate(self):
