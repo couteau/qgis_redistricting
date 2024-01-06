@@ -24,22 +24,34 @@
 """
 from __future__ import annotations
 
-from typing import Iterator, List, Union
-from qgis.PyQt.QtCore import QObject, pyqtSignal
+from typing import (
+    Generic,
+    Iterator,
+    List,
+    TypeVar,
+    Union
+)
 
-from .Field import Field, DataField
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
+
+from .Field import Field
+
+T = TypeVar("T")
 
 
-class FieldList(QObject):
+class FieldList(QObject, Generic[T]):
     fieldAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
     fieldRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
     fieldMoved = pyqtSignal('PyQt_PyObject', int, int)
 
-    def __init__(self, parent: QObject = None, fields: List[Union[Field, DataField]] = None):
+    def __init__(self, parent: QObject = None, fields: List[T] = None):
         super().__init__(parent)
         self._fields: List[Field] = fields or []
 
-    def __getitem__(self, key) -> Union[Field, DataField, FieldList]:
+    def __getitem__(self, key) -> Union[T, FieldList[T]]:
         if isinstance(key, str):
             item = next((f for f in self._fields if f.fieldName == key), None)
             if item is None:
@@ -66,7 +78,7 @@ class FieldList(QObject):
             f.setParent(None)
         self.fieldRemoved.emit(self, fields[0] if len(fields) == 1 else fields, index)
 
-    def __contains__(self, item) -> bool:
+    def __contains__(self, item: Union[T, str]) -> bool:
         if isinstance(item, Field):
             return item in self._fields
 
@@ -82,17 +94,17 @@ class FieldList(QObject):
     def __bool__(self):
         return bool(self._fields)
 
-    def append(self, item: Union[Field, DataField]):
+    def append(self, item: T):
         item.setParent(self)
         self._fields.append(item)
         self.fieldAdded.emit(self, item, len(self._fields) - 1)
 
-    def insert(self, idx, item: Union[Field, DataField]):
+    def insert(self, idx, item: T):
         item.setParent(self)
         self._fields.insert(idx, item)
         self.fieldAdded.emit(self, item, idx)
 
-    def extend(self, items: Union[FieldList, List[Union[Field, DataField]]]):
+    def extend(self, items: Union[FieldList[T], List[T]]):
         if not items:
             return
         self._fields.extend(items)
@@ -103,7 +115,7 @@ class FieldList(QObject):
     def clear(self):
         del self[:]
 
-    def remove(self, item: Union[Field, DataField]):
+    def remove(self, item: T):
         if item in self._fields:
             item.setParent(None)
             i = self._fields.index(item)
@@ -122,7 +134,7 @@ class FieldList(QObject):
         else:
             raise IndexError()
 
-    def __iadd__(self, item) -> FieldList:
+    def __iadd__(self, item) -> FieldList[T]:
         if isinstance(item, Field):
             self.append(item)
         elif isinstance(item, list):
@@ -141,7 +153,7 @@ class FieldList(QObject):
 
         raise ValueError()
 
-    def __iter__(self) -> Iterator[Union[Field, DataField]]:
+    def __iter__(self) -> Iterator[T]:
         return iter(self._fields)
 
     def __len__(self) -> int:

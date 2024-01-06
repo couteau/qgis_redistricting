@@ -30,6 +30,7 @@ from typing import (
     Dict,
     Iterable,
     List,
+    Sequence,
     Set
 )
 
@@ -58,7 +59,7 @@ from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
     from .. import (
-        Field,
+        GeoField,
         RedistrictingPlan
     )
 
@@ -89,7 +90,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
 
         self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
 
-        self.geoFields: List['Field'] = plan.geoFields
+        self.geoFields: Sequence['GeoField'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
         self.geoPackagePath = plan.geoPackagePath
 
@@ -165,6 +166,14 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                                 geoids = db.execute(sql).fetchone()[0]
                                 pop[d] = self.getPopData(geoids)
                             group["districts"] = pop
+
+                    if field.nameField and field._index and field._layer.referencingRelations(field._index):
+                        ref = field._layer.referencingRelations(field._index)[0]
+                        l = ref.referencedLayer()
+                        j = ref.resolveReferencedField(field.field)
+                        for split in s:
+                            f = next(l.getFeatures(f"{j} = '{split[field.fieldName]}'"))
+                            split['name'] = field.nameField.getValue(f)
 
                     self.splits[field.fieldName] = s
 

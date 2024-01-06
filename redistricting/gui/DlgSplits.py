@@ -46,7 +46,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..core import (
-    Field,
+    GeoField,
     RedistrictingPlan
 )
 from ..core.utils import (
@@ -60,7 +60,7 @@ from .ui.DlgSplits import Ui_dlgSplits
 class SplitsModel(QAbstractItemModel):
     _plan: RedistrictingPlan = None
 
-    def __init__(self, plan: RedistrictingPlan = None, geoField: Field = None, parent: QObject = None):
+    def __init__(self, plan: RedistrictingPlan = None, geoField: GeoField = None, parent: QObject = None):
         super().__init__(parent)
         self._keys = []
         self._headings = []
@@ -88,7 +88,7 @@ class SplitsModel(QAbstractItemModel):
             if self._plan is not None:
                 self._plan.stats.statsChanged.connect(self.statsChanged)
                 self._plan.planChanged.connect(self.planChanged)
-            
+
             self.updateSplits()
             self.updateColumnKeys()
             self.endResetModel()
@@ -96,9 +96,9 @@ class SplitsModel(QAbstractItemModel):
     @property
     def field(self):
         return self._field
-    
+
     @field.setter
-    def field(self, value: Field):
+    def field(self, value: GeoField):
         if value != self._field:
             self.beginResetModel()
             self._field = value
@@ -108,7 +108,7 @@ class SplitsModel(QAbstractItemModel):
 
     def updateSplits(self):
         if self._plan and self._field:
-            if self._field not in self._plan.dataFields:
+            if self._field not in self._plan.geoFields:
                 raise ValueError(
                     f"Cannot show splits for {self._field.fieldName}. Field {self._field.field} not in plan {self._plan.name}")
             if not self._field in self._plan.stats.splits:
@@ -123,22 +123,26 @@ class SplitsModel(QAbstractItemModel):
             self._keys = []
             self._subkeys = []
             return
-        
-        self._keys = [
+
+    #    self._keys = [self._field.nameField.fieldName] if self._field.nameField else []
+        self._keys = []
+        self._keys.extend([
             self._field.fieldName,
             "districts"
-        ]
+        ])
 
         self._subkeys = [
             "district",
             self._plan.popField
         ]
 
-        self._headings = [
+        # self._headings = [self._field.nameField.caption] if self._field.nameField else []
+        self._headings = []
+        self._headings.extend([
             self._field.caption,
             tr('Districts'),
             tr('Population')
-        ]
+        ])
 
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
@@ -161,15 +165,18 @@ class SplitsModel(QAbstractItemModel):
         self.endResetModel()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-       if not parent.isValid():
+        if not parent.isValid():
             return len(self._splits)
-       else:
+        else:
             return len(self._splits[parent.row()]['districts'])
-       
+
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._headings)
 
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):            
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        if not index.isValid():
+            return QVariant()
+
         if role in (Qt.DisplayRole, Qt.EditRole):
             row = index.row()
             column = index.column()
@@ -177,7 +184,7 @@ class SplitsModel(QAbstractItemModel):
             if not index.parent().isValid():
                 if column >= len(self._keys):
                     return QVariant()
-                
+
                 key = self._keys[column]
                 value = self._splits[row][key]
                 if key == "districts" and isinstance(value, dict):
@@ -185,14 +192,14 @@ class SplitsModel(QAbstractItemModel):
             else:
                 if column == 0:
                     return ""
-                
+
                 key = self._subkeys[column-1]
 
                 if key == 'district':
                     value = self._splits[index.parent().row()]['districts'].keys()[row]
                 else:
                     split_detail: dict = self._splits[index.parent().row()]['districts'].values()[row]
-                
+
                     if key[:3] == 'pct_':
                         k = key[5:]
                         f = self.plan.dataFields[k]
@@ -221,45 +228,46 @@ class SplitsModel(QAbstractItemModel):
                 return self._headings[section]
 
         return QVariant()
-    
+
     def hasChildren(self, parent: QModelIndex = QModelIndex()) -> bool:
         if not parent.isValid():
             return True
-        
+
         if parent.internalPointer() is not None or parent.column() != 0:
             return False
-        
+
         return isinstance(self._splits[parent.row()]['districts'], Iterable)
-    
+
     def parent(self, index: QModelIndex) -> QModelIndex:
         if not index.isValid():
             return QModelIndex()
-        
+
         item = index.internalPointer()
         if item is None:
             return QModelIndex()
         else:
             return self.createIndex(item, 0)
-    
+
     def index(self, row: int, column: int, parent: QModelIndex) -> QModelIndex:
         if not self.hasIndex(row, column, parent):
             return QModelIndex()
-        
+
         if not parent.isValid():
             idx = self.createIndex(row, column)
         else:
             idx = self.createIndex(row, column, parent.row())
-        
+
         return idx
 
+
 class DlgSplitDetail(Ui_dlgSplits, QDialog):
-    def __init__(self, plan: RedistrictingPlan, geoField: Field, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RedistrictingPlan, geoField: GeoField, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
         self._model = None
         self._plan: RedistrictingPlan = None
-        self._field: Field = None
+        self._field: GeoField = None
 
         self.plan = plan
         self.geoField = geoField
@@ -268,38 +276,49 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         if self._plan is None or self._field is None:
             model = QStandardItemModel(0, 0, self)
             return model
-        
-        
-        headings = [
+
+        # headings = [self._field.nameField.caption] if self._field.nameField else []
+        headings = []
+        headings.extend([
             self._field.caption,
             tr('Districts')
-        ]
+        ])
         h = True
-        
+
         model = QStandardItemModel()
-        
+
         root = model.invisibleRootItem()
         for s in self._plan.stats.splits[self._field]:
-            split = QStandardItem(s[self._field.fieldName])
-            if isinstance(s["districts"], dict):
-                districts = ','.join(d for d in s["districts"].keys())
+            row: list[QStandardItem] = []
+#            if self._field.nameField:
+#                row.append(QStandardItem(s[self._field.nameField.fieldName]))
+
+            if s.get('name'):
+                f = f'{s["name"]} ({s[self._field.fieldName]})'
             else:
-                districts = s["districts"]
-            root.appendRow([split, QStandardItem(districts)])
+                f = s[self._field.fieldName]
+            row.append(QStandardItem(f))
+            if isinstance(s["districts"], dict):
+                row.append(QStandardItem(','.join(d for d in s["districts"].keys())))
+            else:
+                row.append(QStandardItem(districts=s["districts"]))
+            root.appendRow(row)
             if isinstance(s["districts"], dict):
                 if h:
                     headings.append(tr('Population'))
                 for district, pop in s["districts"].items():
-                    children = [QStandardItem(""), QStandardItem(district), QStandardItem(f"{pop[self._plan.popField]:,}")]
+                    children = [QStandardItem(""), QStandardItem(
+                        district), QStandardItem(f"{pop[self._plan.popField]:,}")]
 
                     for field in self._plan.popFields:
-                        children.append(QStandardItem(f"{pop[field.fieldName]:,}"))
+                        v = pop[field.fieldName]
+                        children.append(QStandardItem(f"{v if v is not None else 0:,}"))
                         if h:
                             headings.append(field.caption)
                     for field in self._plan.dataFields:
                         v = pop[field.fieldName]
                         if field.sum:
-                            children.append(QStandardItem(f"{v:,}"))
+                            children.append(QStandardItem(f"{v if v is not None else 0:,}"))
                             if h:
                                 headings.append(field.caption)
                         if field.pctbase is not None:
@@ -307,7 +326,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
                                 base = pop[self.plan.popField]
                             else:
                                 continue
-                            
+
                             if base != 0:
                                 pct = v / pop[self.plan.popField]
                             else:
@@ -317,32 +336,32 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
                             if h:
                                 headings.append(f'%{field.caption}')
                     h = False
-                    split.appendRow(children)
+                    row[0].appendRow(children)
 
         model.setHorizontalHeaderLabels(headings)
         return model
-        
+
     @property
     def plan(self) -> RedistrictingPlan:
         return self._plan
-    
+
     @plan.setter
     def plan(self, value: RedistrictingPlan):
         self._plan = value
-        #self._model =  SplitsModel(self._plan, self._field)
+        # self._model =  SplitsModel(self._plan, self._field)
         self._model = self.makeModel()
         self.tvSplits.setModel(self._model)
 
     @property
-    def geoField(self) -> Field:
+    def geoField(self) -> GeoField:
         return self._field
-    
+
     @geoField.setter
-    def geoField(self, value: Field):
+    def geoField(self, value: GeoField):
         self._field = value
         if self._field:
             self.setWindowTitle(f"{self._field.caption} {tr('Splits')}")
 
-        #self._model =  SplitsModel(self._plan, self._field)
+        # self._model =  SplitsModel(self._plan, self._field)
         self._model = self.makeModel()
         self.tvSplits.setModel(self._model)

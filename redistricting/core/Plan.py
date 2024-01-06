@@ -61,7 +61,8 @@ from .ErrorList import ErrorListMixin
 from .Exception import RdsException
 from .Field import (
     DataField,
-    Field
+    Field,
+    GeoField
 )
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
@@ -109,12 +110,12 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._geoIdField = None
         self._geoIdCaption = None
         self._distField = 'district'
-        self._geoFields = FieldList(self)
+        self._geoFields = FieldList[GeoField](self)
 
         self._distLayer: QgsVectorLayer = None
         self._popField = None
-        self._popFields = FieldList(self)
-        self._dataFields = FieldList(self)
+        self._popFields = FieldList[Field](self)
+        self._dataFields = FieldList[DataField](self)
 
         self._districts = DistrictList(self)
         self._stats = PlanStatistics(self)
@@ -200,7 +201,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         plan._districts.updateDistrictFields()
 
         for field in data.get('geo-fields', []):
-            f = Field.deserialize(field, plan.geoFields)
+            f = GeoField.deserialize(field, plan.geoFields)
             if f:
                 plan._geoFields.append(f)
 
@@ -556,14 +557,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def geoFields(self) -> FieldList:
         return self._geoFields
 
-    def _setGeoFields(self, value: Union[FieldList, List[Field]]):
+    def _setGeoFields(self, value: Union[FieldList[GeoField], List[GeoField]]):
         if self._geoFields == value:
             return
 
         oldFields = self._geoFields
 
-        newFields: Set[Field] = set(value) - set(oldFields)
-        removedFields: Set[Field] = set(oldFields) - set(value)
+        newFields: Set[GeoField] = set(value) - set(oldFields)
+        removedFields: Set[GeoField] = set(oldFields) - set(value)
 
         self._geoFields.clear()
         self._geoFields.extend(value)

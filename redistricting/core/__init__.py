@@ -32,7 +32,8 @@ from .DistrictList import DistrictList
 from .Exception import RdsException
 from .Field import (
     DataField,
-    Field
+    Field,
+    GeoField
 )
 from .FieldList import FieldList
 from .FieldListModels import (
@@ -62,7 +63,7 @@ from .utils import (
 )
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
-           'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField',
+           'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField', 'GeoField'
            'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',

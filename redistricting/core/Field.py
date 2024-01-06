@@ -22,7 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from enum import IntEnum
+from copy import copy
 from typing import (
     Any,
     Dict,
@@ -64,7 +64,7 @@ class Field(QObject):
         if layer is None or field is None:
             raise ValueError()
 
-        self._layer = None
+        self._layer: QgsVectorLayer = None
         self._error = None
         self._field = field
         self._isExpression = isExpression if isExpression is not None else not field.isidentifier()
@@ -231,7 +231,60 @@ class Field(QObject):
         else:
             result = feature[self.field]
 
+        if isinstance(result, QVariant):
+            result = None
+
         return result
+
+
+class GeoField(Field):
+    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
+                 caption: str = None, parent: Optional['QObject'] = None):
+        self._nameField: Field = None
+        super().__init__(layer, field, isExpression, caption, parent)
+
+    def getRelatedLayer(self):
+        if self._layer and self._index != -1:
+            relations = self._layer.referencingRelations(self._index)
+            if relations:
+                return relations[0].referencedLayer()
+        return None
+
+    def setLayer(self, layer: QgsVectorLayer):
+        super().setLayer(layer)
+        if self._nameField is None:
+            l = self.getRelatedLayer()
+            if l:
+                if l.fields().lookupField("name") != -1:
+                    self.setNameField("name")
+                elif self._layer.fields().lookupField("name20") != -1:
+                    self.setNameField("name20")
+                elif self._layer.fields().lookupField("name10") != -1:
+                    self.setNameField("name10")
+
+    @property
+    def nameField(self):
+        return self._nameField
+
+    def setNameField(self, value: Union[Field, str]):
+        if isinstance(value, str):
+            self._nameField = Field(self.getRelatedLayer(), value, parent=self)
+        else:
+            self._nameField = copy(value)
+
+    def serialize(self):
+        nf = {'name-field': self._nameField.serialize()} \
+            if self._nameField else {}
+        return super().serialize() | nf
+
+    @classmethod
+    def deserialize(cls, data, parent: Optional['QObject'] = None):
+        if field := super().deserialize(data, parent):
+            nf = data.get('name-field')
+            if nf:
+                field._nameField = Field.deserialize(nf, field)
+
+        return field
 
 
 class DataField(Field):
