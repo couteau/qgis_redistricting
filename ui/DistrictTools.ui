@@ -98,6 +98,16 @@
         </widget>
        </item>
        <item>
+        <widget class="QToolButton" name="btnSaveAsNew">
+         <property name="text">
+          <string>...</string>
+         </property>
+         <property name="autoRaise">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <widget class="QToolButton" name="btnRollbackUpdate">
          <property name="text">
           <string>...</string>

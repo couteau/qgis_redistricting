@@ -399,6 +399,16 @@ class Redistricting:
             parent=self.iface.mainWindow()
         )
 
+        self.actionSaveAsNew = self.addAction(
+            QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
+            text=self.tr('Save as new'),
+            statusTip=self.tr(
+                'Save all unsaved districting changes to a new redistricting plan'),
+            callback=self.saveChangesAsNewPlan,
+            enabledFlag=False,
+            parent=self.iface.mainWindow()
+        )
+
         self.actionRollbackPlanChanges = self.addAction(
             QgsApplication.getThemeIcon('/mActionCancelEdits.svg'),
             text=self.tr('Rollback changes'),
@@ -469,6 +479,7 @@ class Redistricting:
         dockwidget.btnPaintRectangle.setDefaultAction(self.actionPaintRectangle)
         dockwidget.btnSelectByGeography.setDefaultAction(self.actionSelectByGeography)
         dockwidget.btnCommitUpdate.setDefaultAction(self.actionCommitPlanChanges)
+        dockwidget.btnSaveAsNew.setDefaultAction(self.actionSaveAsNew)
         dockwidget.btnRollbackUpdate.setDefaultAction(self.actionRollbackPlanChanges)
         dockwidget.btnEditPlan.setDefaultAction(self.actionEditPlan)
 
@@ -873,6 +884,23 @@ class Redistricting:
             copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                             dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
 
+    def saveChangesAsNewPlan(self):
+        if not self.checkActivePlan(self.tr('copy')):
+            return
+
+        dlgCopyPlan = DlgCopyPlan(self.activePlan, self.iface.mainWindow())
+        dlgCopyPlan.cbxCopyAssignments.hide()
+
+        if dlgCopyPlan.exec_() == QDialog.Accepted:
+            copier = PlanCopier(self.activePlan)
+            progress = self.startProgress(self.tr('Creating plan layers...'))
+            copier.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(copier.cancel)
+            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
+                                   dlgCopyPlan.geoPackagePath, True)
+            copier.copyBufferedAssignments(plan)
+            self.appendPlan(plan)
+
     def importPlan(self):
         if not self.checkActivePlan(self.tr('import')):
             return
@@ -939,10 +967,12 @@ class Redistricting:
 
     def editingStarted(self):
         self.actionCommitPlanChanges.setEnabled(True)
+        self.actionSaveAsNew.setEnabled(True)
         self.actionRollbackPlanChanges.setEnabled(True)
 
     def editingStopped(self):
         self.actionCommitPlanChanges.setEnabled(False)
+        self.actionSaveAsNew.setEnabled(False)
         self.actionRollbackPlanChanges.setEnabled(False)
 
     def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
@@ -1174,6 +1204,8 @@ class Redistricting:
                     self.editingStopped)
 
                 self.actionCommitPlanChanges.setEnabled(
+                    self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
+                self.actionSaveAsNew.setEnabled(
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())
                 self.actionRollbackPlanChanges.setEnabled(
                     self.activePlan.assignLayer and self.activePlan.assignLayer.isEditable())

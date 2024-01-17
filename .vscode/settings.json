@@ -26,6 +26,9 @@
     "qtForPython.rcc.args": [
         "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}${fileBasenameNoExtension}.py\""
     ],
+    "qtForPython.rcc.options": [
+        "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}resources.py\""
+    ],
     "qtForPython.uic.args": [
         "-o",
         "${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${fileBasenameNoExtension}.py"

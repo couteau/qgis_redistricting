@@ -27,7 +27,10 @@ from __future__ import annotations
 import shutil
 import sqlite3
 from contextlib import closing
-from typing import TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Any
+)
 
 from qgis.core import (
     Qgis,
@@ -106,11 +109,24 @@ class PlanCopier(ErrorListMixin, QObject):
             plan._stats = PlanStatistics.deserialize(plan, self._plan._stats.serialize())
 
             self.setProgress(100)
-            planCreated(plan)            
+            planCreated(plan)
 
         return plan
 
-    def copyAssignments(self, target: RedistrictingPlan):
+    def copyBufferedAssignments(self, target: RedistrictingPlan, rollback=True):
+        if not self._plan.assignLayer.isEditable():
+            return
+
+        buffer = self._plan.assignLayer.editBuffer()
+        values: dict[int, dict[int, Any]] = buffer.changedAttributeValues()
+        target.assignLayer.startEditing()
+        for id, feat in values.items():
+            target.assignLayer.changeAttributeValues(id, feat)
+        target.assignLayer.commitChanges(True)
+        if rollback:
+            self._plan.assignLayer.rollBack(True)
+
+    def copyAssignments(self, target: RedistrictingPlan, autocommit=True):
         def progress():
             nonlocal count
             count += 1
@@ -135,8 +151,8 @@ class PlanCopier(ErrorListMixin, QObject):
             )
             return
 
-        if self._plan.assignLayer.isEditable():
-            self.setError(tr('Committing unsaved changes before copy'))
+        if autocommit and self._plan.assignLayer.isEditable():
+            # self.setError(tr('Committing unsaved changes before copy'))
             self._plan.assignLayer.commitChanges(True)
 
         with closing(spatialite_connect(target.geoPackagePath)) as db:
