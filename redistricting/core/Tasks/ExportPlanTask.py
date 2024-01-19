@@ -45,6 +45,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 from qgis.utils import spatialite_connect
+from traitlets import Integer
 
 from ..Exception import RdsException
 from ..utils import tr
@@ -112,10 +113,14 @@ class ExportRedistrictingPlanTask(QgsTask):
 
     def _createFields(self, context: QgsExpressionContext):
         fields = QgsFields()
-        fieldNames = {self.distField: makeDbfFieldName(
-            self.distField, fields), 'name': 'name'}
+        fieldNames = {
+            self.distField: makeDbfFieldName(self.distField, fields),
+            'name': 'name',
+            'members': 'members'
+        }
         fields.append(QgsField(fieldNames[self.distField], QVariant.Int))
         fields.append(QgsField('name', QVariant.String, 'String', 127))
+        fields.append(QgsField("members", QVariant.Int))
 
         if self.includeDemographics:
             fieldNames |= {
@@ -169,6 +174,7 @@ class ExportRedistrictingPlanTask(QgsTask):
             flt = None
 
         layer = QgsVectorLayer(f'MultiPolygon?crs={self.distLayer.crs()}&index=yes', 'tempshape', 'memory')
+        layer.setCrs(self.distLayer.crs())
 
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.distLayer))
