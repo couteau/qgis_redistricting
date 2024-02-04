@@ -106,7 +106,7 @@ class DlgEditPlan(QWizard):
                         break
             if l is None:
                 raise ValueError(tr("No vector layer found in project"))
-            
+
             self.setField('sourceLayer', l)
 
     def showHelp(self):
@@ -152,7 +152,7 @@ class DlgEditPlan(QWizard):
 
     def popFields(self):
         return self.field('popFields')
-    
+
     def dataFields(self):
         return self.field('dataFields')
 

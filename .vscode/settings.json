@@ -41,6 +41,6 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
     "pylint.path": [
-        "/Users/stuart/anaconda3/envs/qgis_plugin/bin/pylint"
+        "${userHome}/anaconda3/envs/qgis_plugin/bin/pylint"
     ],
 }

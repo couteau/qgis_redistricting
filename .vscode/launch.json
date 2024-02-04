@@ -15,6 +15,10 @@
             "justMyCode": false,
             "pathMappings": [
                 {
+                    "localRoot": "${workspaceFolder}/redistricting",
+                    "remoteRoot": "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins/redistricting"
+                },
+                {
                     "localRoot": "${workspaceFolder}",
                     "remoteRoot": "${workspaceFolder}"
                 }
@@ -31,7 +35,7 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                "QGIS_PREFIX_PATH": "/Users/stuart/anaconda3/envs/qgis_redist",
+                // "QGIS_PREFIX_PATH": "${userHome}/anaconda3/envs/qgis_redist",
                 "PYTEST_ADDOPTS": "--no-cov"
             }
         },

@@ -125,8 +125,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def __copy__(self):
         data = self.serialize()
         del data['id']
-        del data['assign-layer']
-        del data['dist-layer']
+        if 'assign-layer' in data:
+            del data['assign-layer']
+        if 'dist-layer' in data:
+            del data['dist-layer']
         return RedistrictingPlan.deserialize(data, self.parent())
 
     def __deepcopy__(self, memo):
@@ -527,7 +529,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self.planChanged.emit(self, 'pop-fields', self._popFields, oldFields)
 
     @property
-    def dataFields(self) -> FieldList:
+    def dataFields(self) -> FieldList[DataField]:
         return self._dataFields
 
     def _setDataFields(self, value: Union[FieldList, List[DataField]]):

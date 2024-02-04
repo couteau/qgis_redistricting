@@ -32,7 +32,8 @@ from typing import (
     TYPE_CHECKING,
     List,
     Type,
-    Union
+    Union,
+    overload
 )
 
 from osgeo import gdal
@@ -52,12 +53,21 @@ if TYPE_CHECKING:
     from . import Field
 
 
-# this file is part of qgis/QGIS-Mac-Packager package
-# https://github.com/qgis/QGIS-Mac-Packager/issues/79
+@overload
+def tr(message: str):
+    pass
 
 
-def tr(context, message=None):
+@overload
+def tr(context: str, message: str):
+    pass
+
+
+def tr(ctx_or_msg: str, message: str | None = None):
     """Get the translation for a string using Qt translation API.
+
+            :param ctx_or_msg: Translation context or string for translation.
+            :type message: str, QString
 
             :param message: String for translation.
             :type message: str, QString
@@ -66,9 +76,9 @@ def tr(context, message=None):
             :rtype: QString
             """
     if message is None:
-        message = context
-        context = 'Redistricting'
-    return QCoreApplication.translate(context, message)
+        message = ctx_or_msg
+        ctx_or_msg = 'redistricting'
+    return QCoreApplication.translate(ctx_or_msg, message)
 
 
 def makeFieldName(field: Field):
@@ -94,6 +104,7 @@ def getDefaultField(layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern
 
     return None
 
+
 def matchField(field: str, layer: QgsVectorLayer, fieldList: List[Union[str, re.Pattern]]) -> bool:
     for f in fieldList:
         if isinstance(f, str):
@@ -102,6 +113,7 @@ def matchField(field: str, layer: QgsVectorLayer, fieldList: List[Union[str, re.
         elif isinstance(f, re.Pattern):
             if f.match(field):
                 return layer is None or layer.fields().lookupField(field) != -1
+
 
 def showHelp(helpPage='index.html'):
     """Display application help to the user."""

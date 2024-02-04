@@ -102,7 +102,7 @@ class BasePlanBuilder(PlanValidator):
         if not isinstance(value, int):
             raise ValueError(tr('Number of seats must be an integer'))
 
-        self._numSeats = value
+        self._numSeats = max(value, self._numDistricts)
         return self
 
     def setDeviation(self, value: float):

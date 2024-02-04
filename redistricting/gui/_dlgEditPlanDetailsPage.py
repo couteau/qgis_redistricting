@@ -24,8 +24,10 @@
 """
 import os
 import re
+
 from qgis.core import QgsProject
 from qgis.PyQt.QtWidgets import QWizardPage
+
 from .ui.WzpEditPlanDetailsPage import Ui_wzpPlanDetails
 
 
@@ -53,7 +55,7 @@ class dlgEditPlanDetailsPage(Ui_wzpPlanDetails, QWizardPage):
         super().initializePage()
         self.linkSeats = self.field('numDistricts') == self.field('numSeats')
         self.inpPlanName.setFocus()
-        if not self.wizard().new:
+        if not self.wizard().new and self.fileGpkg.filePath():
             self.fileGpkg.setEnabled(False)
         self.setFinalPage(self.wizard().isComplete())
 

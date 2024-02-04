@@ -786,9 +786,7 @@ class Redistricting:
 
         self.appendPlan(plan)
 
-    def newPlan(self):
-        """Display new redistricting plan dialog and create new plan"""
-
+    def buildPlan(self, builder: PlanBuilder, importer: AssignmentImporter = None):
         def updateProgress(value: int):
             progress.setValue(value)
 
@@ -803,6 +801,23 @@ class Redistricting:
                 self.endProgress(progress)
                 self.pushErrors(builder.errors())
 
+        progress = self.startProgress(self.tr('Creating plan layers...'))
+        builder.progressChanged.connect(updateProgress)
+        progress.canceled.connect(builder.cancel)
+
+        if importer:
+            builder.layersCreated.connect(importStarted)
+        else:
+            builder.layersCreated.connect(self.layersCreated)
+        builder.layersCreated.connect(lambda _: self.endProgress(progress))
+        builder.builderError.connect(newPlanError)
+
+        if not (plan := builder.createPlan(QgsProject.instance())):
+            self.endProgress(progress)
+            self.pushErrors(builder.errors())
+
+    def newPlan(self):
+        """Display new redistricting plan dialog and create new plan"""
         if len(self.project.mapLayers()) == 0:
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"),
@@ -812,16 +827,16 @@ class Redistricting:
                 duration=5)
             return
 
-        if self.project.isDirty():
-            # the project must be saved before a plan can be created
-            self.iface.messageBar().pushMessage(
-                self.tr("Wait!"),
-                self.tr("Please save your project before "
-                        "creating a redistricting plan."),
-                level=Qgis.Warning,
-                duration=5
-            )
-            return
+        # if self.project.isDirty():
+        #     # the project must be saved before a plan can be created
+        #     self.iface.messageBar().pushMessage(
+        #         self.tr("Wait!"),
+        #         self.tr("Please save your project before "
+        #                 "creating a redistricting plan."),
+        #         level=Qgis.Warning,
+        #         duration=5
+        #     )
+        #     return
 
         dlgNewPlan = DlgEditPlan(parent=self.iface.mainWindow())
         if dlgNewPlan.exec_() == QDialog.Accepted:
@@ -855,20 +870,7 @@ class Redistricting:
             else:
                 importer = None
 
-            progress = self.startProgress(self.tr('Creating plan layers...'))
-            builder.progressChanged.connect(updateProgress)
-            progress.canceled.connect(builder.cancel)
-
-            if importer:
-                builder.layersCreated.connect(importStarted)
-            else:
-                builder.layersCreated.connect(self.layersCreated)
-            builder.layersCreated.connect(lambda _: self.endProgress(progress))
-            builder.builderError.connect(newPlanError)
-
-            if not (plan := builder.createPlan(QgsProject.instance())):
-                self.endProgress(progress)
-                self.pushErrors(builder.errors())
+            self.buildPlan(builder, importer)
 
     def copyPlan(self):
         if not self.checkActivePlan(self.tr('copy')):
