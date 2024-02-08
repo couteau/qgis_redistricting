@@ -49,6 +49,13 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QDesktopServices
 
+try:
+    import pyogrio
+    gpd_read = pyogrio.read_dataframe
+except ImportError:
+    import geopandas as gpd
+    gpd_read = gpd.read_file
+
 if TYPE_CHECKING:
     from . import Field
 

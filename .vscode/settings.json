@@ -11,6 +11,11 @@
         "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
     ],
     "python.analysis.extraPaths": [
+        "${userHome}/anaconda3/envs/qgis_plugin/lib/python3.11/site-packages/PyQt5-stubs",
+        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/",
+        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/plugins",
+        "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python",
+        "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
         "~/anaconda3/envs/qgis_plugin/lib/python3.11/site-packages/PyQt5-stubs",
         "~/anaconda3/envs/qgis_plugin/share/qgis/python/",
         "~/anaconda3/envs/qgis_plugin/share/qgis/python/plugins",
@@ -23,15 +28,8 @@
             "source.organizeImports": "explicit"
         },
     },
-    "qtForPython.rcc.args": [
-        "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}${fileBasenameNoExtension}.py\""
-    ],
     "qtForPython.rcc.options": [
         "-o \"${workspaceFolder}${pathSeparator}redistricting${pathSeparator}resources.py\""
-    ],
-    "qtForPython.uic.args": [
-        "-o",
-        "${workspaceFolder}${pathSeparator}redistricting${pathSeparator}gui${pathSeparator}ui${pathSeparator}${fileBasenameNoExtension}.py"
     ],
     "qtForPython.uic.options": [
         "-o",

@@ -87,7 +87,7 @@ class Field(QObject):
 
     def __copy__(self):
         cls = self.__class__
-        result = cls.__new__(cls)
+        result = cls.__new__(cls)  # pylint: disable=E1120
         super(Field, result).__init__(self.parent())
         result.__dict__.update(self.__dict__)
         return result
@@ -279,10 +279,11 @@ class GeoField(Field):
 
     @classmethod
     def deserialize(cls, data, parent: Optional['QObject'] = None):
-        if field := super().deserialize(data, parent):
+        field = super().deserialize(data, parent)
+        if field:
             nf = data.get('name-field')
             if nf:
-                field._nameField = Field.deserialize(nf, field)
+                field._nameField = Field.deserialize(nf, field)  # pylint: disable=protected-access
 
         return field
 
@@ -311,8 +312,6 @@ class DataField(Field):
 
         # sum
         self._sum = self.isNumeric if sumfield is None else (sumfield and self.isNumeric)
-
-        f = field.lower()
 
         if not self.isNumeric or isExpression:
             self._pctbase = None

@@ -38,8 +38,7 @@ from qgis.core import (
     QgsApplication,
     QgsTask
 )
-from qgis.PyQt.QtCore import (
-    NULL,
+from qgis.PyQt.QtCore import (  # NULL,
     QObject,
     pyqtSignal
 )
@@ -50,6 +49,7 @@ from .District import (
     Unassigned
 )
 from .Tasks import AggregateDistrictDataTask
+from .utils import gpd_read
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -72,11 +72,10 @@ class DistrictList(QObject):
             self._districts: Dict[int, BaseDistrict] = {
                 0: Unassigned(self._plan)
             }
-        self._keys = []
-        self._headings = []
+
         self._needUpdate = False
         self._needGeomUpdate = False
-        self._updateDistricts: set[int] = None
+        self._updateDistricts = None
         self._updateTask = None
 
     @overload
@@ -195,20 +194,29 @@ class DistrictList(QObject):
 
     def loadData(self, loadall=False):
         if self._plan.distLayer:
-            dists = [str(d) for d in range(0, self._plan.numDistricts+1)] if loadall \
-                else [str(d) for d in self._districts]
+            geoPackagePath, _ = self._plan.distLayer.dataProvider().dataSourceUri().split('|')
+            data = gpd_read(geoPackagePath, layer="districts")
 
-            features = self._plan.distLayer.getFeatures(
-                f'{self._plan.distField} in ({",".join(dists)})')
+            dists = list(range(self._plan.numDistricts+1)) if loadall \
+                else self._districts
 
-            for f in features:
-                if not f['district'] in self._districts:
-                    self.addDistrict(f['district'], f['name'], f['members'])
+            for _, r in data.iterrows():
+                if r['district'] in dists:
+                    if not r["district"] in self._districts:
+                        self.addDistrict(r['district'], r['name'], r['members'])
+                    self._districts[r['district']].update(r)
 
-                self._districts[f['district']].update(
-                    {k: v if v != NULL else None for k, v in zip(
-                        f.fields().names(), f.attributes())}
-                )
+            # features = self._plan.distLayer.getFeatures(
+            #     f'{self._plan.distField} in ({",".join(dists)})')
+
+            # for f in features:
+            #     if not f['district'] in self._districts:
+            #         self.addDistrict(f['district'], f['name'], f['members'])
+
+            #     self._districts[f['district']].update(
+            #         {k: v if v != NULL else None for k, v in zip(
+            #             f.fields().names(), f.attributes())}
+            #     )
 
     def updateData(self, data: pd.DataFrame, districts: List[int] = None):
         updateall = districts is None or districts == list(self._districts.keys())

@@ -32,21 +32,25 @@ from typing import (
     Optional
 )
 
+import pandas as pd
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QCoreApplication,
-    QEvent,
+    QMimeData,
     QModelIndex,
     QObject,
     Qt
 )
 from qgis.PyQt.QtGui import (
+    QContextMenuEvent,
     QFont,
     QKeySequence
 )
 from qgis.PyQt.QtWidgets import (
+    QAction,
     QDockWidget,
+    QMenu,
     QWidget
 )
 
@@ -223,10 +227,20 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._plan: RedistrictingPlan = None
         self.plan = plan
 
+        self.actionCopy = QAction(
+            QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            self.tr("Copy"),
+            self
+        )
+        self.actionCopy.triggered.connect(self.copySelection)
+        self.actionCopy.setShortcut(QKeySequence.Copy)
+        self.addAction(self.actionCopy)
+        # self.tblDataTable.menu
+
     def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
         if plan != self._plan:
             return
-        
+
         if prop == 'name':
             self.lblPlanName.setText(newValue)
 
@@ -259,29 +273,39 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         text = os.linesep.join([','.join(r) for r in t])
         cb.setText(text)
 
-    def copySelection(self):
-        selection = self.tblDataTable.selectedIndexes()
-        if selection:
-            rows = sorted(index.row() for index in selection)
-            columns = sorted(index.column() for index in selection)
-            rowcount = rows[-1] - rows[0] + 1
-            colcount = columns[-1] - columns[0] + 1
-            table = [[''] * colcount for _ in range(rowcount)]
-            for index in selection:
-                row = index.row() - rows[0]
-                column = index.column() - columns[0]
-                table[row][column] = index.data()
-            stream = io.StringIO()
-            csv.writer(stream, delimiter='\t').writerows(table)
-            QgsApplication.instance().clipboard().setText(stream.getvalue())
-        return
+    def copyAsHtml(self, selection: list[QModelIndex]):
+        df = pd.DataFrame()
+        for idx in selection:
+            r = self._plan.districts[idx.row()].district
+            c = self._model.headerData(idx.column(), Qt.Horizontal, Qt.DisplayRole)
+            df.loc[r, c] = idx.data()
+        df.sort_index(inplace=True)
+        html = df.to_html(na_rep='')
+        mime = QMimeData()
+        mime.setHtml(html)
+        QgsApplication.instance().clipboard().setMimeData(mime)
 
-    def eventFilter(self, source, event):
-        if (event.type() == QEvent.KeyPress and
-                event.matches(QKeySequence.Copy)):
-            self.copySelection()
-            return True
-        return super().eventFilter(source, event)
+    def copySelection(self):
+        table = None
+        if self.tblPlanStats.hasFocus():
+            selection = self.tblPlanStats.selectedIndexes()
+            if selection:
+                selection.sort(key=lambda idx: idx.row())
+                table = []
+                for idx in selection:
+                    table.append([self._statsModel.headerData(idx.row(), Qt.Vertical, Qt.DisplayRole), idx.data()])
+                stream = io.StringIO()
+                csv.writer(stream, delimiter='\t').writerows(table)
+                QgsApplication.instance().clipboard().setText(stream.getvalue())
+        else:
+            selection = self.tblDataTable.selectedIndexes()
+            if selection:
+                self.copyAsHtml(selection)
+
+    def contextMenuEvent(self, event: QContextMenuEvent):
+        menu = QMenu(self)
+        menu.addActions(self.actions())
+        menu.exec(event.globalPos())
 
     def btnHelpClicked(self):
         showHelp('usage/data_table.html')

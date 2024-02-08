@@ -43,7 +43,6 @@ from qgis.core import (
     QgsGroupLayer,
     QgsLayerTreeLayer,
     QgsMapLayer,
-    QgsMapLayerType,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext,
@@ -154,6 +153,8 @@ class Redistricting:
         self.menuName = self.tr('&Redistricting')
         self.icon = QIcon(':/plugins/redistricting/icon.png')
 
+        self.contextAction = None
+        self.contextMenu = None
         self.menu = None
         self.planMenu = None
         self.planActions = None
@@ -265,8 +266,8 @@ class Redistricting:
             self.tr('Redistricting'),
             self.iface.mainWindow()
         )
-        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.GroupLayer, False)
-        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.VectorLayer, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Group, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Vector, False)
 
         self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
         self.contextMenu.addAction(self.addAction(
@@ -605,7 +606,7 @@ class Redistricting:
 
     # --------------------------------------------------------------------------
 
-    def layerChanged(self, layer: QgsMapLayer):
+    def layerChanged(self, layer: QgsMapLayer):  # pylint: disable=unused-argument
         g = self.iface.layerTreeView().currentGroupNode()
         if g.isVisible():
             p = g.customProperty('redistricting-plan-id', None)
@@ -1004,8 +1005,8 @@ class Redistricting:
     def contextMenuSlot(self, action):
         def trigger():
             group = self.iface.layerTreeView().currentGroupNode()
-            id = group.customProperty('redistricting-plan-id', None)
-            plan = self.planById(id)
+            planid = group.customProperty('redistricting-plan-id', None)
+            plan = self.planById(planid)
             if plan:
                 action(plan)
 
@@ -1013,9 +1014,9 @@ class Redistricting:
 
     def contextMenuActivatePlan(self):
         group = self.iface.layerTreeView().currentGroupNode()
-        id = group.customProperty('redistricting-plan-id', None)
-        if id and id != self.activePlan.id:
-            self.setActivePlan(id)
+        planid = group.customProperty('redistricting-plan-id', None)
+        if planid and planid != self.activePlan.id:
+            self.setActivePlan(planid)
             self.project.setDirty()
 
     # --------------------------------------------------------------------------
@@ -1145,15 +1146,15 @@ class Redistricting:
         finally:
             del dirtyBlocker
 
-    def planById(self, id: Union[UUID, str]):
-        if isinstance(id, str):
+    def planById(self, planid: Union[UUID, str]):
+        if isinstance(planid, str):
             try:
-                id = UUID(id)
+                planid = UUID(planid)
             except ValueError:
                 return None
 
         for p in self.redistrictingPlans:
-            if p.id == id:
+            if p.id == planid:
                 return p
 
         return None

@@ -502,7 +502,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
 
     @property
-    def popFields(self) -> FieldList:
+    def popFields(self) -> FieldList[Field]:
         return self._popFields
 
     def _setPopFields(self, value: Union[FieldList, List[Field]]):
