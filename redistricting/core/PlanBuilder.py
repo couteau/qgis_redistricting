@@ -183,6 +183,16 @@ class PlanBuilder(BasePlanBuilder):
             'data-fields': [field.serialize() for field in self._dataFields],
             'geo-fields': [field.serialize() for field in self._geoFields],
         }
+        if self._geoLayer is not None and self._geoLayer.storageType() == 'ESRI Shapefile':
+            f = self._geoLayer.fields().lookupField(self._geoIdField)
+            if f != -1:
+                self._geoLayer.dataProvider().createAttributeIndex(f)
+
+        if self._popLayer is not None and self._popLayer != self._geoLayer and \
+                self._popLayer.storageType() == 'ESRI Shapefile':
+            f = self._popLayer.fields().lookupField(self._geoJoinField)
+            if f != -1:
+                self._popLayer.dataProvider().createAttributeIndex(f)
 
         plan = RedistrictingPlan.deserialize({k: v for k, v in data.items() if v is not None}, parent)
         if createLayers:
