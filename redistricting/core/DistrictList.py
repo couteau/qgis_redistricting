@@ -49,7 +49,10 @@ from .District import (
     Unassigned
 )
 from .Tasks import AggregateDistrictDataTask
-from .utils import gpd_read
+from .utils import (
+    gpd_read,
+    makeFieldName
+)
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -65,6 +68,27 @@ class DistrictList(QObject):
     def __init__(self, plan: RedistrictingPlan, districts: List[BaseDistrict] = None):
         super().__init__(plan)
         self._plan = plan
+        if not districts:
+            self._index = pd.RangeIndex(plan.numDistricts + 1)
+        else:
+            self._index = pd.Index([d.district for d in districts])
+
+        cols = self._keys = ['district', 'name', 'members',
+                             self._plan.popField, 'deviation', 'pct_deviation']
+
+        for field in self._plan.popFields:
+            cols.append(field.fieldName)
+
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            if field.sum:
+                cols.append(fn)
+            if field.pctbase and field.pctbase in cols:
+                cols.append(f'pct_{fn}')
+
+        cols += ['polsbyPopper', 'reock', 'convexHull']
+        self._columns = pd.Index(cols)
+
         if districts:
             self._districts: Dict[int, BaseDistrict] = {}
             self.update({dist.district: dist for dist in districts})
@@ -205,18 +229,6 @@ class DistrictList(QObject):
                     if not r["district"] in self._districts:
                         self.addDistrict(r['district'], r['name'], r['members'])
                     self._districts[r['district']].update(r)
-
-            # features = self._plan.distLayer.getFeatures(
-            #     f'{self._plan.distField} in ({",".join(dists)})')
-
-            # for f in features:
-            #     if not f['district'] in self._districts:
-            #         self.addDistrict(f['district'], f['name'], f['members'])
-
-            #     self._districts[f['district']].update(
-            #         {k: v if v != NULL else None for k, v in zip(
-            #             f.fields().names(), f.attributes())}
-            #     )
 
     def updateData(self, data: pd.DataFrame, districts: List[int] = None):
         updateall = districts is None or districts == list(self._districts.keys())
