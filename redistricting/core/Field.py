@@ -161,6 +161,10 @@ class Field(QObject):
         return makeFieldName(self)
 
     @property
+    def index(self):
+        return self._index
+
+    @property
     def icon(self) -> QIcon:
         return self._icon
 

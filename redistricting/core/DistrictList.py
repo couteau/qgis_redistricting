@@ -32,6 +32,7 @@ from typing import (
     overload
 )
 
+import numpy as np
 import pandas as pd
 from qgis.core import (
     Qgis,
@@ -196,6 +197,7 @@ class DistrictList(QObject):
         if self._plan.distLayer:
             geoPackagePath, _ = self._plan.distLayer.dataProvider().dataSourceUri().split('|')
             data = gpd_read(geoPackagePath, layer="districts")
+            data.replace({np.nan: None}, inplace=True)
 
             dists = list(range(self._plan.numDistricts+1)) if loadall \
                 else self._districts
