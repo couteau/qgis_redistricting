@@ -24,187 +24,84 @@
 """
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import (
     TYPE_CHECKING,
-    Dict,
-    Union
+    Any,
+    overload
 )
 
 import pandas as pd
-from qgis.core import (
-    QgsCategorizedSymbolRenderer,
-    QgsFeature
-)
+from qgis.core import QgsCategorizedSymbolRenderer
 from qgis.PyQt.QtGui import (
     QColor,
     QPalette
 )
 
 from .Delta import Delta
-from .Field import (
-    DataField,
-    Field
-)
-from .utils import (
-    makeFieldName,
-    tr
-)
 
 if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
+    from .DistrictList import DistrictList
 
 
-class BaseDistrict:  # pylint: disable=too-many-instance-attributes
-    def __init__(self, plan: RedistrictingPlan, district: int, name='', description=''):
-        self._plan = plan
+class District:
+    def __init__(self, district: int, owner: DistrictList):
         self._district = district
-        self._name = name or str(district)
-        self._description = description
-
-        self._data = {}
+        self._list = owner
         self._delta = None
-        self.updateFields()
-        self.clear()
 
-    def __getitem__(self, key):
-        return getattr(self, key)
+    @overload
+    def __getitem__(self, index: str | int) -> Any:
+        ...
 
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
+    @overload
+    def __getitem__(self, index: slice) -> pd.Series:
+        ...
 
-    def getPctValue(self, fn: str):
-        fld: DataField = self._plan.dataFields[fn]
-        if not fld.pctbase:
-            return None
+    def __getitem__(self, key: int | str | slice):
+        if isinstance(key, str) and key in self._list.data.columns:
+            return self._list.data.at[self._district, key]
 
-        value = self._data[fn]
-        if isinstance(value, (int, float)):
-            if fld.pctbase:
-                total = getattr(self, fld.pctbase, None)
-                return value / total if total else 0
+        if isinstance(key, int) and 0 <= key < len(self._list.data.columns):
+            return self._list.data.iat[self._district, key]
 
-        return None
+        if isinstance(key, slice):
+            return self._list.data.loc[self._district, key]
 
-    def __getattr__(self, key):
-        if key[:4] == 'pct_' and key[4:] in self._data:
-            return self.getPctValue(key[4:])
+        raise IndexError(f"{key} not found in district")
 
-        if key in self._data:
-            return self._data[key]
+    def __setitem__(self, key: int | str, value):
+        if key in ("district", 0):
+            raise ValueError("district field is read-only")
 
-        raise AttributeError()
+        if isinstance(key, str) and key in self._list.data.columns:
+            self._list.data.at[self._district, key] = value
+        elif isinstance(key, int) and 1 <= key < len(self._list.data.columns):
+            self._list.data.iat[self._district, key] = value
 
-    def serialize(self):
-        return {
-            'district': self._district,
-            'name': self._name,
-            'description': self._description
-        }
+    def __getattr__(self, key: str):
+        try:
+            self.__getitem__(key)
+        except IndexError as e:
+            raise AttributeError(f"{key} not found in plan") from e
 
-    @classmethod
-    def deserialize(cls, plan, data: dict):
-        if not 'district' in data:
-            return None
-        return cls(plan, **data)
-
-    def updateFields(self):
-        keys = {makeFieldName(field) for field in self._plan.dataFields}
-        keys |= {makeFieldName(field) for field in self._plan.popFields}
-        if self._plan.popField:
-            keys.add(self._plan.popField)
-        deletedKeys = set(self._data) - keys
-        for k in deletedKeys:
-            del self._data[k]
-
-        added = {s: 0 for s in keys if not s in self._data}
-        self._data.update(added)
-
-    def clear(self):
-        if self._plan.popField:
-            self._data[self._plan.popField] = 0
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            self._data[fn] = 0
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            self._data[fn] = 0
-
-        self.polsbyPopper = None
-        self.reock = None
-        self.convexHull = None
-
-    @property
-    def district(self):
-        return self._district
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, value: str):
-        if value != self._name:
-            oldValue = self._name
-            self._name = value
-
-            nindex = self._plan.distLayer.fields().indexFromName('name')
-            if nindex != -1:
-                features = self._plan.distLayer.getFeatures(
-                    f"{self._plan.distField} = {self._district}")
-
-                f: QgsFeature = next(features, None)
-                if f is not None:
-                    self._plan.distLayer.dataProvider().changeAttributeValues({
-                        f.id(): {nindex: value}})
-                    self._plan.distLayer.dataProvider().flushBuffer()
-                    self._plan.distLayer.triggerRepaint()
-
-            self._plan.planChanged.emit(
-                self._plan, 'district.name', self._name, oldValue)
-
-    @property
-    def description(self):
-        return self._description
-
-    @property
-    def population(self):
-        return self._data.get(self._plan.popField) if self._plan.popField else 0
+    def isValid(self):
+        lower, upper = self._list.idealRange(self["members"])
+        return lower <= self["population"] <= upper
 
     @property
     def delta(self):
         return self._delta
 
     @delta.setter
-    def delta(self, value: Dict[str, int]):
+    def delta(self, value: dict[str, int]):
         if value:
             self._delta = Delta(self._plan, self, value)
         else:
             self._delta = None
 
     @property
-    @abstractmethod
-    def ideal(self):
-        ...
-
-    @property
-    @abstractmethod
-    def deviation(self):
-        ...
-
-    @property
-    @abstractmethod
-    def pct_deviation(self):
-        ...
-
-    @property
-    @abstractmethod
-    def valid(self):
-        ...
-
-    @property
     def color(self):
-        renderer = self._plan.distLayer.renderer()
+        renderer = self._list.layer.renderer()
         if isinstance(renderer, QgsCategorizedSymbolRenderer):
             idx = renderer.categoryIndexForValue(self._district)
             if idx != -1:
@@ -212,79 +109,3 @@ class BaseDistrict:  # pylint: disable=too-many-instance-attributes
                 return QColor(cat.symbol().color())
 
         return QColor(QPalette().color(QPalette.Normal, QPalette.Window))
-
-    def update(self, data: Union[pd.Series, Dict[str, Union[int, float]]]):
-        if self._plan.popField in data:
-            self._data[self._plan.popField] = int(data[self._plan.popField] or 0)
-        for field in self._plan.popFields:
-            fn = makeFieldName(field)
-            if fn in data:
-                self._data[fn] = float(data[fn] or 0)
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if fn in data:
-                self._data[fn] = int(data[fn] or 0)
-
-        # pylint: disable=attribute-defined-outside-init
-        if 'polsbypopper' in data:
-            self.polsbyPopper = data['polsbypopper']
-        if 'reock' in data:
-            self.reock = data['reock']
-        if 'convexhull' in data:
-            self.convexHull = data['convexhull']
-        # pylint: enable=attribute-defined-outside-init
-
-
-class Unassigned(BaseDistrict):
-    def __init__(self, plan: RedistrictingPlan):
-        super().__init__(
-            plan,
-            0,
-            tr('Unassigned')
-        )
-
-    @property
-    def ideal(self):
-        return None
-
-    @property
-    def deviation(self):
-        return None
-
-    @property
-    def pct_deviation(self):
-        return None
-
-    @property
-    def valid(self):
-        return None
-
-
-class District(BaseDistrict):
-    def __init__(self, plan: RedistrictingPlan, district: int, name='', members=1, description=''):
-        super().__init__(plan, district, name, description)
-        self._members = members
-
-    def serialize(self):
-        return super().serialize() | {'members': self._members}
-
-    @property
-    def members(self):
-        return self._members
-
-    @property
-    def ideal(self):
-        return self._members * self._plan.ideal
-
-    @property
-    def deviation(self):
-        return self.population - self.ideal
-
-    @property
-    def pct_deviation(self):
-        return self.deviation / self.ideal if self.ideal else None
-
-    @property
-    def valid(self):
-        idealLower, idealUpper = self._plan.devBounds(self.members)
-        return idealLower <= self.population <= idealUpper

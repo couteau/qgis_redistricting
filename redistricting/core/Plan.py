@@ -23,10 +23,6 @@
  ***************************************************************************/
 """
 import pathlib
-from math import (
-    ceil,
-    floor
-)
 from numbers import Number
 from typing import (
     Any,
@@ -34,8 +30,7 @@ from typing import (
     List,
     Optional,
     Set,
-    Union,
-    overload
+    Union
 )
 from uuid import (
     UUID,
@@ -52,10 +47,7 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from .District import (
-    BaseDistrict,
-    District
-)
+from .District import District
 from .DistrictList import DistrictList
 from .ErrorList import ErrorListMixin
 from .Exception import RdsException
@@ -67,7 +59,10 @@ from .Field import (
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
 from .PlanStats import PlanStatistics
-from .utils import tr
+from .utils import (
+    connect_layer,
+    tr
+)
 
 
 class RedistrictingPlan(ErrorListMixin, QObject):
@@ -118,7 +113,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._dataFields = FieldList[DataField](self)
 
         self._districts = DistrictList(self)
-        self._stats = PlanStatistics(self)
+        self._stats = self._districts
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -161,8 +156,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],
 
-            'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
-            'plan-stats': self._stats.serialize()
+            # 'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
+            # 'plan-stats': self._stats.serialize()
         }
 
         return {k: v for k, v in data.items() if v is not None}
@@ -200,25 +195,27 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             if f:
                 plan._dataFields.append(f)
 
-        plan._districts.updateDistrictFields()
-
         for field in data.get('geo-fields', []):
             f = GeoField.deserialize(field, plan.geoFields)
             if f:
                 plan._geoFields.append(f)
 
-        for dist in data.get('districts', []):
-            plan._districts.deserializeDistrict(dist)
+        plan._districts.updateDistrictFields()
+        plan._stats.initSplits()
 
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
+
+        plan._updateDistLayer()
+        if ('districts' in data):
+            for dist in data['districts']:
+                plan._districts.district[dist["district"]]["members"] = dist["members"]
+
         if 'geo-layer' in data:
             layer = QgsProject.instance().mapLayer(data['geo-layer'])
             plan._geoLayer = layer
 
         plan._geoJoinField = data.get('geo-join-field')
-
-        plan._stats = PlanStatistics.deserialize(plan, data.get('plan-stats', {}))
         if plan._totalPopulation == 0:
             plan._districts.resetData()
 
@@ -470,6 +467,25 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def distLayer(self) -> QgsVectorLayer:
         return self._distLayer
 
+    def _updateDistLayer(self):
+        if not self._distLayer:
+            return
+
+        fields = {
+            "deviation": "deviation REAL DEFAULT 0",
+            "pct_deviation": "pct_deviation REAL DEFAULT 0",
+            "description": "description TEXT",
+            "members": "members INTEGER DEFAULT 1"
+        }
+        update_fields = []
+        for f in fields:
+            if self._distLayer.fields().lookupField(f) == -1:
+                update_fields.append(f)
+        if update_fields:
+            sql = ";".join(f"ALTER TABLE districts ADD COLUMN {fields[f]}" for f in update_fields)
+            with connect_layer(self._distLayer) as db:
+                db.executescript(sql)
+
     def _setDistLayer(self, value: QgsVectorLayer):
         self._distLayer = value
         if self._distLayer is not None:
@@ -492,7 +508,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return self._districts
 
     @districts.setter
-    def districts(self, districts: Union[DistrictList, Dict[int, BaseDistrict], List[BaseDistrict]]):
+    def districts(self, districts: Union[DistrictList, dict[int, District], list[District]]):
         self.clearErrors()
         oldDistricts = self._districts[:]
         self._districts.clear()
@@ -593,20 +609,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
     @property
     def stats(self) -> PlanStatistics:
-        return self._stats
-
-    @property
-    def ideal(self):
-        return round(self._totalPopulation / self.numSeats)
-
-    def devBounds(self, members: int = 1):
-        maxDeviation = int(self._totalPopulation *
-                           self.deviation / self._numDistricts)
-        idealUpper = ceil(members * self._totalPopulation /
-                          self.numSeats) + maxDeviation
-        idealLower = floor(self._totalPopulation /
-                           self.numSeats) - maxDeviation
-        return (idealLower, idealUpper)
+        return self._districts
 
     @property
     def geoPackagePath(self):
@@ -691,31 +694,6 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         QgsProject.instance().addMapLayers([assignLayer, distLayer], False)
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)
-
-    def addDistrict(self, district: int, name='', members=1, description=''):
-        self.clearErrors()
-        oldDistricts = self._districts[:]
-        dist = self._districts.addDistrict(district, name, members, description)
-        self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
-        return dist
-
-    @ overload
-    def removeDistrict(self, district: District):
-        ...
-
-    @ overload
-    def removeDistrict(self, district: int):
-        ...
-
-    def removeDistrict(self, district):
-        self.clearErrors()
-
-        if isinstance(district, int):
-            district = self._districts[str(district)]
-        oldDistricts = self._districts[:]
-        del self._districts[district.district]
-        self.planChanged.emit(
-            self, 'districts', self._districts[:], oldDistricts)
 
     def assignmentsCommitted(self):
         districts = {d.district for d in self._districts if d.delta is not None}

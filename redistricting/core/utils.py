@@ -283,5 +283,10 @@ def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
 DFLT_ALLOWED_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 
+def connect_layer(layer: QgsVectorLayer) -> sqlite3.Connection:
+    gpkg, _ = layer.source().split('|', 1)
+    return spatialite_connect(gpkg)
+
+
 def random_id(length, allowed_chars=DFLT_ALLOWED_CHARS):
     return ''.join(choice(allowed_chars) for _ in range(length))

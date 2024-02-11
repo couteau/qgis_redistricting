@@ -96,7 +96,7 @@ class PlanStatistics(QObject):
         if len(self._plan.districts) <= 1:
             return None
 
-        values = self._plan.districts[1:]['polsbyPopper']
+        values = self._plan.districts[1:]['polsbypopper']
         if None in values:
             return None
 
@@ -107,7 +107,7 @@ class PlanStatistics(QObject):
         if len(self._plan.districts) <= 1:
             return None
 
-        values = self._plan.districts[1:]['convexHull']
+        values = self._plan.districts[1:]['convexhull']
         if None in values:
             return None
 

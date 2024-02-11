@@ -50,7 +50,7 @@ class TestDistrictDataModel:
                                         'vap_apblack', 'pct_vap_apblack',
                                         'vap_nh_white', 'pct_vap_nh_white',
                                         'vap_hispanic', 'pct_vap_hispanic',
-                                        'polsbyPopper', 'reock', 'convexHull']
+                                        'polsbypopper', 'reock', 'convexhull']
     # pylint: enable=protected-access
 
     def test_signals(self, district_model: DistrictDataModel, plan: RedistrictingPlan, qtbot: QtBot):

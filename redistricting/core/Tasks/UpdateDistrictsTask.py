@@ -24,16 +24,14 @@
 """
 import math
 import sqlite3
-from contextlib import closing
-from typing import (
-    TYPE_CHECKING,
-    Dict,
+from collections.abc import (
     Iterable,
-    List,
-    Sequence,
-    Set
+    Sequence
 )
+from contextlib import closing
+from typing import TYPE_CHECKING
 
+import numpy as np
 import pandas as pd
 import pyproj
 from qgis.core import (
@@ -94,7 +92,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.numDistricts: int = plan.numDistricts
         self.geoPackagePath = plan.geoPackagePath
 
-        self.updateDistricts: Set[int] = None \
+        self.updateDistricts: set[int] = None \
             if updateDistricts is None or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
             else set(updateDistricts)
 
@@ -102,7 +100,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.includeDemographics = includeDemographics
         self.useBuffer = useBuffer
 
-        self.districts: pd.DataFrame = None
+        self.districts: pd.DataFrame
         self.totalPop = 0
         self.splits = {}
 
@@ -167,8 +165,8 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                                 pop[d] = self.getPopData(geoids)
                             group["districts"] = pop
 
-                    if field.nameField and field._index and field._layer.referencingRelations(field._index):
-                        ref = field._layer.referencingRelations(field._index)[0]
+                    if field.nameField and field.index and field.layer.referencingRelations(field.index):
+                        ref = field.layer.referencingRelations(field.index)[0]
                         l = ref.referencedLayer()
                         j = ref.resolveReferencedField(field.field)
                         for split in s:
@@ -180,9 +178,9 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
     def doMetrics(self):
         crs = self.assignLayer.crs()
 
-        pp: Dict[int, float] = {}
-        reock: Dict[int, float] = {}
-        ch: Dict[int, float] = {}
+        pp: dict[int, float] = {}
+        reock: dict[int, float] = {}
+        ch: dict[int, float] = {}
 
         from_crs = pyproj.CRS(crs.authid())
         to_crs = pyproj.CRS('+proj=cea')
@@ -264,7 +262,7 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                     if self.includeGeometry:
                         data['geometry'].append(wkt.loads(r['geometry']))
 
-            self.districts = pd.DataFrame(data, index=index)
+            self.districts = pd.DataFrame(data, index=index).replace({np.nan: None})
             if self.includeGeometry:
                 self.doMetrics()
 

@@ -32,12 +32,12 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from .District import BaseDistrict
+    from .District import District
     from .Plan import RedistrictingPlan
 
 
 class Delta:  # pylint: disable=too-few-public-methods
-    def __init__(self, plan: RedistrictingPlan, district: BaseDistrict, delta: Dict[str, Any]):
+    def __init__(self, plan: RedistrictingPlan, district: District, delta: Dict[str, Any]):
         self._plan = plan
         self._district = district
         self._delta = delta

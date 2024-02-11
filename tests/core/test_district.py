@@ -18,7 +18,11 @@
 """
 import pytest
 from pytestqt.plugin import QtBot
-from redistricting.core import RedistrictingPlan, District
+
+from redistricting.core import (
+    District,
+    RedistrictingPlan
+)
 from redistricting.core.District import Unassigned
 
 # pylint: disable=no-self-use
@@ -87,7 +91,7 @@ class TestDistrict:
         new_district.update(data)
         assert new_district.population == 44684
         assert hasattr(new_district, 'pct_vap_apblack') and new_district.pct_vap_apblack == 7580 / 34563
-        assert new_district.polsbyPopper == 0.329727825720102
+        assert new_district.polsbypopper == 0.329727825720102
 
     def test_valid(self, district: District, new_district: District):
         assert district.valid

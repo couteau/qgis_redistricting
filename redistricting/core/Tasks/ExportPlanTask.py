@@ -161,9 +161,9 @@ class ExportRedistrictingPlanTask(QgsTask):
             fields.append(QgsField('reock', QVariant.Double))
             fields.append(QgsField('convexhull', QVariant.Double))
             fieldNames |= {
-                'polsbyPopper': 'polsbypop',
+                'polsbypopper': 'polsbypop',
                 'reock': 'reock',
-                'convexHull': 'convexhull'
+                'convexhull': 'convexhull'
             }
         return fields, fieldNames
 

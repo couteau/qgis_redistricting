@@ -91,11 +91,11 @@ class StatsModel(QAbstractTableModel):
         self.beginResetModel()
         if self._plan:
             self._plan.planChanged.disconnect(self.planChanged)
-            self._plan.stats.statsChanged.disconnect(self.statsUpdated)
+            # self._plan.stats.statsChanged.disconnect(self.statsUpdated)
         self._plan = value
         if self._plan:
             self._plan.planChanged.connect(self.planChanged)
-            self._plan.stats.statsChanged.connect(self.statsUpdated)
+            # self._plan.stats.statsChanged.connect(self.statsUpdated)
         self.endResetModel()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument

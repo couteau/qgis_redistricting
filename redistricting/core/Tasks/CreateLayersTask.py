@@ -171,10 +171,13 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
             f'{self.distField} INTEGER UNIQUE NOT NULL,' \
             'name TEXT DEFAULT \'\',' \
+            'description TEXT,' \
             'members INTEGER DEFAULT 1,' \
-            f'{self.popField} REAL DEFAULT 0,'
+            f'{self.popField} REAL DEFAULT 0,' \
+            'deviation REAL DEFAULT 0,' \
+            'pct_deviation REAL DEFAULT 0,'
 
-        fieldNames = {self.distField, 'name', 'members', self.popField}
+        fieldNames = {self.distField, 'name', 'description', 'members', self.popField, 'deviation', 'pct_deviation'}
 
         context = None
         for f in self.popFields:

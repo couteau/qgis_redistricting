@@ -22,9 +22,9 @@
  *                                                                         *
  ***************************************************************************/
 """
-from numbers import Number
 from typing import Any
 
+import pandas as pd
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
@@ -39,10 +39,6 @@ from qgis.PyQt.QtGui import (
 
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
-from .utils import (
-    makeFieldName,
-    tr
-)
 
 
 class DistrictDataModel(QAbstractTableModel):
@@ -64,8 +60,6 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
 
         if self._districts is not None:
-            self._districts.districtAdded.disconnect(self.districtAdded)
-            self._districts.districtRemoved.disconnect(self.districtRemoved)
             self._districts.updating.disconnect(self.beginResetModel)
             self._districts.updateComplete.disconnect(self.endResetModel)
             self._districts.updateTerminated.disconnect(self.endResetModel)
@@ -75,69 +69,16 @@ class DistrictDataModel(QAbstractTableModel):
         self._districts = self._plan.districts if self._plan else None
 
         if self._districts is not None:
-            self.updateColumnKeys()
-            self._districts.districtAdded.connect(self.districtAdded)
-            self._districts.districtRemoved.connect(self.districtRemoved)
             self._districts.updating.connect(self.beginResetModel)
             self._districts.updateComplete.connect(self.endResetModel)
             self._districts.updateTerminated.connect(self.endResetModel)
             self._plan.planChanged.connect(self.planChanged)
-        else:
-            self._headings = []
-            self._keys = []
 
         self.endResetModel()
-
-    def updateColumnKeys(self):
-        self._keys = ['district', 'name',
-                      self._plan.popField, 'deviation', 'pct_deviation']
-
-        self._headings = [
-            tr('District'),
-            tr('Name'),
-            tr('Population'),
-            tr('Deviation'),
-            tr('%Deviation')
-        ]
-
-        for field in self._plan.popFields:
-            self._keys.append(field.fieldName)
-            self._headings.append(field.caption)
-                
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
-                self._keys.append(fn)
-                self._headings.append(field.caption)
-            if field.pctbase:
-                self._keys.append(f'pct_{fn}')
-                self._headings.append(f'%{field.caption}')
-                
-        self._keys += ['polsbyPopper', 'reock', 'convexHull']
-        self._headings += [
-            tr('Polsby-Popper'),
-            tr('Reock'),
-            tr('Convex Hull'),
-        ]
-
-    def districtAdded(self, plan, dist, index):  # pylint: disable=unused-argument
-        # if plan != self._plan:
-        #    return
-
-        self.beginInsertRows(QModelIndex(), index, index)
-        self.endInsertRows()
-
-    def districtRemoved(self, plan, dist, index):  # pylint: disable=unused-argument
-        # if plan != self._plan:
-        #    return
-
-        self.beginRemoveRows(QModelIndex(), index, index)
-        self.endRemoveRows()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
         if prop in ('districts', 'data-fields', 'pop-field', 'pop-fields'):
             self.beginResetModel()
-            self.updateColumnKeys()
             self.endResetModel()
         elif prop == 'deviation':
             self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
@@ -146,7 +87,10 @@ class DistrictDataModel(QAbstractTableModel):
         return len(self._districts) if self._districts and not parent.isValid() else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._headings) if not parent.isValid() else 0
+        if parent.isValid() or self._districts is None:
+            return 0
+
+        return len(self._districts.data.columns)
 
     def data(self, index, role=Qt.DisplayRole):
         if role in (Qt.DisplayRole, Qt.EditRole):
@@ -155,22 +99,24 @@ class DistrictDataModel(QAbstractTableModel):
             row = index.row()
             column = index.column()
 
-            key = self._keys[column]
-            value = getattr(self._districts[row], key)
+            key = self._districts.data.columns[column]
+            value = self._districts.data.iat[row, column]
 
-            if value is None:
+            if pd.isna(value):
                 return QVariant()
 
             if key == 'deviation':
                 value = f'{value:+,}'
             elif key == 'pct_deviation':
                 value = f'{value:+.2%}'
-            elif key in {'polsbyPopper', 'reock', 'convexHull'}:
+            elif key in {'polsbypopper', 'reock', 'convexhull'}:
                 value = f'{value:.3}'
             elif key[:3] == 'pct':
                 value = f'{value:.2%}'
-            elif isinstance(value, Number):
+            elif isinstance(value, int):
                 value = f'{value:,}'
+            elif isinstance(value, float):
+                value = f'{value:,.2f}'
             return value
 
         if role == Qt.BackgroundRole:
@@ -184,7 +130,7 @@ class DistrictDataModel(QAbstractTableModel):
             elif 1 <= col <= 4:
                 if row == 0:
                     brush = QBrush(QColor(160, 160, 160))
-                elif self._districts[row].valid:
+                elif self._districts[row].isValid():
                     brush = QBrush(QColor(178, 223, 138))
             return brush
 
@@ -201,7 +147,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._headings[section]
+            return self._districts.heading[section]
 
         return None
 

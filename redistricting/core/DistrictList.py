@@ -24,14 +24,18 @@
 """
 from __future__ import annotations
 
+from math import (
+    ceil,
+    floor
+)
 from typing import (
     TYPE_CHECKING,
-    Dict,
-    List,
+    Any,
     Union,
     overload
 )
 
+import numpy as np
 import pandas as pd
 from qgis.core import (
     Qgis,
@@ -40,22 +44,36 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import (  # NULL,
     QObject,
+    QVariant,
     pyqtSignal
 )
 
-from .District import (
-    BaseDistrict,
-    District,
-    Unassigned
-)
+from .District import District
 from .Tasks import AggregateDistrictDataTask
 from .utils import (
-    gpd_read,
-    makeFieldName
+    connect_layer,
+    makeFieldName,
+    tr
 )
 
 if TYPE_CHECKING:
+    from .Field import Field
     from .Plan import RedistrictingPlan
+
+IntTypes = (QVariant.Int, QVariant.UInt, QVariant.LongLong, QVariant.ULongLong)
+
+
+class DistrictAccessor:
+    def __init__(self, dl: DistrictList):
+        self._list = dl
+
+    def __getitem__(self, i: int) -> District:
+        if i not in self._list._index:
+            raise IndexError()
+
+        if i not in self._list._districts:
+            self._list._districts[i] = District(i, self._list)
+        return self._list._districts[i]
 
 
 class DistrictList(QObject):
@@ -65,200 +83,275 @@ class DistrictList(QObject):
     updateComplete = pyqtSignal()
     updateTerminated = pyqtSignal()
 
-    def __init__(self, plan: RedistrictingPlan, districts: List[BaseDistrict] = None):
+    def __init__(self, plan: RedistrictingPlan, districts: list[int] = None):
         super().__init__(plan)
         self._plan = plan
+        self._districts = {}
+        self._accessor = DistrictAccessor(self)
         if not districts:
             self._index = pd.RangeIndex(plan.numDistricts + 1)
         else:
-            self._index = pd.Index([d.district for d in districts])
+            self._index = pd.Index(districts)
 
-        cols = self._keys = ['district', 'name', 'members',
-                             self._plan.popField, 'deviation', 'pct_deviation']
+        self._columns: pd.Index
+        self._data = pd.DataFrame(index=self._index)
+        self._totalPopulation = 0
+        self.updateDistrictFields()
 
-        for field in self._plan.popFields:
-            cols.append(field.fieldName)
-
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
-                cols.append(fn)
-            if field.pctbase and field.pctbase in cols:
-                cols.append(f'pct_{fn}')
-
-        cols += ['polsbyPopper', 'reock', 'convexHull']
-        self._columns = pd.Index(cols)
-
-        if districts:
-            self._districts: Dict[int, BaseDistrict] = {}
-            self.update({dist.district: dist for dist in districts})
-        else:
-            self._districts: Dict[int, BaseDistrict] = {
-                0: Unassigned(self._plan)
-            }
+        self._cutEdges = None
+        self.initSplits()
+        self._plan.planChanged.connect(self.planChanged)
 
         self._needUpdate = False
         self._needGeomUpdate = False
         self._updateDistricts = None
         self._updateTask = None
 
+    def planChanged(self, plan, field, oldValue, newValue):
+        if self._plan != plan:
+            raise ValueError()
+
+        if field == "geo-fiels":
+            self.initSplits()
+        elif field in ("pop-fields", "data-fields"):
+            self.updateDistrictFields()
+        elif field == "num-districts":
+            if oldValue == len(self._data):
+                self._index = pd.RangeIndex(newValue + 1)
+                self.createDataFrame(self._index, self._columns, self._data)
+
+    def createDataFrame(self, districts, columns: dict[str, pd.Series], data: pd.DataFrame = None):
+        self._data = pd.DataFrame(columns, index=districts)
+        self._data.loc[0, ["name", "members"]] = (tr("Unassigned"), pd.NA)
+        self._columns = self._data.columns
+        if data is not None:
+            self.data = data
+
+    def updateDistrictFields(self):
+        if self._plan.popField is None:
+            return
+
+        cols = {
+            'district': pd.Series(self._index, index=self._index, dtype="Int64"),
+            'name': pd.Series("", index=self._index, dtype=str),
+            'members': pd.Series(1, index=self._index, dtype="Int64"),
+            "population": pd.Series(0, index=self._index, dtype="Int64"),
+            'deviation': pd.Series(pd.NA, index=self._index, dtype="Int64"),
+            'pct_deviation': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+        }
+        self._headings = [
+            tr('District'),
+            tr('Name'),
+            tr('Members'),
+            tr('Population'),
+            tr('Deviation'),
+            tr('%Deviation')
+        ]
+
+        for field in self._plan.popFields:
+            cols[field.fieldName] = pd.Series(
+                0,
+                index=self._index,
+                dtype="Int64" if field.fieldType() in IntTypes else "Float64"
+            )
+            self._headings.append(field.caption)
+
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            if field.sum:
+                cols[fn] = pd.Series(
+                    0,
+                    index=self._index,
+                    dtype="Int64" if field.fieldType() in IntTypes else "Float64"
+                )
+                self._headings.append(field.caption)
+            if field.pctbase and field.pctbase in cols:
+                cols[f"pct_{fn}"] = pd.Series(0, index=self._index, dtype="Float64")
+                self._headings.append(f"%{field.caption}")
+
+        cols |= {
+            'polsbypopper': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            'reock': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            'convexhull': pd.Series(pd.NA, index=self._index, dtype="Float64")
+        }
+        self._headings += [
+            tr('Polsby-Popper'),
+            tr('Reock'),
+            tr('Convex Hull'),
+        ]
+        savecols = [col for col in self._data.columns if col in cols]
+        data = self._data[savecols].copy()
+        self.createDataFrame(self._index, cols, data)
+
+    @property
+    def data(self):
+        return self._data
+
+    @data.setter
+    def data(self, value: pd.DataFrame):
+        self._data.update(value.replace({pd.NA: None}))
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            pctbase = "population" if field.pctbase == self._plan.popField else field.pctbase
+            if pctbase and pctbase in self._data.columns:
+                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[pctbase], fill_value=0)
+
+    @property
+    def layer(self):
+        return self._plan.distLayer
+
+    @property
+    def district(self):
+        return self._accessor
+
+    @property
+    def heading(self):
+        return self._headings
+
+    @property
+    def ideal(self):
+        return round(self._totalPopulation / self._plan.numSeats)
+
+    def idealRange(self, members: int = 1):
+        maxDeviation = int(self._totalPopulation *
+                           self._plan.deviation / self._plan.numDistricts)
+        idealUpper = ceil(members * self._totalPopulation / self._plan.numSeats) + maxDeviation
+        idealLower = floor(self._totalPopulation / self._plan.numSeats) - maxDeviation
+        return (idealLower, idealUpper)
+
     @overload
-    def __getitem__(self, index: Union[str, int]) -> BaseDistrict:
+    def __getitem__(self, index: Union[str, int]) -> District:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> List[BaseDistrict]:
+    def __getitem__(self, index: slice) -> DistrictList:
+        ...
+
+    @overload
+    def __getitem__(self, index: tuple) -> Any:
         ...
 
     def __getitem__(self, index):
+        district = None
+        field = None
+
+        if isinstance(index, tuple):
+            field = index[1]
+            index = index[0]
+
         if isinstance(index, slice):
-            return DistrictList(self._plan, list(self._districts.values())[index])
+            if field:
+                if isinstance(field, int):
+                    acc = self._data.loc
+                else:
+                    acc = self._data.iloc
+                return list(acc[index, field].replace({pd.NA: None}))
+
+            return DistrictList(self._plan, list(self._data.loc[index].index))
 
         if isinstance(index, str):
             if index.isnumeric():
-                index = int(index)
-                if index in self._districts:
-                    return self._districts[index]
-                if 0 <= index <= self._plan.numDistricts:
-                    return None
+                district = self.district[int(index)]
             else:
-                d = next(iter(self._districts.values()), BaseDistrict(self._plan, 0))
-                if hasattr(d, index):
-                    return [getattr(dist, index) for dist in self.values() if dist.district != 0]
-        elif isinstance(index, int):
-            return list(self._districts.values())[index]
+                i = self._data.loc[self._data["name"] == index]
+                if i and len(i) == 1:
+                    district = self.district[i.index[0]]
+        elif isinstance(index, int) and 0 <= index < len(self._data):
+            district = self.district[index]
+
+        if district:
+            if field:
+                return district[field]
+            return district
 
         raise IndexError()
 
-    def __delitem__(self, index):
-        if isinstance(index, District):
-            index = index.district
-        elif isinstance(index, str) and index.isnumeric():
-            index = int(index)
-        elif not isinstance(index, int):
-            raise IndexError()
-
-        if index in self._districts:
-            i = list(self._districts.values()).index(self._districts[index])
-            self.districtRemoved.emit(self._plan, self._districts[index], i)
-            del self._districts[index]
-        else:
-            raise IndexError()
-
     def __iter__(self):
-        return iter(self._districts.values())
+        return (self._accessor[d] for d in self._data.index)
 
     def __len__(self):
-        return len(self._districts)
+        return len(self._data)
 
     def __contains__(self, index):
-        if isinstance(index, BaseDistrict):
-            return index.district in self._districts
+        if isinstance(index, District):
+            return index.district in self._data.index
 
         if isinstance(index, str) and index.isnumeric():
             index = int(index)
 
-        return index in self._districts
+        return index in self._data.index
 
     def __bool__(self) -> bool:
-        return bool(self._districts)
-
-    def _append(self, dist: District):
-        self._districts[dist.district] = dist
-        self._districts = {k: self._districts[k]
-                           for k in sorted(self._districts)}
-        i = list(self._districts.values()).index(dist)
-        self.districtAdded.emit(self._plan, dist, i)
+        return not self._data.empty
 
     def keys(self):
-        return self._districts.keys()
+        return list(self._data.index)
 
     def values(self):
-        return self._districts.values()
+        return (self._accessor[d] for d in range(len(self._data)))
 
     def items(self):
-        return self._districts.items()
+        return ((d, self._accessor[d]) for d in range(len(self._data)))
 
-    def index(self, district):
-        return list(self._districts.values()).index(district)
-
-    def update(self, districts: Dict[int, BaseDistrict]):
-        self._districts.update(districts)
-        self._districts = {k: self._districts[k]
-                           for k in sorted(self._districts)}
+    def index(self, district: District):
+        return district.district
 
     def clear(self):
-        unassigned = self.unassigned
-        self._districts.clear()
-        self._districts[0] = unassigned
+        cols = ["population"]
 
-    @property
-    def unassigned(self):
-        return self._districts[0] if 0 in self._districts else None
+        for field in self._plan.popFields:
+            cols.append(field.fieldName)
+
+        for field in self._plan.dataFields:
+            if field.sum:
+                cols.append(makeFieldName(field))
+
+        s = self._data[cols].sum()
+
+        cols = self._data.columns
+        self._data = pd.DataFrame(index=self._index, columns=cols)
+        self._data.loc[0].update(s)
 
     @property
     def updatingData(self):
         return self.updateDistricts() is not None
 
-    def updateDistrictFields(self):
-        for dist in self._districts.values():
-            dist.updateFields()
-
-    def addDistrict(self, district: int, name='', members=1, description='') -> District:
-        dist = District(self._plan, district,
-                        name, members, description)
-        self._append(dist)
-        return dist
-
-    def deserializeDistrict(self, data):
-        dist = District.deserialize(self._plan, data)
-        if dist:
-            self._append(dist)
-        return dist
-
-    def loadData(self, loadall=False):
+    def loadData(self):
         if self._plan.distLayer:
-            geoPackagePath, _ = self._plan.distLayer.dataProvider().dataSourceUri().split('|')
-            data = gpd_read(geoPackagePath, layer="districts")
+            with connect_layer(self._plan.distLayer) as db:
+                data = pd.read_sql("select * from districts", db, columns=self._data.columns)
+            # data = gpd_read(geoPackagePath, layer="districts")
 
-            dists = list(range(self._plan.numDistricts+1)) if loadall \
-                else self._districts
+            self.data = data.set_index("district", drop=False) \
+                .replace({np.nan: None}) \
+                .rename(columns={self._plan.popField: "population"})
+            self._totalPopulation = self._data["population"].sum()
 
-            for _, r in data.iterrows():
-                if r['district'] in dists:
-                    if not r["district"] in self._districts:
-                        self.addDistrict(r['district'], r['name'], r['members'])
-                    self._districts[r['district']].update(r)
+            if self._data.loc[1:, "deviation"].isna().any():
+                self._data.loc[1:, "deviation"] = \
+                    self._data.loc[1:, "population"].sub(self._data.loc[1:, "members"] * self.ideal)
+                self._data.loc[1:, "pct_deviation"] = \
+                    self._data.loc[1:, "deviation"].div(self._data.loc[1:, "members"] * self.ideal)
 
-    def updateData(self, data: pd.DataFrame, districts: List[int] = None):
-        updateall = districts is None or districts == list(self._districts.keys())
+    def saveData(self):
+        with connect_layer(self._plan.distLayer) as db:
+            data = self._data.rename(columns={"population": self._plan.popField}).replace({pd.NA: None})
+            cols = [s for s in data.columns if s[:3] != "pct" or s == "pct_deviation"]
+            sql = f"INSERT INTO districts ({', '.join(cols)}) " \
+                f"VALUES ({', '.join(['?'] * len(cols))}) " \
+                f"ON CONFLICT (district) DO UPDATE SET {', '.join(f'{c} = excluded.{c}' for c in cols[1:])}"
+            db.executemany(sql, data[cols].itertuples(index=False))
 
-        if districts is None:
-            districts = range(0, self._plan.numDistricts+1)
-
-        for d in districts:
-            if updateall and not d in data.index and d in self._districts:
-                self._districts[d].clear()
-            elif d in data.index:
-                if d in self._districts:
-                    district = self._districts[d]
-                else:
-                    district = \
-                        self.addDistrict(
-                            int(d),
-                            str(data.name[d]),
-                            int(data.members[d])
-                        ) if d > 0 \
-                        else Unassigned(self._plan)
-                district.update(data.loc[d])
+    def updateData(self, data: pd.DataFrame):
+        self.data = data
 
     def updateTaskCompleted(self):
         self._plan.distLayer.reload()
         if self._updateTask.totalPop:
             self._plan.totalPopulation = self._updateTask.totalPop
 
-        self.updateData(self._updateTask.districts, self._updateDistricts)
-        self._plan.stats.update(None, self._updateTask.splits)
+        self.data = self._updateTask.districts.rename(columns={self._plan.popField: "population"})
+        self.updateSplits(None, self._updateTask.splits)
 
         if self._needGeomUpdate:
             self._plan.distLayer.triggerRepaint()
@@ -331,3 +424,42 @@ class DistrictList(QObject):
                 self._updateDistricts |= districts
         if immediate:
             self.updateDistricts(True)
+
+    # stats
+    def _avgScore(self, score: str):
+        return self._data.loc[1:, score].mean()
+
+    @property
+    def avgPolsbyPopper(self):
+        return self._avgScore("polsbypopper")
+
+    @property
+    def avgReock(self):
+        return self._avgScore("reock")
+
+    @property
+    def avgConvexHull(self):
+        return self._avgScore("convexhull")
+
+    @property
+    def cutEdges(self):
+        return self._cutEdges
+
+    @property
+    def splits(self) -> dict[Field, list[dict]]:
+        return self._splits
+
+    def initSplits(self):
+        self._splits: dict[Field, list[dict]] = {
+            f: [] for f in self._plan.geoFields
+        }
+
+    def updateSplits(self, cutEdges, splits):
+        if cutEdges is not None:
+            self._cutEdges = cutEdges
+
+        if splits is not None:
+            for f, split in splits.items():
+                field = self._plan.geoFields[f]
+                if field is not None:
+                    self._splits[field] = split
