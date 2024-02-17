@@ -45,7 +45,6 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 from qgis.utils import spatialite_connect
-from traitlets import Integer
 
 from ..Exception import RdsException
 from ..utils import tr
