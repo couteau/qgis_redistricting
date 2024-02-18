@@ -331,32 +331,11 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
             self.exception = e
             return False
 
-    def _updateDistLayer(self):
-        if not self.distLayer:
-            return
-
-        fields = {
-            "deviation": "deviation REAL DEFAULT 0",
-            "pct_deviation": "pct_deviation REAL DEFAULT 0",
-            "description": "description TEXT",
-            "members": "members INTEGER DEFAULT 1"
-        }
-        update_fields = []
-        for f in fields:
-            if self.distLayer.fields().lookupField(f) == -1:
-                update_fields.append(f)
-        if update_fields:
-            sql = ";".join(f"ALTER TABLE districts ADD COLUMN {fields[f]}" for f in update_fields)
-            with spatialite_connect(self.geoPackagePath) as db:
-                db.executescript(sql)
-
     def finished(self, result: bool):
         super().finished(result)
 
         if not result:
             return
-
-        self._updateDistLayer()
 
         with spatialite_connect(self.geoPackagePath) as db:
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.data.columns)}

@@ -44,7 +44,7 @@ from qgis.utils import spatialite_connect
 
 from .ErrorList import ErrorListMixin
 from .PlanBuilder import PlanBuilder
-from .PlanStats import PlanStatistics
+from .PlanStats import SplitList
 from .PlanStyle import PlanStyler
 from .utils import tr
 
@@ -103,10 +103,11 @@ class PlanCopier(ErrorListMixin, QObject):
         if copyAssignments:
             shutil.copyfile(self._plan.geoPackagePath, destGpkgPath)
             plan.addLayersFromGeoPackage(destGpkgPath)
-            districts = [dist.serialize() for dist in self._plan.districts if dist.district != 0]
-            for dist in districts:
-                plan.districts.deserializeDistrict(dist)
-            plan._stats = PlanStatistics.deserialize(plan, self._plan._stats.serialize())
+
+            for f in plan.geoFields:
+                split = SplitList(plan, f, plan.districts)
+                split.setData(self._plan.stats.splits[f].data.copy())
+                plan.districts.splits[f] = split
 
             self.setProgress(100)
             planCreated(plan)
@@ -120,8 +121,8 @@ class PlanCopier(ErrorListMixin, QObject):
         buffer = self._plan.assignLayer.editBuffer()
         values: dict[int, dict[int, Any]] = buffer.changedAttributeValues()
         target.assignLayer.startEditing()
-        for id, feat in values.items():
-            target.assignLayer.changeAttributeValues(id, feat)
+        for fid, feat in values.items():
+            target.assignLayer.changeAttributeValues(fid, feat)
         target.assignLayer.commitChanges(True)
         if rollback:
             self._plan.assignLayer.rollBack(True)

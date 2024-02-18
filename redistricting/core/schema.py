@@ -258,18 +258,32 @@ def migrateSchema1_0_1_to_1_0_2(data: dict):
     splits = data["plan-stats"]["splits"]
     plan_splits = {}
     for f, s in splits.items():
-        if "districts" not in s or len(s["districts"]) == 0:
+        if len(s) == 0:
             continue
         index = []
         split_data = []
         columns = None
-        for d, p in s["districts"].items():
-            if columns is None:
-                columns = p.keys()
-            index.append([s[f], int(d)])
-            split_data.append(p.values())
+        for g in s:
+            if 'districts' not in g or len(g['districts']) == 0:
+                continue
+            geoid = g[f]
+            if 'name' in g:
+                name = g['name']
+            else:
+                name = None
+            for d, p in g['districts'].items():
+                if columns is None:
+                    columns = list(p.keys())
+                    if name:
+                        columns.append('__name')
+                index.append([geoid, int(d)])
+                row = list(p.values())
+                if name:
+                    row.append(name)
+                split_data.append(row)
 
         plan_splits[f] = {"index": index, "columns": columns, "data": split_data}
+
     data["plan-splits"] = plan_splits
     if "cut-edges" in data["plan-stats"]:
         data["cut-edges"] = data["plan-stats"]["cut-edges"]

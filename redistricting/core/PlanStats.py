@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - plan-wide stats
 
-         begin                : 2022-05-31
+         begin                : 2024-02-18
          git sha              : $Format:%H$
-         copyright            : (C) 2022 by Cryptodira
+         copyright            : (C) 2024 by Cryptodira
          email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -120,7 +120,8 @@ class Split:
     @property
     def name(self):
         if "__name" in self._data.columns:
-            return self._data.loc[self._geoid, "__name"][0]
+            i = self._data.columns.get_loc("__name",)
+            return self._data.loc[self._geoid].iat[0, i]
 
         return ""
 

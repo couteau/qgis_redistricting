@@ -206,14 +206,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
 
-        if 'districts' in data:
-            for dist in data['districts']:
-                plan._districts.district[dist["district"]]["members"] = \
-                    None if dist["district"] == 0 else dist["members"]
-
-        if 'plan-splits' in data:
-            for f, s in data['plan-splits'].items():
-                plan._districts.splits[plan.geoFields[f]] = SplitList.deserialize(plan, plan.geoFields[f], s)
+        for f, s in data.get('plan-splits', {}).items():
+            plan._districts.splits[plan.geoFields[f]] = SplitList.deserialize(plan, plan.geoFields[f], s)
 
         if 'geo-layer' in data:
             layer = QgsProject.instance().mapLayer(data['geo-layer'])

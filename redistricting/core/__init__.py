@@ -47,7 +47,6 @@ from .PlanImport import (
     AssignmentImporter,
     ShapefileImporter
 )
-from .PlanStats import PlanStatistics
 from .PlanStyle import PlanStyler
 from .storage import ProjectStorage
 from .utils import (
@@ -65,5 +64,5 @@ __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',
            'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
-           'showHelp', 'RdsException', 'PlanStatistics',
+           'showHelp', 'RdsException',
            'GeoFieldsModel', 'PopFieldsModel']
