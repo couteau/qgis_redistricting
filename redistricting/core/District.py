@@ -80,13 +80,13 @@ class District:
 
     def __getattr__(self, key: str):
         try:
-            self.__getitem__(key)
+            return self.__getitem__(key)
         except IndexError as e:
             raise AttributeError(f"{key} not found in plan") from e
 
     def isValid(self):
         lower, upper = self._list.idealRange(self["members"])
-        return lower <= self["population"] <= upper
+        return lower <= self[self._list.popField] <= upper
 
     @property
     def delta(self):

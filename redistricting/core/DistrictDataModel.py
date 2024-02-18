@@ -24,6 +24,7 @@
 """
 from typing import Any
 
+import numpy as np
 import pandas as pd
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
@@ -113,9 +114,9 @@ class DistrictDataModel(QAbstractTableModel):
                 value = f'{value:.3}'
             elif key[:3] == 'pct':
                 value = f'{value:.2%}'
-            elif isinstance(value, int):
+            elif isinstance(value, (int, np.integer)):
                 value = f'{value:,}'
-            elif isinstance(value, float):
+            elif isinstance(value, (float, np.floating)):
                 value = f'{value:,.2f}'
             return value
 

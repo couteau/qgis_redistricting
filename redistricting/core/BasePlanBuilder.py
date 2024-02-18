@@ -59,6 +59,7 @@ class BasePlanBuilder(PlanValidator):
         self._cvap = None
         self._geoPackagePath: pathlib.Path = None
 
+    # pylint: disable=protected-access
     @classmethod
     def fromPlan(cls, plan: RedistrictingPlan, parent: QObject = None):
         instance = super().fromPlan(plan, parent)
@@ -67,8 +68,9 @@ class BasePlanBuilder(PlanValidator):
                 instance._vap = f
             if instance._isCVAP(f.field):
                 instance._cvap = f
-        instance._geoPackagePath = plan.geoPackagePath  # pylint: disable=protected-access
+        instance._geoPackagePath = plan.geoPackagePath
         return instance
+    # pylint: enable=protected-access
 
     def setName(self, value: str):
         if not isinstance(value, str):
@@ -303,21 +305,21 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def appendDataField(self, field: str, isExpression: bool = False, caption: str = None, sum=None, pctbase=None) -> Self:
+    def appendDataField(self, field: str, isExpression: bool = False, caption: str = None, sumfield=None, pctbase=None) -> Self:
         ...
 
     @overload
     def appendDataField(self, field: DataField) -> Self:
         ...
 
-    def appendDataField(self, field, isExpression=False, caption=None, sum=None, pctbase=None) -> Self:
+    def appendDataField(self, field, isExpression=False, caption=None, sumfield=None, pctbase=None) -> Self:
         if isinstance(field, str):
             if pctbase is None:
                 if matchField(field, self._popLayer, defaults.VAP_FIELDS):
                     pctbase = self._vap
                 elif matchField(field, self._popLayer, defaults.CVAP_FIELDS):
                     pctbase = self._cvap
-            field = DataField(self._popLayer, field, isExpression, caption, sum, pctbase)
+            field = DataField(self._popLayer, field, isExpression, caption, sumfield, pctbase)
         elif not isinstance(field, DataField):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').

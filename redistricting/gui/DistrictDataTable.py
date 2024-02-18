@@ -91,21 +91,21 @@ class StatsModel(QAbstractTableModel):
         self.beginResetModel()
         if self._plan:
             self._plan.planChanged.disconnect(self.planChanged)
-            # self._plan.stats.statsChanged.disconnect(self.statsUpdated)
+            for s in self._plan.stats.splits.values():
+                s.splitUpdating.disconnect(self.beginResetModel)
+                s.splitUpdated.disconnect(self.endResetModel)
         self._plan = value
         if self._plan:
             self._plan.planChanged.connect(self.planChanged)
-            # self._plan.stats.statsChanged.connect(self.statsUpdated)
+            for s in self._plan.stats.splits.values():
+                s.splitUpdating.connect(self.beginResetModel)
+                s.splitUpdated.connect(self.endResetModel)
         self.endResetModel()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
         if prop == 'geo-fields':
             self.beginResetModel()
             self.endResetModel()
-
-    def statsUpdated(self):
-        self.beginResetModel()
-        self.endResetModel()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():

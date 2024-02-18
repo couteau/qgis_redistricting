@@ -135,8 +135,38 @@ class SqlAccess:
 
             return cur
 
+    def _connectSqlNativeSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
+        conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
+        return spatialite_connect(conndata['dbname'])
+
+    def _connectSqlOgrSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
+        database, _ = provider.dataSourceUri().split('|', 1)
+        return spatialite_connect(database)
+
+    def _connectSqlPostgres(self, provider: QgsVectorDataProvider):
+        if self._uri != provider.uri():
+            self._uri = provider.uri()
+            self._connInfo = self._uri.connectionInfo(True)
+            connDict = dict(tuple(a.split('=')) for a in shlex.split(self._connInfo))
+            self._user = connDict['user']
+            self._passwd = connDict['password']
+            if not self._user or not self._passwd:
+                c = QgsCredentials.instance()
+                c.lock()
+                try:
+                    (success, self._user, self._passwd) = c.get(self._connInfo, self._user, self._passwd)
+                    if not success:
+                        return None
+                    self._uri.setUsername(self._user)
+                    self._uri.setPassword(self._passwd)
+                    self._connInfo = self._uri.connectionInfo(True)
+                finally:
+                    c.unlock()
+        params = {'dsn': self._connInfo}
+        return psycopg2.connect(**params)
+
     def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
-        conndata = dict(tuple(a.split('=')) for a in shlex.split( provider.uri().connectionInfo(True)))
+        conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
         return self._executeSqlSqlite(conndata['dbname'], sql, as_dict)
 
     def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
@@ -223,6 +253,18 @@ class SqlAccess:
             return (dict(zip(f.fields().names(), f.attributes())) for f in vl.getFeatures())
 
         return (f.attributes() for f in vl.getFeatures())
+
+    def dbconnect(self, layer):
+        provider = layer.dataProvider()
+        if provider.name() == 'ogr':
+            if provider.storageType() in ('GPKG', 'SQLite'):
+                return self._connectSqlOgrSqlite(provider)
+        elif provider.name() == 'spatialite':
+            return self._connectSqlNativeSqlite(provider)
+        elif provider.name() in ('postgis', 'postgres'):
+            return self._connectSqlPostgres(provider)
+
+        return None
 
     def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
         provider = layer.dataProvider()

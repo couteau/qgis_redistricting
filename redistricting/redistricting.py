@@ -27,6 +27,7 @@
  ***************************************************************************/
 """
 import pathlib
+import sys
 from typing import (
     Callable,
     Iterable,
@@ -43,6 +44,7 @@ from qgis.core import (
     QgsGroupLayer,
     QgsLayerTreeLayer,
     QgsMapLayer,
+    QgsMapLayerType,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext,
@@ -67,6 +69,10 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.PyQt.QtXml import QDomDocument
 
+if pathlib.Path(__file__).with_name("vendor").exists():
+    sys.path.insert(0, str(pathlib.Path(__file__).with_name("vendor")))
+
+# pylint: disable=wrong-import-position
 from .core import (
     AssignmentImporter,
     PlanBuilder,
@@ -266,8 +272,8 @@ class Redistricting:
             self.tr('Redistricting'),
             self.iface.mainWindow()
         )
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Group, False)
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Vector, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.GroupLayer, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.VectorLayer, False)
 
         self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
         self.contextMenu.addAction(self.addAction(

@@ -31,6 +31,7 @@ from typing import (
     List
 )
 
+import geopandas as gpd
 from qgis.core import (
     Qgis,
     QgsAggregateCalculator,
@@ -47,7 +48,6 @@ from qgis.PyQt.QtCore import QVariant
 from ..utils import (
     createGeoPackage,
     createGpkgTable,
-    gpd_read,
     spatialite_connect,
     tr
 )
@@ -123,14 +123,14 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
     def readLayerIntoDataFrame(self, popLayer: QgsVectorLayer):
         if popLayer.dataProvider().name() == "ogr":
             if popLayer.dataProvider().storageType() == "GPKG":
-                df = gpd_read(popLayer.source())
+                df = gpd.read_file(popLayer.source())
             elif popLayer.dataProvider().storageType() == "ESRI Shapefile":
                 gpkg, lyrparam = popLayer.source().split('|', 1)
                 lyr = lyrparam.split('=')[1]
-                df = gpd_read(gpkg, layer=lyr)
+                df = gpd.read_file(gpkg, layer=lyr)
             elif popLayer.dataProvider().storageType() == "GeoJSON":
                 gpkg, geomparam = popLayer.source().split('|', 1)  # pylint: disable=unused-variable
-                df = gpd_read(gpkg)
+                df = gpd.read_file(gpkg)
 
         return df
 
@@ -171,13 +171,12 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
             f'{self.distField} INTEGER UNIQUE NOT NULL,' \
             'name TEXT DEFAULT \'\',' \
-            'description TEXT,' \
             'members INTEGER DEFAULT 1,' \
             f'{self.popField} REAL DEFAULT 0,' \
             'deviation REAL DEFAULT 0,' \
             'pct_deviation REAL DEFAULT 0,'
 
-        fieldNames = {self.distField, 'name', 'description', 'members', self.popField, 'deviation', 'pct_deviation'}
+        fieldNames = {self.distField, 'name', 'members', self.popField, 'deviation', 'pct_deviation'}
 
         context = None
         for f in self.popFields:

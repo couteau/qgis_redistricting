@@ -24,6 +24,7 @@
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sqlite3
@@ -36,7 +37,9 @@ from typing import (
     overload
 )
 
+import geopandas as gpd
 from osgeo import gdal
+from packaging.version import parse as parse_version
 from processing.algs.gdal.GdalUtils import GdalUtils
 from qgis.core import (
     QgsDataSourceUri,
@@ -50,11 +53,47 @@ from qgis.PyQt.QtCore import (
 from qgis.PyQt.QtGui import QDesktopServices
 
 try:
+    # pylint: disable-next=unused-import
     import pyogrio
-    gpd_read = pyogrio.read_dataframe
+    if parse_version(gpd.__version__) >= parse_version("0.11"):
+        gpd.options.io_engine = "pyogrio"
+    else:
+        # if the installed geopandas doesn't support pyogrio, monkeypatch read_file
+        gpd_read_file = gpd.read_file
+
+        def read_file_pygrio(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+            if engine is not None and engine != "pyogrio":
+                return gpd_read_file(filename, bbox, mask, rows, **kwargs)
+
+            if isinstance(rows, slice):
+                skip_features = rows.start
+                max_features = rows.stop - rows.start
+            elif isinstance(rows, int):
+                skip_features = 0
+                max_features = rows
+            else:
+                skip_features = 0
+                max_features = None
+
+            return pyogrio.read_dataframe(
+                filename, bbox=bbox, mask=mask,
+                skip_features=skip_features, max_features=max_features,
+                **kwargs
+            )
+
+        gpd.read_file = read_file_pygrio
+
 except ImportError:
-    import geopandas as gpd
-    gpd_read = gpd.read_file
+    pass
+
+if parse_version(gdal.__version__) > parse_version("3.6"):
+    try:
+        # pylint: disable-next=unused-import
+        import pyarrow
+        os.environ["PYOGRIO_USE_ARROW"] = "1"
+    except ImportError:
+        pass
+
 
 if TYPE_CHECKING:
     from . import Field

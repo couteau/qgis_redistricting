@@ -42,13 +42,14 @@ from qgis.core import (
     QgsApplication,
     QgsTask
 )
-from qgis.PyQt.QtCore import (  # NULL,
+from qgis.PyQt.QtCore import (
     QObject,
     QVariant,
     pyqtSignal
 )
 
 from .District import District
+from .PlanStats import SplitList
 from .Tasks import AggregateDistrictDataTask
 from .utils import (
     connect_layer,
@@ -111,7 +112,7 @@ class DistrictList(QObject):
         if self._plan != plan:
             raise ValueError()
 
-        if field == "geo-fiels":
+        if field == "geo-fields":
             self.initSplits()
         elif field in ("pop-fields", "data-fields"):
             self.updateDistrictFields()
@@ -122,10 +123,11 @@ class DistrictList(QObject):
 
     def createDataFrame(self, districts, columns: dict[str, pd.Series], data: pd.DataFrame = None):
         self._data = pd.DataFrame(columns, index=districts)
-        self._data.loc[0, ["name", "members"]] = (tr("Unassigned"), pd.NA)
+        self._data.loc[0, ["name", "members", "polsbypopper", "reock", "convexhull"]] = \
+            (tr("Unassigned"), None, None, None, None)
         self._columns = self._data.columns
         if data is not None:
-            self.data = data
+            self.setData(data)
 
     def updateDistrictFields(self):
         if self._plan.popField is None:
@@ -135,7 +137,7 @@ class DistrictList(QObject):
             'district': pd.Series(self._index, index=self._index, dtype="Int64"),
             'name': pd.Series("", index=self._index, dtype=str),
             'members': pd.Series(1, index=self._index, dtype="Int64"),
-            "population": pd.Series(0, index=self._index, dtype="Int64"),
+            self.popField: pd.Series(0, index=self._index, dtype="Int64"),
             'deviation': pd.Series(pd.NA, index=self._index, dtype="Int64"),
             'pct_deviation': pd.Series(pd.NA, index=self._index, dtype="Float64"),
         }
@@ -187,18 +189,22 @@ class DistrictList(QObject):
     def data(self):
         return self._data
 
-    @data.setter
-    def data(self, value: pd.DataFrame):
-        self._data.update(value.replace({pd.NA: None}))
+    def setData(self, data: pd.DataFrame):
+        dtypes = {c: self._data[c].dtype for c in self._data.columns}
+        self._data.update(data)
+        self._data = self._data.astype(dtype=dtypes, copy=False)
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
-            pctbase = "population" if field.pctbase == self._plan.popField else field.pctbase
-            if pctbase and pctbase in self._data.columns:
-                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[pctbase], fill_value=0)
+            if field.pctbase and field.pctbase in self._data.columns:
+                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[field.pctbase], fill_value=0)
 
     @property
     def layer(self):
         return self._plan.distLayer
+
+    @property
+    def popField(self):
+        return self._plan.popField
 
     @property
     def district(self):
@@ -245,7 +251,7 @@ class DistrictList(QObject):
                     acc = self._data.loc
                 else:
                     acc = self._data.iloc
-                return list(acc[index, field].replace({pd.NA: None}))
+                return list(acc[index, field])
 
             return DistrictList(self._plan, list(self._data.loc[index].index))
 
@@ -288,7 +294,7 @@ class DistrictList(QObject):
         return list(self._data.index)
 
     def values(self):
-        return (self._accessor[d] for d in range(len(self._data)))
+        return (self._accessor[d] for d in self._data.index)
 
     def items(self):
         return ((d, self._accessor[d]) for d in range(len(self._data)))
@@ -297,7 +303,7 @@ class DistrictList(QObject):
         return district.district
 
     def clear(self):
-        cols = ["population"]
+        cols = [self.popField]
 
         for field in self._plan.popFields:
             cols.append(field.fieldName)
@@ -319,39 +325,32 @@ class DistrictList(QObject):
     def loadData(self):
         if self._plan.distLayer:
             with connect_layer(self._plan.distLayer) as db:
-                data = pd.read_sql("select * from districts", db, columns=self._data.columns)
-            # data = gpd_read(geoPackagePath, layer="districts")
+                data = pd.read_sql(
+                    "select * from districts",
+                    db,
+                    columns=self._data.columns
+                )
+                # data = gpd_read(geoPackagePath, layer="districts")
 
-            self.data = data.set_index("district", drop=False) \
-                .replace({np.nan: None}) \
-                .rename(columns={self._plan.popField: "population"})
-            self._totalPopulation = self._data["population"].sum()
+            self.setData(data.set_index("district", drop=False).replace({np.nan: None}))
+            self._totalPopulation = self._data[self.popField].sum()
 
             if self._data.loc[1:, "deviation"].isna().any():
                 self._data.loc[1:, "deviation"] = \
-                    self._data.loc[1:, "population"].sub(self._data.loc[1:, "members"] * self.ideal)
+                    self._data.loc[1:, self.popField].sub(self._data.loc[1:, "members"] * self.ideal)
                 self._data.loc[1:, "pct_deviation"] = \
                     self._data.loc[1:, "deviation"].div(self._data.loc[1:, "members"] * self.ideal)
 
-    def saveData(self):
-        with connect_layer(self._plan.distLayer) as db:
-            data = self._data.rename(columns={"population": self._plan.popField}).replace({pd.NA: None})
-            cols = [s for s in data.columns if s[:3] != "pct" or s == "pct_deviation"]
-            sql = f"INSERT INTO districts ({', '.join(cols)}) " \
-                f"VALUES ({', '.join(['?'] * len(cols))}) " \
-                f"ON CONFLICT (district) DO UPDATE SET {', '.join(f'{c} = excluded.{c}' for c in cols[1:])}"
-            db.executemany(sql, data[cols].itertuples(index=False))
-
-    def updateData(self, data: pd.DataFrame):
-        self.data = data
+            if self._data.loc[1:, "name"].isna().any():
+                self._data.loc[1:, "name"] = tr("District") + " " + self._data.loc[1: "district"].astype(str)
 
     def updateTaskCompleted(self):
         self._plan.distLayer.reload()
         if self._updateTask.totalPop:
             self._plan.totalPopulation = self._updateTask.totalPop
 
-        self.data = self._updateTask.districts.rename(columns={self._plan.popField: "population"})
-        self.updateSplits(None, self._updateTask.splits)
+        self.setData(self._updateTask.data)
+        self.updateSplits(self._updateTask.cutEdges, self._updateTask.splits)
 
         if self._needGeomUpdate:
             self._plan.distLayer.triggerRepaint()
@@ -446,12 +445,12 @@ class DistrictList(QObject):
         return self._cutEdges
 
     @property
-    def splits(self) -> dict[Field, list[dict]]:
+    def splits(self) -> dict[Field, SplitList]:
         return self._splits
 
     def initSplits(self):
-        self._splits: dict[Field, list[dict]] = {
-            f: [] for f in self._plan.geoFields
+        self._splits: dict[Field, SplitList] = {
+            f: SplitList(self._plan, f, self) for f in self._plan.geoFields
         }
 
     def updateSplits(self, cutEdges, splits):
@@ -462,4 +461,4 @@ class DistrictList(QObject):
             for f, split in splits.items():
                 field = self._plan.geoFields[f]
                 if field is not None:
-                    self._splits[field] = split
+                    self._splits[field].setData(split)

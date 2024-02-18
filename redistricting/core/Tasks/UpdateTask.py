@@ -29,6 +29,8 @@ from typing import (
     Sequence
 )
 
+import geopandas as gpd
+import pandas as pd
 from qgis.core import (
     Qgis,
     QgsExpressionContext,
@@ -69,6 +71,31 @@ class AggregateDataTask(QgsTask):
         self.getters = []
         self.aggs = {}
         self.context: QgsExpressionContext = None
+
+    def updateProgress(self, total, count, start, stop):
+        self.setProgress(start + (stop-start)*count/total)
+        if self.isCanceled():
+            raise CancelledError()
+
+    def pd_read(self, source, fc, prog_start, prog_stop, **kwargs):
+        df: gpd.GeoDataFrame = None
+        if fc:
+            divisions = 10
+            chunksize = fc // divisions
+            lastchunk = fc % divisions
+            chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)] + [slice(fc-lastchunk, fc)]
+            for s in chunks:
+                chunk = gpd.read_file(source, rows=s, **kwargs)
+                if df is None:
+                    df = chunk
+                else:
+                    df = pd.concat([df, chunk])
+                self.updateProgress(fc, s.stop, prog_start, prog_stop)
+        else:
+            df = gpd.read_file(source, **kwargs)
+            self.updateProgress(len(df), len(df), prog_start, prog_stop)
+
+        return df
 
     def hasExpression(self):
         for f in self.dataFields:

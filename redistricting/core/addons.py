@@ -1,4 +1,10 @@
-"""QGIS Redistricting Plugin - unit tests for updating changes background task
+# -*- coding: utf-8 -*-
+"""QGIS Redistricting Plugin - install additional python packages
+
+        begin                : 2022-06-01
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
 
 /***************************************************************************
  *                                                                         *
@@ -16,27 +22,34 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.Tasks.UpdateDistrictsTask import (
-    AggregateDistrictDataTask
-)
+import os
+import pathlib
+import subprocess
+
+# from pip import main as pipmain
 
 
-class TestUpdatePendingChangesTask:
+def python_executable():
+    return pathlib.Path(os.__file__).parents[2] / 'bin' / 'python'
 
-    def test_create(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan)
-        assert t.exception is None
-        assert not t.updateDistricts
 
-    def test_run(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan)
-        t.run()
-        assert t.data is not None
+def install_addon(pkg: str, *options):
+    installdir = pathlib.Path(__file__).parent.parent / "vendor"
+    if not installdir.exists():
+        installdir.mkdir()
+    if (installdir / pkg).exists():
+        options = (*options, "--upgrade")
+    subprocess.check_call([python_executable(), '-m', 'pip', 'install', '-t', str(installdir), *options, pkg])
+    # pipmain(['install', '-t', str(installdir), *options, pkg])
 
-    def test_run_subset(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan, [2, 3])
-        t.run()
-        assert t.data is not None
-        assert len(t.data.index) == 2
-        assert t.totalPop == 0
+
+def install_pyogrio():
+    install_addon('pyogrio', '--no-deps')
+
+
+def install_pyarrow():
+    install_addon('pyarrow', '--no-deps')
+
+
+def install_gerrychain():
+    install_addon('gerrychain', '--no-deps')

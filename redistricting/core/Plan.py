@@ -48,7 +48,10 @@ from qgis.PyQt.QtCore import (
 )
 
 from .District import District
-from .DistrictList import DistrictList
+from .DistrictList import (
+    DistrictList,
+    SplitList
+)
 from .ErrorList import ErrorListMixin
 from .Exception import RdsException
 from .Field import (
@@ -58,11 +61,7 @@ from .Field import (
 )
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
-from .PlanStats import PlanStatistics
-from .utils import (
-    connect_layer,
-    tr
-)
+from .utils import tr
 
 
 class RedistrictingPlan(ErrorListMixin, QObject):
@@ -158,6 +157,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
             # 'districts': [dist.serialize() for dist in self._districts if dist.district != 0],
             # 'plan-stats': self._stats.serialize()
+            'plan-splits': {f.fieldName: s.serialize() for f, s in self.districts.splits.items()}
         }
 
         return {k: v for k, v in data.items() if v is not None}
@@ -201,15 +201,19 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                 plan._geoFields.append(f)
 
         plan._districts.updateDistrictFields()
-        plan._stats.initSplits()
+        plan._districts.initSplits()
 
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
 
-        plan._updateDistLayer()
-        if ('districts' in data):
+        if 'districts' in data:
             for dist in data['districts']:
-                plan._districts.district[dist["district"]]["members"] = dist["members"]
+                plan._districts.district[dist["district"]]["members"] = \
+                    None if dist["district"] == 0 else dist["members"]
+
+        if 'plan-splits' in data:
+            for f, s in data['plan-splits'].items():
+                plan._districts.splits[plan.geoFields[f]] = SplitList.deserialize(plan, plan.geoFields[f], s)
 
         if 'geo-layer' in data:
             layer = QgsProject.instance().mapLayer(data['geo-layer'])
@@ -467,25 +471,6 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def distLayer(self) -> QgsVectorLayer:
         return self._distLayer
 
-    def _updateDistLayer(self):
-        if not self._distLayer:
-            return
-
-        fields = {
-            "deviation": "deviation REAL DEFAULT 0",
-            "pct_deviation": "pct_deviation REAL DEFAULT 0",
-            "description": "description TEXT",
-            "members": "members INTEGER DEFAULT 1"
-        }
-        update_fields = []
-        for f in fields:
-            if self._distLayer.fields().lookupField(f) == -1:
-                update_fields.append(f)
-        if update_fields:
-            sql = ";".join(f"ALTER TABLE districts ADD COLUMN {fields[f]}" for f in update_fields)
-            with connect_layer(self._distLayer) as db:
-                db.executescript(sql)
-
     def _setDistLayer(self, value: QgsVectorLayer):
         self._distLayer = value
         if self._distLayer is not None:
@@ -608,7 +593,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                                   self._totalPopulation, oldValue)
 
     @property
-    def stats(self) -> PlanStatistics:
+    def stats(self) -> DistrictList:
         return self._districts
 
     @property
