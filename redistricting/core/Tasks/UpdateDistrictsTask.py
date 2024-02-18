@@ -290,7 +290,8 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         name = [self.distList[d].name if d in self.distList else d for d in self.districts.index.astype(str)]
         self.districts.insert(0, 'name', name)
 
-        members = [0 if d == 0 else self.distList[d].members if d in self.distList else 1 for d in self.districts.index]
+        members = [
+            None if d == '0' else self.distList[d].members if d in self.distList else 1 for d in self.districts.index.astype(str)]
         self.districts.insert(1, 'members', members)
 
         with closing(spatialite_connect(self.geoPackagePath)) as db:

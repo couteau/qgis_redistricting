@@ -310,7 +310,10 @@ class DistrictList(QObject):
             return
 
         if self._updateTask and updateGeometry and not self._needGeomUpdate:
-            self._updateTask.cancel()
+            try:
+                self._updateTask.cancel()
+            except RuntimeError:
+                pass
             self._updateTask = None
         self._needUpdate = True
         self._needGeomUpdate = self._needGeomUpdate or updateGeometry
