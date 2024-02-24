@@ -41,4 +41,5 @@
     "pylint.path": [
         "${userHome}/anaconda3/envs/qgis_plugin/bin/pylint"
     ],
+    "qtForPython.qmlls.enabled": false,
 }
