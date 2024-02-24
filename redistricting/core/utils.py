@@ -38,7 +38,13 @@ from typing import (
 )
 
 import geopandas as gpd
-from osgeo import gdal
+import pandas as pd
+import psycopg2
+from osgeo import (
+    gdal,
+    ogr,
+    osr
+)
 from packaging.version import parse as parse_version
 from processing.algs.gdal.GdalUtils import GdalUtils
 from qgis.core import (
@@ -51,10 +57,22 @@ from qgis.PyQt.QtCore import (
     QUrl
 )
 from qgis.PyQt.QtGui import QDesktopServices
+from shapely import wkb
+
+DEC2FLOAT = psycopg2.extensions.new_type(
+    psycopg2.extensions.DECIMAL.values,
+    'DEC2FLOAT',
+    lambda value, curs: float(value) if value is not None else None
+)
+
+psycopg2.extensions.register_type(DEC2FLOAT)
 
 try:
     # pylint: disable-next=unused-import
     import pyogrio
+
+    gpd_io_engine = "pyogrio"
+
     if parse_version(gpd.__version__) >= parse_version("0.11"):
         gpd.options.io_engine = "pyogrio"
     else:
@@ -84,7 +102,104 @@ try:
         gpd.read_file = read_file_pygrio
 
 except ImportError:
-    pass
+    gpd_io_engine = "fiona"
+    gpd_read_file = gpd.read_file
+
+    def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+        path = pathlib.Path(filename)
+        if path.suffix in ('.gpkg', '.sqlite', '.db') and "layer" in kwargs:
+            with spatialite_connect(path) as db:
+                table = kwargs["layer"]
+                c = db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+                c.row_factory = lambda cursor, row: row[0]
+                l = c.fetchall()
+                if 'gpkg_geometry_columns' in l:
+                    fmt = "gpkg"
+                    geom_tbl = "gpkg_geometry_columns"
+                    tbl_col = "table_name"
+                    geom_col = "column_name"
+                    srsid_col = "srs_id"
+                elif 'geometry_columns' in l:
+                    fmt = "spatialite"
+                    geom_tbl = "geometry_columns"
+                    tbl_col = "f_table_name"
+                    geom_col = "f_geometry_column"
+                    srsid_col = "srid"
+                else:
+                    fmt = None
+
+                if fmt:
+                    table = kwargs["layer"]
+
+                    c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))
+                    geometry_column, srs_id = c.fetchone()
+
+                    cols = kwargs.get("columns")
+                    if cols is None:
+                        cols = ["*"]
+                    else:
+                        cols = [*cols, geometry_column]
+
+                    sql = f"SELECT {','.join(cols)} FROM {table}"
+                    if isinstance(rows, slice):
+                        sql = f"{sql} OFFSET {rows.start} LIMIT {rows.stop - rows.start}"
+                    elif isinstance(rows, int):
+                        sql = f"{sql} LIMIT {rows}"
+
+                    df = pd.read_sql(sql, db)
+                    df[geometry_column] = df[geometry_column].apply(lambda x: wkb.loads(x[38:-1]))
+                    df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
+                    return df
+
+        if path.suffix == ".shp":
+            ds: ogr.DataSource = ogr.Open(str(path))
+            lyr: ogr.Layer = ds.GetLayer()
+            crs: osr.SpatialReference = lyr.GetSpatialRef().GetAuthorityCode(None)
+            ldef: ogr.FeatureDefn = lyr.GetLayerDefn()
+            cols = kwargs.get("columns")
+            if cols is None:
+                cols = []
+                for fi in range(ldef.GetFieldCount()):
+                    fld: ogr.FieldDefn = ldef.GetFieldDefn(fi)
+                    cols.append(fld.name)
+
+            data = []
+            index = []
+            geom = []
+            f: ogr.Feature
+            if mask is not None and bbox is not None:
+                raise ValueError()
+
+            if bbox is not None:
+                if isinstance(bbox, tuple):
+                    lyr.SetSpatialFilterRect(*bbox)
+                else:
+                    lyr.SetSpatialFilter(bbox)
+
+            if mask is not None:
+                lyr.SetSpatialFilter(mask)
+
+            if isinstance(rows, slice):
+                lyr.SetNextByIndex(rows.start)
+                count = rows.stop - rows.start
+            elif isinstance(rows, int):
+                count = rows
+            else:
+                count = -1
+            for f in lyr:
+                index.append(f.GetFID())
+                data.append(tuple(f[c] for c in cols))
+                geom.append(wkb.loads(bytes(f.geometry().ExportToWkb())))
+                count -= 1
+                if count == 0:
+                    break
+
+            df = pd.DataFrame.from_records(data, index=index, columns=cols)
+            return gpd.GeoDataFrame(df, geometry=geom, crs=crs)
+
+        return gpd_read_file(filename, bbox, mask, rows, engine, **kwargs)
+
+    gpd.read_file = read_file_no_fiona
 
 if parse_version(gdal.__version__) > parse_version("3.6"):
     try:

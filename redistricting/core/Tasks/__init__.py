@@ -22,15 +22,15 @@
  *                                                                         *
  ***************************************************************************/
 """
-from .CreateLayersTask import CreatePlanLayersTask
-from .ImportTask import ImportAssignmentFileTask
-from .UpdatePendingTask import AggregatePendingChangesTask
-from .UpdateDistrictsTask import AggregateDistrictDataTask
 from .AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
+from .CreateLayersTask import CreatePlanLayersTask
 from .ExportPlanTask import ExportRedistrictingPlanTask
 from .ImportShapeTask import ImportShapeFileTask
-
+from .ImportTask import ImportAssignmentFileTask
+from .ReadPopDataTask import LoadPopulationDataTask
+from .UpdateDistrictsTask import AggregateDistrictDataTask
+from .UpdatePendingTask import AggregatePendingChangesTask
 
 __all__ = ['CreatePlanLayersTask', 'ImportAssignmentFileTask', 'ImportShapeFileTask',
            'AggregatePendingChangesTask', 'AggregateDistrictDataTask',
-           'AddGeoFieldToAssignmentLayerTask', 'ExportRedistrictingPlanTask']
+           'AddGeoFieldToAssignmentLayerTask', 'ExportRedistrictingPlanTask', 'LoadPopulationDataTask']

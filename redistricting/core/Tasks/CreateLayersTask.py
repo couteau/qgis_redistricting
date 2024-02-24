@@ -45,6 +45,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 
+from ..Exception import CancelledError
 from ..utils import (
     createGeoPackage,
     createGpkgTable,
@@ -52,7 +53,6 @@ from ..utils import (
     tr
 )
 from ._debug import debug_thread
-from ._exception import CancelledError
 from .Sql import SqlAccess
 
 if TYPE_CHECKING:

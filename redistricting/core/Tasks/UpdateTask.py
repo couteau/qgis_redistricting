@@ -29,10 +29,9 @@ from typing import (
     Sequence
 )
 
-import geopandas as gpd
-import pandas as pd
 from qgis.core import (
     Qgis,
+    QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsMessageLog,
@@ -40,7 +39,8 @@ from qgis.core import (
     QgsVectorLayer
 )
 
-from ._exception import CancelledError
+from ..Exception import CancelledError
+from .Sql import SqlAccess
 
 if TYPE_CHECKING:
     from .. import (
@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     )
 
 
-class AggregateDataTask(QgsTask):
+class AggregateDataTask(SqlAccess, QgsTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(self, plan: RedistrictingPlan, description):
@@ -71,31 +71,6 @@ class AggregateDataTask(QgsTask):
         self.getters = []
         self.aggs = {}
         self.context: QgsExpressionContext = None
-
-    def updateProgress(self, total, count, start, stop):
-        self.setProgress(start + (stop-start)*count/total)
-        if self.isCanceled():
-            raise CancelledError()
-
-    def pd_read(self, source, fc, prog_start, prog_stop, **kwargs):
-        df: gpd.GeoDataFrame = None
-        if fc:
-            divisions = 10
-            chunksize = fc // divisions
-            lastchunk = fc % divisions
-            chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)] + [slice(fc-lastchunk, fc)]
-            for s in chunks:
-                chunk = gpd.read_file(source, rows=s, **kwargs)
-                if df is None:
-                    df = chunk
-                else:
-                    df = pd.concat([df, chunk])
-                self.updateProgress(fc, s.stop, prog_start, prog_stop)
-        else:
-            df = gpd.read_file(source, **kwargs)
-            self.updateProgress(len(df), len(df), prog_start, prog_stop)
-
-        return df
 
     def hasExpression(self):
         for f in self.dataFields:
@@ -133,6 +108,39 @@ class AggregateDataTask(QgsTask):
             self.cols.append(fld.fieldName)
             self.getters.append(self.getFieldValue(fld, self.context))
             self.aggs[fld.fieldName] = 'sum' if fld.isNumeric else 'first'
+
+    def loadPopData(self):
+        cols = [self.popJoinField, self.popField]
+        context = QgsExpressionContext()
+        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+        for f in self.popFields:
+            if f.isExpression:
+                expr = QgsExpression(f.field)
+                expr.prepare(context)
+                cols += expr.referencedColumns()
+            else:
+                cols.append(f.field)
+
+        for f in self.dataFields:
+            if f.isExpression:
+                expr = QgsExpression(f.field)
+                expr.prepare(context)
+                cols += expr.referencedColumns()
+            else:
+                cols.append(f.field)
+
+        fc = self.popLayer.featureCount()
+        chunksize = fc // 9 if fc % 10 != 0 else fc // 10  # we want 10 full or partial chunks
+        df = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField,
+                             read_geometry=False, chunksize=chunksize)
+        for f in self.popFields:
+            if f.isExpression:
+                df[f.fieldName] = df.query(f.field)
+        for f in self.dataFields:
+            if f.isExpression:
+                df[f.fieldName] = df.query(f.field)
+
+        return df
 
     def finished(self, result: bool):
         if not result:

@@ -45,7 +45,7 @@ if TYPE_CHECKING:
 
 
 class AggregatePendingChangesTask(AggregateDataTask):
-    def __init__(self, plan: RedistrictingPlan, updateTask: QgsTask = None):
+    def __init__(self, plan: RedistrictingPlan, updateTask: QgsTask = None, popData=None):
         super().__init__(plan, tr('Computing pending changes'))
         self.data = None
         self.updateTask = updateTask
@@ -87,7 +87,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
             del old
 
             self.cols = [self.popJoinField]
-            self.getters = [lambda f: f[self.popJoinField]] 
+            self.getters = [lambda f: f[self.popJoinField]]
             self.addPopFields()
 
             if len(pending) == 0:

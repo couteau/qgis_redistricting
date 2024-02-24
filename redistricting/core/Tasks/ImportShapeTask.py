@@ -23,10 +23,10 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-import math
 
+import math
 from typing import TYPE_CHECKING
-from qgis.PyQt.QtCore import NULL
+
 from qgis.core import (
     Qgis,
     QgsCoordinateTransform,
@@ -37,10 +37,11 @@ from qgis.core import (
     QgsTask,
     QgsVectorLayer
 )
+from qgis.PyQt.QtCore import NULL
 
-from ._exception import CancelledError
-from ._debug import debug_thread
+from ..Exception import CancelledError
 from ..utils import tr
+from ._debug import debug_thread
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan

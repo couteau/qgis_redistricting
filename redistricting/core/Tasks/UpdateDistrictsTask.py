@@ -23,8 +23,6 @@
  ***************************************************************************/
 """
 import math
-import re
-import shlex
 from collections.abc import (
     Iterable,
     Sequence
@@ -52,7 +50,6 @@ from ..utils import (
     tr
 )
 from ._debug import debug_thread
-from .Sql import SqlAccess
 from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
@@ -72,7 +69,7 @@ class Config:
         return True
 
 
-class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
+class AggregateDistrictDataTask(AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(
@@ -105,77 +102,6 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         self.totalPop = 0
         self.splits = {}
         self.cutEdges = None
-
-    def loadPopData(self):
-        def prog_attributes(f: QgsFeature):
-            nonlocal count
-            count += 1
-            self.updateProgress(fc, count, 20, 40)
-            return f.attributes()
-
-        cols = [self.popJoinField, self.popField]
-        context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-        for f in self.popFields:
-            if f.isExpression:
-                expr = QgsExpression(f.field)
-                expr.prepare(context)
-                cols += expr.referencedColumns()
-            else:
-                cols.append(f.field)
-
-        fc = self.popLayer.featureCount()
-        for f in self.dataFields:
-            if f.isExpression:
-                expr = QgsExpression(f.field)
-                expr.prepare(context)
-                cols += expr.referencedColumns()
-            else:
-                cols.append(f.field)
-
-        if self.popLayer.storageType() in ("GPKG", "OpenFileGDB"):
-            database, params = self.popLayer.source().split('|', 1)
-            lexer = shlex.shlex(params)
-            lexer.whitespace_split = True
-            lexer.whitespace = '&'
-            params = dict(pair.split('=', 1) for pair in lexer)
-            layer = params['layername']
-
-            df: gpd.GeoDataFrame = self.pd_read(database, fc, prog_start=20, prog_stop=40, layer=layer, columns=cols)
-        elif self.popLayer.dataProvider().name() in ('spatialite', 'SQLite'):
-            params = dict(
-                pair.split('=', 1) for pair in
-                shlex.split(re.sub(r' \(\w+\)', '', self.popLayer.dataProvider().dataSourceUri(True)))
-            )
-            layer = params['table']
-            df: gpd.GeoDataFrame = gpd.read_file(
-                params["dbname"], fc, prog_start=20, prog_stop=40, layer=layer, columns=cols)
-        elif self.popLayer.dataProvider().name() in ('postgis', 'postgres'):
-            df: gpd.GeoDataFrame = gpd.read_file(self.popLayer.dataProvider().dataSourceUri(
-                True), fc, prog_start=20, prog_stop=40, columns=cols)
-        elif self.popLayer.storageType() in ("ESRI Shapefile", "GeoJSON"):
-            df: gpd.GeoDataFrame = gpd.read_file(self.popLayer.source(), fc, prog_start=20, prog_stop=40, columns=cols)
-        else:  # the slow fallback
-            count = 0
-            fields = self.popLayer.fields()
-            indices = [fields.lookupField(c) for c in cols]
-            if any((i == -1 for i in indices)):
-                raise RuntimeError("Bad fields")
-            req = QgsFeatureRequest()
-            req.setSubsetOfAttributes(indices)
-            gen = (prog_attributes(f) for f in self.popLayer.getFeatures(req))
-            df = pd.DataFrame(gen, columns=cols)
-
-        df.drop(columns=df.columns.difference(cols), inplace=True)
-        df.set_index(self.popJoinField, inplace=True)
-        for f in self.popFields:
-            if f.isExpression:
-                df[f.fieldName] = df.query(f.field)
-        for f in self.dataFields:
-            if f.isExpression:
-                df[f.fieldName] = df.query(f.field)
-
-        return df
 
     def calcCutEdges(self, df: gpd.GeoDataFrame, distField) -> Union[int, None]:
         try:
@@ -243,10 +169,10 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 splitpop = splitpop.sort_index()
 
             self.splits[field.fieldName] = splitpop
-            self.updateProgress(total, len(self.splits), 40, 50)
+            self.updateProgress(total, len(self.splits))
 
         self.cutEdges = self.calcCutEdges(data, self.distField)
-        self.updateProgress(total, total, 40, 50)
+        self.updateProgress(total, total)
 
     def calcDistrictMetrics(self, data: gpd.GeoDataFrame):
         cea_crs = pyproj.CRS('+proj=cea')
@@ -261,19 +187,23 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
         debug_thread()
 
         try:
-            self.setProgress(0)
-            assign = self.pd_read(self.geoPackagePath, self.assignLayer.featureCount(),
-                                  prog_start=0, prog_stop=20, layer="assignments")
+            self.setProgressIncrement(0, 20)
+            fc = self.popLayer.featureCount()
+            chunksize = fc // 9 if fc % 10 != 0 else fc // 10  # we want 10 full or partial chunks
+            assign = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry, chunksize=chunksize)
             assign.set_index(self.geoIdField, inplace=True)
 
             cols = [self.distField]
             if self.includeDemographics:
+                self.setProgressIncrement(20, 40)
                 popdf = self.loadPopData()
                 assign: gpd.GeoDataFrame = assign.join(popdf)
                 cols += [self.popField] + [f.fieldName for f in self.popFields] + [f.fieldName for f in self.dataFields]
 
+            self.setProgressIncrement(40, 50)
             self.calcPlanMetrics(assign, cols)
 
+            self.setProgressIncrement(50, 100)
             if self.includeGeometry:
                 cols.append("geometry")
                 if self.updateDistricts:
@@ -286,18 +216,18 @@ class AggregateDistrictDataTask(SqlAccess, AggregateDataTask):
                 for d in dists:
                     rows.append(assign.loc[assign[self.distField] == d, cols]
                                 .dissolve(by=self.distField, aggfunc="sum"))
-                    self.updateProgress(total, len(rows), 50, 100)
+                    self.updateProgress(total, len(rows))
 
                 data = pd.concat(rows)
 
                 self.calcDistrictMetrics(data)
                 self.data = data.to_wkt()
-                self.updateProgress(total, total, 50, 100)
+                self.updateProgress(total, total)
             else:
                 assign.drop(columns="geometry", inplace=True)
                 total = len(assign)
                 self.data = assign[cols].groupby(by=self.distField).sum()
-                self.updateProgress(total, total, 50, 100)
+                self.updateProgress(total, total)
 
             name = pd.Series(
                 [

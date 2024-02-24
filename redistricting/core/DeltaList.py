@@ -24,13 +24,25 @@
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Iterator, List
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import QgsApplication
+from typing import (
+    TYPE_CHECKING,
+    Iterator,
+    List
+)
+
 import pandas as pd
+from qgis.core import QgsApplication
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
 from .Delta import Delta
-from .Tasks import AggregatePendingChangesTask
+from .Tasks import (
+    AggregatePendingChangesTask,
+    LoadPopulationDataTask
+)
+from .utils import tr
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
@@ -51,7 +63,20 @@ class DeltaList(QObject):
         self._plan.assignLayer.afterCommitChanges.connect(self.update)
         self._plan.assignLayer.afterRollBack.connect(self.update)
 
+        self._popTask = LoadPopulationDataTask(self, tr("Loading population data"))
+        self._popTask.taskCompleted.connect(self.setPopData)
+        self._popTask.taskTerminated.connect(self.setError)
+        self._popData = None
         self._pendingTask = None
+        self._noupdates = False
+
+    def setPopData(self):
+        task: LoadPopulationDataTask = self.sender()
+        self._popData = task.data
+
+    def setError(self):
+        self._noupdates = True
+        self.clear()
 
     def __getitem__(self, index) -> Delta:
         if self._districts.updateDistricts():
@@ -94,7 +119,7 @@ class DeltaList(QObject):
     def updateDistricts(self, data: pd.DataFrame):
         for d in self._districts:
             d.delta = None
-            
+
         for dist, delta in data.iterrows():
             d = self._districts[str(dist)]
             if d is None:
@@ -114,6 +139,9 @@ class DeltaList(QObject):
 
         if self._pendingTask:
             return self._pendingTask
+
+        if self._noupdates:
+            return None
 
         if not self._plan.assignLayer or not self._plan.assignLayer.editBuffer() or \
                 len(self._plan.assignLayer.editBuffer().changedAttributeValues()) == 0:

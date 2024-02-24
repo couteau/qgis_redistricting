@@ -26,3 +26,7 @@
 
 class RdsException(Exception):
     ...
+
+
+class CancelledError(Exception):
+    ...

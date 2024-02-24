@@ -38,9 +38,9 @@ from qgis.core import (
 )
 from qgis.utils import spatialite_connect
 
+from ..Exception import CancelledError
 from ..utils import tr
 from ._debug import debug_thread
-from ._exception import CancelledError
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan

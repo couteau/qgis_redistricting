@@ -660,8 +660,6 @@ class Redistricting:
     def onProjectClosing(self):
         self.projectClosing = True
         self.clear()
-        self.dockwidget.hide()
-        self.dataTableWidget.hide()
 
     def onLayersWillBeRemoved(self, layerIds):
         if self.projectClosing:

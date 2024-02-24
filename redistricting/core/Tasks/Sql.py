@@ -30,9 +30,16 @@ from typing import (
     Any,
     Dict,
     Iterable,
+    Optional,
     Union
 )
+from urllib.parse import (
+    parse_qs,
+    urlsplit
+)
 
+import geopandas as gpd
+import pandas as pd
 import psycopg2
 from osgeo import (
     gdal,
@@ -41,13 +48,21 @@ from osgeo import (
 from psycopg2.extras import RealDictConnection
 from qgis.core import (
     QgsCredentials,
+    QgsFeature,
+    QgsFeatureRequest,
+    QgsFeedback,
+    QgsMapLayerUtils,
     QgsProject,
+    QgsTask,
     QgsVectorDataProvider,
     QgsVectorLayer,
     QgsVirtualLayerDefinition
 )
+from shapely import wkb
 
+from ..Exception import CancelledError
 from ..utils import (
+    gpd_io_engine,
     random_id,
     spatialite_connect
 )
@@ -56,16 +71,212 @@ from ..utils import (
 class SqlAccess:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        DEC2FLOAT = psycopg2.extensions.new_type(
-            psycopg2.extensions.DECIMAL.values,
-            'DEC2FLOAT',
-            lambda value, curs: float(value) if value is not None else None)
-
-        psycopg2.extensions.register_type(DEC2FLOAT)
         self._uri = None
         self._connInfo = None
         self._user = None
         self._passwd = None
+        if isinstance(self, (QgsFeedback, QgsTask)):
+            self._feedback = self
+        elif "feedback" in kwargs and isinstance(kwargs["feedback"], (QgsFeedback, QgsTask)):
+            self._feedback = kwargs["feedback"]
+            del kwargs["feedback"]
+        else:
+            self._feedback = None
+
+        self._prog_start = 0
+        self._prog_stop = 100
+
+    def setProgressIncrement(self, start: int, stop: int):
+        self._feedback.setProgress(start)
+        self._prog_start = start
+        self._prog_stop = stop
+
+    def updateProgress(self, total, count):
+        if not self._feedback:
+            return
+        self._feedback.setProgress(min(100, self._prog_start + (self._prog_stop-self._prog_start)*count/total))
+        if self._feedback.isCanceled():
+            raise CancelledError()
+
+    def gpd_read(self, source, fc=0, chunksize=None, **kwargs):
+        df: gpd.GeoDataFrame = None
+        if (fc or chunksize):
+            if chunksize is None and fc != 0:
+                divisions = 10
+                chunksize = fc // divisions
+                lastchunk = fc % divisions
+            elif fc > chunksize:
+                divisions = fc // chunksize
+                lastchunk = fc % chunksize
+            else:
+                divisions = 10
+                lastchunk = 0
+
+            chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)]
+            if lastchunk:
+                chunks += [slice(fc-lastchunk, fc)]
+            for s in chunks:
+                chunk = gpd.read_file(source, rows=s, **kwargs)
+                if df is None:
+                    df = chunk
+                else:
+                    df = pd.concat([df, chunk])
+                self.updateProgress(fc, s.stop)
+        else:
+            df = gpd.read_file(source, **kwargs)
+            self.updateProgress(len(df), len(df))
+
+        return df
+
+    def read_qgis(
+        self,
+        layer: QgsVectorLayer,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        read_geometry=True,
+        chunksize: Optional[int] = None,
+    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+        def prog_attributes(f: QgsFeature):
+            nonlocal count
+            count += 1
+            if count % chunksize == 0:
+                self.updateProgress(fc, count)
+            attrs = [f.attribute(i) for i in indices]
+            if read_geometry:
+                attrs.append(f.geometry().asWkb().data())
+            return attrs
+
+        if not chunksize:
+            chunksize = 1
+        fc = layer.featureCount()
+        count = 0
+        fields = layer.fields()
+        if columns is None:
+            columns = fields.names()
+            gen = (prog_attributes(f) for f in layer.getFeatures())
+        else:
+            indices = [fields.lookupField(c) for c in columns]
+            if any((i == -1 for i in indices)):
+                raise RuntimeError("Bad fields")
+            req = QgsFeatureRequest()
+            req.setSubsetOfAttributes(indices)
+            gen = (prog_attributes(f) for f in layer.getFeatures(req))
+
+        if read_geometry:
+            columns = [*columns, "geometry"]
+            df = pd.DataFrame(gen, columns=columns)
+            df['geometry'] = df['geometry'].apply(wkb.loads)
+            df = gpd.GeoDataFrame(df, geometry="geometry", crs=layer.crs().authid())
+        else:
+            df = pd.DataFrame(gen, columns=columns)
+
+        if order and order in df.columns:
+            df = df.sort_values(order).set_index(order)
+
+        return df
+
+    def read_layer(
+            self,
+            layer: QgsVectorLayer,
+            columns: Optional[list[str]] = None,
+            order: Optional[str] = None,
+            read_geometry=True,
+            chunksize: Optional[int] = None,
+            use_qgis=False
+    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+        def makeSqlQuery():
+            if columns is None:
+                cols = "*"
+            else:
+                cols = ",".join(columns)
+                if read_geometry and (g := self.getGeometryColumn(layer)):
+                    cols += f",{g}"
+            sql = f"SELECT {cols} from {self.getTableName(layer)}"
+            if order:
+                sql = f"{sql} ORDER BY {order}"
+            return sql
+
+        if chunksize == 0:
+            chunksize = None
+
+        if use_qgis or (gpd_io_engine == "fiona" and layer.storageType() == "ESRI Shapefile"):
+            return self.read_qgis(layer, columns, order, read_geometry, chunksize)
+
+        if layer.storageType() in ("GPKG", "OpenFileGDB"):
+            if read_geometry:
+                database, params = layer.dataProvider().dataSourceUri().split('|', 1)
+                lexer = shlex.shlex(params)
+                lexer.whitespace_split = True
+                lexer.whitespace = '&'
+                params = dict(pair.split('=', 1) for pair in lexer)
+                df = self.gpd_read(database, layer.featureCount(), chunksize,
+                                   layer=params['layername'], columns=columns)
+                if order:
+                    df = df.set_index(order).sort_index()
+            else:
+                with self._connectSqlOgrSqlite(layer.dataProvider()) as db:
+                    df = pd.read_sql(makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize)
+                if chunksize is not None:
+                    df = pd.concat(df)
+        elif layer.dataProvider().name() in ('spatialite', 'SQLite'):
+            if read_geometry:
+                params = dict(
+                    pair.split('=', 1) for pair in
+                    shlex.split(re.sub(r' \(\w+\)', '', layer.dataProvider().dataSourceUri(True)))
+                )
+                df = self.gpd_read(params['dbname'], layer.featureCount(),
+                                   chunksize, layer=params['table'], columns=columns)
+                if order:
+                    df = df.set_index(order).sort_index()
+            else:
+                with self._connectSqlNativeSqlite(layer.dataProvider()) as db:
+                    df = pd.read_sql(makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize)
+                if chunksize is not None:
+                    df = pd.concat(df)
+        elif layer.dataProvider().name() in ('postgis', 'postgres'):
+            with self._connectSqlPostgres(layer.dataProvider(), as_dict=False) as db:
+                if read_geometry:
+                    df = gpd.read_postgis(makeSqlQuery(), db, self.getGeometryColumn(layer),
+                                          index_col=order, chunksize=chunksize)
+                else:
+                    df = pd.read_sql(makeSqlQuery(), db, self.getGeometryColumn(layer),
+                                     index_col=order, columns=columns, chunksize=chunksize)
+            if chunksize is not None:
+                df = pd.concat(df)
+        elif layer.storageType() in ("ESRI Shapefile", "GeoJSON"):
+            df = self.gpd_read(layer.source(), layer.featureCount(), columns=columns,
+                               chunksize=chunksize, read_geometry=read_geometry)
+            if order:
+                df = df.set_index(order).sort_index()
+        elif layer.dataProvider().name() == "delimitedtext":
+            uri_parts = urlsplit(layer.source())
+            params = parse_qs(uri_parts.query)
+            delimiter = params.get("delimiter", ",")[-1:]
+            header = params.get("useHeader")
+            if header is None:
+                header = "infer"
+            elif header in ("No", "False"):
+                header = None
+            else:
+                header = 0
+
+            if read_geometry:
+                df = self.gpd_read(uri_parts.path, chunksize=chunksize, columns=columns)
+            else:
+                usecols = None if header is None else columns
+                if chunksize is not None:
+                    reader = pd.read_csv(uri_parts.path, delimiter=delimiter, header=header,
+                                         usecols=usecols, chunksize=chunksize)
+                    df = pd.concat(f for f in reader.get_chunk())
+                else:
+                    df = pd.read_csv(uri_parts.path, delimiter=delimiter, header=header, usecols=usecols)
+                if header is None:
+                    if len(columns) == len(df.columns):
+                        df.columns = columns
+        else:
+            df = self.read_qgis(layer, columns, order, read_geometry, chunksize)
+
+        return df
 
     def getTableName(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
@@ -90,10 +301,16 @@ class SqlAccess:
 
         return None
 
-    def getGeometryColumn(self, layer: QgsVectorLayer, table: str = None):
+    def getGeometryColumn(self, layer: QgsVectorLayer, table: str = None) -> str:
         if table is None:
             table = self.getTableName(layer)
         provider = layer.dataProvider()
+
+        if provider.storageType() in ('GPKG', 'SQLite') or provider.name() in ('spatialite', 'postgis', 'postgres'):
+            conn = QgsMapLayerUtils.databaseConnection(layer)
+            if conn:
+                if col := conn.table('', table).geometryColumn():
+                    return col
 
         if provider.name() == 'ogr':
             database = provider.dataSourceUri().split('|')[0]
@@ -121,19 +338,18 @@ class SqlAccess:
             if r:
                 return next(r)['f_geometry_column']
 
-        return None
+        return ''
 
     def _executeSqlSqlite(
-        self, database, sql, as_dict
+        self, db: sqlite3.Connection, sql, as_dict
     ) -> Union[Iterable[Union[Iterable, sqlite3.Row]], None]:
-        with spatialite_connect(database) as db:
-            if as_dict:
-                db.row_factory = sqlite3.Row
-            cur = db.execute(sql)
-            if cur.rowcount == 0:
-                return None
+        if as_dict:
+            db.row_factory = sqlite3.Row
+        cur = db.execute(sql)
+        if cur.rowcount == 0:
+            return None
 
-            return cur
+        return cur
 
     def _connectSqlNativeSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
         conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
@@ -143,39 +359,9 @@ class SqlAccess:
         database, _ = provider.dataSourceUri().split('|', 1)
         return spatialite_connect(database)
 
-    def _connectSqlPostgres(self, provider: QgsVectorDataProvider):
-        if self._uri != provider.uri():
-            self._uri = provider.uri()
-            self._connInfo = self._uri.connectionInfo(True)
-            connDict = dict(tuple(a.split('=')) for a in shlex.split(self._connInfo))
-            self._user = connDict['user']
-            self._passwd = connDict['password']
-            if not self._user or not self._passwd:
-                c = QgsCredentials.instance()
-                c.lock()
-                try:
-                    (success, self._user, self._passwd) = c.get(self._connInfo, self._user, self._passwd)
-                    if not success:
-                        return None
-                    self._uri.setUsername(self._user)
-                    self._uri.setPassword(self._passwd)
-                    self._connInfo = self._uri.connectionInfo(True)
-                finally:
-                    c.unlock()
-        params = {'dsn': self._connInfo}
-        return psycopg2.connect(**params)
-
-    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
-        conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
-        return self._executeSqlSqlite(conndata['dbname'], sql, as_dict)
-
-    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
-        database, _ = provider.dataSourceUri().split('|', 1)
-        return self._executeSqlSqlite(database, sql, as_dict)
-
-    def _executeSqlPostgre(
-        self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
-    ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
+    def _connectSqlPostgres(
+        self, provider: QgsVectorDataProvider, as_dict: bool = True
+    ) -> Union[RealDictConnection, psycopg2.extensions.connection]:
         if self._uri != provider.uri():
             self._uri = provider.uri()
             self._connInfo = self._uri.connectionInfo(True)
@@ -197,7 +383,20 @@ class SqlAccess:
         params = {'dsn': self._connInfo}
         if as_dict:
             params['connection_factory'] = RealDictConnection if as_dict else None
-        with psycopg2.connect(**params) as db:
+        return psycopg2.connect(**params)
+
+    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+        with self._connectSqlNativeSqlite(provider) as db:
+            return self._executeSqlSqlite(db, sql, as_dict)
+
+    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+        with self._connectSqlOgrSqlite(provider) as db:
+            return self._executeSqlSqlite(db, sql, as_dict)
+
+    def _executeSqlPostgre(
+        self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
+    ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
+        with self._connectSqlPostgres(provider, as_dict) as db:
             cur = db.cursor()
             cur.execute(sql)
             if cur.rowcount == 0:
@@ -254,11 +453,10 @@ class SqlAccess:
 
         return (f.attributes() for f in vl.getFeatures())
 
-    def dbconnect(self, layer):
+    def dbconnect(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr':
-            if provider.storageType() in ('GPKG', 'SQLite'):
-                return self._connectSqlOgrSqlite(provider)
+        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
+            return self._connectSqlOgrSqlite(provider)
         elif provider.name() == 'spatialite':
             return self._connectSqlNativeSqlite(provider)
         elif provider.name() in ('postgis', 'postgres'):
@@ -268,9 +466,8 @@ class SqlAccess:
 
     def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr':
-            if provider.storageType() in ('GPKG', 'SQLite'):
-                return self._executeSqlOgrSqlite(provider, sql, as_dict)
+        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
+            return self._executeSqlOgrSqlite(provider, sql, as_dict)
         elif provider.name() == 'spatialite':
             return self._executeSqlNativeSqlite(provider, sql, as_dict)
         elif provider.name() in ('postgis', 'postgres'):
