@@ -7,11 +7,12 @@ from qgis.core import (
     QgsTask
 )
 
+from ..Exception import CanceledError
+from ..layer import RdsLayerUtilities
+from ._debug import debug_thread
+
 if TYPE_CHECKING:
     from ..Plan import RedistrictingPlan
-
-from ..Exception import CancelledError
-from ..layer import RdsLayerUtilities
 
 
 class LoadPopulationDataTask(QgsTask):
@@ -22,6 +23,8 @@ class LoadPopulationDataTask(QgsTask):
         self.exception = None
 
     def run(self):
+        debug_thread()
+
         try:
             utils = RdsLayerUtilities(self._plan.popLayer)
 
@@ -56,7 +59,7 @@ class LoadPopulationDataTask(QgsTask):
                     df[f.fieldName] = df.query(f.field)
 
             self.data = df
-        except CancelledError:
+        except CanceledError:
             self.cancel()
             return False
         except Exception as e:  # pylint: disable=broad-except

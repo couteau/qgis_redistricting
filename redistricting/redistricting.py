@@ -231,9 +231,8 @@ class Redistricting:
         if not self.projectSignalsConnected:
             self.project.readProjectWithContext.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
-            # there is no signal that gets triggered before a project
-            # is closed, but removeAll comes close
-            self.project.removeAll.connect(self.onProjectClosing)
+
+            self.project.aboutToBeCleared.connect(self.onProjectClosing)
 
             # layersWillBeRemoved signal is triggered when a project is
             # closed or when the user removes a layer, and there seems
@@ -447,7 +446,7 @@ class Redistricting:
         if self.projectSignalsConnected:
             self.project.readProjectWithContext.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
-            self.project.removeAll.disconnect(self.onProjectClosing)
+            self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
             self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
             self.project.layersAdded.disconnect(self.updateNewPlanAction)
             self.project.layersRemoved.disconnect(self.updateNewPlanAction)
@@ -689,8 +688,8 @@ class Redistricting:
     # --------------------------------------------------------------------------
 
     def setDistTarget(self, target):
-        if target is None:
-            target = self.createDistrict()
+        # if target is None:
+        #    target = self.createDistrict()
         self.mapTool.setTargetDistrict(target)
         if target is None:
             self.canvas.unsetMapTool(self.mapTool)
@@ -706,9 +705,9 @@ class Redistricting:
             return
 
         self.mapTool.paintMode = mode
-        if self.mapTool.targetDistrict() is None:
-            target = self.createDistrict()
-            self.mapTool.setTargetDistrict(target)
+        # if self.mapTool.targetDistrict() is None:
+        #    target = self.createDistrict()
+        #    self.mapTool.setTargetDistrict(target)
         if self.mapTool.canActivate():
             self.activePlan.updateDistricts()
             self.canvas.setMapTool(self.mapTool)

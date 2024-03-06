@@ -39,7 +39,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import NULL
 
-from ..Exception import CancelledError
+from ..Exception import CanceledError
 from ..utils import tr
 from ._debug import debug_thread
 
@@ -130,17 +130,17 @@ class ImportShapeFileTask(QgsTask):
                     chunk.clear()
                     count += 1
                     if self.isCanceled():
-                        raise CancelledError()
+                        raise CanceledError()
                     self.setProgress(100*count/total)
 
             # write any partial chunk
             if len(chunk) > 0:
                 pv.changeAttributeValues(chunk)
                 if self.isCanceled():
-                    raise CancelledError()
+                    raise CanceledError()
                 self.setProgress(100*count/total)
 
-        except CancelledError:
+        except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e

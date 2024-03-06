@@ -45,7 +45,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 
-from ..Exception import CancelledError
+from ..Exception import CanceledError
 from ..utils import (
     createGeoPackage,
     createGpkgTable,
@@ -330,7 +330,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             while count < total:
                 s = islice(gen, chunkSize)
                 if self.isCanceled():
-                    raise CancelledError()
+                    raise CanceledError()
                 db.executemany(sql, s)
                 count = min(total, count + chunkSize)
                 self.setProgress(2 + 97 * count/total)
@@ -363,7 +363,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                 self.importSourceData()
             else:
                 return False
-        except CancelledError:
+        except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e

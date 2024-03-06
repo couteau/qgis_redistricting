@@ -163,7 +163,7 @@ class TargetDistrictModel(DistrictSelectModel):
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if row == 0:
-                return tr('New district')
+                return tr('Select district')
 
         elif role == Qt.DecorationRole:
             if row == 0:

@@ -27,17 +27,17 @@ from __future__ import annotations
 from typing import (
     TYPE_CHECKING,
     Any,
+    Union,
     overload
 )
 
+import numpy as np
 import pandas as pd
 from qgis.core import QgsCategorizedSymbolRenderer
 from qgis.PyQt.QtGui import (
     QColor,
     QPalette
 )
-
-from .Delta import Delta
 
 if TYPE_CHECKING:
     from .DistrictList import DistrictList
@@ -46,8 +46,9 @@ if TYPE_CHECKING:
 class District:
     def __init__(self, district: int, owner: DistrictList):
         self._district = district
+        self._data = owner._data
+        self._index = self._data.index.get_loc(district)
         self._list = owner
-        self._delta = None
 
     @overload
     def __getitem__(self, index: str | int) -> Any:
@@ -57,47 +58,100 @@ class District:
     def __getitem__(self, index: slice) -> pd.Series:
         ...
 
-    def __getitem__(self, key: int | str | slice):
-        if isinstance(key, str) and key in self._list.data.columns:
-            return self._list.data.at[self._district, key]
+    def __getitem__(self, key: Union[int, str, slice]):
+        if isinstance(key, str) and key in self._data.columns:
+            value = self._data.at[self._district, key]
+        elif isinstance(key, int) and 0 <= key < len(self._list.columns):
+            value = self._data.iat[self._index, key+1]
+        elif isinstance(key, slice):
+            key = self._list.columns[key]
+            value = self._data.at[self._district, key]
+        else:
+            raise IndexError(f"{key} not found in district")
 
-        if isinstance(key, int) and 0 <= key < len(self._list.data.columns):
-            return self._list.data.iat[self._district, key]
+        if isinstance(value, np.integer):
+            value = int(value)
+        elif isinstance(value, np.floating):
+            value = float(value)
+        elif isinstance(value, np.bool_):
+            value = bool(value)
 
-        if isinstance(key, slice):
-            return self._list.data.loc[self._district, key]
+        return value
 
-        raise IndexError(f"{key} not found in district")
+    def __setitem__(self, key: Union[int, str], value: Any):
+        if key == "district":
+            raise IndexError("district field is readonly")
 
-    def __setitem__(self, key: int | str, value):
-        if key in ("district", 0):
-            raise ValueError("district field is read-only")
+        if isinstance(key, int):
+            if 0 <= key < len(self._list.columns):
+                key = self._list.columns[key]
+            else:
+                raise IndexError(f"no item at index {key}")
 
-        if isinstance(key, str) and key in self._list.data.columns:
-            self._list.data.at[self._district, key] = value
-        elif isinstance(key, int) and 1 <= key < len(self._list.data.columns):
-            self._list.data.iat[self._district, key] = value
+        self._list.changeDistrictAttribute(self._district, key, value)
 
     def __getattr__(self, key: str):
         try:
             return self.__getitem__(key)
         except IndexError as e:
-            raise AttributeError(f"{key} not found in plan") from e
+            raise AttributeError(f"{key} not found in district object") from e
 
-    def isValid(self):
-        lower, upper = self._list.idealRange(self["members"])
-        return lower <= self[self._list.popField] <= upper
+    def __eq__(self, __value: "District"):
+        return self._district == __value._district and \
+            self._data.loc[self._district].equals(__value._data.loc[self._district])
 
     @property
-    def delta(self):
-        return self._delta
+    def name(self):
+        value = self["name"]
+        if not value:
+            value = str(self._district)
 
-    @delta.setter
-    def delta(self, value: dict[str, int]):
-        if value:
-            self._delta = Delta(self._plan, self, value)
-        else:
-            self._delta = None
+        return value
+
+    @name.setter
+    def name(self, value):
+        self["name"] = value
+
+    @property
+    def members(self):
+        return self["members"]
+
+    @members.setter
+    def members(self, value):
+        self["members"] = value
+
+    @property
+    def district(self):
+        return self._district
+
+    @property
+    def population(self):
+        if self._list.popField is None:
+            return 0
+
+        return self[self._list.popField]
+
+    @property
+    def ideal(self):
+        return self._list.ideal * self["members"]
+
+    @property
+    def deviation(self):
+        return self["deviation"]
+
+    @property
+    def description(self):
+        return self["description"]
+
+    @description.setter
+    def description(self, value):
+        self["description"] = value
+
+    def isValid(self):
+        if self._district == 0:
+            return True
+        lower, upper = self._list.idealRange(self["members"])
+        return lower <= self.population <= upper
 
     @property
     def color(self):

@@ -47,6 +47,7 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
+from .DeltaList import DeltaList
 from .District import District
 from .DistrictList import (
     DistrictList,
@@ -113,6 +114,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         self._districts = DistrictList(self)
         self._stats = self._districts
+        self._delta = DeltaList(self)
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -220,6 +222,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return plan
 
     def isValid(self):
+        """Test whether plan meets minimum specifications for use"""
         return bool(
             self.name and
             self.assignLayer and
@@ -283,7 +286,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
     @property
     def allocatedSeats(self):
-        return sum(d.members for d in self._districts if isinstance(d, District))
+        return sum(d.members for d in self._districts)
 
     @property
     def description(self) -> str:
@@ -424,9 +427,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return self._assignLayer
 
     def _setAssignLayer(self, value: QgsVectorLayer):
+        if value is None and self._assignLayer is not None:
+            self._assignLayer.afterCommitChanges.disconnect(self.assignmentsCommitted)
+            self._delta.detachSignals()
+
         self._assignLayer = value
         if self._assignLayer is not None:
             self._assignLayer.afterCommitChanges.connect(self.assignmentsCommitted)
+            self._delta.attachSignals()
             self._group.updateLayers()
 
             if self._geoIdField is None:
@@ -495,6 +503,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             districts = {dist.district: dist for dist in districts}
         self._districts.update(districts)
         self.planChanged.emit(self, 'districts', self._districts[:], oldDistricts)
+
+    @property
+    def delta(self):
+        return self._delta
 
     @property
     def popFields(self) -> FieldList[Field]:
@@ -587,6 +599,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                                   self._totalPopulation, oldValue)
 
     @property
+    def ideal(self):
+        return round(self._totalPopulation / self.numSeats)
+
+    @property
     def stats(self) -> DistrictList:
         return self._districts
 
@@ -631,9 +647,11 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
     def resetData(self, updateGeometry=False, districts: set[int] = None, immediate=False):
         self._districts.resetData(updateGeometry, districts, immediate)
+        self._delta.clear()
 
     def updateDistricts(self, force=False):
-        return self._districts.updateDistricts(force)
+        pass
+        # return self._districts.updateDistricts(force)
 
     def layerRemoved(self, layer):
         if layer == self._assignLayer:
@@ -675,5 +693,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._setDistLayer(distLayer)
 
     def assignmentsCommitted(self):
-        districts = {d.district for d in self._districts if d.delta is not None}
-        self._districts.resetData(updateGeometry=True, districts=districts, immediate=True)
+        districts = {d.district for d in self._delta}
+        self.resetData(updateGeometry=True, districts=districts, immediate=True)
+
+    def assignmentsRolledBack(self):
+        self._delta.clear()

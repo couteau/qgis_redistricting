@@ -32,7 +32,6 @@ from qgis.PyQt.QtCore import (
     QVariant
 )
 
-from .DeltaList import DeltaList
 from .Field import (
     DataField,
     Field
@@ -54,21 +53,25 @@ class DeltaListModel(QAbstractTableModel):
 
     def setPlan(self, plan: RedistrictingPlan):
         if plan != self._plan:
+            self.beginResetModel()
             if self._plan:
                 self._plan.planChanged.disconnect(self.planChanged)
+                self._delta.updateStarted.disconnect(self.startUpdate)
+                self._delta.updateComplete.disconnect(self.endUpdate)
+                self._delta.updateTerminated.disconnect(self.cancelUpdate)
             self._plan = plan
             if self._plan:
                 self._plan.planChanged.connect(self.planChanged)
-                self.beginResetModel()
-                self._delta = DeltaList(self._plan, self)
+                self._delta = self._plan.delta
                 self.updateFields()
-                self._delta.updating.connect(self.startUpdate)
+                self._delta.updateStarted.connect(self.startUpdate)
                 self._delta.updateComplete.connect(self.endUpdate)
                 self._delta.updateTerminated.connect(self.cancelUpdate)
-                self.endResetModel()
             else:
                 self._delta = None
                 self._fields = []
+
+            self.endResetModel()
 
     def updateFields(self):
         self._fields = [
@@ -152,10 +155,8 @@ class DeltaListModel(QAbstractTableModel):
             col = index.column()
 
             if role in {Qt.DisplayRole, Qt.EditRole}:
-                dist = self._delta[col]
-                if dist is not None:
-                    value = dist[self._fields[row]['name']]
-                    return self._fields[row]['format'].format(value) if value is not None else None
+                value = self._delta[col, row]
+                return self._fields[row]['format'].format(value) if value is not None else None
 
         return QVariant()
 
@@ -163,8 +164,7 @@ class DeltaListModel(QAbstractTableModel):
         if self._delta:
             if role == Qt.DisplayRole:
                 if orientation == Qt.Horizontal:
-                    if self._delta[section] is not None:
-                        return self._delta[section].name
+                    return self._delta[section].name
                 else:
                     return self._fields[section]['caption']
             if role == Qt.TextAlignmentRole:

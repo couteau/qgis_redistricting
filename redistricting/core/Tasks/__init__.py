@@ -27,10 +27,9 @@ from .CreateLayersTask import CreatePlanLayersTask
 from .ExportPlanTask import ExportRedistrictingPlanTask
 from .ImportShapeTask import ImportShapeFileTask
 from .ImportTask import ImportAssignmentFileTask
-from .ReadPopDataTask import LoadPopulationDataTask
 from .UpdateDistrictsTask import AggregateDistrictDataTask
 from .UpdatePendingTask import AggregatePendingChangesTask
 
 __all__ = ['CreatePlanLayersTask', 'ImportAssignmentFileTask', 'ImportShapeFileTask',
            'AggregatePendingChangesTask', 'AggregateDistrictDataTask',
-           'AddGeoFieldToAssignmentLayerTask', 'ExportRedistrictingPlanTask', 'LoadPopulationDataTask']
+           'AddGeoFieldToAssignmentLayerTask', 'ExportRedistrictingPlanTask']

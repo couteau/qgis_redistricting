@@ -31,6 +31,7 @@ from math import (
 from typing import (
     TYPE_CHECKING,
     Any,
+    Optional,
     Union,
     overload
 )
@@ -40,7 +41,9 @@ import pandas as pd
 from qgis.core import (
     Qgis,
     QgsApplication,
-    QgsTask
+    QgsFeature,
+    QgsTask,
+    QgsVectorLayer
 )
 from qgis.PyQt.QtCore import (
     QObject,
@@ -78,24 +81,24 @@ class DistrictAccessor:
 
 
 class DistrictList(QObject):
-    districtAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
-    districtRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
+    districtChanged = pyqtSignal('PyQt_PyObject')
     updating = pyqtSignal()
     updateComplete = pyqtSignal()
     updateTerminated = pyqtSignal()
 
-    def __init__(self, plan: RedistrictingPlan, districts: list[int] = None):
+    def __init__(self, plan: RedistrictingPlan, data: Optional[pd.DataFrame] = None):
         super().__init__(plan)
         self._plan = plan
         self._districts = {}
         self._accessor = DistrictAccessor(self)
-        if not districts:
+        if data is None:
             self._index = pd.RangeIndex(plan.numDistricts + 1)
+            self._data = pd.DataFrame(index=self._index)
         else:
-            self._index = pd.Index(districts)
+            self._index = data.index
+            self._data = data
+        self._columns = self._data.columns
 
-        self._columns: pd.Index
-        self._data = pd.DataFrame(index=self._index)
         self._totalPopulation = 0
         self.updateDistrictFields()
 
@@ -107,123 +110,6 @@ class DistrictList(QObject):
         self._needGeomUpdate = False
         self._updateDistricts = None
         self._updateTask = None
-
-    def planChanged(self, plan, field, oldValue, newValue):
-        if self._plan != plan:
-            raise ValueError()
-
-        if field == "geo-fields":
-            self.initSplits()
-        elif field in ("pop-fields", "data-fields"):
-            self.updateDistrictFields()
-        elif field == "num-districts":
-            if oldValue == len(self._data):
-                self._index = pd.RangeIndex(newValue + 1)
-                self.createDataFrame(self._index, self._columns, self._data)
-
-    def createDataFrame(self, districts, columns: dict[str, pd.Series], data: pd.DataFrame = None):
-        self._data = pd.DataFrame(columns, index=districts)
-        self._data.loc[0, ["name", "members", "polsbypopper", "reock", "convexhull"]] = \
-            (tr("Unassigned"), None, None, None, None)
-        self._columns = self._data.columns
-        if data is not None:
-            self.setData(data)
-
-    def updateDistrictFields(self):
-        if self._plan.popField is None:
-            return
-
-        cols = {
-            'district': pd.Series(self._index, index=self._index, dtype="Int64"),
-            'name': pd.Series("", index=self._index, dtype=str),
-            'members': pd.Series(1, index=self._index, dtype="Int64"),
-            self.popField: pd.Series(0, index=self._index, dtype="Int64"),
-            'deviation': pd.Series(pd.NA, index=self._index, dtype="Int64"),
-            'pct_deviation': pd.Series(pd.NA, index=self._index, dtype="Float64"),
-        }
-        self._headings = [
-            tr('District'),
-            tr('Name'),
-            tr('Members'),
-            tr('Population'),
-            tr('Deviation'),
-            tr('%Deviation')
-        ]
-
-        for field in self._plan.popFields:
-            cols[field.fieldName] = pd.Series(
-                0,
-                index=self._index,
-                dtype="Int64" if field.fieldType() in IntTypes else "Float64"
-            )
-            self._headings.append(field.caption)
-
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
-                cols[fn] = pd.Series(
-                    0,
-                    index=self._index,
-                    dtype="Int64" if field.fieldType() in IntTypes else "Float64"
-                )
-                self._headings.append(field.caption)
-            if field.pctbase and field.pctbase in cols:
-                cols[f"pct_{fn}"] = pd.Series(0, index=self._index, dtype="Float64")
-                self._headings.append(f"%{field.caption}")
-
-        cols |= {
-            'polsbypopper': pd.Series(pd.NA, index=self._index, dtype="Float64"),
-            'reock': pd.Series(pd.NA, index=self._index, dtype="Float64"),
-            'convexhull': pd.Series(pd.NA, index=self._index, dtype="Float64")
-        }
-        self._headings += [
-            tr('Polsby-Popper'),
-            tr('Reock'),
-            tr('Convex Hull'),
-        ]
-        savecols = [col for col in self._data.columns if col in cols]
-        data = self._data[savecols].copy()
-        self.createDataFrame(self._index, cols, data)
-
-    @property
-    def data(self):
-        return self._data
-
-    def setData(self, data: pd.DataFrame):
-        dtypes = {c: self._data[c].dtype for c in self._data.columns}
-        self._data.update(data)
-        self._data = self._data.astype(dtype=dtypes, copy=False)
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.pctbase and field.pctbase in self._data.columns:
-                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[field.pctbase], fill_value=0)
-
-    @property
-    def layer(self):
-        return self._plan.distLayer
-
-    @property
-    def popField(self):
-        return self._plan.popField
-
-    @property
-    def district(self):
-        return self._accessor
-
-    @property
-    def heading(self):
-        return self._headings
-
-    @property
-    def ideal(self):
-        return round(self._totalPopulation / self._plan.numSeats)
-
-    def idealRange(self, members: int = 1):
-        maxDeviation = int(self._totalPopulation *
-                           self._plan.deviation / self._plan.numDistricts)
-        idealUpper = ceil(members * self._totalPopulation / self._plan.numSeats) + maxDeviation
-        idealLower = floor(self._totalPopulation / self._plan.numSeats) - maxDeviation
-        return (idealLower, idealUpper)
 
     @overload
     def __getitem__(self, index: Union[str, int]) -> District:
@@ -242,8 +128,9 @@ class DistrictList(QObject):
         field = None
 
         if isinstance(index, tuple):
-            field = index[1]
-            index = index[0]
+            index, field = index
+            if isinstance(field, int) and isinstance(index, int):
+                return self._data.iat[index, field+1]
 
         if isinstance(index, slice):
             if field:
@@ -253,17 +140,20 @@ class DistrictList(QObject):
                     acc = self._data.iloc
                 return list(acc[index, field])
 
-            return DistrictList(self._plan, list(self._data.loc[index].index))
+            return DistrictList(self._plan, self._data.loc[index])
 
         if isinstance(index, str):
             if index.isnumeric():
-                district = self.district[int(index)]
+                if int(index) in self._index:
+                    district = self.district[int(index)]
+            elif index in self._data.columns:
+                return list(self._data[index])
             else:
                 i = self._data.loc[self._data["name"] == index]
-                if i and len(i) == 1:
+                if len(i) == 1:
                     district = self.district[i.index[0]]
-        elif isinstance(index, int) and 0 <= index < len(self._data):
-            district = self.district[index]
+        elif isinstance(index, int):
+            district = self.district[self._index[index]]
 
         if district:
             if field:
@@ -273,14 +163,14 @@ class DistrictList(QObject):
         raise IndexError()
 
     def __iter__(self):
-        return (self._accessor[d] for d in self._data.index)
+        return (self._accessor[d] for d in self._index)
 
     def __len__(self):
-        return len(self._data)
+        return len(self._index)
 
     def __contains__(self, index):
         if isinstance(index, District):
-            return index.district in self._data.index
+            return index.district in self._index
 
         if isinstance(index, str) and index.isnumeric():
             index = int(index)
@@ -319,10 +209,148 @@ class DistrictList(QObject):
         self._data.loc[0].update(s)
 
     @property
+    def layer(self) -> QgsVectorLayer:
+        return self._plan.distLayer
+
+    @property
+    def popField(self):
+        return self._plan.popField
+
+    @property
+    def district(self):
+        return self._accessor
+
+    @property
+    def headings(self):
+        return self._headings
+
+    @property
+    def columns(self):
+        return self._columns
+
+    @property
+    def ideal(self):
+        return round(self._totalPopulation / self._plan.numSeats)
+
+    def idealRange(self, members: int = 1):
+        maxDeviation = int(self._totalPopulation *
+                           self._plan.deviation / self._plan.numDistricts)
+        idealUpper = ceil(members * self._totalPopulation / self._plan.numSeats) + maxDeviation
+        idealLower = floor(self._totalPopulation / self._plan.numSeats) - maxDeviation
+        return (idealLower, idealUpper)
+
+    @property
     def updatingData(self):
         return self.updateDistricts() is not None
 
+    def planChanged(self, plan, field, oldValue, newValue):
+        if self._plan != plan:
+            raise ValueError()
+
+        if field == "geo-fields":
+            self.initSplits()
+        elif field in ("pop-field", "pop-fields", "data-fields"):
+            self.updateDistrictFields()
+        elif field == "num-districts":
+            if oldValue == len(self._data):
+                self._index = pd.RangeIndex(newValue + 1)
+                self.createDataFrame(self._index, self._columns, self._data)
+
+    def createDataFrame(self, districts, columns: dict[str, pd.Series], data: pd.DataFrame = None):
+        self._data = pd.DataFrame(
+            {"fid": pd.Series(pd.NA, index=self._index, dtype="Int64")} |
+            columns |
+            {"description": pd.Series("", index=self._index)},
+            index=districts
+        )
+        self._data.loc[0, ["name", "members", "polsbypopper", "reock", "convexhull"]] = \
+            (tr("Unassigned"), None, None, None, None)
+        self._columns = list(columns.keys())
+        if data is not None:
+            self.setData(data)
+
+    def updateDistrictFields(self):
+        if self._plan.popField is None:
+            cols = {
+                'district': pd.Series(self._index, index=self._index, dtype="Int64"),
+                'name': pd.Series("", index=self._index, dtype=str),
+                'members': pd.Series(1, index=self._index, dtype="Int64"),
+                'deviation': pd.Series(pd.NA, index=self._index, dtype="Int64"),
+                'pct_deviation': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            }
+            self._headings = [
+                tr('District'),
+                tr('Name'),
+                tr('Members'),
+                tr('Deviation'),
+                tr('%Deviation')
+            ]
+        else:
+            cols = {
+                'district': pd.Series(self._index, index=self._index, dtype="Int64"),
+                'name': pd.Series("", index=self._index, dtype=str),
+                'members': pd.Series(1, index=self._index, dtype="Int64"),
+                self.popField: pd.Series(0, index=self._index, dtype="Int64"),
+                'deviation': pd.Series(pd.NA, index=self._index, dtype="Int64"),
+                'pct_deviation': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            }
+            self._headings = [
+                tr('District'),
+                tr('Name'),
+                tr('Members'),
+                tr('Population'),
+                tr('Deviation'),
+                tr('%Deviation')
+            ]
+
+        for field in self._plan.popFields:
+            cols[field.fieldName] = pd.Series(
+                0,
+                index=self._index,
+                dtype="Int64" if field.fieldType() in IntTypes else "Float64"
+            )
+            self._headings.append(field.caption)
+
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            if field.sum:
+                cols[fn] = pd.Series(
+                    0,
+                    index=self._index,
+                    dtype="Int64" if field.fieldType() in IntTypes else "Float64"
+                )
+                self._headings.append(field.caption)
+            if field.pctbase and field.pctbase in cols:
+                cols[f"pct_{fn}"] = pd.Series(0, index=self._index, dtype="Float64")
+                self._headings.append(f"%{field.caption}")
+
+        cols |= {
+            'polsbypopper': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            'reock': pd.Series(pd.NA, index=self._index, dtype="Float64"),
+            'convexhull': pd.Series(pd.NA, index=self._index, dtype="Float64")
+        }
+        self._headings += [
+            tr('Polsby-Popper'),
+            tr('Reock'),
+            tr('Convex Hull'),
+        ]
+        savecols = [col for col in self._data.columns if col in cols or col in {"fid", "description"}]
+        data = self._data[savecols].copy()
+        self.createDataFrame(self._index, cols, data)
+
+    def setData(self, data: pd.DataFrame):
+        dtypes = {c: self._data[c].dtype for c in data.columns if c in self._data.columns}
+        self._data.update(data.astype(dtype=dtypes, copy=False))
+        # self._data = self._data.astype(dtype=dtypes, copy=False)
+        for field in self._plan.dataFields:
+            fn = makeFieldName(field)
+            if field.pctbase and field.pctbase in self._data.columns:
+                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[field.pctbase], fill_value=0)
+
     def loadData(self):
+        if not self._plan.isValid():
+            return
+
         if self._plan.distLayer:
             with connect_layer(self._plan.distLayer) as db:
                 data = pd.read_sql(
@@ -330,10 +358,9 @@ class DistrictList(QObject):
                     db,
                     columns=self._data.columns
                 )
-                # data = gpd_read(geoPackagePath, layer="districts")
 
             self.setData(data.set_index("district", drop=False).replace({np.nan: None}))
-            self._totalPopulation = self._data[self.popField].sum()
+            self._totalPopulation = int(self._data[self.popField].sum())
 
             if self._data.loc[1:, "deviation"].isna().any():
                 self._data.loc[1:, "deviation"] = \
@@ -344,10 +371,50 @@ class DistrictList(QObject):
             if self._data.loc[1:, "name"].isna().any():
                 self._data.loc[1:, "name"] = tr("District") + " " + self._data.loc[1: "district"].astype(str)
 
+    READONLY_FIELDS = {"fid", "district"}
+
+    def saveData(self, district=None):
+        def changeAttributes(dist: int, feature: QgsFeature):
+            values = {}
+            for idx, field in field_map.items():
+                if field in self._data.columns and field not in self.READONLY_FIELDS:
+                    value = self._data.at[dist, field]
+                    if value != feature[idx]:
+                        values[idx] = value
+            if values:
+                self._plan.distLayer.changeAttributeValues(feature.id(), values)
+
+        fields = self._plan.distLayer.fields()
+        field_map = dict(map(lambda i, j: (i, j), fields.allAttributesList(), fields.names()))
+        dist_idx = fields.indexFromName(self._plan.distField)
+        if district is None:
+            fids = self._data["fid"].dropna()
+            self._plan.distLayer.startEditing()
+            for feat in self._plan.distLayer.getFeatures(list(fids)):
+                changeAttributes(feat[dist_idx], feat)
+            self._plan.distLayer.commitChanges(True)
+        else:
+            fid = int(self._data.at[district, "fid"])
+            if pd.isna(fid):
+                raise ValueError("Invalid fid for district")
+
+            feat = self._plan.distLayer.getFeature(fid)
+            if feat is None:
+                raise ValueError("Invalid fid for district")
+
+            self._plan.distLayer.startEditing()
+            changeAttributes(district, feat)
+            self._plan.distLayer.commitChanges(True)
+
+    def changeDistrictAttribute(self, district: int, attr: str, value: Any):
+        self._data.at[district, attr] = value
+        self.saveData(district)
+        self.districtChanged.emit(self.district[district])
+
     def updateTaskCompleted(self):
         self._plan.distLayer.reload()
-        if self._updateTask.totalPop:
-            self._plan.totalPopulation = self._updateTask.totalPop
+        if self._updateTask.totalPopulation:
+            self._plan.totalPopulation = self._updateTask.totalPopulation
 
         self.setData(self._updateTask.data)
         self.updateSplits(self._updateTask.cutEdges, self._updateTask.splits)

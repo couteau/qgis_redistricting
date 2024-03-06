@@ -38,7 +38,7 @@ from qgis.core import (
 )
 from qgis.utils import spatialite_connect
 
-from ..Exception import CancelledError
+from ..Exception import CanceledError
 from ..utils import tr
 from ._debug import debug_thread
 
@@ -56,7 +56,8 @@ class ImportAssignmentFileTask(QgsTask):
             distColumn=1,
             delimiter=',',
             quotechar='"',
-            joinField=None):
+            joinField=None
+    ):
         super().__init__(tr('Import assignment file'), QgsTask.AllFlags)
 
         self.assignLayer: QgsVectorLayer = plan.assignLayer
@@ -74,11 +75,11 @@ class ImportAssignmentFileTask(QgsTask):
         self.joinField = self.geoIdField if joinField is None else joinField
         self.exception: Exception = None
 
-    def run(self):
+    def run(self) -> bool:
         def makeTuple(tup):
             nonlocal progress
             if self.isCanceled():
-                raise CancelledError()
+                raise CanceledError()
 
             progress += 1
             self.setProgress(100*progress/total)
@@ -133,7 +134,7 @@ class ImportAssignmentFileTask(QgsTask):
 
                 db.executemany(sql, generator)
                 db.commit()
-        except CancelledError:
+        except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e

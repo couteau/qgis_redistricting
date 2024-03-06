@@ -18,7 +18,6 @@
     <widget class="QLabel" name="lblConfirm">
      <property name="font">
       <font>
-       <family>Arial</family>
        <pointsize>24</pointsize>
        <weight>75</weight>
        <bold>true</bold>

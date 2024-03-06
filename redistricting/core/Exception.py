@@ -28,5 +28,5 @@ class RdsException(Exception):
     ...
 
 
-class CancelledError(Exception):
+class CanceledError(Exception):
     ...

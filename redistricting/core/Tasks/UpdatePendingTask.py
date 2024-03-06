@@ -22,20 +22,14 @@
  *                                                                         *
  ***************************************************************************/
 """
-from __future__ import annotations
-
 from typing import (
     TYPE_CHECKING,
-    Any,
-    Dict
+    Optional
 )
 
 import pandas as pd
-from qgis.core import (
-    QgsFeatureRequest,
-    QgsTask
-)
 
+from ..Exception import CanceledError
 from ..utils import tr
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
@@ -45,16 +39,16 @@ if TYPE_CHECKING:
 
 
 class AggregatePendingChangesTask(AggregateDataTask):
-    def __init__(self, plan: RedistrictingPlan, updateTask: QgsTask = None, popData=None):
+    def __init__(
+        self,
+        plan: "RedistrictingPlan",
+        popData: Optional[pd.DataFrame] = None,
+        assignments: Optional[pd.DataFrame] = None
+    ):
         super().__init__(plan, tr('Computing pending changes'))
         self.data = None
-        self.updateTask = updateTask
-        if self.updateTask:
-            self.updateTask.taskCompleted.connect(self.clearUpdateTask)
-            self.updateTask.taskTerminated.connect(self.clearUpdateTask)
-
-    def clearUpdateTask(self):
-        self.updateTask = None
+        self.popData = popData
+        self.assignments = assignments
 
     def run(self):
         debug_thread()
@@ -67,54 +61,91 @@ class AggregatePendingChangesTask(AggregateDataTask):
             if gindex == -1:
                 return False
 
-            flt: Dict[int, Dict[int, Any]] = {
-                k: v for k, v in self.assignLayer.editBuffer().changedAttributeValues().items() if dindex in v}
+            index = []
+            data = []
+            for k, v in self.assignLayer.editBuffer().changedAttributeValues().items():
+                if dindex in v:
+                    index.append(k)
+                    data.append(v[dindex])
+            df_new = pd.DataFrame({f"new_{self.distField}": data}, index=index)
 
-            request = QgsFeatureRequest(list(flt))
-            request.setSubsetOfAttributes([gindex, dindex])
-            datagen = ([f.attribute(gindex), f.attribute(dindex)]
-                       for f in self.assignLayer.getFeatures(request))
-            new = pd.DataFrame.from_records(
-                datagen, columns=[self.geoIdField, f'new_{self.distField}'], index=self.geoIdField)
-            datagen = ([f.attribute(gindex), f.attribute(dindex)]
-                       for f in self.assignLayer.dataProvider().getFeatures(request))
-            old = pd.DataFrame.from_records(
-                datagen, columns=[self.geoIdField, f'old_{self.distField}'], index=self.geoIdField)
+            self.checkCanceled()
 
-            pending = pd.merge(new, old, how='outer', left_index=True, right_index=True)
+            if self.assignments is None:
+                with self._connectSqlOgrSqlite(self.assignLayer.dataProvider()) as db:
+                    self.assignments: pd.DataFrame = pd.read_sql(
+                        f"SELECT fid, {self.geoIdField}, {self.distField} as old_{self.distField} FROM assignments",
+                        db,
+                        index_col="fid"
+                    )
+                self.checkCanceled()
+
+            pending = self.assignments.loc[index].join(df_new)
             pending = pending[pending[f'new_{self.distField}'] != pending[f'old_{self.distField}']]
-            del new
-            del old
-
-            self.cols = [self.popJoinField]
-            self.getters = [lambda f: f[self.popJoinField]]
-            self.addPopFields()
-
             if len(pending) == 0:
-                pending[self.cols] = None
-                self.data = pending
                 return True
 
-            request = QgsFeatureRequest()
-            request.setExpressionContext(self.context)
-            r = ','.join([f"'{geoid}'" for geoid in pending.index])
-            request.setFilterExpression(f'{self.popJoinField} in ({r})')
+            if self.popData is None:
+                self.popData = self.loadPopData()
 
-            datagen = ([getter(f) for getter in self.getters]
-                       for f in self.popLayer.getFeatures(request))
-            dfpop = pd.DataFrame.from_records(datagen, index=self.popJoinField, columns=self.cols)
-            pending = pd.merge(pending, dfpop, how='left', left_index=True, right_index=True)
+            pending = pending.join(self.popData, on=self.geoIdField, how="inner")
 
-            newdist = pending.groupby(f'new_{self.distField}').agg(self.aggs)
-            olddist = pending.groupby(f'old_{self.distField}').agg(self.aggs)
-            del pending
+            newdist = pending\
+                .drop(columns=f"old_{self.distField}")\
+                .groupby(f'new_{self.distField}')\
+                .sum(numeric_only=True)
+            self.checkCanceled()
+            olddist = pending\
+                .drop(columns=f"new_{self.distField}")\
+                .groupby(f'old_{self.distField}')\
+                .sum(numeric_only=True)
+            self.checkCanceled()
 
-            self.data = newdist.sub(olddist, fill_value=0)
+            data = newdist.sub(olddist, fill_value=0)
+            dist = self.assignments\
+                .join(self.popData, on=self.geoIdField)\
+                .drop(columns=self.geoIdField)\
+                .groupby(f"old_{self.distField}")\
+                .sum()
+            self.checkCanceled()
+            dist = dist.loc[dist.index.intersection(data.index)]
+
+            new = pd.DataFrame(0, index=data.index.difference(dist.index), columns=dist.columns)
+            if len(new) > 0:
+                dist = pd.concat([dist, new])
+            members = [self.districts[d].members for d in dist.index]
+            dist["members"] = members
+
+            # dist = self.districts.data.loc[data.index]
+            data["deviation"] = newdist[self.popField] - (dist["members"] * self.ideal)
+            data["pct_deviation"] = data["deviation"] / (dist["members"] * self.ideal)
+            data[f"new_{self.popField}"] = dist[self.popField] + data[self.popField]
+            for f in self.popFields:
+                data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
+            for f in self.dataFields:
+                data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
+                if f.pctbase:
+                    data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{f.pctbase}"]
+
+            self.checkCanceled()
+
+            cols = [f"new_{self.popField}", self.popField, "deviation", "pct_deviation"]
+            for f in self.popFields:
+                cols.append(f"new_{f.fieldName}")
+                cols.append(f.fieldName)
+            for f in self.dataFields:
+                cols.append(f"new_{f.fieldName}")
+                cols.append(f.fieldName)
+                if f.pctbase:
+                    cols.append(f"pct_{f.fieldName}")
+
+            self.data = data[cols]
+            self.checkCanceled()
+        except CanceledError:
+            self.data = None
+            return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e
             return False
-
-        if self.updateTask:
-            self.updateTask.waitForFinished(0)
 
         return True

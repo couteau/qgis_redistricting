@@ -36,6 +36,7 @@ from typing import (
 import geopandas as gpd
 import pandas as pd
 import pyproj
+import shapely.ops
 from qgis.core import (
     QgsAggregateCalculator,
     QgsExpression,
@@ -43,6 +44,14 @@ from qgis.core import (
     QgsExpressionContextUtils,
     QgsFeature,
     QgsFeatureRequest
+)
+from qgis.PyQt.QtCore import (
+    QRunnable,
+    QThreadPool
+)
+from shapely.geometry import (
+    MultiPolygon,
+    Polygon
 )
 
 from ..utils import (
@@ -67,6 +76,27 @@ class Config:
     @staticmethod
     def splitPopulation():
         return True
+
+
+class DissolveWorker(QRunnable):
+    def __init__(self, dist: int, geoms: Sequence[MultiPolygon], cb=None):
+        super().__init__()
+        self.dist = dist
+        self.geoms = geoms
+        self.merged = None
+        self.callback = cb
+
+    def run(self):
+        debug_thread()
+        try:
+            self.merged = shapely.ops.unary_union(self.geoms)
+            if isinstance(self.merged, Polygon):
+                self.merged = MultiPolygon([self.merged])
+        except:  # pylint: disable=bare-except
+            pass
+
+        if self.callback:
+            self.callback()
 
 
 class AggregateDistrictDataTask(AggregateDataTask):
@@ -99,7 +129,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.useBuffer = useBuffer
 
         self.data: pd.DataFrame
-        self.totalPop = 0
         self.splits = {}
         self.cutEdges = None
 
@@ -143,14 +172,14 @@ class AggregateDistrictDataTask(AggregateDataTask):
     def calcPlanMetrics(self, data: pd.DataFrame, cols: list[str]):
         total = len(self.geoFields) + 1
         if self.popField in cols:
-            self.totalPop = data[self.popField].sum()
+            self.totalPopulation = data[self.popField].sum()
         else:
             context = QgsExpressionContext()
             context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
             agg = QgsAggregateCalculator(self.popLayer)
             totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
             if success:
-                self.totalPop = int(totalPop)
+                self.totalPopulation = int(totalPop)
 
         self.splits = {}
         for field in self.geoFields:
@@ -183,14 +212,16 @@ class AggregateDistrictDataTask(AggregateDataTask):
         data['convexhull'] = area / cea.convex_hull.area
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+        def dissolve_progress():
+            nonlocal count, total
+            count += 1
+            self.updateProgress(total, count)
 
         debug_thread()
 
         try:
             self.setProgressIncrement(0, 20)
-            fc = self.popLayer.featureCount()
-            chunksize = fc // 9 if fc % 10 != 0 else fc // 10  # we want 10 full or partial chunks
-            assign = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry, chunksize=chunksize)
+            assign = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry)
             assign.set_index(self.geoIdField, inplace=True)
 
             cols = [self.distField]
@@ -205,26 +236,38 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             self.setProgressIncrement(50, 100)
             if self.includeGeometry:
-                cols.append("geometry")
-                if self.updateDistricts:
-                    dists = self.updateDistricts
-                    total = len(self.updateDistricts) + 1
-                else:
-                    total = self.numDistricts + 2
-                    dists = range(total)
-                rows = []
-                for d in dists:
-                    rows.append(assign.loc[assign[self.distField] == d, cols]
-                                .dissolve(by=self.distField, aggfunc="sum"))
-                    self.updateProgress(total, len(rows))
+                if self.updateDistricts is not None:
+                    assign = assign[assign[self.distField].isin(self.updateDistricts)]
+                data = assign[cols].groupby(by=self.distField).sum()
+                g_geom = assign[[self.distField, "geometry"]].groupby(self.distField)
+                total = len(g_geom)
+                count = 0
+                geoms = {}
+                pool = QThreadPool()
+                tasks: list[DissolveWorker] = []
+                for g, v in g_geom["geometry"]:
+                    if g == 0:
+                        geoms[g] = None
+                        count += 1
+                        self.updateProgress(total, count)
+                    else:
+                        task = DissolveWorker(int(g), v.array, dissolve_progress)
+                        task.setAutoDelete(False)
+                        tasks.append(task)
+                        pool.start(task)
 
-                data = pd.concat(rows)
+                pool.waitForDone()
+                geoms |= {t.dist: t.merged for t in tasks}
+
+                data["geometry"] = pd.Series(geoms)
+                data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
 
                 self.calcDistrictMetrics(data)
                 self.data = data.to_wkt()
-                self.updateProgress(total, total)
             else:
                 assign.drop(columns="geometry", inplace=True)
+                if self.updateDistricts is not None:
+                    assign = assign[assign[self.distField].isin(self.updateDistricts)]
                 total = len(assign)
                 self.data = assign[cols].groupby(by=self.distField).sum()
                 self.updateProgress(total, total)
@@ -247,7 +290,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
             )
 
             if self.includeDemographics:
-                ideal = round(self.totalPop / self.numSeats)
+                ideal = round(self.totalPopulation / self.numSeats)
                 deviation = self.data[self.popField].sub(members * ideal)
                 pct_dev = deviation.div(members * ideal)
                 df = pd.DataFrame({'name': name, 'members': members, 'deviation': deviation, 'pct_deviation': pct_dev})
@@ -283,3 +326,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 f"VALUES ({','.join(fields.values())})"
             db.executemany(sql, data)
             db.commit()
+
+        self.distLayer.reload()
+        if self.includeGeometry:
+            self.distLayer.triggerRepaint()

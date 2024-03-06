@@ -35,9 +35,11 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import (
     QBrush,
-    QColor
+    QColor,
+    QFont
 )
 
+from .District import District
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
 
@@ -64,6 +66,7 @@ class DistrictDataModel(QAbstractTableModel):
             self._districts.updating.disconnect(self.beginResetModel)
             self._districts.updateComplete.disconnect(self.endResetModel)
             self._districts.updateTerminated.disconnect(self.endResetModel)
+            self._districts.districtChanged.disconnect(self.districtChanged)
             self._plan.planChanged.disconnect(self.planChanged)
 
         self._plan = value
@@ -73,6 +76,7 @@ class DistrictDataModel(QAbstractTableModel):
             self._districts.updating.connect(self.beginResetModel)
             self._districts.updateComplete.connect(self.endResetModel)
             self._districts.updateTerminated.connect(self.endResetModel)
+            self._districts.districtChanged.connect(self.districtChanged)
             self._plan.planChanged.connect(self.planChanged)
 
         self.endResetModel()
@@ -84,6 +88,12 @@ class DistrictDataModel(QAbstractTableModel):
         elif prop == 'deviation':
             self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
 
+    def districtChanged(self, district: District):
+        row = self._districts.index(district)
+        start = self.createIndex(row, 1)
+        end = self.createIndex(row, self.columnCount())
+        self.dataChanged.emit(start, end, {Qt.DisplayRole, Qt.EditRole, Qt.BackgroundRole})
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._districts) if self._districts and not parent.isValid() else 0
 
@@ -91,21 +101,26 @@ class DistrictDataModel(QAbstractTableModel):
         if parent.isValid() or self._districts is None:
             return 0
 
-        return len(self._districts.data.columns)
+        return len(self._districts.columns)
 
     def data(self, index, role=Qt.DisplayRole):
         if role in (Qt.DisplayRole, Qt.EditRole):
             self._districts.updateDistricts()
 
             row = index.row()
-            column = index.column()
+            col = index.column()
 
-            key = self._districts.data.columns[column]
-            value = self._districts.data.iat[row, column]
+            if row == 0:
+                if col == 0:
+                    return self._districts[0, "name"]
+                if col == 1:
+                    return QVariant()
 
+            value = self._districts[row, col]
             if pd.isna(value):
                 return QVariant()
 
+            key = self._districts.columns[col]
             if key == 'deviation':
                 value = f'{value:+,}'
             elif key == 'pct_deviation':
@@ -121,19 +136,33 @@ class DistrictDataModel(QAbstractTableModel):
             return value
 
         if role == Qt.BackgroundRole:
-            self._districts.updateDistricts()
-
             brush = QVariant()
             row = index.row()
             col = index.column()
             if col == 0:
                 brush = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
-            elif 1 <= col <= 4:
-                if row == 0:
-                    brush = QBrush(QColor(160, 160, 160))
-                elif self._districts[row].isValid():
-                    brush = QBrush(QColor(178, 223, 138))
             return brush
+
+        if role == Qt.FontRole:
+            row = index.row()
+            col = index.column()
+            if row > 0 and col in {0, 4, 5}:
+                font = QFont()
+                font.setBold(True)
+                return font
+
+        if role == Qt.TextColorRole:
+            color = QVariant()
+            row = index.row()
+            col = index.column()
+            if col == 0:
+                color = QColor(55, 55, 55)
+            elif 4 <= col <= 5:
+                if self._districts[row].isValid():
+                    color = QColor(99, 196, 101)
+                else:
+                    color = QColor(207, 99, 92)
+            return color
 
         return QVariant()
 
@@ -148,7 +177,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._districts.heading[section]
+            return self._districts.headings[section]
 
         return None
 
