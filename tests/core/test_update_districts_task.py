@@ -22,7 +22,7 @@ from redistricting.core.Tasks.UpdateDistrictsTask import (
 )
 
 
-class TestUpdatePendingChangesTask:
+class TestUpdateDistrictsTask:
 
     def test_create(self, plan: RedistrictingPlan):
         t = AggregateDistrictDataTask(plan)
@@ -36,7 +36,10 @@ class TestUpdatePendingChangesTask:
 
     def test_run_subset(self, plan: RedistrictingPlan):
         t = AggregateDistrictDataTask(plan, [2, 3])
-        t.run()
+        result = t.run()
+        assert result
         assert t.data is not None
+        assert t.exception is None
         assert len(t.data.index) == 2
-        assert t.totalPop == 0
+        assert t.totalPopulation == 227036
+        # t.finished(True)

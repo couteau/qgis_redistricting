@@ -33,10 +33,6 @@ from redistricting.core.Tasks.CreateLayersTask import CreatePlanLayersTask
 
 
 class TestCreateLayersTask:
-    @pytest.fixture(autouse=True)
-    def setQgisPrefixPath(self, qgis_app):
-        qgis_app.setPrefixPath('~/anaconda3/envs/qgis_plugin')
-
     @pytest.mark.parametrize(('sourcefile', 'pop_field', 'geoid_field'), [
         ('tuscaloosa_blocks.gpkg|layername=plans', 'pop_total', 'geoid20'),
         ('tuscaloosa_pl2020_b.shp', 'P0010001', 'GEOID20'),
@@ -59,6 +55,7 @@ class TestCreateLayersTask:
         assert result
         assert task.totalPop == 227036
         assert gpkg.exists()
+        layer.deleteLater()
 
     @ pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),

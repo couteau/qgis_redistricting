@@ -17,12 +17,20 @@
  ***************************************************************************/
 """
 from typing import Tuple
+from unittest.mock import MagicMock
+
 import pytest
 from pytest_mock import MockerFixture
-from unittest.mock import MagicMock
 from pytestqt.plugin import QtBot
 from qgis.core import Qgis
-from redistricting.core import PlanEditor, RedistrictingPlan, DataField, Field, RdsException
+
+from redistricting.core import (
+    DataField,
+    Field,
+    PlanEditor,
+    RdsException,
+    RedistrictingPlan
+)
 from redistricting.core.PlanEdit import QgsApplication
 
 
@@ -31,14 +39,13 @@ class TestPlanEditor:
     def editor(self, valid_plan):
         return PlanEditor.fromPlan(valid_plan)
 
-    def test_update_updates_plan(self, minimal_plan, block_layer, gpkg_path):
-        minimal_plan.addLayersFromGeoPackage(gpkg_path)
-        e = PlanEditor.fromPlan(minimal_plan)
-        e.setPopLayer(block_layer)
-        e.setGeoIdField('geoid20')
-        e.setPopField('pop_total')
+    def test_update_updates_plan(self, valid_plan):
+        assert valid_plan.geoIdCaption != "Test Geog"
+        e = PlanEditor.fromPlan(valid_plan)
+        e.setGeoDisplay("Test Geog")
         p = e.updatePlan()
-        assert p.popLayer == block_layer
+        assert p is not None
+        assert p.geoIdCaption == "Test Geog"
 
     def test_signals(self, editor: PlanEditor, valid_plan, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.planChanged,
@@ -66,13 +73,13 @@ class TestPlanEditor:
             editor.appendGeoField('vtdid20')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
-        assert editor.modifiedFields == {'geo-fields', 'plan-stats'}
+        assert editor.modifiedFields == {'geo-fields', 'plan-splits'}
 
         with qtbot.waitSignals([valid_plan.geoFieldRemoved, valid_plan.planChanged]):
             editor.removeGeoField(0)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 0
-        assert editor.modifiedFields == {'geo-fields', 'plan-stats'}
+        assert editor.modifiedFields == {'geo-fields', 'plan-splits'}
 
     def test_datafields_append_sets_parent(self, editor: PlanEditor, valid_plan: RedistrictingPlan):
         editor.appendDataField('vap_apblack', False, 'APBVAP')
@@ -116,7 +123,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def bvap_field_str(self):
-        return'vap_nh_black'
+        return 'vap_nh_black'
 
     @pytest.mark.parametrize('field', ['bvap_field_str', 'bvap_field_fld'])
     def test_datafields_set_error_when_duplicate_field_added(
@@ -188,7 +195,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def vtd_field_str(self):
-        return'vtdid20'
+        return 'vtdid20'
 
     @pytest.fixture
     def mock_update_geo_field_task(self, mocker: MockerFixture):

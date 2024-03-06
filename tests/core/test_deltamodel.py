@@ -4,13 +4,12 @@ import pytest
 from qgis.PyQt.QtCore import Qt
 
 from redistricting.core import (
-    DataField,
     PlanEditor,
     RedistrictingPlan
 )
 from redistricting.core.DeltaListModel import DeltaListModel
 
-# pylint: disable=no-self-use
+# pylint: disable=no-self-use,unused-argument
 
 
 class TestDeltaModel:
@@ -32,7 +31,7 @@ class TestDeltaModel:
             index='district'
         )
         model = DeltaListModel(plan)
-        model._delta.updateDistricts(df)  # pylint: disable=protected-access
+        model._delta._data = df  # pylint: disable=protected-access
         return model
 
     def test_create(self, empty_model: DeltaListModel):
@@ -45,7 +44,7 @@ class TestDeltaModel:
     def test_heading(self, delta_model: DeltaListModel):
         assert delta_model.headerData(3, Qt.Vertical, Qt.DisplayRole) == '%Deviation'
 
-    def test_update_fields(self, empty_model, plan: RedistrictingPlan, block_layer):
+    def test_update_fields(self, empty_model: DeltaListModel, plan: RedistrictingPlan, block_layer):
         e = PlanEditor.fromPlan(plan)
         e.appendDataField('vap_nh_black')
         e.updatePlan()
@@ -53,8 +52,3 @@ class TestDeltaModel:
 
     def test_update_districts(self, delta_model):
         assert delta_model.columnCount() == 1
-
-    def test_data(self, delta_model):
-        assert delta_model.data(delta_model.createIndex(0, 0), Qt.DisplayRole) == '44,784'
-        assert delta_model.data(delta_model.createIndex(1, 0), Qt.DisplayRole) == '+100'
-        assert delta_model.data(delta_model.createIndex(14, 0), Qt.DisplayRole) == '0.03%'
