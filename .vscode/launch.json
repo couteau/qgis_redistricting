@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "Python: Remote Attach",
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
             "connect": {
                 "host": "localhost",
@@ -26,7 +26,7 @@
         },
         {
             "name": "Python: Debug Tests",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "purpose": [
@@ -35,7 +35,6 @@
             "console": "integratedTerminal",
             "justMyCode": false,
             "env": {
-                // "QGIS_PREFIX_PATH": "${userHome}/anaconda3/envs/qgis_redist",
                 "PYTEST_ADDOPTS": "--no-cov"
             }
         },
