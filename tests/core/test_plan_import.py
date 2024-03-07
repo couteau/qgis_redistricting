@@ -18,8 +18,10 @@
 """
 import pathlib
 import re
+
 import pytest
 from pytest_mock.plugin import MockerFixture
+
 import redistricting.core.PlanImport
 
 
@@ -59,6 +61,7 @@ class TestPlanImport:
         p.importPlan(new_plan)
         task.assert_called_once()
         add.assert_called_once()
+        p.deleteLater()
 
     def test_import_assignments_non_existent_file_sets_error(self, new_plan):
         p = redistricting.core.PlanImport.AssignmentImporter()
@@ -67,6 +70,7 @@ class TestPlanImport:
         assert not result
         msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
         assert re.search('not exist', msg)
+        p.deleteLater()
 
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
         task = mocker.patch('redistricting.core.PlanImport.ImportAssignmentFileTask')

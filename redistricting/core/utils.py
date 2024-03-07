@@ -24,6 +24,7 @@
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 import sqlite3
@@ -36,7 +37,15 @@ from typing import (
     overload
 )
 
-from osgeo import gdal
+import geopandas as gpd
+import pandas as pd
+import psycopg2
+from osgeo import (
+    gdal,
+    ogr,
+    osr
+)
+from packaging.version import parse as parse_version
 from processing.algs.gdal.GdalUtils import GdalUtils
 from qgis.core import (
     QgsDataSourceUri,
@@ -48,13 +57,158 @@ from qgis.PyQt.QtCore import (
     QUrl
 )
 from qgis.PyQt.QtGui import QDesktopServices
+from shapely import wkb
+
+DEC2FLOAT = psycopg2.extensions.new_type(
+    psycopg2.extensions.DECIMAL.values,
+    'DEC2FLOAT',
+    lambda value, curs: float(value) if value is not None else None
+)
+
+psycopg2.extensions.register_type(DEC2FLOAT)
 
 try:
+    # pylint: disable-next=unused-import
     import pyogrio
-    gpd_read = pyogrio.read_dataframe
+
+    gpd_io_engine = "pyogrio"
+
+    if parse_version(gpd.__version__) >= parse_version("0.11"):
+        gpd.options.io_engine = "pyogrio"
+    else:
+        # if the installed geopandas doesn't support pyogrio, monkeypatch read_file
+        gpd_read_file = gpd.read_file
+
+        def read_file_pygrio(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+            if engine is not None and engine != "pyogrio":
+                return gpd_read_file(filename, bbox, mask, rows, **kwargs)
+
+            if isinstance(rows, slice):
+                skip_features = rows.start
+                max_features = rows.stop - rows.start
+            elif isinstance(rows, int):
+                skip_features = 0
+                max_features = rows
+            else:
+                skip_features = 0
+                max_features = None
+
+            return pyogrio.read_dataframe(
+                filename, bbox=bbox, mask=mask,
+                skip_features=skip_features, max_features=max_features,
+                **kwargs
+            )
+
+        gpd.read_file = read_file_pygrio
+
 except ImportError:
-    import geopandas as gpd
-    gpd_read = gpd.read_file
+    gpd_io_engine = "fiona"
+    gpd_read_file = gpd.read_file
+
+    def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+        path = pathlib.Path(filename)
+        if path.suffix in ('.gpkg', '.sqlite', '.db') and "layer" in kwargs:
+            with spatialite_connect(path) as db:
+                table = kwargs["layer"]
+                c = db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+                c.row_factory = lambda cursor, row: row[0]
+                l = c.fetchall()
+                if 'gpkg_geometry_columns' in l:
+                    fmt = "gpkg"
+                    geom_tbl = "gpkg_geometry_columns"
+                    tbl_col = "table_name"
+                    geom_col = "column_name"
+                    srsid_col = "srs_id"
+                elif 'geometry_columns' in l:
+                    fmt = "spatialite"
+                    geom_tbl = "geometry_columns"
+                    tbl_col = "f_table_name"
+                    geom_col = "f_geometry_column"
+                    srsid_col = "srid"
+                else:
+                    fmt = None
+
+                if fmt:
+                    table = kwargs["layer"]
+
+                    c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))
+                    geometry_column, srs_id = c.fetchone()
+
+                    cols = kwargs.get("columns")
+                    if cols is None:
+                        cols = ["*"]
+                    else:
+                        cols = [*cols, geometry_column]
+
+                    sql = f"SELECT {','.join(cols)} FROM {table}"
+                    if isinstance(rows, slice):
+                        sql = f"{sql} OFFSET {rows.start} LIMIT {rows.stop - rows.start}"
+                    elif isinstance(rows, int):
+                        sql = f"{sql} LIMIT {rows}"
+
+                    df = pd.read_sql(sql, db)
+                    df[geometry_column] = df[geometry_column].apply(lambda x: wkb.loads(x[38:-1]))
+                    df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
+                    return df
+
+        if path.suffix == ".shp":
+            ds: ogr.DataSource = ogr.Open(str(path))
+            lyr: ogr.Layer = ds.GetLayer()
+            crs: osr.SpatialReference = lyr.GetSpatialRef().GetAuthorityCode(None)
+            ldef: ogr.FeatureDefn = lyr.GetLayerDefn()
+            cols = kwargs.get("columns")
+            if cols is None:
+                cols = []
+                for fi in range(ldef.GetFieldCount()):
+                    fld: ogr.FieldDefn = ldef.GetFieldDefn(fi)
+                    cols.append(fld.name)
+
+            data = []
+            index = []
+            geom = []
+            f: ogr.Feature
+            if mask is not None and bbox is not None:
+                raise ValueError()
+
+            if bbox is not None:
+                if isinstance(bbox, tuple):
+                    lyr.SetSpatialFilterRect(*bbox)
+                else:
+                    lyr.SetSpatialFilter(bbox)
+
+            if mask is not None:
+                lyr.SetSpatialFilter(mask)
+
+            if isinstance(rows, slice):
+                lyr.SetNextByIndex(rows.start)
+                count = rows.stop - rows.start
+            elif isinstance(rows, int):
+                count = rows
+            else:
+                count = -1
+            for f in lyr:
+                index.append(f.GetFID())
+                data.append(tuple(f[c] for c in cols))
+                geom.append(wkb.loads(bytes(f.geometry().ExportToWkb())))
+                count -= 1
+                if count == 0:
+                    break
+
+            df = pd.DataFrame.from_records(data, index=index, columns=cols)
+            return gpd.GeoDataFrame(df, geometry=geom, crs=crs)
+
+        return gpd_read_file(filename, bbox, mask, rows, engine, **kwargs)
+
+    gpd.read_file = read_file_no_fiona
+
+if parse_version(gdal.__version__) > parse_version("3.6"):
+    try:
+        # pylint: disable-next=unused-import
+        import pyarrow
+        os.environ["PYOGRIO_USE_ARROW"] = "1"
+    except ImportError:
+        pass
+
 
 if TYPE_CHECKING:
     from . import Field
@@ -213,111 +367,7 @@ def spatialite_connect(database: Union[str, bytes, pathlib.Path],
 
 
 CREATE_GPKG_SQL = """
-PRAGMA foreign_keys=OFF;
-
-CREATE TABLE gpkg_spatial_ref_sys (
-    srs_name                 TEXT    NOT NULL,
-    srs_id                   INTEGER NOT NULL PRIMARY KEY,
-    organization             TEXT    NOT NULL,
-    organization_coordsys_id INTEGER NOT NULL,
-    definition               TEXT    NOT NULL,
-    description              TEXT
-);
-
-INSERT INTO gpkg_spatial_ref_sys VALUES (
-    'Undefined cartesian SRS',
-    -1,
-    'NONE',
-    -1,
-    'undefined',
-    'undefined cartesian coordinate reference system'
-);
-
-INSERT INTO gpkg_spatial_ref_sys VALUES (
-    'Undefined geographic SRS',
-    0,
-    'NONE',
-    0,
-    'undefined',
-    'undefined geographic coordinate reference system'
-);
-
-INSERT INTO gpkg_spatial_ref_sys VALUES (
-    'WGS 84 geodetic',
-    4326,
-    'EPSG',
-    4326,
-    'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]]',
-    'longitude/latitude coordinates in decimal degrees on the WGS 84 spheroid'
-);
-
-CREATE TABLE gpkg_contents (
-    table_name  TEXT     NOT NULL PRIMARY KEY,
-    data_type   TEXT     NOT NULL,
-    identifier  TEXT UNIQUE,
-    description TEXT              DEFAULT '',
-    last_change DATETIME NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%S.%fZ', 'now')),
-    min_x       DOUBLE,
-    min_y       DOUBLE,
-    max_x       DOUBLE,
-    max_y       DOUBLE,
-    srs_id      INTEGER,
-    CONSTRAINT fk_gc_r_srs_id
-        FOREIGN KEY (srs_id) REFERENCES gpkg_spatial_ref_sys(srs_id)
-);
-
-CREATE TABLE gpkg_geometry_columns (
-    table_name         TEXT    NOT NULL,
-    column_name        TEXT    NOT NULL,
-    geometry_type_name TEXT    NOT NULL,
-    srs_id             INTEGER NOT NULL,
-    z                  TINYINT NOT NULL,
-    m                  TINYINT NOT NULL,
-    CONSTRAINT pk_geom_cols PRIMARY KEY (table_name, column_name),
-    CONSTRAINT uk_gc_table_name UNIQUE (table_name),
-    CONSTRAINT fk_gc_tn FOREIGN KEY (table_name)
-        REFERENCES gpkg_contents(table_name),
-    CONSTRAINT fk_gc_srs FOREIGN KEY (srs_id)
-        REFERENCES gpkg_spatial_ref_sys(srs_id)
-);
-
-
-CREATE TABLE gpkg_tile_matrix_set (
-    table_name TEXT    NOT NULL PRIMARY KEY,
-    srs_id     INTEGER NOT NULL,
-    min_x      DOUBLE  NOT NULL,
-    min_y      DOUBLE  NOT NULL,
-    max_x      DOUBLE  NOT NULL,
-    max_y      DOUBLE  NOT NULL,
-    CONSTRAINT fk_gtms_table_name FOREIGN KEY (table_name)
-        REFERENCES gpkg_contents(table_name),
-    CONSTRAINT fk_gtms_srs FOREIGN KEY (srs_id)
-        REFERENCES gpkg_spatial_ref_sys(srs_id)
-);
-
-CREATE TABLE gpkg_tile_matrix (
-    table_name    TEXT    NOT NULL,
-    zoom_level    INTEGER NOT NULL,
-    matrix_width  INTEGER NOT NULL,
-    matrix_height INTEGER NOT NULL,
-    tile_width    INTEGER NOT NULL,
-    tile_height   INTEGER NOT NULL,
-    pixel_x_size  DOUBLE  NOT NULL,
-    pixel_y_size  DOUBLE  NOT NULL,
-    CONSTRAINT pk_ttm PRIMARY KEY (table_name, zoom_level),
-    CONSTRAINT fk_tmm_table_name FOREIGN KEY (table_name)
-        REFERENCES gpkg_contents(table_name)
-);
-
-CREATE TABLE gpkg_extensions (
-    table_name     TEXT,
-    column_name    TEXT,
-    extension_name TEXT NOT NULL,
-    definition     TEXT NOT NULL,
-    scope          TEXT NOT NULL,
-    CONSTRAINT ge_tce UNIQUE (table_name, column_name, extension_name)
-);
-
+SELECT gpkgCreateBaseTables();
 CREATE TABLE gpkg_ogr_contents (
     table_name    TEXT NOT NULL PRIMARY KEY,
     feature_count INTEGER DEFAULT NULL
@@ -344,14 +394,21 @@ def createGeoPackage(gpkg):
     try:
         if isinstance(gpkg, str):
             gpkg = pathlib.Path(gpkg)
+
         if gpkg.exists():
             pattern = gpkg.name + '*'
             for f in gpkg.parent.glob(pattern):
                 f.unlink()
 
-        with spatialite_connect(gpkg) as db:
-            db.executescript(CREATE_GPKG_SQL)
-    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+        gdal.UseExceptions()
+        drv: gdal.Driver = gdal.GetDriverByName("GPKG")
+        ds: gdal.Dataset = drv.Create(
+            str(gpkg), 0, 0, 0,
+            options=["VERSION=1.4", "ADD_GPKG_OGR_CONTENTS=YES",
+                     "METADATA_TABLES=YES", "DATETIME_FORMAT=UTC"]
+        )
+        ds.Close()
+    except (PermissionError, RuntimeError) as e:
         return False, e
 
     return True, None
@@ -369,8 +426,8 @@ def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
             db.execute(f'SELECT gpkgAddGeometryTriggers("{table}", "{geom_column_name}")')
             if create_spatial_index:
                 db.execute(f'SELECT gpkgAddSpatialIndex("{table}", "{geom_column_name}")')
-            db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
-            db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
+            # db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
+            # db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
     except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError):
         return False
 
@@ -378,6 +435,11 @@ def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
 
 
 DFLT_ALLOWED_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+
+def connect_layer(layer: QgsVectorLayer) -> sqlite3.Connection:
+    gpkg, _ = layer.source().split('|', 1)
+    return spatialite_connect(gpkg)
 
 
 def random_id(length, allowed_chars=DFLT_ALLOWED_CHARS):

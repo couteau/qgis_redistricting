@@ -16,8 +16,9 @@
  *                                                                         *
  ***************************************************************************/
 """
-import pytest
 import pandas as pd
+import pytest
+
 from redistricting.core.DeltaList import DeltaList
 from redistricting.core.Plan import RedistrictingPlan
 
@@ -30,7 +31,7 @@ class TestDeltaList:
         return DeltaList(plan)
 
     @pytest.fixture
-    def delta_list(self, empty_delta_list):
+    def delta_list(self, empty_delta_list: DeltaList):
         df = pd.DataFrame.from_records(
             [{
                 'district': 1,
@@ -42,7 +43,7 @@ class TestDeltaList:
             }],
             index='district'
         )
-        empty_delta_list.updateDistricts(df)
+        empty_delta_list._data = df  # pylint: disable=protected-access
         return empty_delta_list
 
     def test_create(self, empty_delta_list: DeltaList):
@@ -52,6 +53,7 @@ class TestDeltaList:
         delta_list.clear()
         assert len(delta_list) == 0
 
-    def test_getitem(self, delta_list, plan: RedistrictingPlan):
-        assert delta_list['1'] == plan.districts[1].delta
-        assert delta_list[0] == plan.districts[1].delta
+    def test_getitem(self, delta_list: DeltaList):
+        assert delta_list['1'] == delta_list[0]
+        assert delta_list[0].name == 'Council District 1'
+        assert delta_list[0].district == 1

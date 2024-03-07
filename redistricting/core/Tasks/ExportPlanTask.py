@@ -91,11 +91,11 @@ class ExportRedistrictingPlanTask(QgsTask):
         self.includeMetrics = includeMetrics
         self.includeUnassigned = includeUnassigned
 
-        self.exportEquivalency = exportEquivalency and equivalencyFileName and plan.assignLayer
+        self.exportEquivalency = exportEquivalency and equivalencyFileName and plan._assignLayer
         self.equivalencyFileName = equivalencyFileName
         self.assignGeography = assignGeography
 
-        self.assignLayer = plan.assignLayer
+        self.assignLayer = plan._assignLayer
         self.geoIdField = plan.geoIdField
         self.distField = plan.distField
 
@@ -160,9 +160,9 @@ class ExportRedistrictingPlanTask(QgsTask):
             fields.append(QgsField('reock', QVariant.Double))
             fields.append(QgsField('convexhull', QVariant.Double))
             fieldNames |= {
-                'polsbyPopper': 'polsbypop',
+                'polsbypopper': 'polsbypop',
                 'reock': 'reock',
-                'convexHull': 'convexhull'
+                'convexhull': 'convexhull'
             }
         return fields, fieldNames
 

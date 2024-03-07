@@ -70,9 +70,7 @@ class TestPlan:
         plan = RedistrictingPlan('test', 5)
         assert plan.name == 'test'
         assert plan.numSeats == 5
-        assert plan.allocatedDistricts == 0
-        assert plan.allocatedSeats == 0
-        assert plan.assignLayer is None
+        assert plan._assignLayer is None
         assert plan.distLayer is None
         assert plan.popLayer is None
         assert plan.popJoinField is None
@@ -87,22 +85,23 @@ class TestPlan:
         assert plan.totalPopulation == 0
         assert len(plan.geoFields) == 0
         assert len(plan.dataFields) == 0
-        assert len(plan.districts) == 1
+        assert len(plan.districts) == 6
         assert plan.districts[0].name == 'Unassigned'
 
     def test_new_plan_is_not_valid(self):
         plan = RedistrictingPlan('test', 5)
         assert not plan.isValid()
 
-    def test_assign_name_updates_layer_names(self, block_layer, gpkg_path):
+    def test_assign_name_updates_layer_names(self, gpkg_path):
         plan = RedistrictingPlan('oldname', 45)
-        plan._setPopLayer(block_layer)
         plan.addLayersFromGeoPackage(gpkg_path)
         assert plan.distLayer.name() == 'oldname_districts'
-        assert plan.assignLayer.name() == 'oldname_assignments'
+        assert plan._assignLayer.name() == 'oldname_assignments'
+        assert plan._group.groupName == "Redistricting Plan - oldname"
         plan._setName('newname')
         assert plan.distLayer.name() == 'newname_districts'
-        assert plan.assignLayer.name() == 'newname_assignments'
+        assert plan._assignLayer.name() == 'newname_assignments'
+        assert plan._group.groupName == "Redistricting Plan - newname"
 
     def test_datafields_assign(self, valid_plan: RedistrictingPlan, block_layer, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.planChanged):
@@ -128,12 +127,12 @@ class TestPlan:
         gpkg = datadir / 'tuscaloosa_plan.gpkg'
         plan.addLayersFromGeoPackage(gpkg)
         assert plan.error() is None
-        assert plan.assignLayer.name() == 'test_assignments'
+        assert plan._assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
         assert QgsProject.instance().mapLayersByName('test_assignments')
         assert QgsProject.instance().mapLayersByName('test_districts')
         assert plan.geoIdField == 'geoid20'
-        assert plan._group._group.findLayer(plan.assignLayer.id())  # pylint: disable=protected-access
+        assert plan._group._group.findLayer(plan._assignLayer.id())  # pylint: disable=protected-access
         assert plan._group._group.findLayer(plan.distLayer.id())  # pylint: disable=protected-access
 
     def test_addgeopackage_set_error_when_plan_is_invalid(self, datadir):

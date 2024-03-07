@@ -16,8 +16,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.core.Tasks.UpdatePendingTask import AggregatePendingChangesTask
 from redistricting.core.Plan import RedistrictingPlan
+from redistricting.core.Tasks.UpdatePendingTask import (
+    AggregatePendingChangesTask
+)
 
 
 class TestUpdatePendingChangesTask:
@@ -26,10 +28,11 @@ class TestUpdatePendingChangesTask:
         assert t.exception is None
 
     def test_run(self, plan: RedistrictingPlan):
-        plan.assignLayer.startEditing()
-        f = next(plan.assignLayer.getFeatures())
-        i = plan.assignLayer.fields().lookupField(plan.distField)
-        plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
+        plan.delta.detachSignals()
+        plan._assignLayer.startEditing()
+        f = next(plan._assignLayer.getFeatures())
+        i = plan._assignLayer.fields().lookupField(plan.distField)
+        plan._assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
         t = AggregatePendingChangesTask(plan)
         t.run()
         assert t.data is not None

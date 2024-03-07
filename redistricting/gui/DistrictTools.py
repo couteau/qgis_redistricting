@@ -48,7 +48,7 @@ from qgis.PyQt.QtGui import (
 from qgis.PyQt.QtWidgets import QDockWidget
 
 from ..core import (
-    BaseDistrict,
+    District,
     GeoFieldsModel,
     RedistrictingPlan,
     showHelp,
@@ -63,7 +63,7 @@ class DistrictSelectModel(QAbstractListModel):
         self._offset = 2
         self._plan = plan
 
-    def updateDistricts(self, newValue: List[BaseDistrict], oldValue: List[BaseDistrict]):
+    def updateDistricts(self, newValue: List[District], oldValue: List[District]):
         added = set(newValue) - set(oldValue)
         removed = set(oldValue) - set(newValue)
 
@@ -163,7 +163,7 @@ class TargetDistrictModel(DistrictSelectModel):
 
         if role == Qt.DisplayRole or role == Qt.EditRole:
             if row == 0:
-                return tr('New district')
+                return tr('Select district')
 
         elif role == Qt.DecorationRole:
             if row == 0:

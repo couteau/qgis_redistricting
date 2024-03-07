@@ -22,89 +22,166 @@
  *                                                                         *
  ***************************************************************************/
 """
-from __future__ import annotations
+from typing import (
+    TYPE_CHECKING,
+    Union,
+    overload
+)
 
-from typing import TYPE_CHECKING, Iterator, List
-from qgis.PyQt.QtCore import QObject, pyqtSignal
-from qgis.core import QgsApplication
 import pandas as pd
+from qgis.core import (
+    QgsApplication,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
-from .Delta import Delta
 from .Tasks import AggregatePendingChangesTask
 
 if TYPE_CHECKING:
     from .Plan import RedistrictingPlan
 
 
+class Delta:
+    def __init__(self, index: int, dlist: "DeltaList"):
+        self._list = dlist
+        self._index = index
+
+    def __getitem__(self, index):
+        if isinstance(index, int) and 0 <= index < len(self._list.data.columns):
+            return self._list.data.iloc[self._index, index]
+
+        if isinstance(index, str) and index in self._list.data.columns:
+            d = self._list.data.index[self._index]
+            return self._list.data.loc[d, index]
+
+        raise IndexError("Bad delta index")
+
+    def __len__(self):
+        return len(self._list.data.columns)
+
+    def __eq__(self, other: "Delta"):
+        return self._list == other._list and self._index == other._index
+
+    @property
+    def name(self):
+        d = int(self._list.data.index[self._index])
+        return self._list.districts[d].name
+
+    @property
+    def district(self):
+        return int(self._list.data.index[self._index])
+
+
 class DeltaList(QObject):
-    updating = pyqtSignal('PyQt_PyObject')
+    updateStarted = pyqtSignal('PyQt_PyObject')
     updateComplete = pyqtSignal('PyQt_PyObject')
     updateTerminated = pyqtSignal('PyQt_PyObject')
 
-    def __init__(self, plan: RedistrictingPlan, parent: QObject = None) -> None:
-        super().__init__(parent)
+    def __init__(self, plan: "RedistrictingPlan") -> None:
+        super().__init__(plan)
         self._plan = plan
-        self._districts = plan.districts
+        self.districts = plan.districts
 
-        self._undoStack = self._plan.assignLayer.undoStack()
-        self._undoStack.indexChanged.connect(self.update)
-        self._plan.assignLayer.afterCommitChanges.connect(self.update)
-        self._plan.assignLayer.afterRollBack.connect(self.update)
+        self._assignLayer: QgsVectorLayer = None
+        self._undoStack = None
+        self._data: pd.DataFrame = None
+        self._assignments: pd.DataFrame = None
+        self._popData: pd.DataFrame = None
+        self._pendingTask: AggregatePendingChangesTask = None
 
-        self._pendingTask = None
+    @overload
+    def __getitem__(self, index: int) -> Delta:
+        pass
 
-    def __getitem__(self, index) -> Delta:
-        if self._districts.updateDistricts():
+    @overload
+    def __getitem__(self, index: str) -> Union[Delta, pd.Series, None]:
+        pass
+
+    @overload
+    def __getitem__(self, index: tuple) -> Union[int, str, float]:
+        pass
+
+    def __getitem__(self, index) -> Union[int, str, float, pd.Series, Delta, None]:
+        if self._data is None:
             return None
 
-        if isinstance(index, str) and index.isnumeric():
-            if index in self._districts:
-                return self._districts[index].delta
+        if isinstance(index, tuple):
+            row, col = index
+            value = self._data.iat[row, col]
+            return value if not pd.isna(value) else None
 
-            if 0 <= int(index) <= self._plan.numDistricts:
-                return None
+        if isinstance(index, str):
+            if index.isnumeric():
+                index = int(index)
+                if index in self._data.index:
+                    i = self._data.index.get_loc(index)
+                    return Delta(i, self)
+                if 0 <= index <= self._plan.numDistricts:
+                    return None
+            elif index in self._data.columns:
+                return self._data[index]
+
         elif isinstance(index, int):
-            return self.items[index]
+            return Delta(index, self)
 
         raise IndexError()
 
     def __len__(self) -> int:
-        return sum(1 for d in self._districts if d.delta is not None)
+        return len(self._data) if self._data is not None else 0
 
-    def __iter__(self) -> Iterator[Delta]:
-        return iter(self.items)
+    def __iter__(self):
+        if self._data is not None:
+            for index in range(len(self._data)):
+                yield Delta(index, self)
+
+    def changedDistricts(self) -> list[int]:
+        if self._data is not None:
+            return list(self._data.index)
+
+        return []
+
+    @property
+    def data(self):
+        return self._data
 
     @property
     def plan(self):
         return self._plan
 
-    @property
-    def items(self) -> List[Delta]:
-        return [d.delta for d in self._districts if d.delta is not None]
+    def setAssignLayer(self, value: QgsVectorLayer):
+        if self._assignLayer is not None:
+            self._assignLayer.afterRollBack.disconnect(self.clear)
+            self._assignLayer.afterCommitChanges.disconnect(self.clear)
+            self._undoStack.indexChanged.disconnect(self.update)
+            self._undoStack = None
+        self._assignLayer = value
+        if self._assignLayer is not None:
+            self._assignLayer.afterRollBack.connect(self.clear)
+            self._assignLayer.afterCommitChanges.connect(self.clear)
+            self._undoStack = self._assignLayer.undoStack()
+            self._undoStack.indexChanged.connect(self.update)
+
+    def detachSignals(self):
+        self._undoStack.indexChanged.disconnect(self.update)
+        self._undoStack = None
 
     def isUpdatingPending(self):
-        return self._pendingTask is not None
+        return self._pendingTask is not None and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete
 
     def clear(self):
-        self.updating.emit(self._plan)
-        for district in self._districts:
-            district.delta = None
+        self.updateStarted.emit(self._plan)
+        self._data = None
+        self._assignments = None
         self.updateComplete.emit(self._plan)
-
-    def updateDistricts(self, data: pd.DataFrame):
-        for d in self._districts:
-            d.delta = None
-            
-        for dist, delta in data.iterrows():
-            d = self._districts[str(dist)]
-            if d is None:
-                assert d != 0
-                d = self._districts.addDistrict(dist)
-            d.delta = delta.to_dict()
 
     def update(self):
         def taskCompleted():
-            self.updateDistricts(self._pendingTask.data)
+            self._data = self._pendingTask.data
+            self._assignments = self._pendingTask.assignments
+            self._popData = self._pendingTask.popData
             self._pendingTask = None
             self.updateComplete.emit(self._plan)
 
@@ -112,16 +189,16 @@ class DeltaList(QObject):
             self._pendingTask = None
             self.updateTerminated.emit(self._plan)
 
-        if self._pendingTask:
+        if self._pendingTask and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete:
             return self._pendingTask
 
-        if not self._plan.assignLayer or not self._plan.assignLayer.editBuffer() or \
-                len(self._plan.assignLayer.editBuffer().changedAttributeValues()) == 0:
-            self.clear()
+        if not self._assignLayer or not self._assignLayer.editBuffer() or \
+                len(self._assignLayer.editBuffer().changedAttributeValues()) == 0:
+            # self.clear()
             return None
 
-        self.updating.emit(self._plan)
-        self._pendingTask = AggregatePendingChangesTask(self._plan, self._districts.updateDistricts())
+        self.updateStarted.emit(self._plan)
+        self._pendingTask = AggregatePendingChangesTask(self._plan, self._popData, self._assignments)
         self._pendingTask.taskCompleted.connect(taskCompleted)
         self._pendingTask.taskTerminated.connect(taskTerminated)
         QgsApplication.taskManager().addTask(self._pendingTask)

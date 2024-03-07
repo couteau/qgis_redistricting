@@ -23,13 +23,13 @@
  ***************************************************************************/
 """
 from __future__ import annotations
-import math
 
 from typing import TYPE_CHECKING
-from qgis.PyQt.QtCore import NULL
+
 from qgis.core import (
     Qgis,
     QgsCoordinateTransform,
+    QgsFeature,
     QgsGeometry,
     QgsMessageLog,
     QgsProject,
@@ -37,10 +37,11 @@ from qgis.core import (
     QgsTask,
     QgsVectorLayer
 )
+from qgis.PyQt.QtCore import NULL
 
-from ._exception import CancelledError
-from ._debug import debug_thread
+from ..Exception import CanceledError
 from ..utils import tr
+from ._debug import debug_thread
 
 if TYPE_CHECKING:
     from .. import RedistrictingPlan
@@ -54,18 +55,39 @@ class ImportShapeFileTask(QgsTask):
         importDistField
     ):
         super().__init__(tr('Import districts from shapefile'), QgsTask.AllFlags)
-        self.assignLayer = plan.assignLayer
+        self.assignLayer = plan._assignLayer
         self.distField = plan.distField
         self.shapeFile = shapeFile
         self.importDistField = importDistField
         self.exception = None
         self.errors = []
 
+    def makeProjection(self, layer: QgsVectorLayer):
+        crsSrc = layer.crs()
+        crsDest = self.assignLayer.crs()
+        if crsSrc.authid() != crsDest.authid():
+            transformContext = QgsProject.instance().transformContext()
+            xform = QgsCoordinateTransform(crsSrc, crsDest, transformContext)
+            l = QgsVectorLayer(f"multipolygon?crs={crsDest}", "xformlayer",  "memory")
+            pv = l.dataProvider()
+            pv.addAttributes(layer.fields().toList())
+            l.updateFields()
+            feats = []
+            for f in layer.getFeatures():
+                g = QgsGeometry(f.geometry())
+                g.transform(xform)
+                f.setGeometry(g)
+                feats.append(f)
+
+            pv.addFeatures(feats)
+            l.updateExtents()
+            return l
+
+        return layer
+
     def run(self):
         debug_thread()
         try:
-            chunkSize = 100
-
             layer = QgsVectorLayer(self.shapeFile)
             sindex = layer.fields().lookupField(self.importDistField)
             if sindex == -1:
@@ -76,29 +98,11 @@ class ImportShapeFileTask(QgsTask):
                 self.exception = ValueError('invalid district field for shapefile import')
                 return False
 
-            crsSrc = layer.crs()
-            crsDest = self.assignLayer.crs()
-            if crsSrc.authid() != crsDest.authid():
-                transformContext = QgsProject.instance().transformContext()
-                xform = QgsCoordinateTransform(crsSrc, crsDest, transformContext)
-                l = QgsVectorLayer(f"multipolygon?crs={crsDest}", "xformlayer",  "memory")
-                pv = l.dataProvider()
-                pv.addAttributes(layer.fields().toList())
-                l.updateFields()
-                feats = []
-                for f in layer.getFeatures():
-                    g = QgsGeometry(f.geometry())
-                    g.transform(xform)
-                    f.setGeometry(g)
-                    feats.append(f)
-
-                pv.addFeatures(feats)
-                l.updateExtents()
-                layer = l
-
+            layer = self.makeProjection(layer)
             index = QgsSpatialIndex(layer.getFeatures())
 
             distmap = {}
+            d: QgsFeature
             for d in layer.getFeatures():
                 dist = d[sindex]
                 if dist == NULL:
@@ -109,37 +113,27 @@ class ImportShapeFileTask(QgsTask):
                     dist = d.id()+1
                 distmap[d[sindex]] = dist
 
-            total = math.ceil(self.assignLayer.featureCount() / chunkSize)
+            total = self.assignLayer.featureCount()
             count = 0
-            pv = self.assignLayer.dataProvider()
-            chunk = {}
-            for f in pv.getFeatures():
-                g = f.geometry()
-                candidates = index.intersects(g.boundingBox())
-                for d in layer.getFeatures(candidates):
+            f: QgsFeature
+            self.assignLayer.startEditing()
+            for f in self.assignLayer.getFeatures():
+                g: QgsGeometry = f.geometry()
+                for d in layer.getFeatures(index.intersects(g.boundingBox())):
                     i = g.intersection(d.geometry())
                     if not i.isEmpty() and i.area() > g.area() / 2:
-                        chunk[f.id()] = {dindex: distmap[d[sindex]]}
+                        self.assignLayer.changeAttributeValue(f.id(), dindex, distmap[d[sindex]])
                         break
                 else:
                     self.errors.append(f.id())
 
-                if len(chunk) == chunkSize:
-                    pv.changeAttributeValues(chunk)
-                    chunk.clear()
-                    count += 1
-                    if self.isCanceled():
-                        raise CancelledError()
-                    self.setProgress(100*count/total)
-
-            # write any partial chunk
-            if len(chunk) > 0:
-                pv.changeAttributeValues(chunk)
+                count += 1
                 if self.isCanceled():
-                    raise CancelledError()
+                    raise CanceledError()
                 self.setProgress(100*count/total)
+            self.assignLayer.commitChanges(True)
 
-        except CancelledError:
+        except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e

@@ -25,20 +25,26 @@
 from __future__ import annotations
 
 from contextlib import closing
-from typing import TYPE_CHECKING, List
+from typing import (
+    TYPE_CHECKING,
+    List
+)
+
 from qgis.core import (
     Qgis,
-    QgsMessageLog,
-    QgsTask,
-    QgsFeatureRequest,
     QgsExpressionContext,
     QgsExpressionContextUtils,
+    QgsFeatureRequest,
+    QgsMessageLog,
+    QgsTask,
     QgsVectorLayer
 )
 from qgis.utils import spatialite_connect
-from ..utils import tr
+
 from ..Exception import RdsException
+from ..utils import tr
 from ._debug import debug_thread
+
 if TYPE_CHECKING:
     from .. import Field
 

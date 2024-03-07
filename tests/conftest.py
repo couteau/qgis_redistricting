@@ -1,12 +1,11 @@
 """QGIS Redistricting Plugin test fixtures"""
-
 import pathlib
 import shutil
 
 import pytest
-from pytest_mock.plugin import MockerFixture
+from pytest_mock import MockerFixture
 from qgis.core import (
-    QgsApplication,
+    QgsCoordinateReferenceSystem,
     QgsProject,
     QgsVectorLayer
 )
@@ -17,11 +16,6 @@ from redistricting.core.Plan import RedistrictingPlan
 from redistricting.core.PlanBuilder import PlanBuilder
 
 # pylint: disable=redefined-outer-name, unused-argument
-
-
-@pytest.fixture(autouse=True)
-def setup_qgis(qgis_app: QgsApplication):
-    QgsApplication.setPrefixPath("./qgis", True)
 
 
 @pytest.fixture
@@ -36,9 +30,10 @@ def datadir(tmp_path: pathlib.Path):
 
 
 @pytest.fixture
-def block_layer(datadir, qgis_new_project):
+def block_layer(datadir: pathlib.Path, qgis_new_project):
     gpkg = (datadir / 'tuscaloosa_blocks.gpkg').resolve()
     layer = QgsVectorLayer(f'{gpkg}|layername=plans', 'blocks', 'ogr')
+    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
     QgsProject.instance().addMapLayer(layer)
     return layer
 
@@ -99,10 +94,6 @@ def plan(block_layer, assign_layer, dist_layer):
         'assign-layer': assign_layer.id(),
         'dist-layer': dist_layer.id(),
         'num-districts': 5,
-        'districts': [
-            {'district': 1, 'name': 'Council District 1', 'members': 1},
-            {'district': 2, 'name': 'Council District 2', 'members': 1},
-        ],
         'data-fields': [
             {'layer': block_layer.id(),
              'field': 'vap_apblack',
@@ -137,9 +128,10 @@ def plan(block_layer, assign_layer, dist_layer):
 
 @ pytest.fixture
 def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
-    dst = (datadir / 'tuscaloosa_new_plan.gpkg')
+    dst = datadir / 'tuscaloosa_new_plan.gpkg'
 
-    p: RedistrictingPlan = PlanBuilder() \
+    b = PlanBuilder()
+    p: RedistrictingPlan = b \
         .setName('test') \
         .setNumDistricts(5) \
         .setDeviation(0.025) \
@@ -153,6 +145,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .appendDataField('vap_nh_white', caption='WVAP') \
         .appendGeoField('vtdid20', caption='VTD') \
         .createPlan(createLayers=False)
+    del b
 
     update = mocker.patch.object(p.districts, 'updateDistricts')
     update.return_value = None
@@ -160,7 +153,9 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
     p.addLayersFromGeoPackage(dst)
     p.totalPopulation = 227036
 
-    return p
+    yield p
+
+    p.deleteLater()
 
 
 @pytest.fixture

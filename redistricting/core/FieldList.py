@@ -32,24 +32,14 @@ from typing import (
     Union
 )
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
-
 from .Field import Field
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Field)
 
 
-class FieldList(QObject, Generic[T]):
-    fieldAdded = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
-    fieldRemoved = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject', int)
-    fieldMoved = pyqtSignal('PyQt_PyObject', int, int)
-
-    def __init__(self, parent: QObject = None, fields: List[T] = None):
-        super().__init__(parent)
-        self._fields: List[Field] = fields or []
+class FieldList(Generic[T]):
+    def __init__(self, fields: List[T] = None):
+        self._fields: List[T] = fields or []
 
     def __getitem__(self, key) -> Union[T, FieldList[T]]:
         if isinstance(key, str):
@@ -62,21 +52,12 @@ class FieldList(QObject, Generic[T]):
             return self._fields[key]
 
         if isinstance(key, slice):
-            return FieldList(self.parent(), self._fields[key])
+            return FieldList(self._fields[key])
 
         raise KeyError()
 
     def __delitem__(self, key: Union[int, slice]):
-        if isinstance(key, slice):
-            index = key.start
-            fields = self._fields[key]
-        else:
-            fields = [self._fields[key]]
-            index = self._fields.index(fields[0])
         del self._fields[key]
-        for f in fields:
-            f.setParent(None)
-        self.fieldRemoved.emit(self, fields[0] if len(fields) == 1 else fields, index)
 
     def __contains__(self, item: Union[T, str]) -> bool:
         if isinstance(item, Field):
@@ -95,42 +76,27 @@ class FieldList(QObject, Generic[T]):
         return bool(self._fields)
 
     def append(self, item: T):
-        item.setParent(self)
         self._fields.append(item)
-        self.fieldAdded.emit(self, item, len(self._fields) - 1)
 
     def insert(self, idx, item: T):
-        item.setParent(self)
         self._fields.insert(idx, item)
-        self.fieldAdded.emit(self, item, idx)
 
     def extend(self, items: Union[FieldList[T], List[T]]):
         if not items:
             return
         self._fields.extend(items)
-        for f in items:
-            f.setParent(self)
-            self.fieldAdded.emit(self, f, self._fields.index(f))
 
     def clear(self):
         del self[:]
 
     def remove(self, item: T):
-        if item in self._fields:
-            item.setParent(None)
-            i = self._fields.index(item)
-            self._fields.remove(item)
-            self.fieldRemoved.emit(self, item, i)
-            return
-
-        raise ValueError()
+        self._fields.remove(item)
 
     def move(self, idx1, idx2):
         if 0 <= idx1 < len(self._fields) and 0 <= idx2 < len(self._fields):
             item = self._fields[idx1]
             self._fields[idx1] = self._fields[idx2]
             self._fields[idx2] = item
-            self.fieldMoved.emit(self, idx1, idx2)
         else:
             raise IndexError()
 

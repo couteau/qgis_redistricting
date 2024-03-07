@@ -34,6 +34,8 @@ from redistricting.gui import (
     DlgImportShape
 )
 
+# pylint: disable=unused-argument
+
 
 class TestPluginInit:
 
@@ -325,6 +327,7 @@ class TestPluginInit:
         assert len(plugin_with_gui.redistrictingPlans) == 1
         plan: redistricting.RedistrictingPlan = plugin_with_gui.activePlan
         assert plan.totalPopulation > 0 or plan.districts._needUpdate  # pylint: disable=protected-access
+        project.clear()
 
     def test_close_project(self, plugin_with_project):
         QgsProject.instance().clear()
@@ -357,41 +360,16 @@ class TestPluginInit:
 
         result = plugin_with_gui.checkActivePlan('test')
         assert result
-
-    def test_create_district(self, plugin_with_plan, mocker: MockerFixture, qgis_iface):
-        result = plugin_with_plan.createDistrict()
-        assert result is None
-        assert "Oops!:Cannot create district: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
-
-        plugin_with_plan.setActivePlan(plugin_with_plan.redistrictingPlans[0])
-        dlgcls = mocker.patch('redistricting.redistricting.DlgNewDistrict')
-        dlg = dlgcls.return_value
-        dlg.exec_.return_value = QDialog.Accepted
-        add = mocker.patch.object(plugin_with_plan.activePlan, 'addDistrict')
-        settarget = mocker.patch.object(plugin_with_plan.dockwidget, 'setTargetDistrict')
-        result = plugin_with_plan.createDistrict()
-        assert result is not None
-        add.assert_called_once()
-        settarget.assert_called_once()
-
-        dlg.exec_.return_value = QDialog.Rejected
-        result = plugin_with_plan.createDistrict()
-        assert result is None
-
-    def test_create_district_all_allocated(self, plugin_with_project, qgis_iface):
-        result = plugin_with_project.createDistrict()
-        assert result is None
-        assert 'Warning:All districts have already been allocated' in qgis_iface.messageBar().get_messages(Qgis.Warning)
+        project.clear()
 
     def test_edit_signals(self, plugin_with_project: redistricting.Redistricting, qtbot):
         plan = plugin_with_project.activePlan
-        with qtbot.wait_signal(plan.assignLayer.editingStarted):
-            plan.assignLayer.startEditing()
+        with qtbot.wait_signal(plan._assignLayer.editingStarted):
+            plan._assignLayer.startEditing()
         assert plugin_with_project.actionCommitPlanChanges.isEnabled()
         assert plugin_with_project.actionRollbackPlanChanges.isEnabled()
-        with qtbot.wait_signal(plan.assignLayer.editingStopped):
-            plan.assignLayer.rollBack(True)
+        with qtbot.wait_signal(plan._assignLayer.editingStopped):
+            plan._assignLayer.rollBack(True)
         assert not plugin_with_project.actionCommitPlanChanges.isEnabled()
         assert not plugin_with_project.actionRollbackPlanChanges.isEnabled()
 
@@ -437,14 +415,6 @@ class TestPluginInit:
         builder = mock_builder.return_value
         importer_class = mocker.patch('redistricting.redistricting.AssignmentImporter')
 
-        plugin_with_project.project.setDirty(True)
-        plugin_with_project.newPlan()
-        mock_edit_dlg.assert_not_called()
-        mock_builder.assert_not_called()
-        assert "Wait!:Please save your project before creating a redistricting plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
-
-        plugin_with_project.project.setDirty(False)
         plugin_with_project.newPlan()
         mock_edit_dlg.assert_called_once()
         mock_builder.assert_called_once()

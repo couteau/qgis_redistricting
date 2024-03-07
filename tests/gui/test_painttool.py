@@ -9,6 +9,7 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QMouseEvent
 
+from redistricting.core import RedistrictingPlan
 from redistricting.gui import (
     PaintDistrictsTool,
     PaintMode
@@ -17,7 +18,8 @@ from redistricting.gui import (
 
 class TestPaintTool:
     @pytest.fixture
-    def tool(self, qgis_canvas, plan) -> PaintDistrictsTool:
+    def tool(self, qgis_canvas, plan: RedistrictingPlan) -> PaintDistrictsTool:
+        plan.delta.detachSignals()
         return PaintDistrictsTool(qgis_canvas, plan)
 
     @pytest.fixture

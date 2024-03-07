@@ -1,0 +1,6 @@
+[tool.autopep8]
+max_line_length = 120
+
+[tool.pytest.ini_options]
+filterwarnings = "ignore:distutils:DeprecationWarning"
+qt_api = "pyqt5"

@@ -31,6 +31,7 @@ from typing import (
     List
 )
 
+import geopandas as gpd
 from qgis.core import (
     Qgis,
     QgsAggregateCalculator,
@@ -44,6 +45,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 
+from ..Exception import CanceledError
 from ..utils import (
     createGeoPackage,
     createGpkgTable,
@@ -51,7 +53,6 @@ from ..utils import (
     tr
 )
 from ._debug import debug_thread
-from ._exception import CancelledError
 from .Sql import SqlAccess
 
 if TYPE_CHECKING:
@@ -69,7 +70,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         self.assignFields = []
 
-        self.geoLayer: QgsVectorLayer = geoLayer # None
+        self.geoLayer: QgsVectorLayer = geoLayer  # None
         self.geoField: QgsField = None
         self.geoJoinField = geoJoinField
         self.geoFields: List[Field] = list(plan.geoFields)
@@ -91,7 +92,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.popTotals = {}
         self.totalPop = 0
         # self.getPopFieldTotals(plan.popLayer)
-        self.setDependentLayers(l for l in (self.geoLayer,self.popLayer) if l is not None)
+        self.setDependentLayers(l for l in (self.geoLayer, self.popLayer) if l is not None)
 
     def validatePopFields(self, popLayer: QgsVectorLayer):
         popFields = popLayer.fields()
@@ -119,6 +120,20 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         return d
 
+    def readLayerIntoDataFrame(self, popLayer: QgsVectorLayer):
+        if popLayer.dataProvider().name() == "ogr":
+            if popLayer.dataProvider().storageType() == "GPKG":
+                df = gpd.read_file(popLayer.source())
+            elif popLayer.dataProvider().storageType() == "ESRI Shapefile":
+                gpkg, lyrparam = popLayer.source().split('|', 1)
+                lyr = lyrparam.split('=')[1]
+                df = gpd.read_file(gpkg, layer=lyr)
+            elif popLayer.dataProvider().storageType() == "GeoJSON":
+                gpkg, geomparam = popLayer.source().split('|', 1)  # pylint: disable=unused-variable
+                df = gpd.read_file(gpkg)
+
+        return df
+
     def makePopTotalsSqlSelect(self, table):
         sql = f'SELECT 0 as {self.distField}, \'{tr("Unassigned")}\' as name, SUM({self.popField}) as {self.popField}'
 
@@ -133,6 +148,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return sql
 
     def getPopFieldTotals(self, popLayer: QgsVectorLayer):
+
         if self.isSQLCapable(popLayer):
             table = self.getTableName(popLayer)
             if table:
@@ -156,9 +172,11 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             f'{self.distField} INTEGER UNIQUE NOT NULL,' \
             'name TEXT DEFAULT \'\',' \
             'members INTEGER DEFAULT 1,' \
-            f'{self.popField} REAL DEFAULT 0,'
+            f'{self.popField} REAL DEFAULT 0,' \
+            'deviation REAL DEFAULT 0,' \
+            'pct_deviation REAL DEFAULT 0,'
 
-        fieldNames = {self.distField, 'name', 'members', self.popField}
+        fieldNames = {self.distField, 'name', 'members', self.popField, 'deviation', 'pct_deviation'}
 
         context = None
         for f in self.popFields:
@@ -215,7 +233,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             with closing(spatialite_connect(self.path)) as db:
                 db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
 
-        return True        
+        return True
 
     def createUnassigned(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
@@ -312,11 +330,14 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             while count < total:
                 s = islice(gen, chunkSize)
                 if self.isCanceled():
-                    raise CancelledError()
+                    raise CanceledError()
                 db.executemany(sql, s)
                 count = min(total, count + chunkSize)
                 self.setProgress(2 + 97 * count/total)
             db.commit()
+            db.execute(
+                "UPDATE gpkg_ogr_contents SET feature_count = (SELECT COUNT(*) FROM assignments)"
+            )
 
         return True
 
@@ -342,7 +363,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                 self.importSourceData()
             else:
                 return False
-        except CancelledError:
+        except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
             self.exception = e

@@ -45,7 +45,7 @@ class GeoFieldsModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._data: list[Field] = list(plan.geoFields)
-        self._data.insert(0, Field(plan.assignLayer, plan.geoIdField,
+        self._data.insert(0, Field(plan._assignLayer, plan.geoIdField,
                           False, plan.geoIdCaption, self))
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
@@ -64,6 +64,7 @@ class GeoFieldsModel(QAbstractListModel):
     @property
     def fields(self):
         return self._data
+
 
 class PopFieldsModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):

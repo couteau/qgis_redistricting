@@ -22,9 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from numbers import Number
 from typing import Any
 
+import numpy as np
+import pandas as pd
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
@@ -34,15 +35,13 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import (
     QBrush,
-    QColor
+    QColor,
+    QFont
 )
 
+from .District import District
 from .DistrictList import DistrictList
 from .Plan import RedistrictingPlan
-from .utils import (
-    makeFieldName,
-    tr
-)
 
 
 class DistrictDataModel(QAbstractTableModel):
@@ -64,131 +63,105 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
 
         if self._districts is not None:
-            self._districts.districtAdded.disconnect(self.districtAdded)
-            self._districts.districtRemoved.disconnect(self.districtRemoved)
             self._districts.updating.disconnect(self.beginResetModel)
             self._districts.updateComplete.disconnect(self.endResetModel)
             self._districts.updateTerminated.disconnect(self.endResetModel)
+            self._districts.districtChanged.disconnect(self.districtChanged)
             self._plan.planChanged.disconnect(self.planChanged)
 
         self._plan = value
         self._districts = self._plan.districts if self._plan else None
 
         if self._districts is not None:
-            self.updateColumnKeys()
-            self._districts.districtAdded.connect(self.districtAdded)
-            self._districts.districtRemoved.connect(self.districtRemoved)
             self._districts.updating.connect(self.beginResetModel)
             self._districts.updateComplete.connect(self.endResetModel)
             self._districts.updateTerminated.connect(self.endResetModel)
+            self._districts.districtChanged.connect(self.districtChanged)
             self._plan.planChanged.connect(self.planChanged)
-        else:
-            self._headings = []
-            self._keys = []
 
         self.endResetModel()
-
-    def updateColumnKeys(self):
-        self._keys = ['district', 'name',
-                      self._plan.popField, 'deviation', 'pct_deviation']
-
-        self._headings = [
-            tr('District'),
-            tr('Name'),
-            tr('Population'),
-            tr('Deviation'),
-            tr('%Deviation')
-        ]
-
-        for field in self._plan.popFields:
-            self._keys.append(field.fieldName)
-            self._headings.append(field.caption)
-                
-        for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
-                self._keys.append(fn)
-                self._headings.append(field.caption)
-            if field.pctbase:
-                self._keys.append(f'pct_{fn}')
-                self._headings.append(f'%{field.caption}')
-                
-        self._keys += ['polsbyPopper', 'reock', 'convexHull']
-        self._headings += [
-            tr('Polsby-Popper'),
-            tr('Reock'),
-            tr('Convex Hull'),
-        ]
-
-    def districtAdded(self, plan, dist, index):  # pylint: disable=unused-argument
-        # if plan != self._plan:
-        #    return
-
-        self.beginInsertRows(QModelIndex(), index, index)
-        self.endInsertRows()
-
-    def districtRemoved(self, plan, dist, index):  # pylint: disable=unused-argument
-        # if plan != self._plan:
-        #    return
-
-        self.beginRemoveRows(QModelIndex(), index, index)
-        self.endRemoveRows()
 
     def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
         if prop in ('districts', 'data-fields', 'pop-field', 'pop-fields'):
             self.beginResetModel()
-            self.updateColumnKeys()
             self.endResetModel()
         elif prop == 'deviation':
             self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+
+    def districtChanged(self, district: District):
+        row = self._districts.index(district)
+        start = self.createIndex(row, 1)
+        end = self.createIndex(row, self.columnCount())
+        self.dataChanged.emit(start, end, {Qt.DisplayRole, Qt.EditRole, Qt.BackgroundRole})
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._districts) if self._districts and not parent.isValid() else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._headings) if not parent.isValid() else 0
+        if parent.isValid() or self._districts is None:
+            return 0
+
+        return len(self._districts.columns)
 
     def data(self, index, role=Qt.DisplayRole):
+        value = QVariant()
         if role in (Qt.DisplayRole, Qt.EditRole):
-            self._districts.updateDistricts()
-
             row = index.row()
-            column = index.column()
+            col = index.column()
 
-            key = self._keys[column]
-            value = getattr(self._districts[row], key)
+            if row == 0:
+                if col == 0:
+                    return self._districts[0, "name"]
+                if col == 1:
+                    return QVariant()
 
-            if value is None:
+            value = self._districts[row, col]
+            if pd.isna(value):
                 return QVariant()
 
+            key = self._districts.columns[col]
             if key == 'deviation':
                 value = f'{value:+,}'
             elif key == 'pct_deviation':
                 value = f'{value:+.2%}'
-            elif key in {'polsbyPopper', 'reock', 'convexHull'}:
+            elif key in {'polsbypopper', 'reock', 'convexhull'}:
                 value = f'{value:.3}'
             elif key[:3] == 'pct':
                 value = f'{value:.2%}'
-            elif isinstance(value, Number):
+            elif isinstance(value, (int, np.integer)):
                 value = f'{value:,}'
-            return value
+            elif isinstance(value, (float, np.floating)):
+                value = f'{value:,.2f}'
 
-        if role == Qt.BackgroundRole:
-            self._districts.updateDistricts()
-
-            brush = QVariant()
+        elif role == Qt.BackgroundRole:
             row = index.row()
             col = index.column()
             if col == 0:
-                brush = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
-            elif 1 <= col <= 4:
-                if row == 0:
-                    brush = QBrush(QColor(160, 160, 160))
-                elif self._districts[row].valid:
-                    brush = QBrush(QColor(178, 223, 138))
-            return brush
+                value = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
 
-        return QVariant()
+        elif role == Qt.FontRole:
+            row = index.row()
+            col = index.column()
+            if row > 0 and col in {0, 4, 5}:
+                value = QFont()
+                value.setBold(True)
+
+        elif role == Qt.TextAlignmentRole:
+            if index.column() == 0:
+                value = Qt.AlignCenter
+
+        elif role == Qt.TextColorRole:
+            row = index.row()
+            col = index.column()
+            if col == 0:
+                value = QColor(55, 55, 55)
+            elif 4 <= col <= 5:
+                if self._districts[row].isValid():
+                    value = QColor(99, 196, 101)
+                else:
+                    value = QColor(207, 99, 92)
+
+        return value
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
         if role == Qt.EditRole and index.column() == 1 and index.row() != 0:
@@ -201,7 +174,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._headings[section]
+            return self._districts.headings[section]
 
         return None
 

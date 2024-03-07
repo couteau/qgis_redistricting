@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - plan-wide stats
 
-         begin                : 2022-05-31
+         begin                : 2024-02-18
          git sha              : $Format:%H$
-         copyright            : (C) 2022 by Cryptodira
+         copyright            : (C) 2024 by Cryptodira
          email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -24,109 +24,159 @@
 """
 from __future__ import annotations
 
-from statistics import fmean
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict
+    Optional,
+    Sequence
 )
 
+import pandas as pd
 from qgis.PyQt.QtCore import (
     QObject,
     pyqtSignal
 )
 
+from .utils import tr
+
 if TYPE_CHECKING:
+    from .DistrictList import DistrictList
     from .Field import Field
     from .Plan import RedistrictingPlan
 
 
-class PlanStatistics(QObject):
-    statsChanged = pyqtSignal()
+class SplitDistrict:
+    def __init__(self, split: "Split", data: pd.DataFrame, idx: tuple[str, int], row: int):
+        self._data = data
+        self._split = split
+        self._idx = idx
+        self._row = row
 
-    def __init__(self, plan: RedistrictingPlan):
-        super().__init__(plan)
-        self._plan = plan
-        self._cutEdges = 0
-        self.initSplits()
-        self._plan.planChanged.connect(self.planChanged)
-        self._plan.districts.updateComplete.connect(self.statsChanged)
+    @property
+    def geoid(self) -> str:
+        return self._idx[0]
 
-    def planChanged(self, plan, field, oldValue, newValue):  # pylint: disable=unused-argument
-        if field == 'geo-fields':
-            self.initSplits()
-            self.statsChanged.emit()
+    @property
+    def district(self) -> int:
+        return self._idx[1]
 
-    def initSplits(self):
-        self._splits: Dict[Field, list[dict]] = {
-            f: [] for f in self._plan.geoFields
-        }
+    @property
+    def row(self) -> int:
+        return self._row
 
-    def serialize(self):
-        return {
-            'cut-edges': self._cutEdges,
-            'splits': {
-                f.fieldName: split for f, split in self._splits.items()
-            }
-        }
+    @property
+    def parent(self) -> "Split":
+        return self._split
+
+    @property
+    def attributes(self) -> Sequence[Any]:
+        return self
+
+    def __len__(self) -> int:
+        return len(self._data.columns) + 1 - int("__name" in self._data.columns)
+
+    def __getitem__(self, index):
+        if index == 0:
+            return self.district
+        else:
+            col = self._data.columns[index-1]
+            return self._data.loc[self._idx, col]
+
+
+class Split:
+    def __init__(self, lst: "SplitList", data: pd.DataFrame, geoid: str, row: int):
+        self._list = lst
+        self._data = data
+        self._geoid = geoid
+        self._row = row
+        districts = data.loc[geoid].index
+        self._districts = [
+            SplitDistrict(self, data, (geoid, d), r) for r, d in enumerate(districts)
+        ]
+
+    def __len__(self):
+        return len(self._districts)
+
+    def __getitem__(self, index) -> SplitDistrict:
+        return self._districts[index]
+
+    @property
+    def geoid(self):
+        return self._geoid
+
+    @property
+    def row(self):
+        return self._row
+
+    @property
+    def parent(self):
+        return self._list
+
+    @property
+    def districts(self):
+        districts = self._data.loc[self._geoid].index
+        return ",".join(str(d) for d in districts)
+
+    @property
+    def name(self):
+        if "__name" in self._data.columns:
+            i = self._data.columns.get_loc("__name",)
+            return self._data.loc[self._geoid].iat[0, i]
+
+        return ""
+
+    @property
+    def attributes(self):
+        return [f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, self.districts]
+
+
+class SplitList(QObject):
+    splitUpdating = pyqtSignal()
+    splitUpdated = pyqtSignal()
+
+    def __init__(self, plan: "RedistrictingPlan", field: Field, parent: Optional["DistrictList"] = None):
+        super().__init__(parent)
+        self.data = pd.DataFrame()
+        self.field = field
+        self.plan = plan
+        self._splits = []
+        self._header = [self.field.caption, tr("Districts"), tr('Population')]
+        self._header.extend(field.caption for field in [*plan.popFields, *plan.dataFields])
 
     @classmethod
-    def deserialize(cls, plan: RedistrictingPlan, data: Dict[str, Any]):
-        stats = cls(plan)
-        stats._cutEdges = data.get('cut-edges', 0)
-        for f, s in data.get('splits', {}).items():
-            if f in plan.geoFields:
-                field = plan.geoFields[f]
-                stats._splits[field] = s
-        return stats
+    def deserialize(cls, plan: "RedistrictingPlan", field: Field, data: dict):
+        instance = cls(plan, field, plan.districts)
+        idx = pd.MultiIndex.from_tuples(
+            (tuple(i) for i in data['index']),
+            names=[field.fieldName, "district"]
+        )
+        df = pd.DataFrame(data['data'], index=idx, columns=data['columns'])
+        instance.setData(df)
+        return instance
+
+    def serialize(self):
+        return self.data.to_dict(orient="split")
+
+    def setData(self, data: pd.DataFrame):
+        self.splitUpdating.emit()
+        self.data = data
+
+        self._header = [self.field.caption, tr("Districts"), tr('Population')]
+        self._header.extend(field.caption for field in [*self.plan.popFields, *self.plan.dataFields])
+        self._splits = [Split(self, data, geoid, row)
+                        for row, geoid in enumerate(data.index.get_level_values(0).unique())]
+        self.splitUpdated.emit()
+
+    def __len__(self):
+        return len(self._splits)
+
+    def __getitem__(self, index) -> Split:
+        return self._splits[index]
 
     @property
-    def avgReock(self):
-        if len(self._plan.districts) <= 1:
-            return None
-
-        values = self._plan.districts[1:]['reock']
-        if None in values:
-            return None
-
-        return fmean(values)
+    def attrCount(self):
+        return len(self.data.columns) + 2 - int("__name" in self.data.columns)
 
     @property
-    def avgPolsbyPopper(self):
-        if len(self._plan.districts) <= 1:
-            return None
-
-        values = self._plan.districts[1:]['polsbyPopper']
-        if None in values:
-            return None
-
-        return fmean(values)
-
-    @property
-    def avgConvexHull(self):
-        if len(self._plan.districts) <= 1:
-            return None
-
-        values = self._plan.districts[1:]['convexHull']
-        if None in values:
-            return None
-
-        return fmean(values)
-
-    @property
-    def cutEdges(self):
-        return self._cutEdges
-
-    @property
-    def splits(self) -> Dict[Field, list[dict]]:
-        return self._splits
-
-    def update(self, cutEdges, splits):
-        if cutEdges is not None:
-            self._cutEdges = cutEdges
-
-        if splits is not None:
-            for f, split in splits.items():
-                field = self._plan.geoFields[f]
-                if field is not None:
-                    self._splits[field] = split
+    def header(self):
+        return self._header

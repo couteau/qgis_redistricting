@@ -1,12 +1,11 @@
 {
     "python.testing.pytestEnabled": true,
-    "python.testing.pytestPath": "~/anaconda3/envs/qgis_plugin/bin/pytest",
     "python.experiments.optInto": [
         "pythonTestAdapter"
     ],
     "python.autoComplete.extraPaths": [
-        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/",
-        "${userHome}/anaconda3/envs/qgis_plugin/share/qgis/python/plugins",
+        "${env:QGIS_PREFIX_PATH}/share/qgis/python/",
+        "${env:QGIS_PREFIX_PATH}/share/qgis/python/plugins",
         "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python",
         "${userHome}/Library/Application Support/QGIS/QGIS3/profiles/default/python/plugins",
     ],
@@ -38,7 +37,9 @@
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
-    "pylint.path": [
-        "${userHome}/anaconda3/envs/qgis_plugin/bin/pylint"
+    "qtForPython.qmlls.enabled": false,
+    "python.testing.pytestArgs": [
+        "tests"
     ],
+    "python.testing.unittestEnabled": false,
 }

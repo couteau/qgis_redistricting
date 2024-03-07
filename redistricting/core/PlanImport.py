@@ -40,11 +40,8 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from . import (
-    District,
-    RedistrictingPlan
-)
 from .ErrorList import ErrorListMixin
+from .Plan import RedistrictingPlan
 from .Tasks import (
     ImportAssignmentFileTask,
     ImportShapeFileTask
@@ -126,9 +123,9 @@ class PlanImporter(ErrorListMixin, QObject):
         if not self._isValid():
             return None
 
-        if self._plan.assignLayer.isEditable():
+        if self._plan._assignLayer.isEditable():
             self.setError(tr('Committing unsaved changes before import'))
-            self._plan.assignLayer.commitChanges(True)
+            self._plan._assignLayer.commitChanges(True)
 
         self._importTask = self._createImportTask()
         self._importTask.taskCompleted.connect(self.taskCompleted)
@@ -194,9 +191,9 @@ class AssignmentImporter(PlanImporter):
         return result
 
     def _createImportTask(self):
-        if self._plan.assignLayer.isEditable():
+        if self._plan._assignLayer.isEditable():
             self.pushError(tr('Committing unsaved changes before import'))
-            self._plan.assignLayer.commitChanges(True)
+            self._plan._assignLayer.commitChanges(True)
 
         return ImportAssignmentFileTask(
             self._plan, self._file, self._headerRow, self._geoColumn, self._distColumn,
@@ -216,6 +213,7 @@ class ShapefileImporter(PlanImporter):
 
         if result:
             self._layer = QgsVectorLayer(str(self._file), '__import_layer')
+            self._layer.setParent(self)
             if not self._layer.isValid() or self._layer.dataProvider().storageType() != 'ESRI Shapefile':
                 self.pushError(tr('Invalid shapefile for import: {file!s}').format(file=self._file), Qgis.Critical)
                 result = False
@@ -253,7 +251,6 @@ class ShapefileImporter(PlanImporter):
         return ImportShapeFileTask(self._plan, str(self._file), self._distField)
 
     def taskCompleted(self):
-        districts = {}
         for f in self._layer.getFeatures():
             dist = f[self._distField]
             if dist == NULL:
@@ -266,6 +263,7 @@ class ShapefileImporter(PlanImporter):
             name = f[self._nameField] if self._nameField else None
             members = f[self._membersField] if self._membersField else 1
             if dist != 0:
-                districts[dist] = District(self._plan, dist, name, members)
-        self._plan.districts = districts
+                d = self._plan.districts[dist]
+                d.name = name
+                d.members = members
         super().taskCompleted()

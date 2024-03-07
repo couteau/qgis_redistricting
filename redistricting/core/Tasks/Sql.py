@@ -41,6 +41,7 @@ from osgeo import (
 from psycopg2.extras import RealDictConnection
 from qgis.core import (
     QgsCredentials,
+    QgsMapLayerUtils,
     QgsProject,
     QgsVectorDataProvider,
     QgsVectorLayer,
@@ -56,12 +57,6 @@ from ..utils import (
 class SqlAccess:
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        DEC2FLOAT = psycopg2.extensions.new_type(
-            psycopg2.extensions.DECIMAL.values,
-            'DEC2FLOAT',
-            lambda value, curs: float(value) if value is not None else None)
-
-        psycopg2.extensions.register_type(DEC2FLOAT)
         self._uri = None
         self._connInfo = None
         self._user = None
@@ -90,10 +85,20 @@ class SqlAccess:
 
         return None
 
-    def getGeometryColumn(self, layer: QgsVectorLayer, table: str = None):
+    def getGeometryColumn(self, layer: QgsVectorLayer, table: str = None) -> str:
         if table is None:
             table = self.getTableName(layer)
         provider = layer.dataProvider()
+
+        if provider.storageType() in ('GPKG', 'SQLite') or provider.name() in ('spatialite', 'postgis', 'postgres'):
+            if "." in table:
+                schema, table = table.split(".")
+            else:
+                schema = ""
+            conn = QgsMapLayerUtils.databaseConnection(layer)
+            if conn:
+                if col := conn.table(schema, table).geometryColumn():
+                    return col
 
         if provider.name() == 'ogr':
             database = provider.dataSourceUri().split('|')[0]
@@ -121,31 +126,30 @@ class SqlAccess:
             if r:
                 return next(r)['f_geometry_column']
 
-        return None
+        return ''
 
     def _executeSqlSqlite(
-        self, database, sql, as_dict
+        self, db: sqlite3.Connection, sql, as_dict
     ) -> Union[Iterable[Union[Iterable, sqlite3.Row]], None]:
-        with spatialite_connect(database) as db:
-            if as_dict:
-                db.row_factory = sqlite3.Row
-            cur = db.execute(sql)
-            if cur.rowcount == 0:
-                return None
+        if as_dict:
+            db.row_factory = sqlite3.Row
+        cur = db.execute(sql)
+        if cur.rowcount == 0:
+            return None
 
-            return cur
+        return cur
 
-    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
-        conndata = dict(tuple(a.split('=')) for a in shlex.split( provider.uri().connectionInfo(True)))
-        return self._executeSqlSqlite(conndata['dbname'], sql, as_dict)
+    def _connectSqlNativeSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
+        conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
+        return spatialite_connect(conndata['dbname'])
 
-    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+    def _connectSqlOgrSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
         database, _ = provider.dataSourceUri().split('|', 1)
-        return self._executeSqlSqlite(database, sql, as_dict)
+        return spatialite_connect(database)
 
-    def _executeSqlPostgre(
-        self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
-    ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
+    def _connectSqlPostgres(
+        self, provider: QgsVectorDataProvider, as_dict: bool = True
+    ) -> Union[RealDictConnection, psycopg2.extensions.connection]:
         if self._uri != provider.uri():
             self._uri = provider.uri()
             self._connInfo = self._uri.connectionInfo(True)
@@ -167,7 +171,20 @@ class SqlAccess:
         params = {'dsn': self._connInfo}
         if as_dict:
             params['connection_factory'] = RealDictConnection if as_dict else None
-        with psycopg2.connect(**params) as db:
+        return psycopg2.connect(**params)
+
+    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+        with self._connectSqlNativeSqlite(provider) as db:
+            return self._executeSqlSqlite(db, sql, as_dict)
+
+    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+        with self._connectSqlOgrSqlite(provider) as db:
+            return self._executeSqlSqlite(db, sql, as_dict)
+
+    def _executeSqlPostgre(
+        self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
+    ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
+        with self._connectSqlPostgres(provider, as_dict) as db:
             cur = db.cursor()
             cur.execute(sql)
             if cur.rowcount == 0:
@@ -224,11 +241,21 @@ class SqlAccess:
 
         return (f.attributes() for f in vl.getFeatures())
 
+    def dbconnect(self, layer: QgsVectorLayer):
+        provider = layer.dataProvider()
+        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
+            return self._connectSqlOgrSqlite(provider)
+        elif provider.name() == 'spatialite':
+            return self._connectSqlNativeSqlite(provider)
+        elif provider.name() in ('postgis', 'postgres'):
+            return self._connectSqlPostgres(provider)
+
+        return None
+
     def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr':
-            if provider.storageType() in ('GPKG', 'SQLite'):
-                return self._executeSqlOgrSqlite(provider, sql, as_dict)
+        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
+            return self._executeSqlOgrSqlite(provider, sql, as_dict)
         elif provider.name() == 'spatialite':
             return self._executeSqlNativeSqlite(provider, sql, as_dict)
         elif provider.name() in ('postgis', 'postgres'):

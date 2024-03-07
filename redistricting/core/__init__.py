@@ -23,10 +23,7 @@
  ***************************************************************************/
 """
 from .DeltaListModel import DeltaListModel
-from .District import (
-    BaseDistrict,
-    District
-)
+from .District import District
 from .DistrictDataModel import DistrictDataModel
 from .DistrictList import DistrictList
 from .Exception import RdsException
@@ -50,7 +47,6 @@ from .PlanImport import (
     AssignmentImporter,
     ShapefileImporter
 )
-from .PlanStats import PlanStatistics
 from .PlanStyle import PlanStyler
 from .storage import ProjectStorage
 from .utils import (
@@ -63,10 +59,10 @@ from .utils import (
 )
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
-           'BaseDistrict', 'District', 'DistrictList', 'FieldList', 'Field', 'DataField', 'GeoField'
+           'District', 'DistrictList', 'FieldList', 'Field', 'DataField', 'GeoField',
            'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',
            'makeFieldName', 'tr', 'spatialite_connect', 'createGeoPackage', 'createGpkgTable',
-           'showHelp', 'RdsException', 'PlanStatistics',
+           'showHelp', 'RdsException',
            'GeoFieldsModel', 'PopFieldsModel']

@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 """QGIS Redistricting Plugin
 
         QGIS plugin for building political districts from geographic units
@@ -27,6 +28,7 @@
  ***************************************************************************/
 """
 import pathlib
+import sys
 from typing import (
     Callable,
     Iterable,
@@ -43,6 +45,7 @@ from qgis.core import (
     QgsGroupLayer,
     QgsLayerTreeLayer,
     QgsMapLayer,
+    QgsMapLayerType,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext,
@@ -67,6 +70,10 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.PyQt.QtXml import QDomDocument
 
+if pathlib.Path(__file__).with_name("vendor").exists():
+    sys.path.insert(0, str(pathlib.Path(__file__).with_name("vendor")))
+
+# pylint: disable=wrong-import-position
 from .core import (
     AssignmentImporter,
     PlanBuilder,
@@ -105,7 +112,7 @@ class RdsProgressDialog(QProgressDialog):
         if self.wasCanceled():
             return
 
-        return super().setValue(progress)
+        super().setValue(progress)
 
 
 class Redistricting:
@@ -225,9 +232,8 @@ class Redistricting:
         if not self.projectSignalsConnected:
             self.project.readProjectWithContext.connect(self.onReadProject)
             self.project.writeProject.connect(self.onWriteProject)
-            # there is no signal that gets triggered before a project
-            # is closed, but removeAll comes close
-            self.project.removeAll.connect(self.onProjectClosing)
+
+            self.project.aboutToBeCleared.connect(self.onProjectClosing)
 
             # layersWillBeRemoved signal is triggered when a project is
             # closed or when the user removes a layer, and there seems
@@ -266,8 +272,8 @@ class Redistricting:
             self.tr('Redistricting'),
             self.iface.mainWindow()
         )
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Group, False)
-        self.iface.addCustomActionForLayerType(self.contextAction, None, Qgis.LayerType.Vector, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.GroupLayer, False)
+        self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.VectorLayer, False)
 
         self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
         self.contextMenu.addAction(self.addAction(
@@ -441,7 +447,7 @@ class Redistricting:
         if self.projectSignalsConnected:
             self.project.readProjectWithContext.disconnect(self.onReadProject)
             self.project.writeProject.disconnect(self.onWriteProject)
-            self.project.removeAll.disconnect(self.onProjectClosing)
+            self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
             self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
             self.project.layersAdded.disconnect(self.updateNewPlanAction)
             self.project.layersRemoved.disconnect(self.updateNewPlanAction)
@@ -654,8 +660,6 @@ class Redistricting:
     def onProjectClosing(self):
         self.projectClosing = True
         self.clear()
-        self.dockwidget.hide()
-        self.dataTableWidget.hide()
 
     def onLayersWillBeRemoved(self, layerIds):
         if self.projectClosing:
@@ -685,8 +689,8 @@ class Redistricting:
     # --------------------------------------------------------------------------
 
     def setDistTarget(self, target):
-        if target is None:
-            target = self.createDistrict()
+        # if target is None:
+        #    target = self.createDistrict()
         self.mapTool.setTargetDistrict(target)
         if target is None:
             self.canvas.unsetMapTool(self.mapTool)
@@ -702,11 +706,10 @@ class Redistricting:
             return
 
         self.mapTool.paintMode = mode
-        if self.mapTool.targetDistrict() is None:
-            target = self.createDistrict()
-            self.mapTool.setTargetDistrict(target)
+        # if self.mapTool.targetDistrict() is None:
+        #    target = self.createDistrict()
+        #    self.mapTool.setTargetDistrict(target)
         if self.mapTool.canActivate():
-            self.activePlan.updateDistricts()
             self.canvas.setMapTool(self.mapTool)
 
     def startPaintDistricts(self):

@@ -17,12 +17,14 @@
  ***************************************************************************/
 """
 import json
+
 import pytest
 from pytestqt.plugin import QtBot
 from qgis.core import QgsProject
 from qgis.PyQt.QtXml import QDomDocument
-from redistricting.core.storage import ProjectStorage
+
 from redistricting.core.Plan import RedistrictingPlan
+from redistricting.core.storage import ProjectStorage
 
 
 class TestStorage:
@@ -54,7 +56,7 @@ class TestStorage:
         assert plan.numDistricts == 5
         assert plan.numSeats == 5
         assert plan.popLayer == block_layer
-        assert plan.assignLayer == assign_layer
+        assert plan._assignLayer == assign_layer
         assert plan.distLayer == dist_layer
         assert len(plan.districts) == 6
         assert len(plan.dataFields) == 3 and plan.dataFields[0].layer == block_layer
