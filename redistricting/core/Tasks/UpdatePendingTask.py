@@ -116,7 +116,6 @@ class AggregatePendingChangesTask(AggregateDataTask):
             members = [self.districts[d].members for d in dist.index]
             dist["members"] = members
 
-            # dist = self.districts.data.loc[data.index]
             data["deviation"] = newdist[self.popField] - (dist["members"] * self.ideal)
             data["pct_deviation"] = data["deviation"] / (dist["members"] * self.ideal)
             data[f"new_{self.popField}"] = dist[self.popField] + data[self.popField]

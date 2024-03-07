@@ -155,7 +155,11 @@ disable=raw-checker-failed,
         fixme,
         C0115, # missing-class-docstring
         C0116, # missing-function-docstring
-        no-else-return,
+
+        R0902, # too-many-instance-attributes
+        R0903, # too-few-public-methods
+        R0904, # too-many-public-methods
+        R0912, # too-many-branches
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

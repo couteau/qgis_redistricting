@@ -60,7 +60,7 @@ class ImportAssignmentFileTask(QgsTask):
     ):
         super().__init__(tr('Import assignment file'), QgsTask.AllFlags)
 
-        self.assignLayer: QgsVectorLayer = plan.assignLayer
+        self.assignLayer: QgsVectorLayer = plan._assignLayer
         self.setDependentLayers((self.assignLayer,))
 
         self.distField: str = plan.distField

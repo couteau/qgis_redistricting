@@ -23,9 +23,14 @@
  ***************************************************************************/
 """
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
-from qgis.core import QgsProject, QgsLayerTreeGroup
+from qgis.core import (
+    QgsLayerTreeGroup,
+    QgsProject
+)
+
 from .utils import tr
 
 if TYPE_CHECKING:
@@ -53,8 +58,8 @@ class PlanGroup:
         if not self._group:
             self.createGroup()
 
-        if self._plan.assignLayer and not self._group.findLayer(self._plan.assignLayer):
-            self._group.addLayer(self._plan.assignLayer)
+        if self._plan._assignLayer and not self._group.findLayer(self._plan._assignLayer):
+            self._group.addLayer(self._plan._assignLayer)
         if self._plan.distLayer and not self._group.findLayer(self._plan.distLayer):
             self._group.addLayer(self._plan.distLayer)
 

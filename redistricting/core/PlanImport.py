@@ -123,9 +123,9 @@ class PlanImporter(ErrorListMixin, QObject):
         if not self._isValid():
             return None
 
-        if self._plan.assignLayer.isEditable():
+        if self._plan._assignLayer.isEditable():
             self.setError(tr('Committing unsaved changes before import'))
-            self._plan.assignLayer.commitChanges(True)
+            self._plan._assignLayer.commitChanges(True)
 
         self._importTask = self._createImportTask()
         self._importTask.taskCompleted.connect(self.taskCompleted)
@@ -191,9 +191,9 @@ class AssignmentImporter(PlanImporter):
         return result
 
     def _createImportTask(self):
-        if self._plan.assignLayer.isEditable():
+        if self._plan._assignLayer.isEditable():
             self.pushError(tr('Committing unsaved changes before import'))
-            self._plan.assignLayer.commitChanges(True)
+            self._plan._assignLayer.commitChanges(True)
 
         return ImportAssignmentFileTask(
             self._plan, self._file, self._headerRow, self._geoColumn, self._distColumn,

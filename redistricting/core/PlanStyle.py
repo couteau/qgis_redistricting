@@ -58,7 +58,7 @@ class PlanStyler(QObject):
     def __init__(self, plan: RedistrictingPlan):
         super().__init__(plan)
         self._plan = plan
-        self._assignLayer = plan.assignLayer
+        self._assignLayer = plan._assignLayer
         self._distLayer = plan.distLayer
         self._distField = plan.distField
         self._numDistricts = plan.numDistricts
@@ -156,7 +156,7 @@ class PlanStyler(QObject):
         if fromPlan.numDistricts < self._plan.numDistricts:
             self.createRenderer()
         else:
-            self._assignLayer.setRenderer(fromPlan.assignLayer.renderer().clone())
+            self._assignLayer.setRenderer(fromPlan._assignLayer.renderer().clone())
             self._distLayer.setRenderer(fromPlan.distLayer.renderer().clone())
             if fromPlan.distLayer.labelsEnabled():
                 self._distLayer.setLabelsEnabled(True)

@@ -155,79 +155,82 @@ class PlanEditor(BasePlanBuilder):
             return None
 
         a = self._plan.serialize()
+        self._plan.blockSignals(True)
+        try:
+            self._plan._setName(self._name)
+            self._plan._setNumDistricts(self._numDistricts)
+            self._plan._setNumSeats(self._numSeats)
+            self._plan._setDescription(self._description)
+            self._plan._setDeviation(self._deviation)
 
-        self._plan._setName(self._name)
-        self._plan._setNumDistricts(self._numDistricts)
-        self._plan._setNumSeats(self._numSeats)
-        self._plan._setDescription(self._description)
-        self._plan._setDeviation(self._deviation)
+            if self._popFields != self._plan.popFields:
+                if self._plan.distLayer:
+                    layer = self._plan.distLayer
+                    addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
+                    if addedFields:
+                        self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-        if self._popFields != self._plan.popFields:
-            if self._plan.distLayer:
-                layer = self._plan.distLayer
-                addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
-                if addedFields:
-                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+                    removedFields: Set[Field] = set(self._plan.popFields) - set(self._popFields)
+                    if removedFields:
+                        provider = layer.dataProvider()
+                        for f in removedFields:
+                            findex = layer.fields().lookupField(f.fieldName)
+                            if findex != -1:
+                                provider.deleteAttributes([findex])
+                        layer.updateFields()
 
-                removedFields: Set[Field] = set(self._plan.popFields) - set(self._popFields)
-                if removedFields:
-                    provider = layer.dataProvider()
-                    for f in removedFields:
-                        findex = layer.fields().lookupField(f.fieldName)
-                        if findex != -1:
-                            provider.deleteAttributes([findex])
-                    layer.updateFields()
+                self._plan._setPopFields(self._popFields)
 
-            self._plan._setPopFields(self._popFields)
+            if self._dataFields != self._plan.dataFields:
+                if self._plan.distLayer:
+                    layer = self._plan.distLayer
 
-        if self._dataFields != self._plan.dataFields:
-            if self._plan.distLayer:
-                layer = self._plan.distLayer
+                    addedFields: Set[DataField] = set(self._dataFields) - set(self._plan.dataFields)
+                    if addedFields:
+                        self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-                addedFields: Set[DataField] = set(self._dataFields) - set(self._plan.dataFields)
-                if addedFields:
-                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+                    removedFields: Set[DataField] = set(self._plan.dataFields) - set(self._dataFields)
+                    if removedFields:
+                        provider = layer.dataProvider()
+                        for f in removedFields:
+                            findex = layer.fields().lookupField(f.fieldName)
+                            if findex != -1:
+                                provider.deleteAttributes([findex])
+                        layer.updateFields()
 
-                removedFields: Set[DataField] = set(self._plan.dataFields) - set(self._dataFields)
-                if removedFields:
-                    provider = layer.dataProvider()
-                    for f in removedFields:
-                        findex = layer.fields().lookupField(f.fieldName)
-                        if findex != -1:
-                            provider.deleteAttributes([findex])
-                    layer.updateFields()
+                self._plan._setDataFields(self._dataFields)
 
-            self._plan._setDataFields(self._dataFields)
+            if self._geoFields != self._plan.geoFields:
+                if self._plan._assignLayer:
+                    layer = self._plan._assignLayer
 
-        if self._geoFields != self._plan.geoFields:
-            if self._plan.assignLayer:
-                layer = self._plan.assignLayer
+                    removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
+                    if removedFields:
+                        provider = layer.dataProvider()
+                        for f in removedFields:
+                            findex = layer.fields().lookupField(f.fieldName)
+                            if findex != -1:
+                                provider.deleteAttributes([findex])
+                        layer.updateFields()
 
-                removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
-                if removedFields:
-                    provider = layer.dataProvider()
-                    for f in removedFields:
-                        findex = layer.fields().lookupField(f.fieldName)
-                        if findex != -1:
-                            provider.deleteAttributes([findex])
-                    layer.updateFields()
+                    addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
+                    if addedFields:
+                        self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
+                        self._updateGeoField(addedFields)
 
-                addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
-                if addedFields:
-                    self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
-                    self._updateGeoField(addedFields)
+                self._plan._setGeoFields(self._geoFields)
 
-            self._plan._setGeoFields(self._geoFields)
+            self._plan._setGeoIdField(self._geoIdField)
+            self._plan._setGeoIdCaption(self._geoIdCaption)
 
-        self._plan._setGeoIdField(self._geoIdField)
-        self._plan._setGeoIdCaption(self._geoIdCaption)
+            self._plan._setGeoLayer(self._geoLayer)
+            self._plan._setGeoJoinField(self._geoJoinField)
 
-        self._plan._setGeoLayer(self._geoLayer)
-        self._plan._setGeoJoinField(self._geoJoinField)
-
-        self._plan._setPopLayer(self._popLayer)
-        self._plan._setPopJoinField(self._popJoinField)
-        self._plan._setPopField(self._popField)
+            self._plan._setPopLayer(self._popLayer)
+            self._plan._setPopJoinField(self._popJoinField)
+            self._plan._setPopField(self._popField)
+        finally:
+            self._plan.blockSignals(False)
 
         b = self._plan.serialize()
         self._modifiedFields = {k for k in b if k not in a or b[k] != a[k]}

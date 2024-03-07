@@ -56,7 +56,7 @@ class PlanAssignmentEditor(QObject):
     def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
         super().__init__(parent)
         self._plan = plan
-        self._assignLayer = plan.assignLayer
+        self._assignLayer = plan._assignLayer
         if self._assignLayer:
             self._assignLayer.afterCommitChanges.connect(self.commitChanges)
             self._assignLayer.afterRollBack.connect(self.rollback)

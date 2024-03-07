@@ -1,6 +1,4 @@
 """QGIS Redistricting Plugin test fixtures"""
-
-# import os
 import pathlib
 import shutil
 
@@ -130,7 +128,7 @@ def plan(block_layer, assign_layer, dist_layer):
 
 @ pytest.fixture
 def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
-    dst = (datadir / 'tuscaloosa_new_plan.gpkg')
+    dst = datadir / 'tuscaloosa_new_plan.gpkg'
 
     b = PlanBuilder()
     p: RedistrictingPlan = b \

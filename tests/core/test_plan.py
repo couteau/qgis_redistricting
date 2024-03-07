@@ -70,7 +70,7 @@ class TestPlan:
         plan = RedistrictingPlan('test', 5)
         assert plan.name == 'test'
         assert plan.numSeats == 5
-        assert plan.assignLayer is None
+        assert plan._assignLayer is None
         assert plan.distLayer is None
         assert plan.popLayer is None
         assert plan.popJoinField is None
@@ -96,11 +96,11 @@ class TestPlan:
         plan = RedistrictingPlan('oldname', 45)
         plan.addLayersFromGeoPackage(gpkg_path)
         assert plan.distLayer.name() == 'oldname_districts'
-        assert plan.assignLayer.name() == 'oldname_assignments'
+        assert plan._assignLayer.name() == 'oldname_assignments'
         assert plan._group.groupName == "Redistricting Plan - oldname"
         plan._setName('newname')
         assert plan.distLayer.name() == 'newname_districts'
-        assert plan.assignLayer.name() == 'newname_assignments'
+        assert plan._assignLayer.name() == 'newname_assignments'
         assert plan._group.groupName == "Redistricting Plan - newname"
 
     def test_datafields_assign(self, valid_plan: RedistrictingPlan, block_layer, qtbot: QtBot):
@@ -127,12 +127,12 @@ class TestPlan:
         gpkg = datadir / 'tuscaloosa_plan.gpkg'
         plan.addLayersFromGeoPackage(gpkg)
         assert plan.error() is None
-        assert plan.assignLayer.name() == 'test_assignments'
+        assert plan._assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
         assert QgsProject.instance().mapLayersByName('test_assignments')
         assert QgsProject.instance().mapLayersByName('test_districts')
         assert plan.geoIdField == 'geoid20'
-        assert plan._group._group.findLayer(plan.assignLayer.id())  # pylint: disable=protected-access
+        assert plan._group._group.findLayer(plan._assignLayer.id())  # pylint: disable=protected-access
         assert plan._group._group.findLayer(plan.distLayer.id())  # pylint: disable=protected-access
 
     def test_addgeopackage_set_error_when_plan_is_invalid(self, datadir):

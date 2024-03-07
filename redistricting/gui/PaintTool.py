@@ -212,7 +212,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def plan(self, value: RedistrictingPlan):
         if self._plan != value:
             self._plan = value
-            self._layer = self._plan.assignLayer if self._plan is not None else None
+            self._layer = self._plan._assignLayer if self._plan is not None else None
             if self._layer:
                 self.inTransaction = self._layer.isEditable()
 

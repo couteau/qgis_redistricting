@@ -40,11 +40,7 @@ from qgis.core import (
     QgsProject,
     QgsVectorLayer
 )
-from qgis.PyQt.QtCore import (
-    QObject,
-    QVariant,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtGui import QIcon
 
 from .Exception import RdsException
@@ -54,13 +50,14 @@ from .utils import (
 )
 
 
-class Field(QObject):
-
-    fieldChanged = pyqtSignal('PyQt_PyObject')
-
-    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
-                 caption: str = None, parent: Optional['QObject'] = None):
-        super().__init__(parent)
+class Field:
+    def __init__(
+        self,
+        layer: QgsVectorLayer,
+        field: str,
+        isExpression: Union[bool, None] = None,  # None = autodetect
+        caption: Optional[str] = None
+    ):
         if layer is None or field is None:
             raise ValueError()
 
@@ -85,17 +82,7 @@ class Field(QObject):
 
         self._layer = layer
 
-    def __copy__(self):
-        cls = self.__class__
-        result = cls.__new__(cls)  # pylint: disable=E1120
-        super(Field, result).__init__(self.parent())
-        result.__dict__.update(self.__dict__)
-        return result
-
-    def __deepcopy__(self, memo):
-        return self.__copy__()
-
-    def serialize(self):
+    def serialize(self) -> dict[str, Any]:
         return {
             'layer': self._layer.id(),
             'field': self._field,
@@ -104,11 +91,11 @@ class Field(QObject):
         }
 
     @classmethod
-    def deserialize(cls, data: Dict[str, Any], parent: Optional['QObject'] = None):
+    def deserialize(cls, data: Dict[str, Any]):
         if not 'field' in data:
             return None
         layer = QgsProject.instance().mapLayer(data.get('layer'))
-        return cls(layer, data['field'], data.get('expression', False), data.get('caption'), parent=parent)
+        return cls(layer, data['field'], data.get('expression', False), data.get('caption'))
 
     def _validateExpr(self, layer):
         if not self._isExpression:
@@ -175,7 +162,6 @@ class Field(QObject):
     @caption.setter
     def caption(self, value):
         self._caption = value
-        self.fieldChanged.emit(self)
 
     def hasError(self):
         return self._error is not None
@@ -198,14 +184,16 @@ class Field(QObject):
                 self._error = expr.evalErrorString()
                 return None
 
-            return QVariant(result).type()
+            t = QVariant(result).type()
         else:
             i = layer.fields().lookupField(self.field)
             if i == -1:
                 self._error = tr(f'Field {self.field} not found')
                 return None
 
-            return layer.fields().field(i).type()
+            t = layer.fields().field(i).type()
+
+        return t
 
     def makeQgsField(self, context: QgsExpressionContext = None, name: str = None, layer=None):
         self._error = None
@@ -242,10 +230,15 @@ class Field(QObject):
 
 
 class GeoField(Field):
-    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
-                 caption: str = None, parent: Optional['QObject'] = None):
+    def __init__(
+        self,
+        layer: QgsVectorLayer,
+        field: str,
+        isExpression: Union[bool, None] = None,
+        caption: Optional[str] = None
+    ):
         self._nameField: Field = None
-        super().__init__(layer, field, isExpression, caption, parent)
+        super().__init__(layer, field, isExpression, caption)
 
     def getRelatedLayer(self):
         if self._layer and self._index != -1:
@@ -272,7 +265,7 @@ class GeoField(Field):
 
     def setNameField(self, value: Union[Field, str]):
         if isinstance(value, str):
-            self._nameField = Field(self.getRelatedLayer(), value, parent=self)
+            self._nameField = Field(self.getRelatedLayer(), value)
         else:
             self._nameField = copy(value)
 
@@ -282,21 +275,27 @@ class GeoField(Field):
         return super().serialize() | nf
 
     @classmethod
-    def deserialize(cls, data, parent: Optional['QObject'] = None):
-        field = super().deserialize(data, parent)
+    def deserialize(cls, data: dict[str, Any]):
+        field = super().deserialize(data)
         if field:
             nf = data.get('name-field')
             if nf:
-                field._nameField = Field.deserialize(nf, field)  # pylint: disable=protected-access
+                field._nameField = Field.deserialize(nf)  # pylint: disable=protected-access
 
         return field
 
 
 class DataField(Field):
-    def __init__(self, layer: QgsVectorLayer, field: str, isExpression: bool = None,
-                 caption: str = None, sumfield: bool = None, pctbase: Union[Field, str] = None,
-                 parent: Optional['QObject'] = None):
-        super().__init__(layer, field, isExpression, caption, parent)
+    def __init__(
+        self,
+        layer: QgsVectorLayer,
+        field: str,
+        isExpression: Union[bool, None] = None,
+        caption: Optional[str] = None,
+        sumfield: Optional[bool] = None,
+        pctbase: Optional[Union[Field, str]] = None
+    ):
+        super().__init__(layer, field, isExpression, caption)
 
         if self._isExpression:
             e = QgsExpression(field)
@@ -336,7 +335,6 @@ class DataField(Field):
 
         if self._sum != value:
             self._sum = value
-            self.fieldChanged.emit(self)
 
     @property
     def pctbase(self) -> str:
@@ -352,7 +350,6 @@ class DataField(Field):
 
         if self._pctbase != value:
             self._pctbase = value
-            self.fieldChanged.emit(self)
 
     def serialize(self):
         return super().serialize() | {
@@ -361,9 +358,10 @@ class DataField(Field):
         }
 
     @classmethod
-    def deserialize(cls, data, parent: Optional['QObject'] = None):
-        if field := super().deserialize(data, parent):
-            field.sum = data.get('sum', field.sum) if field.isNumeric else False
-            field.pctbase = data.get('pctbase')
+    def deserialize(cls, data):
+        instance = super().deserialize(data)
+        if instance:
+            instance.sum = data.get('sum', instance.sum) if instance.isNumeric else False  # pylint: disable=no-member
+            instance.pctbase = data.get('pctbase')
 
-        return field
+        return instance

@@ -17,6 +17,7 @@
  ***************************************************************************/
 """
 import pathlib
+
 from redistricting.core.Tasks.ImportShapeTask import ImportShapeFileTask
 
 

@@ -24,13 +24,15 @@
 """
 from typing import (
     TYPE_CHECKING,
-    Iterator,
     Union,
     overload
 )
 
 import pandas as pd
-from qgis.core import QgsApplication
+from qgis.core import (
+    QgsApplication,
+    QgsVectorLayer
+)
 from qgis.PyQt.QtCore import (
     QObject,
     pyqtSignal
@@ -83,6 +85,7 @@ class DeltaList(QObject):
         self._plan = plan
         self.districts = plan.districts
 
+        self._assignLayer: QgsVectorLayer = None
         self._undoStack = None
         self._data: pd.DataFrame = None
         self._assignments: pd.DataFrame = None
@@ -129,11 +132,16 @@ class DeltaList(QObject):
     def __len__(self) -> int:
         return len(self._data) if self._data is not None else 0
 
-    def __iter__(self) -> Iterator[Delta]:
+    def __iter__(self):
         if self._data is not None:
-            return (Delta(index, self) for index in range(len(self._data)))
+            for index in range(len(self._data)):
+                yield Delta(index, self)
 
-        return iter()
+    def changedDistricts(self) -> list[int]:
+        if self._data is not None:
+            return list(self._data.index)
+
+        return []
 
     @property
     def data(self):
@@ -143,9 +151,18 @@ class DeltaList(QObject):
     def plan(self):
         return self._plan
 
-    def attachSignals(self):
-        self._undoStack = self._plan.assignLayer.undoStack()
-        self._undoStack.indexChanged.connect(self.update)
+    def setAssignLayer(self, value: QgsVectorLayer):
+        if self._assignLayer is not None:
+            self._assignLayer.afterRollBack.disconnect(self.clear)
+            self._assignLayer.afterCommitChanges.disconnect(self.clear)
+            self._undoStack.indexChanged.disconnect(self.update)
+            self._undoStack = None
+        self._assignLayer = value
+        if self._assignLayer is not None:
+            self._assignLayer.afterRollBack.connect(self.clear)
+            self._assignLayer.afterCommitChanges.connect(self.clear)
+            self._undoStack = self._assignLayer.undoStack()
+            self._undoStack.indexChanged.connect(self.update)
 
     def detachSignals(self):
         self._undoStack.indexChanged.disconnect(self.update)
@@ -175,8 +192,8 @@ class DeltaList(QObject):
         if self._pendingTask and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete:
             return self._pendingTask
 
-        if not self._plan.assignLayer or not self._plan.assignLayer.editBuffer() or \
-                len(self._plan.assignLayer.editBuffer().changedAttributeValues()) == 0:
+        if not self._assignLayer or not self._assignLayer.editBuffer() or \
+                len(self._assignLayer.editBuffer().changedAttributeValues()) == 0:
             # self.clear()
             return None
 

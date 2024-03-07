@@ -104,9 +104,8 @@ class DistrictDataModel(QAbstractTableModel):
         return len(self._districts.columns)
 
     def data(self, index, role=Qt.DisplayRole):
+        value = QVariant()
         if role in (Qt.DisplayRole, Qt.EditRole):
-            self._districts.updateDistricts()
-
             row = index.row()
             col = index.column()
 
@@ -133,38 +132,36 @@ class DistrictDataModel(QAbstractTableModel):
                 value = f'{value:,}'
             elif isinstance(value, (float, np.floating)):
                 value = f'{value:,.2f}'
-            return value
 
-        if role == Qt.BackgroundRole:
-            brush = QVariant()
+        elif role == Qt.BackgroundRole:
             row = index.row()
             col = index.column()
             if col == 0:
-                brush = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
-            return brush
+                value = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
 
-        if role == Qt.FontRole:
+        elif role == Qt.FontRole:
             row = index.row()
             col = index.column()
             if row > 0 and col in {0, 4, 5}:
-                font = QFont()
-                font.setBold(True)
-                return font
+                value = QFont()
+                value.setBold(True)
 
-        if role == Qt.TextColorRole:
-            color = QVariant()
+        elif role == Qt.TextAlignmentRole:
+            if index.column() == 0:
+                value = Qt.AlignCenter
+
+        elif role == Qt.TextColorRole:
             row = index.row()
             col = index.column()
             if col == 0:
-                color = QColor(55, 55, 55)
+                value = QColor(55, 55, 55)
             elif 4 <= col <= 5:
                 if self._districts[row].isValid():
-                    color = QColor(99, 196, 101)
+                    value = QColor(99, 196, 101)
                 else:
-                    color = QColor(207, 99, 92)
-            return color
+                    value = QColor(207, 99, 92)
 
-        return QVariant()
+        return value
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
         if role == Qt.EditRole and index.column() == 1 and index.row() != 0:

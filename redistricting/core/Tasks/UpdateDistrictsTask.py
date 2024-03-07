@@ -29,7 +29,6 @@ from collections.abc import (
 )
 from typing import (
     TYPE_CHECKING,
-    Iterator,
     Union
 )
 
@@ -42,7 +41,6 @@ from qgis.core import (
     QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsFeature,
     QgsFeatureRequest
 )
 from qgis.PyQt.QtCore import (
@@ -113,7 +111,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
 
-        self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
+        self.setDependentLayers([plan.distLayer, plan._assignLayer, plan.popLayer])
 
         self.geoFields: Sequence['GeoField'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
@@ -152,22 +150,22 @@ class AggregateDistrictDataTask(AggregateDataTask):
             return None
 
     def getSplitNames(self, field: 'GeoField', geoids: Iterable[str]):
-        if field.nameField and field.index and field.layer.referencingRelations(field.index):
-            ref = field.layer.referencingRelations(field.index)[0]
-            name_layer = ref.referencedLayer()
-            name_join_field = ref.resolveReferencedField(field.field)
-            ctx = QgsExpressionContext()
-            ctx.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(name_layer))
-            expr = QgsExpression(f"""{name_join_field} in ({','.join(f"'{i}'" for i in geoids)})""")
-            request = QgsFeatureRequest(expr, ctx)
-            request.setSubsetOfAttributes([name_layer.fields().lookupField(name_join_field), field.nameField.index])
-            request.setInvalidGeometryCheck(QgsFeatureRequest.InvalidGeometryCheck.GeometryNoCheck)
-            fi: Iterator[QgsFeature] = name_layer.getFeatures(expr)
-            attr_tuples: list[tuple[str, str]] = [feat.attributes() for feat in fi]
-            dd = dict(attr_tuples)
-            return pd.Series(dd["name"], index=dd[name_join_field], name="__name")
+        ref = field.layer.referencingRelations(field.index)[0]
+        name_layer = ref.referencedLayer()
+        name_join_field = ref.resolveReferencedField(field.field)
 
-        return None
+        ctx = QgsExpressionContext()
+        ctx.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(name_layer))
+
+        expr = QgsExpression(f"""{name_join_field} in ({','.join(f"'{i}'" for i in geoids)})""")
+
+        request = QgsFeatureRequest(expr, ctx)
+        request.setSubsetOfAttributes([name_layer.fields().lookupField(name_join_field), field.nameField.index])
+        request.setInvalidGeometryCheck(QgsFeatureRequest.InvalidGeometryCheck.GeometryNoCheck)
+
+        name_map = {feat[name_join_field]: feat[field.nameField.index] for feat in name_layer.getFeatures(request)}
+
+        return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
     def calcPlanMetrics(self, data: pd.DataFrame, cols: list[str]):
         total = len(self.geoFields) + 1
@@ -190,10 +188,13 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 .groupby([field.fieldName, self.distField]) \
                 .sum()
 
-            names = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
-            if names:
-                splitpop = splitpop.join(names)
-                splitpop = splitpop.sort_values(by="__name")
+            if field.nameField and field.index and field.layer.referencingRelations(field.index):
+                names = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
+                splitpop = splitpop\
+                    .reset_index(level=1) \
+                    .join(names) \
+                    .set_index('district', append=True) \
+                    .sort_values(by="__name")
             else:
                 splitpop = splitpop.sort_index()
 
@@ -207,6 +208,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         cea_crs = pyproj.CRS('+proj=cea')
         cea: gpd.GeoSeries = data.geometry.to_crs(cea_crs)
         area = cea.area
+
         data['polsbypopper'] = 4 * math.pi * area / (cea.length**2)
         data['reock'] = area / cea.minimum_bounding_circle().area
         data['convexhull'] = area / cea.convex_hull.area

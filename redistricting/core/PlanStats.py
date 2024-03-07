@@ -175,7 +175,7 @@ class SplitList(QObject):
 
     @property
     def attrCount(self):
-        return len(self.data.columns) + 1 - int("__name" in self.data.columns)
+        return len(self.data.columns) + 2 - int("__name" in self.data.columns)
 
     @property
     def header(self):

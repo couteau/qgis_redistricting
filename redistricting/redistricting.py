@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pylint: disable=too-many-lines
 """QGIS Redistricting Plugin
 
         QGIS plugin for building political districts from geographic units
@@ -111,7 +112,7 @@ class RdsProgressDialog(QProgressDialog):
         if self.wasCanceled():
             return
 
-        return super().setValue(progress)
+        super().setValue(progress)
 
 
 class Redistricting:
@@ -709,7 +710,6 @@ class Redistricting:
         #    target = self.createDistrict()
         #    self.mapTool.setTargetDistrict(target)
         if self.mapTool.canActivate():
-            self.activePlan.updateDistricts()
             self.canvas.setMapTool(self.mapTool)
 
     def startPaintDistricts(self):

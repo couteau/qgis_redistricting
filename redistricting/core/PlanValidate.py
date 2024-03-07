@@ -90,7 +90,7 @@ class PlanValidator(ErrorListMixin, QObject):
         instance._popFields = plan.popFields[:]
         instance._dataFields = plan.dataFields[:]
 
-        instance._assignLayer = plan.assignLayer
+        instance._assignLayer = plan._assignLayer
         instance._distLayer = plan.distLayer
         return instance
 

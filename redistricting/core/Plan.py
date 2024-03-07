@@ -62,6 +62,7 @@ from .Field import (
 )
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
+from .PlanUpdate import PlanUpdater
 from .utils import tr
 
 
@@ -105,16 +106,17 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._geoIdField = None
         self._geoIdCaption = None
         self._distField = 'district'
-        self._geoFields = FieldList[GeoField](self)
+        self._geoFields = FieldList[GeoField]()
 
         self._distLayer: QgsVectorLayer = None
         self._popField = None
-        self._popFields = FieldList[Field](self)
-        self._dataFields = FieldList[DataField](self)
+        self._popFields = FieldList[Field]()
+        self._dataFields = FieldList[DataField]()
 
         self._districts = DistrictList(self)
         self._stats = self._districts
         self._delta = DeltaList(self)
+        self._updater = PlanUpdater(self)
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -188,17 +190,17 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         plan._popField = data.get('pop-field')
         plan._setPopLayer(popLayer)
         for field in data.get('pop-fields', []):
-            f = Field.deserialize(field, plan.popFields)
+            f = Field.deserialize(field)
             if f:
                 plan._popFields.append(f)
 
         for field in data.get('data-fields', []):
-            f = DataField.deserialize(field, plan.dataFields)
+            f = DataField.deserialize(field)
             if f:
                 plan._dataFields.append(f)
 
         for field in data.get('geo-fields', []):
-            f = GeoField.deserialize(field, plan.geoFields)
+            f = GeoField.deserialize(field)
             if f:
                 plan._geoFields.append(f)
 
@@ -429,12 +431,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def _setAssignLayer(self, value: QgsVectorLayer):
         if value is None and self._assignLayer is not None:
             self._assignLayer.afterCommitChanges.disconnect(self.assignmentsCommitted)
-            self._delta.detachSignals()
 
         self._assignLayer = value
+        self._delta.setAssignLayer(value)
+        self._updater.setAssignLayer(value)
+
         if self._assignLayer is not None:
             self._assignLayer.afterCommitChanges.connect(self.assignmentsCommitted)
-            self._delta.attachSignals()
+
             self._group.updateLayers()
 
             if self._geoIdField is None:
@@ -647,11 +651,6 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
     def resetData(self, updateGeometry=False, districts: set[int] = None, immediate=False):
         self._districts.resetData(updateGeometry, districts, immediate)
-        self._delta.clear()
-
-    def updateDistricts(self, force=False):
-        pass
-        # return self._districts.updateDistricts(force)
 
     def layerRemoved(self, layer):
         if layer == self._assignLayer:
@@ -695,6 +694,3 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def assignmentsCommitted(self):
         districts = {d.district for d in self._delta}
         self.resetData(updateGeometry=True, districts=districts, immediate=True)
-
-    def assignmentsRolledBack(self):
-        self._delta.clear()

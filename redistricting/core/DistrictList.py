@@ -103,6 +103,7 @@ class DistrictList(QObject):
         self.updateDistrictFields()
 
         self._cutEdges = None
+        self._splits = None
         self.initSplits()
         self._plan.planChanged.connect(self.planChanged)
 
@@ -516,9 +517,13 @@ class DistrictList(QObject):
         return self._splits
 
     def initSplits(self):
+        oldSplits = self._splits
         self._splits: dict[Field, SplitList] = {
             f: SplitList(self._plan, f, self) for f in self._plan.geoFields
         }
+        if oldSplits is not None:
+            for f, s in oldSplits.items():
+                self._splits[f].setData(s.data)
 
     def updateSplits(self, cutEdges, splits):
         if cutEdges is not None:
@@ -527,5 +532,7 @@ class DistrictList(QObject):
         if splits is not None:
             for f, split in splits.items():
                 field = self._plan.geoFields[f]
+                if field not in self._splits:
+                    self._splits[field] = SplitList(self._plan, field, self)
                 if field is not None:
                     self._splits[field].setData(split)

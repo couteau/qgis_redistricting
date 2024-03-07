@@ -17,8 +17,9 @@
  ***************************************************************************/
 """
 import pytest
-from redistricting.core.FieldList import FieldList
+
 from redistricting.core.Field import Field
+from redistricting.core.FieldList import FieldList
 
 # pylint: disable=no-self-use
 
@@ -29,20 +30,20 @@ class TestFieldList:
         return Field(block_layer, 'vap_nh_black')
 
     @pytest.fixture
-    def empty_field_list(self):
-        return FieldList(None)
+    def empty_field_list(self) -> FieldList:
+        return FieldList()
 
     @pytest.fixture
-    def field_list(self, empty_field_list, field):
+    def field_list(self, empty_field_list: FieldList, field) -> FieldList:
         empty_field_list.append(field)
         return empty_field_list
 
     def test_createempty(self):
-        l = FieldList(None)
+        l = FieldList()
         assert len(l) == 0
 
     def test_createfromlist(self, field):
-        l = FieldList(None, [field])
+        l = FieldList([field])
         assert len(l) == 1
 
     def test_append(self, empty_field_list, field):
@@ -70,7 +71,7 @@ class TestFieldList:
 
     def test_extend_fieldlist(self, field_list, block_layer, field):
         field2 = Field(block_layer, 'vap_nh_white')
-        field_list2 = FieldList(None, [field2])
+        field_list2 = FieldList([field2])
         field_list.extend(field_list2)
         assert field_list[0] == field
         assert field_list[1] == field2
@@ -117,4 +118,4 @@ class TestFieldList:
         assert field_list == [field]
 
     def test_list_equality_fieldlist(self, field, field_list):
-        assert field_list == FieldList(None, [field])
+        assert field_list == FieldList([field])
