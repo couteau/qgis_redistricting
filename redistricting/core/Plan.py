@@ -62,7 +62,6 @@ from .Field import (
 )
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
-from .PlanUpdate import PlanUpdater
 from .utils import tr
 
 
@@ -116,7 +115,6 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._districts = DistrictList(self)
         self._stats = self._districts
         self._delta = DeltaList(self)
-        self._updater = PlanUpdater(self)
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
