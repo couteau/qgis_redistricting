@@ -432,7 +432,6 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         self._assignLayer = value
         self._delta.setAssignLayer(value)
-        self._updater.setAssignLayer(value)
 
         if self._assignLayer is not None:
             self._assignLayer.afterCommitChanges.connect(self.assignmentsCommitted)

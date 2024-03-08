@@ -616,7 +616,7 @@ class Redistricting:
         g = self.iface.layerTreeView().currentGroupNode()
         if g.isVisible():
             p = g.customProperty('redistricting-plan-id', None)
-            if p is not None and p != str(self.activePlan.id):
+            if p is not None and (self.activePlan is None or p != str(self.activePlan.id)):
                 self.setActivePlan(UUID(p))
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
