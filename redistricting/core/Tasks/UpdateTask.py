@@ -70,7 +70,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
 
     def __init__(self, plan: RedistrictingPlan, description):
         super().__init__(description, QgsTask.AllFlags)
-        self.assignLayer: QgsVectorLayer = plan._assignLayer
+        self.assignLayer: QgsVectorLayer = plan.assignLayer
         self.distLayer: QgsVectorLayer = plan.distLayer
         self.popLayer: QgsVectorLayer = plan.popLayer
         self.distField: str = plan.distField

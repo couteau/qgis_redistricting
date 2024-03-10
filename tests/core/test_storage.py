@@ -56,7 +56,7 @@ class TestStorage:
         assert plan.numDistricts == 5
         assert plan.numSeats == 5
         assert plan.popLayer == block_layer
-        assert plan._assignLayer == assign_layer
+        assert plan.assignLayer == assign_layer
         assert plan.distLayer == dist_layer
         assert len(plan.districts) == 6
         assert len(plan.dataFields) == 3 and plan.dataFields[0].layer == block_layer
@@ -80,7 +80,7 @@ class TestStorage:
 
         j = json.loads(l[0])
         assert 'name' in j
-        assert j['pop-layer'] == block_layer.id()
+        assert j['geo-layer'] == block_layer.id()
         assert j['dist-layer'] == dist_layer.id()
 
     def test_write_active_plan(self, empty_storage: ProjectStorage, plan):

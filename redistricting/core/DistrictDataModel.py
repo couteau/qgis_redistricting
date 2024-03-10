@@ -81,11 +81,13 @@ class DistrictDataModel(QAbstractTableModel):
 
         self.endResetModel()
 
-    def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
-        if prop in ('districts', 'data-fields', 'pop-field', 'pop-fields'):
+    def planChanged(self, plan, props):
+        assert plan == self.plan
+
+        if props & {'districts', 'data-fields', 'pop-field', 'pop-fields'}:
             self.beginResetModel()
             self.endResetModel()
-        elif prop == 'deviation':
+        elif 'deviation' in props:
             self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
 
     def districtChanged(self, district: District):

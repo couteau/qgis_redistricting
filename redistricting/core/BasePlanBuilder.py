@@ -183,7 +183,7 @@ class BasePlanBuilder(PlanValidator):
 
         return self
 
-    def setJoinField(self, value: str):
+    def setPopJoinField(self, value: str):
         if value is not None and not isinstance(value, str):
             raise ValueError(tr('Population join field must be a string'))
 

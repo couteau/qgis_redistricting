@@ -215,16 +215,16 @@ if TYPE_CHECKING:
 
 
 @overload
-def tr(message: str):
+def tr(message: str) -> str:
     pass
 
 
 @overload
-def tr(context: str, message: str):
+def tr(context: str, message: str) -> str:
     pass
 
 
-def tr(ctx_or_msg: str, message: str | None = None):
+def tr(ctx_or_msg: str, message: str | None = None) -> str:
     """Get the translation for a string using Qt translation API.
 
             :param ctx_or_msg: Translation context or string for translation.

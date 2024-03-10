@@ -37,7 +37,6 @@ from qgis.core import (
     QgsAggregateCalculator,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsFeature,
     QgsField,
     QgsMessageLog,
     QgsTask,
@@ -69,6 +68,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.path = gpkgPath
 
         self.assignFields = []
+        self.numDistricts = plan.numDistricts
 
         self.geoLayer: QgsVectorLayer = geoLayer  # None
         self.geoField: QgsField = None
@@ -235,18 +235,15 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         return True
 
-    def createUnassigned(self):
+    def createDistricts(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
         self.totalPop = self.popTotals[self.popField]
 
-        l = QgsVectorLayer(f'{self.path}|layername=districts', '__districts', 'ogr')
-        feat = QgsFeature(l.fields())
-        for fld, value in self.popTotals.items():
-            if l.fields().lookupField(fld) != -1:
-                feat.setAttribute(fld, value)
-        l.dataProvider().addFeature(feat)
-        l.updateExtents()
-        del l
+        with spatialite_connect(self.path) as db:
+            sql = f"INSERT INTO districts ({self.distField}, name, {', '.join(self.popTotals)}) VALUES (?,?,{','.join('?'*len(self.popTotals))})"
+            db.execute(sql, [0, tr("Unknown")] + list(self.popTotals.values()))
+            sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
+            db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
 
         return True
 
@@ -354,7 +351,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                 return False
 
             if self.createDistLayer():
-                self.createUnassigned()
+                self.createDistricts()
                 self.setProgress(2)
             else:
                 return False

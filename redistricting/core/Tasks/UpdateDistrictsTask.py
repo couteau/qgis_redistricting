@@ -105,8 +105,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         plan: 'RedistrictingPlan',
         updateDistricts: Iterable[int] = None,
         includeDemographics=True,
-        includeGeometry=True,
-        useBuffer=True
+        includeGeometry=True
     ):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
@@ -119,12 +118,11 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.geoPackagePath = plan.geoPackagePath
 
         self.updateDistricts: set[int] = None \
-            if updateDistricts is None or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
+            if not updateDistricts or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
             else set(updateDistricts)
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
-        self.useBuffer = useBuffer
 
         self.data: pd.DataFrame
         self.splits = {}
@@ -181,7 +179,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.splits = {}
         for field in self.geoFields:
-            g = data[[field.fieldName] + cols].groupby([field.fieldName])
+            g = data.dropna(subset=field.fieldName)[[field.fieldName] + cols].groupby([field.fieldName])
             splits_data = g.filter(lambda x: x[self.distField].nunique() > 1)
 
             splitpop = splits_data[[field.fieldName] + cols] \

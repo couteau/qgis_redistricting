@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - splits model
+"""QGIS Redistricting Plugin - plan-wide stats
 
          begin                : 2024-02-18
          git sha              : $Format:%H$
@@ -22,116 +22,161 @@
  *                                                                         *
  ***************************************************************************/
 """
+from __future__ import annotations
+
 from typing import (
+    TYPE_CHECKING,
     Any,
     Optional,
-    Union
+    Sequence
 )
 
-import numpy as np
 import pandas as pd
 from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QModelIndex,
     QObject,
-    Qt,
-    QVariant
+    pyqtSignal
 )
 
-from .PlanStats import (
-    Split,
-    SplitDistrict,
-    SplitList
-)
+from .utils import tr
+
+if TYPE_CHECKING:
+    from .DistrictList import DistrictList
+    from .Field import Field
+    from .Plan import RedistrictingPlan
 
 
-class SplitModel(QAbstractItemModel):
-    def __init__(self, splits: SplitList, parent: Optional[QObject] = None):
-        super().__init__(parent)
-        self._splits = splits
-        self._splits.splitUpdating.connect(self.beginResetModel)
-        self._splits.splitUpdated.connect(self.endResetModel)
-        self._data: pd.DataFrame = splits.data
+class SplitDistrict:
+    def __init__(self, split: "Split", data: pd.DataFrame, idx: tuple[str, int], row: int):
+        self._data = data
+        self._split = split
+        self._idx = idx
+        self._row = row
 
-    def rowCount(self, parent: QModelIndex = ...) -> int:
-        if not parent.isValid():  # it's the root node
-            return len(self._splits)
+    @property
+    def geoid(self) -> str:
+        return self._idx[0]
 
-        if parent.column() > 0:
-            return 0
+    @property
+    def district(self) -> int:
+        return self._idx[1]
 
-        split: Union[Split, SplitDistrict] = parent.internalPointer()
-        if isinstance(split, Split):
-            return len(split)
+    @property
+    def row(self) -> int:
+        return self._row
 
-        return 0
+    @property
+    def parent(self) -> "Split":
+        return self._split
 
-    def columnCount(self, parent: QModelIndex = ...) -> int:
-        if not parent.isValid():
-            return max(2, self._splits.attrCount)
+    @property
+    def attributes(self) -> Sequence[Any]:
+        return self
 
-        split: Union[Split, SplitDistrict] = parent.internalPointer()
-        if isinstance(split, Split):
-            return self._splits.attrCount
+    def __len__(self) -> int:
+        return len(self._data.columns) + 1 - int("__name" in self._data.columns)
 
-        return 0
-
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        if not index.isValid():
-            return Qt.NoItemFlags
-
-        return super().flags(index)
-
-    def data(self, index: QModelIndex, role: int = ...) -> Any:
-        if not index.isValid():
-            return QVariant()
-
-        item: Union[Split, SplitList] = index.internalPointer()
-        col = index.column()
-        if isinstance(item, Split):
-            if col >= 2:
-                return QVariant()
+    def __getitem__(self, index):
+        if index == 0:
+            return self.district
         else:
-            if col == 0:
-                return QVariant()
-            col -= 1
+            col = self._data.columns[index-1]
+            return self._data.loc[self._idx, col]
 
-        if role == Qt.DisplayRole:
-            value = item.attributes[col]
-            if isinstance(value, (int, np.integer)):
-                value = f'{value:,}'
-            elif isinstance(value, (float, np.floating)):
-                value = f'{value:,.2f}'
-            return value
 
-        return QVariant()
+class Split:
+    def __init__(self, lst: "SplitList", data: pd.DataFrame, geoid: str, row: int):
+        self._list = lst
+        self._data = data
+        self._geoid = geoid
+        self._row = row
+        districts = data.loc[geoid].index
+        self._districts = [
+            SplitDistrict(self, data, (geoid, d), r) for r, d in enumerate(districts)
+        ]
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
-        if orientation == Qt.Horizontal:
-            if role == Qt.DisplayRole:
-                return self._splits.header[section]
+    def __len__(self):
+        return len(self._districts)
 
-        return QVariant()
+    def __getitem__(self, index) -> SplitDistrict:
+        return self._districts[index]
 
-    def index(self, row: int, column: int, parent: QModelIndex = ...) -> QModelIndex:
-        if not self.hasIndex(row, column, parent):
-            return QModelIndex()
+    @property
+    def geoid(self):
+        return self._geoid
 
-        if not parent.isValid():
-            return self.createIndex(row, column, self._splits[row])
+    @property
+    def row(self):
+        return self._row
 
-        parentItem: Union[Split, SplitDistrict] = parent.internalPointer()
-        if isinstance(parentItem, SplitDistrict):  # shouldn't happen
-            return QModelIndex()
+    @property
+    def parent(self):
+        return self._list
 
-        return self.createIndex(row, column, parentItem[row])
+    @property
+    def districts(self):
+        districts = self._data.loc[self._geoid].index
+        return ",".join(str(d) for d in districts)
 
-    def parent(self, index: QModelIndex = ...) -> QModelIndex:
-        if not index.isValid():
-            return QModelIndex()
+    @property
+    def name(self):
+        if "__name" in self._data.columns:
+            i = self._data.columns.get_loc("__name",)
+            return self._data.loc[self._geoid].iat[0, i]
 
-        split: Union[Split, SplitDistrict] = index.internalPointer()
-        if isinstance(split, SplitDistrict):
-            return self.createIndex(split.parent.row, 0, split.parent)
+        return ""
 
-        return QModelIndex()
+    @property
+    def attributes(self):
+        return [f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, self.districts]
+
+
+class SplitList(QObject):
+    splitUpdating = pyqtSignal()
+    splitUpdated = pyqtSignal()
+
+    def __init__(self, plan: "RedistrictingPlan", field: Field, parent: Optional["DistrictList"] = None):
+        super().__init__(parent)
+        self.data = pd.DataFrame()
+        self.field = field
+        self.plan = plan
+        self._splits = []
+        self._header = [self.field.caption, tr("Districts"), tr('Population')]
+        self._header.extend(field.caption for field in [*plan.popFields, *plan.dataFields])
+
+    @classmethod
+    def deserialize(cls, plan: "RedistrictingPlan", field: Field, data: dict):
+        instance = cls(plan, field, plan.districts)
+        idx = pd.MultiIndex.from_tuples(
+            (tuple(i) for i in data['index']),
+            names=[field.fieldName, "district"]
+        )
+        df = pd.DataFrame(data['data'], index=idx, columns=data['columns'])
+        instance.setData(df)
+        return instance
+
+    def serialize(self):
+        return self.data.to_dict(orient="split")
+
+    def setData(self, data: pd.DataFrame):
+        self.splitUpdating.emit()
+        self.data = data
+
+        self._header = [self.field.caption, tr("Districts"), tr('Population')]
+        self._header.extend(field.caption for field in [*self.plan.popFields, *self.plan.dataFields])
+        self._splits = [Split(self, data, geoid, row)
+                        for row, geoid in enumerate(data.index.get_level_values(0).unique())]
+        self.splitUpdated.emit()
+
+    def __len__(self):
+        return len(self._splits)
+
+    def __getitem__(self, index) -> Split:
+        return self._splits[index]
+
+    @property
+    def attrCount(self):
+        return len(self.data.columns) + 2 - int("__name" in self.data.columns)
+
+    @property
+    def header(self):
+        return self._header

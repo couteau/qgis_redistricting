@@ -33,7 +33,6 @@ from qgis.core import (
     QgsCategorizedSymbolRenderer,
     QgsLimitedRandomColorRamp,
     QgsPalLayerSettings,
-    QgsRandomColorRamp,
     QgsRendererCategory,
     QgsSimpleLineSymbolLayer,
     QgsSymbol,
@@ -106,7 +105,7 @@ class PlanStyler(QObject):
 
         categoryList: List[QgsRendererCategory] = []
         for dist in range(0, self._numDistricts+1):
-            d = renderer.categories()[dist]
+            d = renderer.categories()[dist]  # pylint: disable=unsubscriptable-object
             color = QColor(d.symbol().color())
             sym = symbol.clone()
             sym.symbolLayer(0).setFillColor(color)
@@ -122,6 +121,9 @@ class PlanStyler(QObject):
 
     def updateColors(self):
         renderer = self._assignLayer.renderer()
+        if not renderer or not isinstance(renderer, QgsCategorizedSymbolRenderer):
+            return
+
         oldCount = len(renderer.categories())
         newCount = self._numDistricts + 1
         if oldCount > newCount:
@@ -156,7 +158,7 @@ class PlanStyler(QObject):
         if fromPlan.numDistricts < self._plan.numDistricts:
             self.createRenderer()
         else:
-            self._assignLayer.setRenderer(fromPlan._assignLayer.renderer().clone())
+            self._assignLayer.setRenderer(fromPlan.assignLayer.renderer().clone())
             self._distLayer.setRenderer(fromPlan.distLayer.renderer().clone())
             if fromPlan.distLayer.labelsEnabled():
                 self._distLayer.setLabelsEnabled(True)

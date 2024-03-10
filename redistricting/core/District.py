@@ -158,8 +158,10 @@ class District:
         renderer = self._list.layer.renderer()
         if isinstance(renderer, QgsCategorizedSymbolRenderer):
             idx = renderer.categoryIndexForValue(self._district)
-            if idx != -1:
-                cat = renderer.categories()[idx]
-                return QColor(cat.symbol().color())
+            if idx == -1:
+                idx = 0
+
+            cat = renderer.categories()[idx]
+            return QColor(cat.symbol().color())
 
         return QColor(QPalette().color(QPalette.Normal, QPalette.Window))

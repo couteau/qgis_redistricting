@@ -25,14 +25,12 @@
 """
 import csv
 import io
-import os
 from typing import (
     Any,
     Dict,
     Optional
 )
 
-import pandas as pd
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
@@ -102,8 +100,10 @@ class StatsModel(QAbstractTableModel):
                 s.splitUpdated.connect(self.endResetModel)
         self.endResetModel()
 
-    def planChanged(self, plan, prop, value, oldValue):  # pylint: disable=unused-argument
-        if prop == 'geo-fields':
+    def planChanged(self, plan, prop):
+        assert plan == self._plan
+
+        if 'geo-fields' in prop:
             self.beginResetModel()
             self.endResetModel()
 
@@ -147,7 +147,7 @@ class StatsModel(QAbstractTableModel):
             elif row == 5:
                 result = None
             elif row <= 6 + len(self._plan.geoFields):
-                result = f'{len(self._plan.stats.splits[self._plan.geoFields[row-6]]):,}'
+                result = f'{len(self._plan.stats.splits[self._plan.geoFields[row-6].fieldName]):,}'
             else:
                 result = None
         elif role == Qt.FontRole:
@@ -237,53 +237,47 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.addAction(self.actionCopy)
         # self.tblDataTable.menu
 
-    def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
+    def planChanged(self, plan: RedistrictingPlan, props: set[str]):  # pylint: disable=unused-argument
         if plan != self._plan:
             return
 
-        if prop == 'name':
-            self.lblPlanName.setText(newValue)
+        if "name" in props:
+            self.lblPlanName.setText(plan.name)
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)
         dlg.exec_()
 
     def recalculate(self):
-        self._plan.districts.resetData(immediate=True)
+        self._plan.updateDistricts(False)
 
-    def copyToClipboard(self):
-        """Copy district data to clipboard in csv format"""
-        m: DistrictDataModel = self.tblDataTable.model()
-        t = []
-        r = []
-        for h in range(0, m.columnCount()):
-            r.append(f'"{m.headerData(h, Qt.Horizontal, Qt.DisplayRole)}"')
+    def copyAsHtml(self, selection: Optional[list[QModelIndex]] = None):
+        """Copy district data to clipboard in html table format"""
+        if selection:
+            selection = ((s.row(), s.column()) for s in selection)
+        html = self._plan.districts.getAsHtml(selection)
 
-        t.append(r)
-        for row in range(1, self.plan.numDistricts+1):
-            r = []
-            for col in range(m.columnCount()):
-                index = m.index(row, col, QModelIndex())
-                v = m.data(index, Qt.DisplayRole)
-                v = v if v is not None else ''
-                r.append(f'"{v}"')
-            t.append(r)
-
-        cb = QgsApplication.instance().clipboard()
-        text = os.linesep.join([','.join(r) for r in t])
-        cb.setText(text)
-
-    def copyAsHtml(self, selection: list[QModelIndex]):
-        df = pd.DataFrame()
-        for idx in selection:
-            r = self._plan.districts[idx.row()].district
-            c = self._model.headerData(idx.column(), Qt.Horizontal, Qt.DisplayRole)
-            df.loc[r, c] = idx.data()
-        df.sort_index(inplace=True)
-        html = df.to_html(na_rep='')
+        # df = pd.DataFrame()
+        # for idx in selection:
+        #     r = self._plan.districts[idx.row()].district
+        #     c = self._model.headerData(idx.column(), Qt.Horizontal, Qt.DisplayRole)
+        #     df.loc[r, c] = idx.data()
+        # df.sort_index(inplace=True)
+        # df.columns.name = tr("District")
+        # html = df.to_html(na_rep='')
         mime = QMimeData()
         mime.setHtml(html)
         QgsApplication.instance().clipboard().setMimeData(mime)
+
+    def copyAsCsv(self, selection: Optional[list[QModelIndex]] = None):
+        """Copy district data to clipboard in csv format"""
+        if selection:
+            selection = ((s.row(), s.column()) for s in selection)
+        text = self._plan.districts.getAsCsv(selection)
+        QgsApplication.instance().clipboard().setText(text)
+
+    def copyToClipboard(self):
+        self.copyAsHtml()
 
     def copySelection(self):
         table = None

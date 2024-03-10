@@ -55,7 +55,7 @@ class ImportShapeFileTask(QgsTask):
         importDistField
     ):
         super().__init__(tr('Import districts from shapefile'), QgsTask.AllFlags)
-        self.assignLayer = plan._assignLayer
+        self.assignLayer = plan.assignLayer
         self.distField = plan.distField
         self.shapeFile = shapeFile
         self.importDistField = importDistField

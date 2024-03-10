@@ -214,9 +214,6 @@ class ExportRedistrictingPlanTask(QgsTask):
     def _exportShapeFile(self):
         """Write shapefile"""
 
-        if self.districts.updatingData:
-            self.districts.waitForUpdate()
-
         layer = self._createDistrictsMemoryLayer()
         if layer is not None:
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()

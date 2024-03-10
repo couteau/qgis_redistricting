@@ -41,7 +41,7 @@ class TestPlanCreator:
         creator = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
 
@@ -63,7 +63,7 @@ class TestPlanCreator:
             .setGeoPackagePath(str((datadir / 'test_plan.gpkg').resolve())) \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
         c.createPlan()
@@ -76,7 +76,7 @@ class TestPlanCreator:
         plan = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total') \
             .createPlan(createLayers=False)
@@ -111,19 +111,19 @@ class TestPlanCreator:
 
     def test_set_nonexistent_fields_no_validate(self, creator: PlanBuilder):
         assert creator._validatePopLayer()
-        creator.setJoinField('not_a_field')
+        creator.setPopJoinField('not_a_field')
         assert not creator._validatePopLayer()
-        creator.setJoinField(None)
+        creator.setPopJoinField(None)
 
         assert creator._validatePopLayer()
         creator.setPopField('not_a_field')
         assert not creator._validatePopLayer()
         creator.setPopField('pop_total')
 
-        #assert creator._validatePopLayer()
-        #creator.appendPopField('not_a_field')
-        #assert not creator._validatePopLayer()
-        #creator.removePopField(0)
+        # assert creator._validatePopLayer()
+        # creator.appendPopField('not_a_field')
+        # assert not creator._validatePopLayer()
+        # creator.removePopField(0)
 
     def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
         plan = creator.createPlan(createLayers=False)

@@ -29,10 +29,10 @@ class TestUpdatePendingChangesTask:
 
     def test_run(self, plan: RedistrictingPlan):
         plan.delta.detachSignals()
-        plan._assignLayer.startEditing()
-        f = next(plan._assignLayer.getFeatures())
-        i = plan._assignLayer.fields().lookupField(plan.distField)
-        plan._assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
+        plan.assignLayer.startEditing()
+        f = next(plan.assignLayer.getFeatures())
+        i = plan.assignLayer.fields().lookupField(plan.distField)
+        plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
         t = AggregatePendingChangesTask(plan)
         t.run()
         assert t.data is not None

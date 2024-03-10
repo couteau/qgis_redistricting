@@ -616,7 +616,7 @@ class Redistricting:
         g = self.iface.layerTreeView().currentGroupNode()
         if g.isVisible():
             p = g.customProperty('redistricting-plan-id', None)
-            if p is not None and p != str(self.activePlan.id):
+            if p is not None and (self.activePlan is None or p != str(self.activePlan.id)):
                 self.setActivePlan(UUID(p))
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
@@ -761,11 +761,8 @@ class Redistricting:
                 .setNumSeats(dlgEditPlan.numSeats()) \
                 .setDescription(dlgEditPlan.description()) \
                 .setDeviation(dlgEditPlan.deviation()) \
-                .setGeoIdField(dlgEditPlan.geoIdField()) \
                 .setGeoDisplay(dlgEditPlan.geoIdCaption()) \
-                .setGeoLayer(dlgEditPlan.geoLayer()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
-                .setJoinField(dlgEditPlan.joinField()) \
                 .setPopField(dlgEditPlan.popField()) \
                 .setPopFields(dlgEditPlan.popFields()) \
                 .setDataFields(dlgEditPlan.dataFields()) \
@@ -854,7 +851,7 @@ class Redistricting:
                 .setGeoDisplay(dlgNewPlan.geoIdCaption()) \
                 .setGeoLayer(dlgNewPlan.geoLayer()) \
                 .setPopLayer(dlgNewPlan.popLayer()) \
-                .setJoinField(dlgNewPlan.joinField()) \
+                .setPopJoinField(dlgNewPlan.joinField()) \
                 .setPopField(dlgNewPlan.popField()) \
                 .setPopFields(dlgNewPlan.popFields()) \
                 .setDataFields(dlgNewPlan.dataFields()) \
@@ -981,9 +978,9 @@ class Redistricting:
         self.actionSaveAsNew.setEnabled(False)
         self.actionRollbackPlanChanges.setEnabled(False)
 
-    def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
+    def planChanged(self, plan, prop):
         self.project.setDirty()
-        if prop in ['total-population', 'deviation', 'pop-field', 'pop-fields', 'data-fields']:
+        if plan == self.activePlan and prop & {'total-population', 'deviation', 'pop-field', 'pop-fields', 'data-fields'}:
             self.dataTableWidget.tblDataTable.update()
 
     def createDistrict(self):

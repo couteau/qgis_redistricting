@@ -42,4 +42,4 @@ class TestUpdateDistrictsTask:
         assert t.exception is None
         assert len(t.data.index) == 2
         assert t.totalPopulation == 227036
-        # t.finished(True)
+        t.finished(True)

@@ -41,7 +41,7 @@ from ..core import (
     GeoField,
     RedistrictingPlan
 )
-from ..core.PlanSplits import SplitModel
+from ..core.PlanSplitsModel import SplitsModel
 from ..core.utils import tr
 from .ui.DlgSplits import Ui_dlgSplits
 
@@ -136,7 +136,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self._plan = value
         if self._plan and self._field:
             # self._model = self.makeModel()
-            self._model = SplitModel(self._plan.districts.splits[self._field], self)
+            self._model = SplitsModel(self._plan.districts.splits[self._field], self)
         else:
             self._model = None
         self.tvSplits.setModel(self._model)
@@ -150,7 +150,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self._field = value
         if self._plan and self._field:
             # self._model = self.makeModel()
-            self._model = SplitModel(self._plan.districts.splits[self._field], self)
+            self._model = SplitsModel(self._plan.districts.splits[self._field], self)
         else:
             self._model = None
 
