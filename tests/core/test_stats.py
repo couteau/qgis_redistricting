@@ -21,7 +21,7 @@
 class TestPlanStats:
 
     def test_create(self, plan):
-        stats = plan.districts
+        stats = plan.stats
         assert stats.cutEdges is None
         assert stats.avgPolsbyPopper == 0.3605302357784885
         assert stats.avgReock == 0.4045977010951855

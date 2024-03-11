@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
 
 class SplitDistrict:
-    def __init__(self, split: "Split", data: pd.DataFrame, idx: tuple[str, int], row: int):
+    def __init__(self, split: "SplitGeography", data: pd.DataFrame, idx: tuple[str, int], row: int):
         self._data = data
         self._split = split
         self._idx = idx
@@ -65,7 +65,7 @@ class SplitDistrict:
         return self._row
 
     @property
-    def parent(self) -> "Split":
+    def parent(self) -> "SplitGeography":
         return self._split
 
     @property
@@ -83,8 +83,8 @@ class SplitDistrict:
             return self._data.loc[self._idx, col]
 
 
-class Split:
-    def __init__(self, lst: "SplitList", data: pd.DataFrame, geoid: str, row: int):
+class SplitGeography:
+    def __init__(self, lst: "Splits", data: pd.DataFrame, geoid: str, row: int):
         self._list = lst
         self._data = data
         self._geoid = geoid
@@ -130,7 +130,7 @@ class Split:
         return [f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, self.districts]
 
 
-class SplitList(QObject):
+class Splits(QObject):
     splitUpdating = pyqtSignal()
     splitUpdated = pyqtSignal()
 
@@ -145,7 +145,7 @@ class SplitList(QObject):
 
     @classmethod
     def deserialize(cls, plan: "RedistrictingPlan", field: Field, data: dict):
-        instance = cls(plan, field, plan.districts)
+        instance = cls(plan, field, plan.stats)
         idx = pd.MultiIndex.from_tuples(
             (tuple(i) for i in data['index']),
             names=[field.fieldName, "district"]
@@ -163,14 +163,14 @@ class SplitList(QObject):
 
         self._header = [self.field.caption, tr("Districts"), tr('Population')]
         self._header.extend(field.caption for field in [*self.plan.popFields, *self.plan.dataFields])
-        self._splits = [Split(self, data, geoid, row)
+        self._splits = [SplitGeography(self, data, geoid, row)
                         for row, geoid in enumerate(data.index.get_level_values(0).unique())]
         self.splitUpdated.emit()
 
     def __len__(self):
         return len(self._splits)
 
-    def __getitem__(self, index) -> Split:
+    def __getitem__(self, index) -> SplitGeography:
         return self._splits[index]
 
     @property

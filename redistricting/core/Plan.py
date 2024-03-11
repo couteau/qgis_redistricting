@@ -47,10 +47,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from .DeltaList import DeltaList
-from .DistrictList import (
-    DistrictList,
-    SplitList
-)
+from .DistrictList import DistrictList
 from .ErrorList import ErrorListMixin
 from .Exception import RdsException
 from .Field import (
@@ -60,6 +57,7 @@ from .Field import (
 )
 from .FieldList import FieldList
 from .PlanGroup import PlanGroup
+from .PlanStats import PlanStats
 from .PlanUpdate import PlanUpdater
 from .utils import tr
 
@@ -106,7 +104,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._dataFields = FieldList[DataField]()
 
         self._districts = DistrictList(self)
-        self._stats = self._districts
+        self._stats = PlanStats(self)
         self._delta = DeltaList(self)
         self._updater = PlanUpdater(self)
         self._updating = 0
@@ -153,8 +151,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],
 
-            'cut-edges': self._districts.cutEdges,
-            'plan-splits': {f: s.serialize() for f, s in self.districts.splits.items()}
+            'plan-stats': self._stats.serialize()
         }
 
         return {k: v for k, v in data.items() if v is not None}
@@ -205,13 +202,10 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                 plan._geoFields.append(f)
 
         plan._districts.updateDistrictFields()
-        plan._districts.initSplits()
+        plan._stats = PlanStats.deserialize(data.get('plan-stats', {}), plan)
 
         plan._setAssignLayer(QgsProject.instance().mapLayer(data.get('assign-layer')))
         plan._setDistLayer(QgsProject.instance().mapLayer(data.get('dist-layer')))
-
-        for f, s in data.get('plan-splits', {}).items():
-            plan._districts.splits[f] = SplitList.deserialize(plan, plan.geoFields[f], s)
 
         return plan
 
@@ -226,6 +220,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
 
         self._updating -= 1
         if self._updating == 0:
+            startUpdate = False
             newvalues = self.serialize()
             modifiedFields = {
                 k for k in newvalues if k not in self._oldvalues or newvalues[k] != self._oldvalues[k]
@@ -241,13 +236,19 @@ class RedistrictingPlan(ErrorListMixin, QObject):
                 self._districts.updateNumDistricts()
 
             if "geo-fields" in modifiedFields:
-                self._districts.initSplits()
+                self._stats.updateGeoFields()
+                self._updater.updateSplits()
+                startUpdate = True
 
             if modifiedFields & {"pop-layer", "pop-field", "pop-fields", "data-fields"}:
                 self._districts.updateDistrictFields()
                 self._updater.updateDemographics()
+                startUpdate = True
 
             self.planChanged.emit(self, modifiedFields)
+
+            if startUpdate:
+                self._updater.startUpdate()
 
     def cancelPlanUpdate(self):
         if self._updating > 0:
@@ -582,8 +583,8 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         return self._delta
 
     @property
-    def stats(self) -> DistrictList:
-        return self._districts
+    def stats(self) -> PlanStats:
+        return self._stats
 
     @property
     def geoPackagePath(self):
@@ -667,7 +668,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         if updateGeometry:
             self._updater.updateDistricts(immediate=True)
         else:
-            self._updater.updateDemographics()
+            self._updater.updateDemographics(immediate=True)
 
     def updateTotalPopulation(self, totalPopulation: int):
         self._totalPopulation = totalPopulation
@@ -675,5 +676,5 @@ class RedistrictingPlan(ErrorListMixin, QObject):
     def updateDistrictData(self, data):
         self._districts.setData(data)
 
-    def updateSplitsData(self, cutEdges, splits):
-        self._stats.updateSplits(cutEdges, splits)
+    def updateStatsData(self, cutEdges, splits):
+        self._stats.setData(cutEdges, splits)

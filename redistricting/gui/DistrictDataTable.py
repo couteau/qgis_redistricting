@@ -55,6 +55,7 @@ from qgis.PyQt.QtWidgets import (
 from ..core import (
     DistrictDataModel,
     Field,
+    PlanStats,
     RedistrictingPlan,
     showHelp,
     tr
@@ -75,45 +76,35 @@ class StatsModel(QAbstractTableModel):
         tr('Splits')
     ]
 
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def __init__(self, stats: PlanStats, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._plan = None
-        self.plan = plan
+        self._stats = None
+        self.setStats(stats)
 
-    @property
-    def plan(self) -> RedistrictingPlan:
-        return self._plan
-
-    @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def setStats(self, value: PlanStats):
         self.beginResetModel()
-        if self._plan:
-            self._plan.planChanged.disconnect(self.planChanged)
-            for s in self._plan.stats.splits.values():
+        if self._stats:
+            self._stats.statsUpdating.disconnect(self.beginResetModel)
+            self._stats.statsUpdated.disconnect(self.endResetModel)
+            for s in self._stats.splits.values():
                 s.splitUpdating.disconnect(self.beginResetModel)
                 s.splitUpdated.disconnect(self.endResetModel)
-        self._plan = value
-        if self._plan:
-            self._plan.planChanged.connect(self.planChanged)
-            for s in self._plan.stats.splits.values():
+        self._stats = value
+        if self._stats:
+            self._stats.statsUpdating.connect(self.beginResetModel)
+            self._stats.statsUpdated.connect(self.endResetModel)
+            for s in self._stats.splits.values():
                 s.splitUpdating.connect(self.beginResetModel)
                 s.splitUpdated.connect(self.endResetModel)
         self.endResetModel()
-
-    def planChanged(self, plan, prop):
-        assert plan == self._plan
-
-        if 'geo-fields' in prop:
-            self.beginResetModel()
-            self.endResetModel()
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
             return 0
 
         c = 5
-        if self._plan and self._plan.geoFields:
-            c += 1 + len(self._plan.geoFields)
+        if self._stats:
+            c += 1 + len(self._stats.splits)
         return c
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -121,33 +112,33 @@ class StatsModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
-            return self.StatLabels[section] if section <= 5 else '   ' + self._plan.geoFields[section-6].caption
+            return self.StatLabels[section] if section <= 5 else '   ' + self._stats.splits.headings[section-6]
 
         return None
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
-        if self._plan is None or not index.isValid() or index.column() != 0:
+        if self._stats is None or not index.isValid() or index.column() != 0:
             return None
 
         row = index.row()
         if role == Qt.DisplayRole:
             if row == 0:
-                result = f'{self._plan.totalPopulation:,}'
+                result = f'{self._stats.totalPopulation:,}'
             elif row == 1:
-                avgPP = self._plan.stats.avgPolsbyPopper
+                avgPP = self._stats.avgPolsbyPopper
                 result = f'{avgPP:.3f}' if avgPP is not None else ''
             elif row == 2:
-                avgReock = self._plan.stats.avgReock
+                avgReock = self._stats.avgReock
                 result = f'{avgReock:.3f}' if avgReock is not None else ''
             elif row == 3:
-                avgCH = self._plan.stats.avgConvexHull
+                avgCH = self._stats.avgConvexHull
                 result = f'{avgCH:.3f}' if avgCH is not None else ''
             elif row == 4:
-                result = f'{self._plan.stats.cutEdges:,}' if self._plan.stats.cutEdges else ''
+                result = f'{self._stats.cutEdges:,}' if self._stats.cutEdges else ''
             elif row == 5:
                 result = None
-            elif row <= 6 + len(self._plan.geoFields):
-                result = f'{len(self._plan.stats.splits[self._plan.geoFields[row-6].fieldName]):,}'
+            elif row <= 6 + len(self._stats.splits):
+                result = f'{len(self._stats.splits[row-6]):,}'
             else:
                 result = None
         elif role == Qt.FontRole:
@@ -176,18 +167,19 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
         self._plan = value
         self._model.plan = value
-        self._statsModel.plan = value
 
         if self._plan is None:
             self.btnAddFields.setEnabled(False)
             self.btnRecalculate.setEnabled(False)
             self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
+            self._statsModel.setStats(None)
         else:
             self.btnAddFields.setEnabled(True)
             self.btnRecalculate.setEnabled(True)
             self.lblPlanName.setText(self._plan.name)
             if self._plan:
                 self._plan.planChanged.connect(self.planChanged)
+            self._statsModel.setStats(self._plan.stats)
 
     def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
         super().__init__(parent)
@@ -204,7 +196,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._model.modelReset.connect(self.lblWaiting.stop)
         self.tblDataTable.setModel(self._model)
 
-        self._statsModel = StatsModel(plan)
+        self._statsModel = StatsModel(None, self)
         self.tblPlanStats.setModel(self._statsModel)
         self.tblPlanStats.verticalHeader()
         self.tblPlanStats.doubleClicked.connect(self.statsDoubleClicked)

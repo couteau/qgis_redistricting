@@ -105,7 +105,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
         plan: 'RedistrictingPlan',
         updateDistricts: Iterable[int] = None,
         includeDemographics=True,
-        includeGeometry=True
+        includeGeometry=True,
+        includSplits=True
     ):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
@@ -123,6 +124,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
+        self.includeSplits = includSplits
 
         self.data: pd.DataFrame
         self.splits = {}
@@ -165,18 +167,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
-    def calcPlanMetrics(self, data: pd.DataFrame, cols: list[str]):
+    def calcSplits(self, data: pd.DataFrame, cols: list[str]):
         total = len(self.geoFields) + 1
-        if self.popField in cols:
-            self.totalPopulation = data[self.popField].sum()
-        else:
-            context = QgsExpressionContext()
-            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-            agg = QgsAggregateCalculator(self.popLayer)
-            totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
-            if success:
-                self.totalPopulation = int(totalPop)
-
         self.splits = {}
         for field in self.geoFields:
             g = data.dropna(subset=field.fieldName)[[field.fieldName] + cols].groupby([field.fieldName])
@@ -211,6 +203,17 @@ class AggregateDistrictDataTask(AggregateDataTask):
         data['reock'] = area / cea.minimum_bounding_circle().area
         data['convexhull'] = area / cea.convex_hull.area
 
+    def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
+        if self.popField in cols:
+            self.totalPopulation = data[self.popField].sum()
+        else:
+            context = QgsExpressionContext()
+            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+            agg = QgsAggregateCalculator(self.popLayer)
+            totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
+            if success:
+                self.totalPopulation = int(totalPop)
+
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         def dissolve_progress():
             nonlocal count, total
@@ -232,7 +235,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 cols += [self.popField] + [f.fieldName for f in self.popFields] + [f.fieldName for f in self.dataFields]
 
             self.setProgressIncrement(40, 50)
-            self.calcPlanMetrics(assign, cols)
+            if self.includeSplits:
+                self.calcSplits(assign, cols)
 
             self.setProgressIncrement(50, 100)
             if self.includeGeometry:

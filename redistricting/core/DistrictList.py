@@ -50,7 +50,6 @@ from qgis.PyQt.QtCore import (
 )
 
 from .District import District
-from .PlanSplits import SplitList
 from .utils import (
     connect_layer,
     makeFieldName,
@@ -58,7 +57,6 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from .Field import Field
     from .Plan import RedistrictingPlan
 
 IntTypes = (QVariant.Int, QVariant.UInt, QVariant.LongLong, QVariant.ULongLong)
@@ -98,10 +96,6 @@ class DistrictList(QObject):
 
         self._totalPopulation = 0
         self.updateDistrictFields()
-
-        self._cutEdges = None
-        self._splits = None
-        self.initSplits()
 
     @overload
     def __getitem__(self, index: Union[str, int]) -> District:
@@ -406,37 +400,6 @@ class DistrictList(QObject):
     @property
     def avgConvexHull(self):
         return self._avgScore("convexhull")
-
-    @property
-    def cutEdges(self):
-        return self._cutEdges
-
-    @property
-    def splits(self) -> dict[str, SplitList]:
-        return self._splits
-
-    def initSplits(self):
-        oldSplits = self._splits
-        self._splits: dict[str, SplitList] = {
-            f.fieldName: SplitList(self._plan, f, self) for f in self._plan.geoFields
-        }
-        if oldSplits is not None:
-            for f, s in oldSplits.items():
-                if f in self._splits:
-                    self._splits[f].setData(s.data)
-
-    def updateSplits(self, cutEdges, splits: dict[str, pd.DataFrame]):
-        if cutEdges is not None:
-            self._cutEdges = cutEdges
-
-        if splits is not None:
-            for f, split in splits.items():
-                field = self._plan.geoFields[f]
-                if field is not None:
-                    if f not in self._splits:
-                        self._splits[f] = SplitList(self._plan, field, self)
-
-                    self._splits[f].setData(split)
 
     def getSelectionData(self, selection: Iterable[tuple[int, int]]) -> pd.DataFrame:
         if selection is not None:

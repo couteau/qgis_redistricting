@@ -110,7 +110,8 @@ class TestPlan:
             )
         assert len(valid_plan.dataFields) == 1
 
-    def test_geofields_assign(self, valid_plan: RedistrictingPlan, block_layer, qtbot: QtBot):
+    # pylint: disable-next=unused-argument
+    def test_geofields_assign(self, valid_plan: RedistrictingPlan, block_layer, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.planChanged):
             valid_plan._setGeoFields([Field(block_layer, 'vtdid20', False)])  # pylint: disable=protected-access
         assert len(valid_plan.geoFields) == 1

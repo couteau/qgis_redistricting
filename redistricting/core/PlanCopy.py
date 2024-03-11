@@ -44,7 +44,7 @@ from qgis.utils import spatialite_connect
 
 from .ErrorList import ErrorListMixin
 from .PlanBuilder import PlanBuilder
-from .PlanSplits import SplitList
+from .PlanSplits import Splits
 from .PlanStyle import PlanStyler
 from .utils import tr
 
@@ -105,7 +105,7 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             for f in plan.geoFields:
-                split = SplitList(plan, f, plan.districts)
+                split = Splits(plan, f, plan.districts)
                 split.setData(self._plan.stats.splits[f.fieldName].data.copy())
                 plan.stats.splits[f.fieldName] = split
 

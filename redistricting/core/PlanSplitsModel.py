@@ -39,14 +39,14 @@ from qgis.PyQt.QtCore import (
 )
 
 from .PlanSplits import (
-    Split,
     SplitDistrict,
-    SplitList
+    SplitGeography,
+    Splits
 )
 
 
 class SplitsModel(QAbstractItemModel):
-    def __init__(self, splits: SplitList, parent: Optional[QObject] = None):
+    def __init__(self, splits: Splits, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._splits = splits
         self._splits.splitUpdating.connect(self.beginResetModel)
@@ -60,8 +60,8 @@ class SplitsModel(QAbstractItemModel):
         if parent.column() > 0:
             return 0
 
-        split: Union[Split, SplitDistrict] = parent.internalPointer()
-        if isinstance(split, Split):
+        split: Union[SplitGeography, SplitDistrict] = parent.internalPointer()
+        if isinstance(split, SplitGeography):
             return len(split)
 
         return 0
@@ -70,8 +70,8 @@ class SplitsModel(QAbstractItemModel):
         if not parent.isValid():
             return max(2, self._splits.attrCount)
 
-        split: Union[Split, SplitDistrict] = parent.internalPointer()
-        if isinstance(split, Split):
+        split: Union[SplitGeography, SplitDistrict] = parent.internalPointer()
+        if isinstance(split, SplitGeography):
             return self._splits.attrCount
 
         return 0
@@ -86,9 +86,9 @@ class SplitsModel(QAbstractItemModel):
         if not index.isValid():
             return QVariant()
 
-        item: Union[Split, SplitList] = index.internalPointer()
+        item: Union[SplitGeography, Splits] = index.internalPointer()
         col = index.column()
-        if isinstance(item, Split):
+        if isinstance(item, SplitGeography):
             if col >= 2:
                 return QVariant()
         else:
@@ -120,7 +120,7 @@ class SplitsModel(QAbstractItemModel):
         if not parent.isValid():
             return self.createIndex(row, column, self._splits[row])
 
-        parentItem: Union[Split, SplitDistrict] = parent.internalPointer()
+        parentItem: Union[SplitGeography, SplitDistrict] = parent.internalPointer()
         if isinstance(parentItem, SplitDistrict):  # shouldn't happen
             return QModelIndex()
 
@@ -130,7 +130,7 @@ class SplitsModel(QAbstractItemModel):
         if not index.isValid():
             return QModelIndex()
 
-        split: Union[Split, SplitDistrict] = index.internalPointer()
+        split: Union[SplitGeography, SplitDistrict] = index.internalPointer()
         if isinstance(split, SplitDistrict):
             return self.createIndex(split.parent.row, 0, split.parent)
 

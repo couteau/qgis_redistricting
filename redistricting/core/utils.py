@@ -275,6 +275,8 @@ def matchField(field: str, layer: QgsVectorLayer, fieldList: List[Union[str, re.
             if f.match(field):
                 return layer is None or layer.fields().lookupField(field) != -1
 
+    return None
+
 
 def showHelp(helpPage='index.html'):
     """Display application help to the user."""
@@ -315,12 +317,17 @@ def getTableName(layer: QgsVectorLayer, dataset: gdal.Dataset):
     return table
 
 
-def spatialite_connect(database: Union[str, bytes, pathlib.Path],
-                       timeout: float = 5.0, detect_types: int = 0,
-                       isolation_level: str = 'DEFERRED', check_same_thread: bool = True,
-                       factory: Type[sqlite3.Connection] = sqlite3.Connection,
-                       cached_statements: int = 128, uri: bool = False,
-                       enable_gpkg=None) -> sqlite3.Connection:
+def spatialite_connect(
+    database: Union[str, bytes, pathlib.Path],
+    timeout: float = 5.0,
+    detect_types: int = 0,
+    isolation_level: str = 'DEFERRED',
+    check_same_thread: bool = True,
+    factory: Type[sqlite3.Connection] = sqlite3.Connection,
+    cached_statements: int = 128,
+    uri: bool = False,
+    enable_gpkg=None
+) -> sqlite3.Connection:
     """returns a dbapi2.Connection to a SpatiaLite db
     using the mod_spatialite_path() extension (python3)"""
 

@@ -43,9 +43,13 @@ class splitSchema(TypedDict):
     data: list[list[Union[int, float]]]
 
 
-class baseDistSchema1_0_1(TypedDict):
-    district: int
-    name: str
+statsSchema = TypedDict(
+    'statsSchema',
+    {
+        'cut-edges': int,
+        'plan-splits': dict[str, splitSchema],
+    }
+)
 
 
 planSchema = TypedDict(
@@ -76,10 +80,14 @@ planSchema = TypedDict(
         'pop-fields': list[fieldSchema],
         'data-fields': list[dataFieldSchema],
 
-        'plan-splits': dict[str, splitSchema],
-        'cut-edges': int
+        'plan-stats': statsSchema
     }
 )
+
+
+class baseDistSchema1_0_1(TypedDict):
+    district: int
+    name: str
 
 
 class distSchema1_0_1(baseDistSchema1_0_1, total=False):
@@ -284,12 +292,9 @@ def migrateSchema1_0_1_to_1_0_2(data: dict):
 
         plan_splits[f] = {"index": index, "columns": columns, "data": split_data}
 
-    data["plan-splits"] = plan_splits
-    if "cut-edges" in data["plan-stats"]:
-        data["cut-edges"] = data["plan-stats"]["cut-edges"]
+    data["plan-stats"]["plan-splits"] = plan_splits
 
     del data["districts"]
-    del data["plan-stats"]
     return data, version.parse('1.0.2')
 
 

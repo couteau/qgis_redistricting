@@ -47,6 +47,10 @@ from .PlanImport import (
     AssignmentImporter,
     ShapefileImporter
 )
+from .PlanStats import (
+    PlanStats,
+    SplitsList
+)
 from .PlanStyle import PlanStyler
 from .storage import ProjectStorage
 from .utils import (
@@ -60,6 +64,7 @@ from .utils import (
 
 __all__ = ['RedistrictingPlan', 'PlanBuilder', 'PlanEditor', 'ProjectStorage',
            'District', 'DistrictList', 'FieldList', 'Field', 'DataField', 'GeoField',
+           'PlanStats', 'SplitsList',
            'DistrictDataModel', 'FieldListModels', 'DeltaListModel',
            'PlanAssignmentEditor', 'PlanExporter', 'AssignmentImporter', 'ShapefileImporter',
            'PlanCopier', 'PlanStyler',

@@ -57,6 +57,7 @@ class PlanUpdater(QObject):
         self._updateTask: Optional[AggregateDistrictDataTask] = None
         self._needDemographicUpdate = False
         self._needGeometryUpdate = False
+        self._needSplitsUpdate = False
         self._updateDistricts = set[int]()
         self._assignLayer: QgsVectorLayer = None
         self._dindex: int = -1
@@ -84,7 +85,7 @@ class PlanUpdater(QObject):
             self._plan.updateTotalPopulation(self._updateTask.totalPopulation)
 
         self._plan.updateDistrictData(self._updateTask.data)
-        self._plan.updateSplitsData(self._updateTask.cutEdges, self._updateTask.splits)
+        self._plan.updateStatsData(self._updateTask.cutEdges, self._updateTask.splits)
 
         self.clear()
 
@@ -106,7 +107,7 @@ class PlanUpdater(QObject):
         :returns: QgsTask object representing the background update task
         :rtype: QgsTask
         """
-        if not (self._needDemographicUpdate or self._needGeometryUpdate):
+        if not (self._needDemographicUpdate or self._needGeometryUpdate or self._needSplitsUpdate):
             return
 
         if force and self._updateTask:
@@ -138,6 +139,7 @@ class PlanUpdater(QObject):
             self._updateDistricts |= districts
 
         self._needGeometryUpdate = True
+        self._needSplitsUpdate = True
         if immediate:
             self.startUpdate()
 
@@ -157,9 +159,15 @@ class PlanUpdater(QObject):
         self._updateDistricts = set()
         self._needGeometryUpdate = False
 
-    def updateDemographics(self):
+    def updateDemographics(self, immediate: bool = False):
         self._needDemographicUpdate = True
-        self.startUpdate()
+        if immediate:
+            self.startUpdate()
+
+    def updateSplits(self, immediate: bool = False):
+        self._needSplitsUpdate = True
+        if immediate:
+            self.startUpdate()
 
     @property
     def isUpdating(self):
