@@ -81,7 +81,7 @@ class DistrictSelectModel(QAbstractListModel):
         return 0
 
     def rowCount(self, parent: QModelIndex):  # pylint: disable=unused-argument
-        return len(self._districts) + 1
+        return len(self._districts) + self._offset
 
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()

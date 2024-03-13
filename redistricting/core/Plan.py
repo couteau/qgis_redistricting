@@ -56,6 +56,7 @@ from .Field import (
     GeoField
 )
 from .FieldList import FieldList
+from .PlanAssignments import PlanAssignmentEditor
 from .PlanGroup import PlanGroup
 from .PlanStats import PlanStats
 from .PlanUpdate import PlanUpdater
@@ -64,6 +65,9 @@ from .utils import tr
 
 class RedistrictingPlan(ErrorListMixin, QObject):
     planChanged = pyqtSignal('PyQt_PyObject', 'PyQt_PyObject')
+    districtsUpdating = pyqtSignal('PyQt_PyObject')
+    districtsUpdated = pyqtSignal('PyQt_PyObject')
+    districtUpdateTerminated = pyqtSignal(bool)
 
     def __init__(self, name='', numDistricts: int = None, uuid: UUID = None, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -107,8 +111,14 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._stats = PlanStats(self)
         self._delta = DeltaList(self)
         self._updater = PlanUpdater(self)
+        self._updater.updateStarted.connect(self.districtsUpdating)
+        self._updater.updateComplete.connect(self.districtsUpdated)
+        self._updater.updateTerminated.connect(self.districtUpdateTerminated)
+
         self._updating = 0
         self._oldvalues: dict[str, Any] = None
+
+        self._assignmentEditor: PlanAssignmentEditor = None
 
         QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
 
@@ -464,6 +474,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         self._assignLayer = value
         self._delta.setAssignLayer(value)
         self._updater.setAssignLayer(value)
+        self.stopEditing()
 
         if self._assignLayer is not None:
             self._group.updateLayers()
@@ -663,6 +674,15 @@ class RedistrictingPlan(ErrorListMixin, QObject):
         QgsProject.instance().addMapLayers([assignLayer, distLayer], False)
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)
+
+    def startEditing(self):
+        if self._assignmentEditor is None:
+            self._assignmentEditor = PlanAssignmentEditor(self, self)
+
+        return self._assignmentEditor
+
+    def stopEditing(self):
+        self._assignmentEditor = None
 
     def updateDistricts(self, updateGeometry=True):
         if updateGeometry:

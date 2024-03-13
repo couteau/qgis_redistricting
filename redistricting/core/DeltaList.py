@@ -164,10 +164,6 @@ class DeltaList(QObject):
             self._undoStack = self._assignLayer.undoStack()
             self._undoStack.indexChanged.connect(self.update)
 
-    def detachSignals(self):
-        self._undoStack.indexChanged.disconnect(self.update)
-        self._undoStack = None
-
     def isUpdatingPending(self):
         return self._pendingTask is not None and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete
 
@@ -192,9 +188,8 @@ class DeltaList(QObject):
         if self._pendingTask and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete:
             return self._pendingTask
 
-        if not self._assignLayer or not self._assignLayer.editBuffer() or \
-                len(self._assignLayer.editBuffer().changedAttributeValues()) == 0:
-            # self.clear()
+        if not self._assignLayer or not self._assignLayer.editBuffer() or self._undoStack.index() == 0:
+            self.clear()
             return None
 
         self.updateStarted.emit(self._plan)

@@ -37,6 +37,7 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
+from .Field import GeoField
 from .PlanSplits import Splits
 
 if TYPE_CHECKING:
@@ -62,20 +63,26 @@ class SplitsList:
     def __contains__(self, key: str) -> bool:
         return key in self._splits
 
-    def __getitem__(self, key: Union[str, int]) -> Splits:
-        if isinstance(key, int):
+    def __getitem__(self, key: Union[str, int, GeoField]) -> Splits:
+        if isinstance(key, GeoField):
+            key = key.fieldName
+        elif isinstance(key, int):
             key = self._plan.geoFields[key].fieldName
 
         return self._splits[key]
 
-    def __setitem__(self, key: Union[str, int], value: Splits):
-        if isinstance(key, int):
+    def __setitem__(self, key: Union[str, int, GeoField], value: Splits):
+        if isinstance(key, GeoField):
+            key = key.fieldName
+        elif isinstance(key, int):
             key = self._plan.geoFields[key].fieldName
 
         self._splits[key] = value
 
-    def __delitem__(self, key: Union[str, int]):
-        if isinstance(key, int):
+    def __delitem__(self, key: Union[str, int, GeoField]):
+        if isinstance(key, GeoField):
+            key = key.fieldName
+        elif isinstance(key, int):
             key = self._plan.geoFields[key].fieldName
 
         del self._splits[key]

@@ -48,7 +48,7 @@ from qgis.core import (
     QgsVirtualLayerDefinition
 )
 
-from ..utils import (
+from .utils import (
     random_id,
     spatialite_connect
 )

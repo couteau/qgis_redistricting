@@ -50,6 +50,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from .District import District
+from .layer import LayerReader
 from .utils import (
     connect_layer,
     makeFieldName,
@@ -77,9 +78,6 @@ class DistrictAccessor:
 
 class DistrictList(QObject):
     districtChanged = pyqtSignal('PyQt_PyObject')
-    updating = pyqtSignal()
-    updateComplete = pyqtSignal()
-    updateTerminated = pyqtSignal()
 
     def __init__(self, plan: RedistrictingPlan, data: Optional[pd.DataFrame] = None):
         super().__init__(plan)
@@ -224,6 +222,14 @@ class DistrictList(QObject):
         idealUpper = ceil(members * self._totalPopulation / self._plan.numSeats) + maxDeviation
         idealLower = floor(self._totalPopulation / self._plan.numSeats) - maxDeviation
         return (idealLower, idealUpper)
+
+    def getAssignments(self, district: int = None):
+        s = LayerReader(self._plan.assignLayer)
+        if district is not None:
+            filt = {self._plan.distField: district}
+        else:
+            filt = None
+        return s.read_layer(['fid', self._plan.geoIdField, self._plan.distField], order='fid', filt=filt, read_geometry=False)
 
     def updateNumDistricts(self):
         if self._plan.numDistricts != len(self._data):

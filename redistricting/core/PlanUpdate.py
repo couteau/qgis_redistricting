@@ -47,8 +47,8 @@ if TYPE_CHECKING:
 
 
 class PlanUpdater(QObject):
-    updateStarted = pyqtSignal()
-    updateComplete = pyqtSignal()
+    updateStarted = pyqtSignal("PyQt_PyObject")
+    updateComplete = pyqtSignal("PyQt_PyObject")
     updateTerminated = pyqtSignal(bool)
 
     def __init__(self, plan: "RedistrictingPlan"):
@@ -65,6 +65,7 @@ class PlanUpdater(QObject):
     def clear(self):
         self._needDemographicUpdate = False
         self._needGeometryUpdate = False
+        self._needSplitsUpdate = False
         self._updateDistricts = set[int]()
 
     def setAssignLayer(self, value: QgsVectorLayer):
@@ -87,9 +88,10 @@ class PlanUpdater(QObject):
         self._plan.updateDistrictData(self._updateTask.data)
         self._plan.updateStatsData(self._updateTask.cutEdges, self._updateTask.splits)
 
+        updated = list(self._updateDistricts) if self._updateDistricts else None
         self.clear()
 
-        self.updateComplete.emit()
+        self.updateComplete.emit(updated)
         self._updateTask = None
 
     def updateTaskTerminated(self):
@@ -118,7 +120,7 @@ class PlanUpdater(QObject):
         if not self._updateTask:
             self._plan.clearErrors()
 
-            self.updateStarted.emit()
+            self.updateStarted.emit(list(self._updateDistricts) if self._updateDistricts else None)
             self._updateTask = AggregateDistrictDataTask(
                 self._plan,
                 updateDistricts=self._updateDistricts,

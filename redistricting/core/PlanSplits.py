@@ -40,9 +40,9 @@ from qgis.PyQt.QtCore import (
 from .utils import tr
 
 if TYPE_CHECKING:
-    from .DistrictList import DistrictList
     from .Field import Field
     from .Plan import RedistrictingPlan
+    from .PlanStats import PlanStats
 
 
 class SplitDistrict:
@@ -134,14 +134,14 @@ class Splits(QObject):
     splitUpdating = pyqtSignal()
     splitUpdated = pyqtSignal()
 
-    def __init__(self, plan: "RedistrictingPlan", field: Field, parent: Optional["DistrictList"] = None):
+    def __init__(self, plan: "RedistrictingPlan", field: Field, parent: Optional["PlanStats"] = None):
         super().__init__(parent)
         self.data = pd.DataFrame()
         self.field = field
         self.plan = plan
         self._splits = []
         self._header = [self.field.caption, tr("Districts"), tr('Population')]
-        self._header.extend(field.caption for field in [*plan.popFields, *plan.dataFields])
+        self._header.extend(f.caption for f in [*plan.popFields, *plan.dataFields])
 
     @classmethod
     def deserialize(cls, plan: "RedistrictingPlan", field: Field, data: dict):

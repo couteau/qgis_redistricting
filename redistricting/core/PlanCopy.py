@@ -105,7 +105,7 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             for f in plan.geoFields:
-                split = Splits(plan, f, plan.districts)
+                split = Splits(plan, f, plan.stats)
                 split.setData(self._plan.stats.splits[f.fieldName].data.copy())
                 plan.stats.splits[f.fieldName] = split
 
@@ -114,7 +114,7 @@ class PlanCopier(ErrorListMixin, QObject):
 
         return plan
 
-    def copyBufferedAssignments(self, target: RedistrictingPlan, rollback=True):
+    def copyBufferedAssignments(self, target: RedistrictingPlan):
         if not self._plan.assignLayer.isEditable():
             return
 
@@ -124,8 +124,6 @@ class PlanCopier(ErrorListMixin, QObject):
         for fid, feat in values.items():
             target.assignLayer.changeAttributeValues(fid, feat)
         target.assignLayer.commitChanges(True)
-        if rollback:
-            self._plan.assignLayer.rollBack(True)
 
     def copyAssignments(self, target: RedistrictingPlan, autocommit=True):
         def progress():

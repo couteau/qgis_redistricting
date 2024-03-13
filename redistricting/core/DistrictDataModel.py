@@ -22,7 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Any
+from typing import (
+    Any,
+    Union
+)
 
 import numpy as np
 import pandas as pd
@@ -63,20 +66,16 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
 
         if self._districts is not None:
-            self._districts.updating.disconnect(self.beginResetModel)
-            self._districts.updateComplete.disconnect(self.endResetModel)
-            self._districts.updateTerminated.disconnect(self.endResetModel)
             self._districts.districtChanged.disconnect(self.districtChanged)
+            self._plan.districtsUpdated.disconnect(self.districtsUpdated)
             self._plan.planChanged.disconnect(self.planChanged)
 
         self._plan = value
         self._districts = self._plan.districts if self._plan else None
 
         if self._districts is not None:
-            self._districts.updating.connect(self.beginResetModel)
-            self._districts.updateComplete.connect(self.endResetModel)
-            self._districts.updateTerminated.connect(self.endResetModel)
             self._districts.districtChanged.connect(self.districtChanged)
+            self._plan.districtsUpdated.connect(self.districtsUpdated)
             self._plan.planChanged.connect(self.planChanged)
 
         self.endResetModel()
@@ -186,3 +185,16 @@ class DistrictDataModel(QAbstractTableModel):
             f |= Qt.ItemIsEditable
 
         return f
+
+    def districtsUpdated(self, districts: Union[list[int], None]):
+        if districts:
+            for d in districts:
+                self.dataChanged.emit(
+                    self.createIndex(d, 3),
+                    self.createIndex(d, self.columnCount()),
+                    [Qt.DisplayRole, Qt.EditRole]
+                )
+                self.dataChanged.emit(self.createIndex(d, 4), self.createIndex(d, 5), [Qt.FontRole])
+        else:
+            self.beginResetModel()
+            self.endResetModel()

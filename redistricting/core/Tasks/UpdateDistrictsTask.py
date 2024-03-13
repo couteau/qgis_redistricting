@@ -233,6 +233,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 popdf = self.loadPopData()
                 assign: gpd.GeoDataFrame = assign.join(popdf)
                 cols += [self.popField] + [f.fieldName for f in self.popFields] + [f.fieldName for f in self.dataFields]
+                self.totalPopulation = int(assign[self.popField].sum())
 
             self.setProgressIncrement(40, 50)
             if self.includeSplits:
@@ -274,7 +275,19 @@ class AggregateDistrictDataTask(AggregateDataTask):
                     assign = assign[assign[self.distField].isin(self.updateDistricts)]
                 total = len(assign)
                 self.data = assign[cols].groupby(by=self.distField).sum()
+
                 self.updateProgress(total, total)
+
+            # Account for districts with no assignments --
+            # otherwise, they will never be updated in the database
+            if self.updateDistricts is None:
+                zero = set(range(0, self.numDistricts+1)) - set(self.data.index)
+            else:
+                zero = self.updateDistricts - set(self.data.index)
+
+            if zero:
+                df = pd.DataFrame(0, index=list(zero), columns=self.data.columns)
+                self.data = pd.concat([self.data, df]).sort_index()
 
             name = pd.Series(
                 [
