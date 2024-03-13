@@ -38,6 +38,7 @@ from qgis.PyQt.QtCore import (
     QMimeData,
     QModelIndex,
     QObject,
+    QPoint,
     Qt
 )
 from qgis.PyQt.QtGui import (
@@ -60,6 +61,7 @@ from ..core import (
     showHelp,
     tr
 )
+from .DistrictActions import DistrictActions
 from .DlgEditFields import DlgEditFields
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
@@ -159,6 +161,9 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
     def plan(self, value: RedistrictingPlan):
         if self._plan:
             self._plan.planChanged.disconnect(self.planChanged)
+            self._plan.districtsUpdating.disconnect(self.lblWaiting.start)
+            self._plan.districtsUpdated.disconnect(self.lblWaiting.stop)
+            self._plan.districtUpdateTerminated.disconnect(self.lblWaiting.stop)
 
         if self._dlgSplits:
             self._dlgSplits.close()
@@ -174,16 +179,20 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
             self._statsModel.setStats(None)
         else:
+            self._plan.planChanged.connect(self.planChanged)
+            self._plan.districtsUpdating.connect(self.lblWaiting.start)
+            self._plan.districtsUpdated.connect(self.lblWaiting.stop)
+            self._plan.districtUpdateTerminated.connect(self.lblWaiting.stop)
             self.btnAddFields.setEnabled(True)
             self.btnRecalculate.setEnabled(True)
             self.lblPlanName.setText(self._plan.name)
-            if self._plan:
-                self._plan.planChanged.connect(self.planChanged)
             self._statsModel.setStats(self._plan.stats)
 
-    def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
+    def __init__(self, plan: RedistrictingPlan, districtCopier: DistrictActions, parent: QObject = None):
         super().__init__(parent)
         self.setupUi(self)
+
+        self.districtCopier = districtCopier
 
         self.fieldStats: Dict[Field, QWidget] = {}
 
@@ -192,8 +201,6 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.lblWaiting.setVisible(False)
 
         self._model = DistrictDataModel(None, self)
-        self._model.modelAboutToBeReset.connect(self.lblWaiting.start)
-        self._model.modelReset.connect(self.lblWaiting.stop)
         self.tblDataTable.setModel(self._model)
 
         self._statsModel = StatsModel(None, self)
@@ -221,13 +228,16 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
         self.actionCopy = QAction(
             QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
-            self.tr("Copy"),
+            self.tr("Copy data"),
             self
         )
+        self.actionCopy.setToolTip(self.tr("Copy selected demographic data to clipboard"))
         self.actionCopy.triggered.connect(self.copySelection)
         self.actionCopy.setShortcut(QKeySequence.Copy)
         self.addAction(self.actionCopy)
-        # self.tblDataTable.menu
+
+        self.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tblDataTable.customContextMenuRequested.connect(self.createDataTableConextMenu)
 
     def planChanged(self, plan: RedistrictingPlan, props: set[str]):  # pylint: disable=unused-argument
         if plan != self._plan:
@@ -243,33 +253,19 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
     def recalculate(self):
         self._plan.updateDistricts(False)
 
-    def copyAsHtml(self, selection: Optional[list[QModelIndex]] = None):
+    def copyMimeDataToClipboard(self, selection: Optional[list[QModelIndex]] = None):
         """Copy district data to clipboard in html table format"""
         if selection:
             selection = ((s.row(), s.column()) for s in selection)
         html = self._plan.districts.getAsHtml(selection)
-
-        # df = pd.DataFrame()
-        # for idx in selection:
-        #     r = self._plan.districts[idx.row()].district
-        #     c = self._model.headerData(idx.column(), Qt.Horizontal, Qt.DisplayRole)
-        #     df.loc[r, c] = idx.data()
-        # df.sort_index(inplace=True)
-        # df.columns.name = tr("District")
-        # html = df.to_html(na_rep='')
+        text = self._plan.districts.getAsCsv(selection)
         mime = QMimeData()
         mime.setHtml(html)
+        mime.setData("application/csv", text)
         QgsApplication.instance().clipboard().setMimeData(mime)
 
-    def copyAsCsv(self, selection: Optional[list[QModelIndex]] = None):
-        """Copy district data to clipboard in csv format"""
-        if selection:
-            selection = ((s.row(), s.column()) for s in selection)
-        text = self._plan.districts.getAsCsv(selection)
-        QgsApplication.instance().clipboard().setText(text)
-
     def copyToClipboard(self):
-        self.copyAsHtml()
+        self.copyMimeDataToClipboard()
 
     def copySelection(self):
         table = None
@@ -286,12 +282,32 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         else:
             selection = self.tblDataTable.selectedIndexes()
             if selection:
-                self.copyAsHtml(selection)
+                self.copyMimeDataToClipboard(selection)
 
     def contextMenuEvent(self, event: QContextMenuEvent):
         menu = QMenu(self)
         menu.addActions(self.actions())
         menu.exec(event.globalPos())
+
+    def createDataTableConextMenu(self, pos: QPoint):
+        menu = QMenu(self)
+        menu.addAction(self.actionCopy)
+
+        idx = self.tblDataTable.indexAt(pos)
+        district = self._plan.districts[idx.row()]
+
+        menu.addAction(self.districtCopier.actionCopyDistrict)
+        self.districtCopier.actionCopyDistrict.setData(district.district)
+        self.districtCopier.actionCopyDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.districtCopier.actionPasteDistrict)
+        self.districtCopier.actionPasteDistrict.setData(district.district)
+        self.districtCopier.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self._plan))
+        menu.addAction(self.districtCopier.actionZoomToDistrict)
+        self.districtCopier.actionZoomToDistrict.setData(district.district)
+        menu.addAction(self.districtCopier.actionFlashDistrict)
+        self.districtCopier.actionFlashDistrict.setData(district.district)
+        self.districtCopier.actionFlashDistrict.setEnabled(district.district != 0)
+        menu.exec(self.tblDataTable.mapToGlobal(pos))
 
     def btnHelpClicked(self):
         showHelp('usage/data_table.html')
