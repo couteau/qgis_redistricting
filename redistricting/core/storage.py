@@ -90,6 +90,11 @@ class ProjectStorage:
         if success:
             for p in l:
                 planJson = json.loads(p)
+
+                if 'geo-layer' not in planJson and 'pop-layer' in planJson:
+                    planJson['geo-layer'] = planJson['pop-layer']
+                    del planJson['pop-layer']
+
                 plan = RedistrictingPlan.deserialize(planJson, parent=self._project)
                 if plan is not None:
                     plans.append(plan)

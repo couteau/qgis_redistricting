@@ -90,7 +90,7 @@ class TestCreateLayersTask:
         d = QgsVectorLayer(f'{str(gpkg)}|layername=districts')
 
         assert d.isValid()
-        assert d.featureCount() == 1
+        assert d.featureCount() == 6
         for f in p.dataFields:
             assert d.fields().lookupField(f.fieldName) != -1
 

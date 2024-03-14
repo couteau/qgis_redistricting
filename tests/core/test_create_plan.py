@@ -20,7 +20,10 @@ import pytest
 from pytest_mock.plugin import MockerFixture
 from qgis.core import QgsTask
 
-from redistricting.core import PlanBuilder
+from redistricting.core import (
+    PlanBuilder,
+    RdsException
+)
 from redistricting.core.PlanBuilder import QgsApplication
 
 # pylint: disable=protected-access
@@ -41,7 +44,7 @@ class TestPlanCreator:
         creator = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
 
@@ -63,7 +66,7 @@ class TestPlanCreator:
             .setGeoPackagePath(str((datadir / 'test_plan.gpkg').resolve())) \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
         c.createPlan()
@@ -76,7 +79,7 @@ class TestPlanCreator:
         plan = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(block_layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total') \
             .createPlan(createLayers=False)
@@ -111,24 +114,24 @@ class TestPlanCreator:
 
     def test_set_nonexistent_fields_no_validate(self, creator: PlanBuilder):
         assert creator._validatePopLayer()
-        creator.setJoinField('not_a_field')
+        creator.setPopJoinField('not_a_field')
         assert not creator._validatePopLayer()
-        creator.setJoinField(None)
+        creator.setPopJoinField(None)
 
         assert creator._validatePopLayer()
         creator.setPopField('not_a_field')
         assert not creator._validatePopLayer()
         creator.setPopField('pop_total')
 
-        #assert creator._validatePopLayer()
-        #creator.appendPopField('not_a_field')
-        #assert not creator._validatePopLayer()
-        #creator.removePopField(0)
+    def test_append_nonexistent_field_raises_error(self, creator: PlanBuilder):
+        assert creator._validatePopLayer()
+        with pytest.raises(RdsException):
+            creator.appendPopField('not_a_field')
 
     def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
         plan = creator.createPlan(createLayers=False)
         assert hasattr(plan.districts[0], 'pop_total')
-        assert not plan.districts._needUpdate
+        assert not plan._updater._needDemographicUpdate
 
         creator.appendPopField('vap_total')
         plan = creator.createPlan(createLayers=False)

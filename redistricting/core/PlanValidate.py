@@ -32,6 +32,11 @@ from qgis.PyQt.QtCore import QObject
 
 from .defaults import MAX_DISTRICTS
 from .ErrorList import ErrorListMixin
+from .Field import (
+    DataField,
+    Field,
+    GeoField
+)
 from .FieldList import FieldList
 from .Plan import RedistrictingPlan
 from .utils import tr
@@ -54,13 +59,13 @@ class PlanValidator(ErrorListMixin, QObject):
 
         self._geoLayer: QgsVectorLayer = None
         self._geoJoinField = None
-        self._geoFields = FieldList(self)
+        self._geoFields = FieldList[GeoField]()
 
         self._popLayer: QgsVectorLayer = None
         self._popJoinField = None
         self._popField = None
-        self._popFields = FieldList(self)
-        self._dataFields = FieldList(self)
+        self._popFields = FieldList[Field]()
+        self._dataFields = FieldList[DataField]()
 
         self._assignLayer: QgsVectorLayer = None
         self._distLayer: QgsVectorLayer = None
@@ -90,7 +95,7 @@ class PlanValidator(ErrorListMixin, QObject):
         instance._popFields = plan.popFields[:]
         instance._dataFields = plan.dataFields[:]
 
-        instance._assignLayer = plan._assignLayer
+        instance._assignLayer = plan.assignLayer
         instance._distLayer = plan.distLayer
         return instance
 

@@ -31,6 +31,7 @@ from math import (
 from typing import (
     TYPE_CHECKING,
     Any,
+    Iterable,
     Optional,
     Union,
     overload
@@ -39,10 +40,7 @@ from typing import (
 import numpy as np
 import pandas as pd
 from qgis.core import (
-    Qgis,
-    QgsApplication,
     QgsFeature,
-    QgsTask,
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import (
@@ -52,8 +50,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from .District import District
-from .PlanStats import SplitList
-from .Tasks import AggregateDistrictDataTask
+from .layer import LayerReader
 from .utils import (
     connect_layer,
     makeFieldName,
@@ -61,7 +58,6 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
-    from .Field import Field
     from .Plan import RedistrictingPlan
 
 IntTypes = (QVariant.Int, QVariant.UInt, QVariant.LongLong, QVariant.ULongLong)
@@ -82,9 +78,6 @@ class DistrictAccessor:
 
 class DistrictList(QObject):
     districtChanged = pyqtSignal('PyQt_PyObject')
-    updating = pyqtSignal()
-    updateComplete = pyqtSignal()
-    updateTerminated = pyqtSignal()
 
     def __init__(self, plan: RedistrictingPlan, data: Optional[pd.DataFrame] = None):
         super().__init__(plan)
@@ -101,16 +94,6 @@ class DistrictList(QObject):
 
         self._totalPopulation = 0
         self.updateDistrictFields()
-
-        self._cutEdges = None
-        self._splits = None
-        self.initSplits()
-        self._plan.planChanged.connect(self.planChanged)
-
-        self._needUpdate = False
-        self._needGeomUpdate = False
-        self._updateDistricts = None
-        self._updateTask = None
 
     @overload
     def __getitem__(self, index: Union[str, int]) -> District:
@@ -240,22 +223,18 @@ class DistrictList(QObject):
         idealLower = floor(self._totalPopulation / self._plan.numSeats) - maxDeviation
         return (idealLower, idealUpper)
 
-    @property
-    def updatingData(self):
-        return self.updateDistricts() is not None
+    def getAssignments(self, district: int = None):
+        s = LayerReader(self._plan.assignLayer)
+        if district is not None:
+            filt = {self._plan.distField: district}
+        else:
+            filt = None
+        return s.read_layer(['fid', self._plan.geoIdField, self._plan.distField], order='fid', filt=filt, read_geometry=False)
 
-    def planChanged(self, plan, field, oldValue, newValue):
-        if self._plan != plan:
-            raise ValueError()
-
-        if field == "geo-fields":
-            self.initSplits()
-        elif field in ("pop-field", "pop-fields", "data-fields"):
-            self.updateDistrictFields()
-        elif field == "num-districts":
-            if oldValue == len(self._data):
-                self._index = pd.RangeIndex(newValue + 1)
-                self.createDataFrame(self._index, self._columns, self._data)
+    def updateNumDistricts(self):
+        if self._plan.numDistricts != len(self._data):
+            self._index = pd.RangeIndex(self._plan.numDistricts + 1)
+            self.createDataFrame(self._index, self._columns, self._data)
 
     def createDataFrame(self, districts, columns: dict[str, pd.Series], data: pd.DataFrame = None):
         self._data = pd.DataFrame(
@@ -412,89 +391,6 @@ class DistrictList(QObject):
         self.saveData(district)
         self.districtChanged.emit(self.district[district])
 
-    def updateTaskCompleted(self):
-        self._plan.distLayer.reload()
-        if self._updateTask.totalPopulation:
-            self._plan.totalPopulation = self._updateTask.totalPopulation
-
-        self.setData(self._updateTask.data)
-        self.updateSplits(self._updateTask.cutEdges, self._updateTask.splits)
-
-        if self._needGeomUpdate:
-            self._plan.distLayer.triggerRepaint()
-
-        self._needUpdate = False
-        self._needGeomUpdate = False
-        self._updateDistricts = None
-        self._updateTask = None
-
-        self.updateComplete.emit()
-
-    def updateTaskTerminated(self):
-        if self._updateTask.exception:
-            self._plan.setError(
-                f'{self._updateTask.exception!r}', Qgis.Critical)
-        self._updateTask = None
-        self._needUpdate = False
-        self.updateTerminated.emit()
-
-    def waitForUpdate(self):
-        if self._updateTask:
-            self._updateTask.waitForFinished()
-
-    def updateDistricts(self, force=False) -> QgsTask:
-        """ update aggregate district data from assignments, including geometry where requested
-
-        :param force: Cancel any pending update and begin a new update
-        :type force: bool
-
-        :returns: QgsTask object representing the background update task
-        :rtype: QgsTask
-        """
-        if not self._needUpdate and not force:
-            return None
-
-        if force:
-            if self._updateTask:
-                self._updateTask.cancel()
-            self._updateTask = None
-
-        if self._needUpdate and not self._updateTask:
-            self._plan.clearErrors()
-
-            self.updating.emit()
-            self._updateTask = AggregateDistrictDataTask(
-                self._plan,
-                updateDistricts=self._updateDistricts,
-                includeGeometry=self._needGeomUpdate,
-                useBuffer=self._needGeomUpdate
-            )
-            self._updateTask.taskCompleted.connect(self.updateTaskCompleted)
-            self._updateTask.taskTerminated.connect(self.updateTaskTerminated)
-            QgsApplication.taskManager().addTask(self._updateTask)
-
-        return self._updateTask
-
-    def resetData(self, updateGeometry=False, districts: set[int] = None, immediate=False):
-        if not self._plan.isValid():
-            return
-
-        if self._updateTask and updateGeometry and not self._needGeomUpdate:
-            try:
-                self._updateTask.cancel()
-            except RuntimeError:
-                pass
-            self._updateTask = None
-        self._needUpdate = True
-        self._needGeomUpdate = self._needGeomUpdate or updateGeometry
-        if districts:
-            if not self._updateDistricts:
-                self._updateDistricts = districts
-            else:
-                self._updateDistricts |= districts
-        if immediate:
-            self.updateDistricts(True)
-
     # stats
     def _avgScore(self, score: str):
         return self._data.loc[1:, score].mean()
@@ -511,31 +407,25 @@ class DistrictList(QObject):
     def avgConvexHull(self):
         return self._avgScore("convexhull")
 
-    @property
-    def cutEdges(self):
-        return self._cutEdges
+    def getSelectionData(self, selection: Iterable[tuple[int, int]]) -> pd.DataFrame:
+        if selection is not None:
+            # create a dataframe of bools with the same dimensions as data
+            s = (self._data.iloc[:, 1:-1] != self._data.iloc[:, 1:-1]).fillna(False)
+            # set elements to True if in selection
+            for row, col in selection:
+                s.iloc[row, col] = True
+            # select the elements of data that are contained in selection
+            df = self._data[s]
+            # drop the unselected rows and columns
+            df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+        else:
+            df = self._data.iloc[:, 1:-1]
+        df = df.fillna('')
+        df.columns.name = tr("District")
+        return df
 
-    @property
-    def splits(self) -> dict[Field, SplitList]:
-        return self._splits
+    def getAsHtml(self, selection: Iterable[tuple[int, int]]) -> str:
+        return self.getSelectionData(selection).style.to_html()
 
-    def initSplits(self):
-        oldSplits = self._splits
-        self._splits: dict[Field, SplitList] = {
-            f: SplitList(self._plan, f, self) for f in self._plan.geoFields
-        }
-        if oldSplits is not None:
-            for f, s in oldSplits.items():
-                self._splits[f].setData(s.data)
-
-    def updateSplits(self, cutEdges, splits):
-        if cutEdges is not None:
-            self._cutEdges = cutEdges
-
-        if splits is not None:
-            for f, split in splits.items():
-                field = self._plan.geoFields[f]
-                if field not in self._splits:
-                    self._splits[field] = SplitList(self._plan, field, self)
-                if field is not None:
-                    self._splits[field].setData(split)
+    def getAsCsv(self, selection: Iterable[tuple[int, int]]) -> str:
+        return self.getSelectionData(selection).to_csv()

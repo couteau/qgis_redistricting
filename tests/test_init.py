@@ -85,8 +85,9 @@ class TestPluginInit:
         builder.setGeoIdField.return_value = builder
         builder.setGeoDisplay.return_value = builder
         builder.setGeoLayer.return_value = builder
+        builder.setGeoJoinField.return_value = builder
         builder.setPopLayer.return_value = builder
-        builder.setJoinField.return_value = builder
+        builder.setPopJoinField.return_value = builder
         builder.setPopField.return_value = builder
         builder.setPopFields.return_value = builder
         builder.setDataFields.return_value = builder
@@ -108,7 +109,7 @@ class TestPluginInit:
         builder.setGeoDisplay.return_value = builder
         builder.setGeoLayer.return_value = builder
         builder.setPopLayer.return_value = builder
-        builder.setJoinField.return_value = builder
+        builder.setGeoJoinField.return_value = builder
         builder.setPopField.return_value = builder
         builder.setPopFields.return_value = builder
         builder.setDataFields.return_value = builder
@@ -237,7 +238,7 @@ class TestPluginInit:
         plugin_with_gui.appendPlan(plan)
         assert len(plugin_with_gui.redistrictingPlans) == 1
         assert plan.isSignalConnected(plan.metaObject().method(plan.metaObject().indexOfMethod(
-            'planChanged(PyQt_PyObject,QString,PyQt_PyObject,PyQt_PyObject)'))
+            'planChanged(PyQt_PyObject,PyQt_PyObject)'))
         )
 
     def test_remove_plan(self, plugin_with_plan, plan, qtbot: QtBot):
@@ -364,12 +365,12 @@ class TestPluginInit:
 
     def test_edit_signals(self, plugin_with_project: redistricting.Redistricting, qtbot):
         plan = plugin_with_project.activePlan
-        with qtbot.wait_signal(plan._assignLayer.editingStarted):
-            plan._assignLayer.startEditing()
+        with qtbot.wait_signal(plan.assignLayer.editingStarted):
+            plan.assignLayer.startEditing()
         assert plugin_with_project.actionCommitPlanChanges.isEnabled()
         assert plugin_with_project.actionRollbackPlanChanges.isEnabled()
-        with qtbot.wait_signal(plan._assignLayer.editingStopped):
-            plan._assignLayer.rollBack(True)
+        with qtbot.wait_signal(plan.assignLayer.editingStopped):
+            plan.assignLayer.rollBack(True)
         assert not plugin_with_project.actionCommitPlanChanges.isEnabled()
         assert not plugin_with_project.actionRollbackPlanChanges.isEnabled()
 

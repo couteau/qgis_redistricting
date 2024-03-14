@@ -61,15 +61,17 @@ def dist_layer(gpkg_path, qgis_new_project):
 
 @pytest.fixture
 def minimal_plan():
-    return RedistrictingPlan('minimal', 5)
+    plan = RedistrictingPlan('minimal', 5)
+    yield plan
+    plan.deleteLater()
 
 
 @pytest.fixture
-def valid_plan(minimal_plan, block_layer, gpkg_path):
+def valid_plan(minimal_plan: RedistrictingPlan, block_layer, gpkg_path):
     # pylint: disable=protected-access
-    minimal_plan._setPopLayer(block_layer)
+    minimal_plan._setGeoLayer(block_layer)
+    minimal_plan._geoIdField = 'geoid20'
     minimal_plan._setPopField('pop_total')
-    minimal_plan._setGeoIdField('geoid20')
     # pylint: enable=protected-access
     minimal_plan.addLayersFromGeoPackage(gpkg_path)
     return minimal_plan
@@ -80,7 +82,7 @@ def plan(block_layer, assign_layer, dist_layer):
     p = RedistrictingPlan.deserialize({
         'name': 'test',
         'deviation': 0.025,
-        'pop-layer': block_layer.id(),
+        'geo-layer': block_layer.id(),
         'geo-id-field': 'geoid20',
         'dist-field': 'district',
         'pop-field': 'pop_total',
@@ -123,7 +125,9 @@ def plan(block_layer, assign_layer, dist_layer):
 
     }, None)
 
-    return p
+    yield p
+
+    p.deleteLater()
 
 
 @ pytest.fixture
@@ -135,7 +139,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .setName('test') \
         .setNumDistricts(5) \
         .setDeviation(0.025) \
-        .setPopLayer(block_layer) \
+        .setGeoLayer(block_layer) \
         .setGeoIdField('geoid20') \
         .setDistField('district') \
         .setPopField('pop_total') \
@@ -147,7 +151,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .createPlan(createLayers=False)
     del b
 
-    update = mocker.patch.object(p.districts, 'updateDistricts')
+    update = mocker.patch.object(p, 'updateDistricts')
     update.return_value = None
 
     p.addLayersFromGeoPackage(dst)
@@ -186,3 +190,9 @@ def mock_plan(mocker: MockerFixture, assign_layer, dist_layer, block_layer):
     type(plan).dataFields = mocker.PropertyMock(return_value=data_fields)
 
     return plan
+
+
+@pytest.fixture
+def mock_taskmanager(qgis_app, mocker: MockerFixture):
+    mock = mocker.patch.object(qgis_app.taskManager(), 'addTask')
+    return mock

@@ -24,9 +24,7 @@
 """
 from typing import (
     Iterable,
-    List,
     Set,
-    Union,
     overload
 )
 
@@ -51,6 +49,8 @@ from .Field import (
 from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
 from .utils import tr
 
+# pylint: disable=protected-access
+
 
 class PlanEditor(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
@@ -70,6 +70,21 @@ class PlanEditor(BasePlanBuilder):
     def cancel(self):
         if self._updateAssignLayerTask:
             self._updateAssignLayerTask.cancel()
+
+    def RaiseChangedReadonlyFieldError(self, attribute: str):
+        raise RuntimeError(tr("Cannot change {attribute} after plan creation").format(attribute=attribute))
+
+    def setGeoIdField(self, value: str):
+        self.RaiseChangedReadonlyFieldError("GeoID Field")
+
+    def setDistField(self, value: str):
+        self.RaiseChangedReadonlyFieldError("District Field")
+
+    def setGeoLayer(self, value: QgsVectorLayer):
+        self.RaiseChangedReadonlyFieldError("Geography Layer")
+
+    def setGeoJoinField(self, value: str):
+        self.RaiseChangedReadonlyFieldError("Geography Join Field")
 
     @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
@@ -99,11 +114,15 @@ class PlanEditor(BasePlanBuilder):
             fields = [QgsField(fieldOrFieldName, fieldType)]
         elif isinstance(fieldOrFieldName, QgsField):
             fields = [QgsField(fieldOrFieldName)]
+        elif isinstance(fieldOrFieldName, Iterable):
+            fields = list(fieldOrFieldName)
+            if not all(isinstance(f, QgsField) for f in fields):
+                raise ValueError("Argument must be an iterable of QgsField")
         else:
-            fields = fieldOrFieldName
+            raise ValueError("Argument must be a string, QgsField, or iterable of QgsField")
 
         provider = layer.dataProvider()
-        if not int(QgsVectorDataProvider.AddAttributes) & int(provider.capabilities()):
+        if not QgsVectorDataProvider.AddAttributes & provider.capabilities():
             self.pushError('Could not add field to layer', Qgis.Critical)
             return
         for field in reversed(fields):
@@ -119,35 +138,69 @@ class PlanEditor(BasePlanBuilder):
             provider.addAttributes(fields)
             layer.updateFields()
 
-    def _updateGeoField(self, geoField: Union[Field, List[Field]]):
+    def _updateGeoFields(self):
+        def removeFields():
+            removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
+            if removedFields:
+                provider = self._assignLayer.dataProvider()
+                fields = self._assignLayer.fields()
+                removeidx = [
+                    fields.lookupField(f.fieldName)
+                    for f in removedFields
+                    if fields.lookupField(f.fieldName) != -1
+                ]
+                provider.deleteAttributes(removeidx)
+                self._assignLayer.updateFields()
 
-        def cleanup():
+        def terminated():
             if self._updateAssignLayerTask.isCanceled():
-                self.setError(tr('Add geography field canceled'),
-                              Qgis.UserCanceled)
+                self.setError(tr('Update geography fields canceled'), Qgis.UserCanceled)
+
+            provider = self._assignLayer.dataProvider()
+            fields = self._assignLayer.fields()
+            removeidx = [
+                fields.lookupField(f.fieldName)
+                for f in self._updateAssignLayerTask.geoFields
+                if fields.lookupField(f.fieldName) != -1
+            ]
+            provider.deleteAttributes(removeidx)
+            self._assignLayer.updateFields()
+
+            self._geoFields = saveFields
+            self._plan._setGeoFields(saveFields)
+
             self._updateAssignLayerTask = None
 
-        if not self._plan or not self._plan.assignLayer:
-            return None
+        def completed():
+            removeFields()
+            self._updateAssignLayerTask = None
 
-        if isinstance(geoField, Field):
-            geoField = [geoField]
+        if not self._plan or not self._plan.assignLayer or self._geoFields == self._plan.geoFields:
+            return
 
-        self._updateAssignLayerTask = AddGeoFieldToAssignmentLayerTask(
-            self._geoPackagePath,
-            self._plan.assignLayer,
-            self._geoLayer,
-            geoField,
-            self._geoJoinField,
-            self._geoIdField
-        )
-        self._updateAssignLayerTask.taskCompleted.connect(cleanup)
-        self._updateAssignLayerTask.taskTerminated.connect(cleanup)
-        self._updateAssignLayerTask.progressChanged.connect(self.setProgress)
-        QgsApplication.taskManager().addTask(self._updateAssignLayerTask)
-        return self._updateAssignLayerTask
+        saveFields = self._plan.geoFields
+        layer = self._plan.assignLayer
+        addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
+        if addedFields:
+            self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-    # pylint: disable=protected-access
+            self._updateAssignLayerTask = AddGeoFieldToAssignmentLayerTask(
+                self._geoPackagePath,
+                self._plan.assignLayer,
+                self._geoLayer,
+                addedFields,
+                self._geoJoinField,
+                self._geoIdField
+            )
+            self._updateAssignLayerTask.taskCompleted.connect(completed)
+            self._updateAssignLayerTask.taskTerminated.connect(terminated)
+            self._updateAssignLayerTask.progressChanged.connect(self.setProgress)
+            QgsApplication.taskManager().addTask(self._updateAssignLayerTask)
+        else:
+            removeFields()
+
+        self._plan._setGeoFields(self._geoFields)
+
     def updatePlan(self):
         self.clearErrors()
 
@@ -155,7 +208,7 @@ class PlanEditor(BasePlanBuilder):
             return None
 
         a = self._plan.serialize()
-        self._plan.blockSignals(True)
+        self._plan.startPlanUpdate()
         try:
             self._plan._setName(self._name)
             self._plan._setNumDistricts(self._numDistricts)
@@ -163,21 +216,16 @@ class PlanEditor(BasePlanBuilder):
             self._plan._setDescription(self._description)
             self._plan._setDeviation(self._deviation)
 
+            self._plan._setPopLayer(self._popLayer)
+            self._plan._setPopJoinField(self._popJoinField)
+            self._plan._setPopField(self._popField)
+
             if self._popFields != self._plan.popFields:
                 if self._plan.distLayer:
                     layer = self._plan.distLayer
                     addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
                     if addedFields:
                         self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
-
-                    removedFields: Set[Field] = set(self._plan.popFields) - set(self._popFields)
-                    if removedFields:
-                        provider = layer.dataProvider()
-                        for f in removedFields:
-                            findex = layer.fields().lookupField(f.fieldName)
-                            if findex != -1:
-                                provider.deleteAttributes([findex])
-                        layer.updateFields()
 
                 self._plan._setPopFields(self._popFields)
 
@@ -200,37 +248,14 @@ class PlanEditor(BasePlanBuilder):
 
                 self._plan._setDataFields(self._dataFields)
 
-            if self._geoFields != self._plan.geoFields:
-                if self._plan._assignLayer:
-                    layer = self._plan._assignLayer
-
-                    removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
-                    if removedFields:
-                        provider = layer.dataProvider()
-                        for f in removedFields:
-                            findex = layer.fields().lookupField(f.fieldName)
-                            if findex != -1:
-                                provider.deleteAttributes([findex])
-                        layer.updateFields()
-
-                    addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
-                    if addedFields:
-                        self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
-                        self._updateGeoField(addedFields)
-
-                self._plan._setGeoFields(self._geoFields)
-
-            self._plan._setGeoIdField(self._geoIdField)
             self._plan._setGeoIdCaption(self._geoIdCaption)
 
-            self._plan._setGeoLayer(self._geoLayer)
-            self._plan._setGeoJoinField(self._geoJoinField)
+            if self._geoFields != self._plan.geoFields:
+                self._updateGeoFields()
 
-            self._plan._setPopLayer(self._popLayer)
-            self._plan._setPopJoinField(self._popJoinField)
-            self._plan._setPopField(self._popField)
-        finally:
-            self._plan.blockSignals(False)
+            self._plan.endPlanUpdate()
+        except:  # pylint: disable=bare-except
+            self._plan.cancelPlanUpdate()
 
         b = self._plan.serialize()
         self._modifiedFields = {k for k in b if k not in a or b[k] != a[k]}

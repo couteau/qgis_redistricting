@@ -24,7 +24,6 @@
  """
 from typing import (
     Any,
-    List,
     Optional
 )
 
@@ -41,8 +40,9 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 from qgis.PyQt.QtGui import (
-    QColor,
+    QBrush,
     QIcon,
+    QPainter,
     QPixmap
 )
 from qgis.PyQt.QtWidgets import QDockWidget
@@ -60,39 +60,28 @@ from .ui.DistrictTools import Ui_qdwDistrictTools
 class DistrictSelectModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...):
         super().__init__(parent)
+        self._districts = plan.districts
+        self._districts.districtChanged.connect(self.districtNameChanged)
         self._offset = 2
-        self._plan = plan
 
-    def updateDistricts(self, newValue: List[District], oldValue: List[District]):
-        added = set(newValue) - set(oldValue)
-        removed = set(oldValue) - set(newValue)
+    def updateDistricts(self):
+        self.beginResetModel()
+        self.endResetModel()
 
-        for dist in removed:
-            i = oldValue.index(dist)
-            self.beginRemoveRows(QModelIndex(), i+self._offset, i+self._offset)
-            self.endInsertRows()
-
-        for dist in added:
-            i = newValue.index(dist)
-            self.beginInsertRows(QModelIndex(), i+self._offset, i+self._offset)
-            self.endInsertRows()
-
-    def districtNameChanged(self, newValue, oldValue):  # pylint: disable=unused-argument
-        self.dataChanged.emit(
-            self.createIndex(self._offset + 1, 0),
-            self.createIndex(self._plan.allocatedDistricts + self._offset, 0),
-            {Qt.DisplayRole}
-        )
+    def districtNameChanged(self, district: District):  # pylint: disable=unused-argument
+        idx = self._districts.index(district)
+        index = self.createIndex(idx + self._offset, 0)
+        self.dataChanged.emit(index, index, {Qt.DisplayRole})
 
     def indexFromDistrict(self, district):
-        if district in self._plan.districts:
-            i = self._plan.districts.index(district)
+        if district in self._districts:
+            i = self._districts.index(district)
             return 1 if i == 0 else i + self._offset
 
         return 0
 
     def rowCount(self, parent: QModelIndex):  # pylint: disable=unused-argument
-        return self._offset if self._plan.allocatedDistricts == 0 else self._plan.allocatedDistricts + self._offset + 1
+        return len(self._districts) + self._offset
 
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
@@ -100,23 +89,29 @@ class DistrictSelectModel(QAbstractListModel):
         if role in {Qt.DisplayRole, Qt.EditRole}:
             if row == 0:
                 return tr('All')
+
             if row == 1:
-                return tr('Unassigned')
+                return self._districts[0].name
+
             if row > self._offset:
-                return self._plan.districts[row-self._offset].name
+                return self._districts[row - 2].name
 
         if role == Qt.DecorationRole:
             if row == 0:
                 return QgsApplication.getThemeIcon('/mActionSelectAll.svg')
 
-            if row == 1:
+            if row == 1 or row > self._offset:
+                dist = 0 if row == 1 else row-self._offset
                 pixmap = QPixmap(64, 64)
-                pixmap.fill(QColor(160, 160, 160))
-                return QIcon(pixmap)
-
-            if row > self._offset:
-                pixmap = QPixmap(64, 64)
-                pixmap.fill(self._plan.districts[row-self._offset].color)
+                pixmap.fill(Qt.transparent)
+                p = QPainter()
+                if p.begin(pixmap):
+                    p.setPen(self._districts[dist].color)
+                    p.setBrush(QBrush(self._districts[dist].color))
+                    p.drawEllipse(0, 0, 64, 64)
+                    p.end()
+                else:
+                    pixmap.fill(self._districts[dist].color)
                 return QIcon(pixmap)
 
         if role == Qt.AccessibleDescriptionRole and row == self._offset:
@@ -134,6 +129,7 @@ class DistrictSelectModel(QAbstractListModel):
 class SourceDistrictModel(DistrictSelectModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
         super().__init__(plan, parent)
+        self._plan = plan
         self._offset = 3
 
     def data(self, index: QModelIndex, role: int = ...) -> Any:
@@ -167,13 +163,13 @@ class TargetDistrictModel(DistrictSelectModel):
 
         elif role == Qt.DecorationRole:
             if row == 0:
-                return QgsApplication.getThemeIcon('/mActionAdd.svg')
+                return QgsApplication.getThemeIcon('/mActionToggleEditing.svg')
 
         return super().data(index, role)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         flags = super().flags(index)
-        if (index.row() == 0 and self._plan.allocatedDistricts == self._plan.numDistricts):
+        if index.row() == 0:
             flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
         return flags
 
@@ -272,14 +268,14 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         i = self.cmbTarget.model().indexFromDistrict(district)
         self.cmbTarget.setCurrentIndex(i)
 
-    def reloadFields(self, plan, prop, newValue, oldValue):
+    def reloadFields(self, plan, prop):
         if plan != self._plan:
             return
 
-        if prop == 'districts':
-            self.cmbSource.model().updateDistricts(newValue, oldValue)
-            self.cmbTarget.model().updateDistricts(newValue, oldValue)
-        elif prop == 'geo-fields':
+        if 'districts' in prop:
+            self.cmbSource.model().updateDistricts()
+            self.cmbTarget.model().updateDistricts()
+        elif 'geo-fields' in prop:
             index = self.cmbGeoSelect.currentIndex()
             if self._plan.geoFields:
                 model = GeoFieldsModel(self._plan, self)
@@ -294,7 +290,7 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             else:
                 field = model.fields[index].fieldName
             self.geoFieldChanged.emit(field)
-        elif prop == 'name':
+        elif 'name' in prop:
             self.lblPlanName.setText(self._plan.name)
 
     def cmbGeoFieldChanged(self, index):

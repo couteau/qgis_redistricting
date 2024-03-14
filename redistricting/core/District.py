@@ -44,11 +44,11 @@ if TYPE_CHECKING:
 
 
 class District:
-    def __init__(self, district: int, owner: DistrictList):
+    def __init__(self, district: int, lst: DistrictList):
         self._district = district
-        self._data = owner._data
+        self._data = lst._data
         self._index = self._data.index.get_loc(district)
-        self._list = owner
+        self._list = lst
 
     @overload
     def __getitem__(self, index: str | int) -> Any:
@@ -154,12 +154,18 @@ class District:
         return lower <= self.population <= upper
 
     @property
+    def assignments(self):
+        return self._list.getAssignments(self._district)
+
+    @property
     def color(self):
         renderer = self._list.layer.renderer()
         if isinstance(renderer, QgsCategorizedSymbolRenderer):
             idx = renderer.categoryIndexForValue(self._district)
-            if idx != -1:
-                cat = renderer.categories()[idx]
-                return QColor(cat.symbol().color())
+            if idx == -1:
+                idx = 0
+
+            cat = renderer.categories()[idx]
+            return QColor(cat.symbol().color())
 
         return QColor(QPalette().color(QPalette.Normal, QPalette.Window))

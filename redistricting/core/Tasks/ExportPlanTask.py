@@ -214,9 +214,6 @@ class ExportRedistrictingPlanTask(QgsTask):
     def _exportShapeFile(self):
         """Write shapefile"""
 
-        if self.districts.updatingData:
-            self.districts.waitForUpdate()
-
         layer = self._createDistrictsMemoryLayer()
         if layer is not None:
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()
@@ -278,12 +275,13 @@ class ExportRedistrictingPlanTask(QgsTask):
                 feedback.canceled.connect(self.cancel)
             saveOptions.feedback = feedback
 
-            error, msg = QgsVectorFileWriter.writeAsVectorFormatV2(
+            error, msg, _, _ = QgsVectorFileWriter.writeAsVectorFormatV3(
                 layer=self.assignLayer,
                 fileName=self.equivalencyFileName,
                 transformContext=QgsProject.instance().transformContext(),
                 options=saveOptions
             )
+
             if error != QgsVectorFileWriter.NoError:
                 self.exception = RdsException(msg)
                 return False

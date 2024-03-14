@@ -106,7 +106,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         updateDistricts: Iterable[int] = None,
         includeDemographics=True,
         includeGeometry=True,
-        useBuffer=True
+        includSplits=True
     ):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
@@ -119,12 +119,12 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.geoPackagePath = plan.geoPackagePath
 
         self.updateDistricts: set[int] = None \
-            if updateDistricts is None or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
+            if not updateDistricts or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
             else set(updateDistricts)
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
-        self.useBuffer = useBuffer
+        self.includeSplits = includSplits
 
         self.data: pd.DataFrame
         self.splits = {}
@@ -167,21 +167,11 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
-    def calcPlanMetrics(self, data: pd.DataFrame, cols: list[str]):
+    def calcSplits(self, data: pd.DataFrame, cols: list[str]):
         total = len(self.geoFields) + 1
-        if self.popField in cols:
-            self.totalPopulation = data[self.popField].sum()
-        else:
-            context = QgsExpressionContext()
-            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-            agg = QgsAggregateCalculator(self.popLayer)
-            totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
-            if success:
-                self.totalPopulation = int(totalPop)
-
         self.splits = {}
         for field in self.geoFields:
-            g = data[[field.fieldName] + cols].groupby([field.fieldName])
+            g = data.dropna(subset=field.fieldName)[[field.fieldName] + cols].groupby([field.fieldName])
             splits_data = g.filter(lambda x: x[self.distField].nunique() > 1)
 
             splitpop = splits_data[[field.fieldName] + cols] \
@@ -213,6 +203,17 @@ class AggregateDistrictDataTask(AggregateDataTask):
         data['reock'] = area / cea.minimum_bounding_circle().area
         data['convexhull'] = area / cea.convex_hull.area
 
+    def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
+        if self.popField in cols:
+            self.totalPopulation = data[self.popField].sum()
+        else:
+            context = QgsExpressionContext()
+            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+            agg = QgsAggregateCalculator(self.popLayer)
+            totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
+            if success:
+                self.totalPopulation = int(totalPop)
+
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         def dissolve_progress():
             nonlocal count, total
@@ -232,9 +233,11 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 popdf = self.loadPopData()
                 assign: gpd.GeoDataFrame = assign.join(popdf)
                 cols += [self.popField] + [f.fieldName for f in self.popFields] + [f.fieldName for f in self.dataFields]
+                self.totalPopulation = int(assign[self.popField].sum())
 
             self.setProgressIncrement(40, 50)
-            self.calcPlanMetrics(assign, cols)
+            if self.includeSplits:
+                self.calcSplits(assign, cols)
 
             self.setProgressIncrement(50, 100)
             if self.includeGeometry:
@@ -272,7 +275,19 @@ class AggregateDistrictDataTask(AggregateDataTask):
                     assign = assign[assign[self.distField].isin(self.updateDistricts)]
                 total = len(assign)
                 self.data = assign[cols].groupby(by=self.distField).sum()
+
                 self.updateProgress(total, total)
+
+            # Account for districts with no assignments --
+            # otherwise, they will never be updated in the database
+            if self.updateDistricts is None:
+                zero = set(range(0, self.numDistricts+1)) - set(self.data.index)
+            else:
+                zero = self.updateDistricts - set(self.data.index)
+
+            if zero:
+                df = pd.DataFrame(0, index=list(zero), columns=self.data.columns)
+                self.data = pd.concat([self.data, df]).sort_index()
 
             name = pd.Series(
                 [

@@ -215,16 +215,16 @@ if TYPE_CHECKING:
 
 
 @overload
-def tr(message: str):
+def tr(message: str) -> str:
     pass
 
 
 @overload
-def tr(context: str, message: str):
+def tr(context: str, message: str) -> str:
     pass
 
 
-def tr(ctx_or_msg: str, message: str | None = None):
+def tr(ctx_or_msg: str, message: str | None = None) -> str:
     """Get the translation for a string using Qt translation API.
 
             :param ctx_or_msg: Translation context or string for translation.
@@ -275,6 +275,8 @@ def matchField(field: str, layer: QgsVectorLayer, fieldList: List[Union[str, re.
             if f.match(field):
                 return layer is None or layer.fields().lookupField(field) != -1
 
+    return None
+
 
 def showHelp(helpPage='index.html'):
     """Display application help to the user."""
@@ -315,12 +317,17 @@ def getTableName(layer: QgsVectorLayer, dataset: gdal.Dataset):
     return table
 
 
-def spatialite_connect(database: Union[str, bytes, pathlib.Path],
-                       timeout: float = 5.0, detect_types: int = 0,
-                       isolation_level: str = 'DEFERRED', check_same_thread: bool = True,
-                       factory: Type[sqlite3.Connection] = sqlite3.Connection,
-                       cached_statements: int = 128, uri: bool = False,
-                       enable_gpkg=None) -> sqlite3.Connection:
+def spatialite_connect(
+    database: Union[str, bytes, pathlib.Path],
+    timeout: float = 5.0,
+    detect_types: int = 0,
+    isolation_level: str = 'DEFERRED',
+    check_same_thread: bool = True,
+    factory: Type[sqlite3.Connection] = sqlite3.Connection,
+    cached_statements: int = 128,
+    uri: bool = False,
+    enable_gpkg=None
+) -> sqlite3.Connection:
     """returns a dbapi2.Connection to a SpatiaLite db
     using the mod_spatialite_path() extension (python3)"""
 

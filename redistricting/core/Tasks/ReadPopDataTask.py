@@ -8,7 +8,7 @@ from qgis.core import (
 )
 
 from ..Exception import CanceledError
-from ..layer import RdsLayerUtilities
+from ..layer import LayerReader
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ class LoadPopulationDataTask(QgsTask):
         debug_thread()
 
         try:
-            utils = RdsLayerUtilities(self._plan.popLayer)
+            utils = LayerReader(self._plan.popLayer)
 
             cols = [self._plan.popJoinField, self._plan.popField]
             context = QgsExpressionContext()

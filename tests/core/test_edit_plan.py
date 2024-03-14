@@ -16,11 +16,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Tuple
-from unittest.mock import MagicMock
-
 import pytest
-from pytest_mock import MockerFixture
 from pytestqt.plugin import QtBot
 from qgis.core import Qgis
 
@@ -31,60 +27,33 @@ from redistricting.core import (
     RdsException,
     RedistrictingPlan
 )
-from redistricting.core.PlanEdit import QgsApplication
 
 
 class TestPlanEditor:
     @pytest.fixture
     def editor(self, valid_plan):
-        return PlanEditor.fromPlan(valid_plan)
+        e = PlanEditor.fromPlan(valid_plan)
+        yield e
+        e.deleteLater()
 
     def test_update_updates_plan(self, valid_plan):
         assert valid_plan.geoIdCaption != "Test Geog"
         e = PlanEditor.fromPlan(valid_plan)
         e.setGeoDisplay("Test Geog")
         p = e.updatePlan()
+        del e
         assert p is not None
         assert p.geoIdCaption == "Test Geog"
 
     def test_signals(self, editor: PlanEditor, valid_plan, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.planChanged,
-                              check_params_cb=lambda p, f, n, o:
-                              p == valid_plan and f == 'name' and n == 'new name' and o == 'minimal'
+                              check_params_cb=lambda p, f:
+                              p == valid_plan and 'name' in f
                               ):
             editor.setName('new name')
             editor.updatePlan()
         assert valid_plan.name == 'new name'
         assert editor.modifiedFields == {'name'}
-
-        with qtbot.waitSignals([valid_plan.dataFieldAdded, valid_plan.planChanged]):
-            editor.appendDataField('vap_nh_black')
-            editor.updatePlan()
-        assert len(valid_plan.dataFields) == 1
-        assert editor.modifiedFields == {'data-fields'}
-
-        with qtbot.waitSignals([valid_plan.dataFieldRemoved, valid_plan.planChanged]):
-            editor.removeDataField('vap_nh_black')
-            editor.updatePlan()
-        assert len(valid_plan.dataFields) == 0
-        assert editor.modifiedFields == {'data-fields'}
-
-        with qtbot.waitSignals([valid_plan.geoFieldAdded, valid_plan.planChanged]):
-            editor.appendGeoField('vtdid20')
-            editor.updatePlan()
-        assert len(valid_plan.geoFields) == 1
-        assert editor.modifiedFields == {'geo-fields', 'plan-splits'}
-
-        with qtbot.waitSignals([valid_plan.geoFieldRemoved, valid_plan.planChanged]):
-            editor.removeGeoField(0)
-            editor.updatePlan()
-        assert len(valid_plan.geoFields) == 0
-        assert editor.modifiedFields == {'geo-fields', 'plan-splits'}
-
-    def test_datafields_append_sets_parent(self, editor: PlanEditor, valid_plan: RedistrictingPlan):
-        editor.appendDataField('vap_apblack', False, 'APBVAP')
-        editor.updatePlan()
-        assert valid_plan.dataFields[0].parent() is valid_plan.dataFields
 
     def test_datafields_append_adds_field(
         self,
@@ -93,24 +62,22 @@ class TestPlanEditor:
         block_layer,
         qtbot: QtBot
     ):
-        with qtbot.waitSignal(valid_plan.dataFieldAdded):
+        with qtbot.waitSignal(valid_plan.planChanged):
             editor.appendDataField('vap_apblack', False, 'APBVAP')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
         assert isinstance(valid_plan.dataFields[0], DataField)
-        assert valid_plan.dataFields[0].parent() is valid_plan.dataFields
         assert valid_plan.dataFields[0].layer == block_layer
         assert valid_plan.dataFields[0].field == 'vap_apblack'
         assert not valid_plan.dataFields[0].isExpression
         assert valid_plan.dataFields[0].caption == 'APBVAP'
 
         f1 = DataField(block_layer, 'pop_apblack', False, caption='APBPOP')
-        with qtbot.waitSignal(valid_plan.dataFieldAdded):
+        with qtbot.waitSignal(valid_plan.planChanged):
             editor.appendDataField(f1)
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
         assert isinstance(valid_plan.dataFields[1], DataField)
-        assert valid_plan.dataFields[1].parent() is valid_plan.dataFields
         assert valid_plan.dataFields[1].field == 'pop_apblack'
 
         editor.appendDataField('vap_nh_white')
@@ -131,6 +98,7 @@ class TestPlanEditor:
         editor: PlanEditor,
         valid_plan: RedistrictingPlan,
         field,
+        mock_taskmanager,  # pylint: disable=unused-argument
         request
     ):
         editor.appendDataField('vap_nh_black', False, 'BVAP')
@@ -171,20 +139,20 @@ class TestPlanEditor:
         editor.updatePlan()
         f1 = valid_plan.dataFields[0]
 
-        with qtbot.waitSignal(valid_plan.dataFieldRemoved):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"data-fields"}):
             editor.removeDataField('vap_apblack')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
         assert valid_plan.dataFields[0].field == 'pop_apblack'
         assert valid_plan.dataFields[1].field == 'vap_nh_white'
 
-        with qtbot.waitSignal(valid_plan.dataFieldRemoved):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"data-fields"}):
             editor.removeDataField(f1)
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
         assert valid_plan.dataFields[0].field == 'vap_nh_white'
 
-        with qtbot.waitSignal(valid_plan.dataFieldRemoved):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"data-fields"}):
             editor.removeDataField(0)
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 0
@@ -197,49 +165,29 @@ class TestPlanEditor:
     def vtd_field_str(self):
         return 'vtdid20'
 
-    @pytest.fixture
-    def mock_update_geo_field_task(self, mocker: MockerFixture):
-        mock = mocker.patch('redistricting.core.PlanEdit.AddGeoFieldToAssignmentLayerTask')
-        taskmgr = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
-        return (mock, taskmgr)
-
-    def test_geofields_append_sets_parent(
-        self,
-        editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
-        mock_update_geo_field_task: Tuple[MagicMock, MagicMock]
-    ):
-        editor.appendGeoField('vtdid20')
-        editor.updatePlan()
-        assert valid_plan.geoFields[0].parent() is valid_plan.geoFields
-        mock_update_geo_field_task[0].assert_called_once()
-        mock_update_geo_field_task[1].assert_called_once()
-
     def test_geofields_append_adds_field(
         self,
         editor: PlanEditor,
         valid_plan: RedistrictingPlan,
-        mock_update_geo_field_task,  # pylint: disable=unused-argument
+        mock_taskmanager,  # pylint: disable=unused-argument
         block_layer,
         qtbot: QtBot
     ):
-        with qtbot.waitSignal(valid_plan.geoFieldAdded):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"geo-fields"}):
             editor.appendGeoField('vtdid20', False, 'VTD')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
         assert isinstance(valid_plan.geoFields[0], Field)
-        assert valid_plan.geoFields[0].parent() is valid_plan.geoFields
         assert valid_plan.geoFields[0].layer == block_layer
         assert valid_plan.geoFields[0].field == 'vtdid20'
         assert not valid_plan.geoFields[0].isExpression
         assert valid_plan.geoFields[0].caption == 'VTD'
 
         f1 = Field(block_layer, 'statefp20 || countyfp20 || vtd', True, caption='VTD')
-        with qtbot.waitSignal(valid_plan.geoFieldAdded):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"geo-fields"}):
             editor.appendGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
-        assert valid_plan.geoFields[1].parent() is valid_plan.geoFields
         assert valid_plan.geoFields[1].field == 'statefp20 || countyfp20 || vtd'
         assert valid_plan.geoFields[1].isExpression
 
@@ -252,7 +200,7 @@ class TestPlanEditor:
         self,
         editor: PlanEditor,
         valid_plan: RedistrictingPlan,
-        mock_update_geo_field_task,  # pylint: disable=unused-argument
+        mock_taskmanager,  # pylint: disable=unused-argument
         field,
         request
     ):
@@ -294,28 +242,30 @@ class TestPlanEditor:
         editor: PlanEditor,
         valid_plan: RedistrictingPlan,
         vtd_field_fld,
+        mock_taskmanager,  # pylint: disable=unused-argument
         qtbot: QtBot
     ):
-        editor.appendGeoField(vtd_field_fld)
-        editor.appendGeoField('statefp20 || countyfp20 || vtd', True)
-        editor.appendGeoField('countyid20')
-        editor.updatePlan()
+        with qtbot.waitSignal(valid_plan.planChanged):
+            editor.appendGeoField(vtd_field_fld)
+            editor.appendGeoField('statefp20 || countyfp20 || vtd', True)
+            editor.appendGeoField('countyid20')
+            editor.updatePlan()
         f1 = valid_plan.geoFields[1]
 
-        with qtbot.waitSignals((valid_plan.geoFieldRemoved, valid_plan.planChanged)):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"geo-fields"}):
             editor.removeGeoField('vtdid20')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
         assert valid_plan.geoFields[0].field == 'statefp20 || countyfp20 || vtd'
         assert valid_plan.geoFields[1].field == 'countyid20'
 
-        with qtbot.waitSignal(valid_plan.geoFieldRemoved):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"geo-fields"}):
             editor.removeGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
         assert valid_plan.geoFields[0].field == 'countyid20'
 
-        with qtbot.waitSignal(valid_plan.geoFieldRemoved):
+        with qtbot.waitSignal(valid_plan.planChanged, check_params_cb=lambda p, f: f == {"geo-fields"}):
             editor.removeGeoField(0)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 0

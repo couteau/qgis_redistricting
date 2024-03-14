@@ -44,7 +44,7 @@ from qgis.utils import spatialite_connect
 
 from .ErrorList import ErrorListMixin
 from .PlanBuilder import PlanBuilder
-from .PlanStats import SplitList
+from .PlanSplits import Splits
 from .PlanStyle import PlanStyler
 from .utils import tr
 
@@ -105,27 +105,25 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             for f in plan.geoFields:
-                split = SplitList(plan, f, plan.districts)
-                split.setData(self._plan.stats.splits[f].data.copy())
-                plan.districts.splits[f] = split
+                split = Splits(plan, f, plan.stats)
+                split.setData(self._plan.stats.splits[f.fieldName].data.copy())
+                plan.stats.splits[f.fieldName] = split
 
             self.setProgress(100)
             planCreated(plan)
 
         return plan
 
-    def copyBufferedAssignments(self, target: RedistrictingPlan, rollback=True):
-        if not self._plan._assignLayer.isEditable():
+    def copyBufferedAssignments(self, target: RedistrictingPlan):
+        if not self._plan.assignLayer.isEditable():
             return
 
-        buffer = self._plan._assignLayer.editBuffer()
+        buffer = self._plan.assignLayer.editBuffer()
         values: dict[int, dict[int, Any]] = buffer.changedAttributeValues()
-        target._assignLayer.startEditing()
+        target.assignLayer.startEditing()
         for fid, feat in values.items():
-            target._assignLayer.changeAttributeValues(fid, feat)
-        target._assignLayer.commitChanges(True)
-        if rollback:
-            self._plan._assignLayer.rollBack(True)
+            target.assignLayer.changeAttributeValues(fid, feat)
+        target.assignLayer.commitChanges(True)
 
     def copyAssignments(self, target: RedistrictingPlan, autocommit=True):
         def progress():
@@ -136,7 +134,7 @@ class PlanCopier(ErrorListMixin, QObject):
 
         self.clearErrors()
 
-        if not target._assignLayer:
+        if not target.assignLayer:
             self.setError(
                 tr('Copy assignments: Target plan {name} has no assignment layer to copy into').format(
                     name=target.name),
@@ -144,7 +142,7 @@ class PlanCopier(ErrorListMixin, QObject):
             )
             return
 
-        if not self._plan._assignLayer:
+        if not self._plan.assignLayer:
             self.setError(
                 tr('Copy assignments: Source plan {name} has no assignment layer to copy from').format(
                     name=self._plan.name),
@@ -152,9 +150,9 @@ class PlanCopier(ErrorListMixin, QObject):
             )
             return
 
-        if autocommit and self._plan._assignLayer.isEditable():
+        if autocommit and self._plan.assignLayer.isEditable():
             # self.setError(tr('Committing unsaved changes before copy'))
-            self._plan._assignLayer.commitChanges(True)
+            self._plan.assignLayer.commitChanges(True)
 
         with closing(spatialite_connect(target.geoPackagePath)) as db:
             db: sqlite3.Connection
@@ -167,5 +165,5 @@ class PlanCopier(ErrorListMixin, QObject):
             db.set_progress_handler(None, 1)
             db.commit()
 
-        target._assignLayer.reload()
-        target.resetData(updateGeometry=True)
+        target.assignLayer.reload()
+        target.updateDistricts()

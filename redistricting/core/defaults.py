@@ -28,8 +28,8 @@ from .utils import tr
 
 MAX_DISTRICTS = 1000
 
-POP_TOTAL_FIELDS = ['pop_total', 'p0010001']
-VAP_TOTAL_FIELDS = ['vap_total', 'p0030001']
+POP_TOTAL_FIELDS = ['pop_total', 'p0010001', 'tot_pop', 'total_pop']
+VAP_TOTAL_FIELDS = ['vap_total', 'p0030001', 'tot_vap', 'total_vap']
 CVAP_TOTAL_FIELDS = ['cvap_total', re.compile(r'^cvap_(?:\d{4}_)total$')]
 
 CVAP_FIELDS = [re.compile(r'^cvap_(?:\d{4}_)?\w+$'), re.compile(r'^\w+(?:\d{4}_)?cvap(?:_\d{4})?$')]

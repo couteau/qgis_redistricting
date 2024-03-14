@@ -81,9 +81,11 @@ class FieldListModel(QAbstractTableModel):
         super().__init__(parent)
         if isinstance(fields, FieldList):
             self._data: FieldList = fields[:]
-            self._data.setParent(self)
+        elif isinstance(fields, list) and all(isinstance(f, Field) for f in fields):
+            self._data: FieldList = FieldList(fields)
         else:
-            self._data: FieldList = FieldList(self, fields)
+            raise ValueError(tr("fields must be a FieldList or a list of Fields"))
+
         self.popFields = popFields
         self._colCount = 3
         if self._data:
@@ -105,7 +107,7 @@ class FieldListModel(QAbstractTableModel):
             self.endRemoveRows()
         if value is not None and len(value):
             self.beginInsertRows(QModelIndex(), 0, len(value))
-            self._data = FieldList(self, value)
+            self._data = FieldList(value)
             self.fieldType = type(self._data[0])
             self.endInsertRows()
 
@@ -121,7 +123,7 @@ class FieldListModel(QAbstractTableModel):
     @property
     def popFields(self) -> FieldList:
         return self._popFields
-    
+
     @popFields.setter
     def popFields(self, value: Union[FieldList, list[Field]]):
         if value is None:
@@ -129,7 +131,7 @@ class FieldListModel(QAbstractTableModel):
         elif isinstance(value, FieldList):
             self._popFields = value
         else:
-            self._popFields = FieldList(self, value)
+            self._popFields = FieldList(value)
 
     def setColCount(self, value):
         if value != self._colCount:
@@ -185,7 +187,7 @@ class FieldListModel(QAbstractTableModel):
             else:
                 value = QVariant()
         elif role == Qt.TextAlignmentRole:
-            if col in {2,4}:
+            if col in {2, 4}:
                 value = Qt.AlignCenter
             else:
                 value = QVariant()
@@ -227,10 +229,10 @@ class FieldListModel(QAbstractTableModel):
             else:
                 value = str(section+1)
         elif role == Qt.TextAlignmentRole:
-            if section in range(2,4):
+            if section in range(2, 4):
                 value = Qt.AlignCenter
             else:
-                value = QVariant()        
+                value = QVariant()
         else:
             value = QVariant()
 
@@ -245,7 +247,7 @@ class FieldListModel(QAbstractTableModel):
             if index.column() == 1:
                 field.caption = value
                 return True
-            
+
             if index.column() == 3:
                 if 0 <= value < len(self._popFields):
                     field.pctbase = self._popFields[value].fieldName
@@ -279,7 +281,7 @@ class FieldListModel(QAbstractTableModel):
 
         return f
 
-    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[Field,DataField,None]:
+    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[Field, DataField, None]:
         for f in self._data:
             if f.field == field:
                 return None

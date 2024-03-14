@@ -77,6 +77,24 @@ class PlanAssignmentEditor(QObject):
     def _clearError(self):
         self._error = None
 
+    def startEditCommand(self, msg: str = None):
+        if not self._assignLayer.isEditable():
+            self._assignLayer.startEditing()
+            self._assignLayer.undoStack()
+
+        if msg is None:
+            msg = tr('Edit assignments')
+
+        self._assignLayer.beginEditCommand(msg)
+
+    def endEditCommand(self):
+        self._assignLayer.endEditCommand()
+        self._assignLayer.triggerRepaint()
+
+    def cancelEditCommand(self):
+        self._assignLayer.destroyEditCommand()
+        self._assignLayer.triggerRepaint()
+
     def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
         self._clearError()
 
@@ -128,8 +146,8 @@ class PlanAssignmentEditor(QObject):
         fieldIndex = self._assignLayer.fields().indexOf(self._distField)
         if fieldIndex == -1:
             self._setError(
-                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.').
-                format(plan=self._plan.name, field=self._distField)
+                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.')
+                .format(plan=self._plan.name, field=self._distField)
             )
             return
 
@@ -145,6 +163,10 @@ class PlanAssignmentEditor(QObject):
             # otherwise we may discard prior, successful updates
             self._assignLayer.rollBack(not inTransaction)
             raise
+
+    def changeAssignments(self, assignments: dict[int, Iterable[int]]):
+        for dist, fids in assignments.items():
+            self.assignFeaturesToDistrict(self._assignLayer.getFeatures(list(fids)), dist)
 
     def _changed(self):
         self.assignmentsChanged.emit()

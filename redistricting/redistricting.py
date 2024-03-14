@@ -70,6 +70,8 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.PyQt.QtXml import QDomDocument
 
+from .gui.DistrictActions import DistrictActions
+
 if pathlib.Path(__file__).with_name("vendor").exists():
     sys.path.insert(0, str(pathlib.Path(__file__).with_name("vendor")))
 
@@ -140,6 +142,7 @@ class Redistricting:
         self.dataTableWidget: DockDistrictDataTable = None
         self.pendingChangesWidget: DockPendingChanges = None
         self.mapTool: PaintDistrictsTool = None
+        self.districtCopyActions = DistrictActions(self)
 
         # initialize plugin directory
         self.pluginDir = pathlib.Path(__file__).parent
@@ -249,6 +252,7 @@ class Redistricting:
 
             self.projectSignalsConnected = True
 
+        self.districtCopyActions.hookCanvasMenu()
         self.iface.layerTreeView().clicked.connect(self.layerChanged)
 
         self.menu = QMenu(self.menuName, self.iface.mainWindow())
@@ -453,6 +457,7 @@ class Redistricting:
             self.project.layersRemoved.disconnect(self.updateNewPlanAction)
             self.projectSignalsConnected = False
 
+        self.districtCopyActions.unhookCanvasMenu()
         self.iface.layerTreeView().clicked.disconnect(self.layerChanged)
 
         self.iface.removeDockWidget(self.dockwidget)
@@ -506,7 +511,7 @@ class Redistricting:
 
     def setupDataTableDockWidget(self):
         """Create the dockwidget that displays district statistics."""
-        dockwidget = DockDistrictDataTable(self.activePlan)
+        dockwidget = DockDistrictDataTable(self.activePlan, self.districtCopyActions)
         self.iface.addDockWidget(
             Qt.BottomDockWidgetArea, dockwidget)
 
@@ -668,23 +673,17 @@ class Redistricting:
             deletePlans = set()
             for layer in layerIds:
                 for plan in self.redistrictingPlans:
-                    if plan.popLayer.id() == layer:
+                    if plan.geoLayer.id() == layer:
+                        plan.geoLayer = None
+                    elif plan.popLayer.id() == layer:
                         deletePlans.add(plan)
                     elif plan.assignLayer.id() == layer:
                         deletePlans.add(plan)
                     elif plan.distLayer.id() == layer:
                         deletePlans.add(plan)
-                    elif plan.geoLayer.id() == layer:
-                        plan.geoLayer = None
 
             for plan in deletePlans:
                 self.removePlan(plan)
-
-    def updateNewPlanAction(self, layers):  # pylint: disable=unused-argument
-        self.actionNewPlan.setEnabled(
-            any(isinstance(layer, QgsVectorLayer)
-                for layer in self.project.mapLayers(True).values())
-        )
 
     # --------------------------------------------------------------------------
 
@@ -746,6 +745,8 @@ class Redistricting:
         self.setActivePlan(plan)
         self.project.setDirty()
 
+    # Actions
+
     def editPlan(self, plan=None):
         """Open redistricting plan in the edit dialog"""
         if not isinstance(plan, RedistrictingPlan):
@@ -761,11 +762,8 @@ class Redistricting:
                 .setNumSeats(dlgEditPlan.numSeats()) \
                 .setDescription(dlgEditPlan.description()) \
                 .setDeviation(dlgEditPlan.deviation()) \
-                .setGeoIdField(dlgEditPlan.geoIdField()) \
                 .setGeoDisplay(dlgEditPlan.geoIdCaption()) \
-                .setGeoLayer(dlgEditPlan.geoLayer()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
-                .setJoinField(dlgEditPlan.joinField()) \
                 .setPopField(dlgEditPlan.popField()) \
                 .setPopFields(dlgEditPlan.popFields()) \
                 .setDataFields(dlgEditPlan.dataFields()) \
@@ -854,7 +852,7 @@ class Redistricting:
                 .setGeoDisplay(dlgNewPlan.geoIdCaption()) \
                 .setGeoLayer(dlgNewPlan.geoLayer()) \
                 .setPopLayer(dlgNewPlan.popLayer()) \
-                .setJoinField(dlgNewPlan.joinField()) \
+                .setPopJoinField(dlgNewPlan.joinField()) \
                 .setPopField(dlgNewPlan.popField()) \
                 .setPopFields(dlgNewPlan.popFields()) \
                 .setDataFields(dlgNewPlan.dataFields()) \
@@ -883,9 +881,12 @@ class Redistricting:
         dlgCopyPlan = DlgCopyPlan(self.activePlan, self.iface.mainWindow())
         if dlgCopyPlan.exec_() == QDialog.Accepted:
             copier = PlanCopier(self.activePlan)
-            progress = self.startProgress(self.tr('Creating plan layers...'))
-            copier.progressChanged.connect(progress.setValue)
-            progress.canceled.connect(copier.cancel)
+
+            if not dlgCopyPlan.copyAssignments:
+                progress = self.startProgress(self.tr('Creating plan layers...'))
+                copier.progressChanged.connect(progress.setValue)
+                progress.canceled.connect(copier.cancel)
+
             copier.copyComplete.connect(self.appendPlan)
             copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                             dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments)
@@ -903,8 +904,9 @@ class Redistricting:
             copier.progressChanged.connect(progress.setValue)
             progress.canceled.connect(copier.cancel)
             plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
-                                   dlgCopyPlan.geoPackagePath, True)
+                                   dlgCopyPlan.geoPackagePath, copyAssignments=True)
             copier.copyBufferedAssignments(plan)
+            self.activePlan.assignLayer.rollBack(True)
             self.appendPlan(plan)
 
     def importPlan(self):
@@ -971,21 +973,6 @@ class Redistricting:
                 export.exportComplete.connect(planExported)
                 export.export(self.startProgress(self.tr('Exporting redistricting plan...')))
 
-    def editingStarted(self):
-        self.actionCommitPlanChanges.setEnabled(True)
-        self.actionSaveAsNew.setEnabled(True)
-        self.actionRollbackPlanChanges.setEnabled(True)
-
-    def editingStopped(self):
-        self.actionCommitPlanChanges.setEnabled(False)
-        self.actionSaveAsNew.setEnabled(False)
-        self.actionRollbackPlanChanges.setEnabled(False)
-
-    def planChanged(self, plan, prop, newValue, oldValue):  # pylint: disable=unused-argument
-        self.project.setDirty()
-        if prop in ['total-population', 'deviation', 'pop-field', 'pop-fields', 'data-fields']:
-            self.dataTableWidget.tblDataTable.update()
-
     def createDistrict(self):
         if not self.checkActivePlan('create district'):
             return None
@@ -1005,6 +992,30 @@ class Redistricting:
         self.dockwidget.setTargetDistrict(dist)
         return dist.district
 
+    def contextMenuActivatePlan(self):
+        group = self.iface.layerTreeView().currentGroupNode()
+        planid = group.customProperty('redistricting-plan-id', None)
+        if planid and planid != self.activePlan.id:
+            self.setActivePlan(planid)
+            self.project.setDirty()
+
+    # Slots
+
+    def editingStarted(self):
+        self.actionCommitPlanChanges.setEnabled(True)
+        self.actionSaveAsNew.setEnabled(True)
+        self.actionRollbackPlanChanges.setEnabled(True)
+
+    def editingStopped(self):
+        self.actionCommitPlanChanges.setEnabled(False)
+        self.actionSaveAsNew.setEnabled(False)
+        self.actionRollbackPlanChanges.setEnabled(False)
+
+    def planChanged(self, plan, prop):
+        self.project.setDirty()
+        if plan == self.activePlan and prop & {'total-population', 'deviation', 'pop-field', 'pop-fields', 'data-fields'}:
+            self.dataTableWidget.tblDataTable.update()
+
     def contextMenuSlot(self, action):
         def trigger():
             group = self.iface.layerTreeView().currentGroupNode()
@@ -1014,15 +1025,6 @@ class Redistricting:
                 action(plan)
 
         return trigger
-
-    def contextMenuActivatePlan(self):
-        group = self.iface.layerTreeView().currentGroupNode()
-        planid = group.customProperty('redistricting-plan-id', None)
-        if planid and planid != self.activePlan.id:
-            self.setActivePlan(planid)
-            self.project.setDirty()
-
-    # --------------------------------------------------------------------------
 
     def activatePlan(self, checked):
         if checked:
@@ -1089,6 +1091,14 @@ class Redistricting:
                 any(isinstance(layer, QgsVectorLayer)
                     for layer in self.project.mapLayers(True).values())
             )
+
+    def updateNewPlanAction(self, layers):  # pylint: disable=unused-argument
+        self.actionNewPlan.setEnabled(
+            any(isinstance(layer, QgsVectorLayer)
+                for layer in self.project.mapLayers(True).values())
+        )
+
+    # Activate Plan
 
     def checkActivePlan(self, action):
         if self.activePlan is None:

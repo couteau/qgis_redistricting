@@ -107,12 +107,12 @@ class ImportAssignmentFileTask(QgsTask):
                 total = l.featureCount()
                 generator = (makeTuple((f[self.distColumn], f[self.geoColumn])) for f in l.getFeatures())
             elif ext in ('.csv', '.txt'):
-                with open(self.equivalencyFile, encoding='utf-8') as f:
+                with open(self.equivalencyFile, encoding='utf-8-sig') as f:
                     total = sum(1 for l in f) or 1
 
                 csvfile = open(self.equivalencyFile,  # pylint: disable=consider-using-with
                                newline='',
-                               encoding='utf-8')
+                               encoding='utf-8-sig')
                 dialect = csv.Sniffer().sniff(csvfile.read(1024))
                 if self.delimiter is not None:
                     dialect.delimiter = self.delimiter

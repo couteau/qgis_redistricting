@@ -52,7 +52,6 @@ from qgis.PyQt.QtGui import (
 )
 
 from ..core import (
-    PlanAssignmentEditor,
     RedistrictingPlan,
     tr
 )
@@ -212,7 +211,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def plan(self, value: RedistrictingPlan):
         if self._plan != value:
             self._plan = value
-            self._layer = self._plan._assignLayer if self._plan is not None else None
+            self._layer = self._plan.assignLayer if self._plan is not None else None
             if self._layer:
                 self.inTransaction = self._layer.isEditable()
 
@@ -252,14 +251,6 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def paintMode(self, value):
         self._paintMode = value
 
-    def _startPaintFeatures(self, target: str = None):
-        if not self._layer.isEditable():
-            self._layer.startEditing()
-            self._layer.undoStack()
-        if target is None:
-            target = str(self.targetDistrict())
-        self._layer.beginEditCommand(tr('Assign features to district {}').format(target))
-
     def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit=True):
         if self._geoField is not None and self._geoField != self._plan.geoIdField:
             values = {str(feature.attribute(self._geoField)) for feature in features}
@@ -270,7 +261,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self.inTransaction = True
         self._layer.triggerRepaint()
         if endEdit:
-            self._layer.endEditCommand()
+            self._assignmentEditor.endEditCommand()
 
     def _selectFeatures(
         self,
@@ -297,7 +288,11 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._paintMode == PaintMode.PaintByGeography:
             r = self.searchRadiusMU(self.canvas())
             self.setCanvasPropertiesOverrides(r/4)
-            self._startPaintFeatures(str(self.targetDistrict(self.buttonsPressed)))
+            self._assignmentEditor.startEditCommand(
+                tr('Assign features to district {}').format(
+                    str(self.targetDistrict(self.buttonsPressed))
+                )
+            )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             self._selectRect.setRect(e.x(), e.y(), e.x()+1, e.y()+1)
 
@@ -322,9 +317,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             if not results:
                 if self._dragging:
                     self._dragging = False
-                    self._layer.endEditCommand()
+                    self._assignmentEditor.endEditCommand()
                 else:
-                    self._layer.destroyEditCommand()
+                    self._assignmentEditor.cancelEditCommand()
                 return
 
             self._paintFeatures(
@@ -411,7 +406,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._distTarget is not None
 
     def activate(self):
-        self._assignmentEditor = PlanAssignmentEditor(self.plan, self)
+        self._assignmentEditor = self.plan.startEditing()
         return super().activate()
 
     def deactivate(self):

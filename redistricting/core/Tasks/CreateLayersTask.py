@@ -31,13 +31,11 @@ from typing import (
     List
 )
 
-import geopandas as gpd
 from qgis.core import (
     Qgis,
     QgsAggregateCalculator,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsFeature,
     QgsField,
     QgsMessageLog,
     QgsTask,
@@ -46,6 +44,7 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 
 from ..Exception import CanceledError
+from ..sql import SqlAccess
 from ..utils import (
     createGeoPackage,
     createGpkgTable,
@@ -53,7 +52,6 @@ from ..utils import (
     tr
 )
 from ._debug import debug_thread
-from .Sql import SqlAccess
 
 if TYPE_CHECKING:
     from .. import (
@@ -69,6 +67,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.path = gpkgPath
 
         self.assignFields = []
+        self.numDistricts = plan.numDistricts
 
         self.geoLayer: QgsVectorLayer = geoLayer  # None
         self.geoField: QgsField = None
@@ -119,20 +118,6 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
 
         return d
-
-    def readLayerIntoDataFrame(self, popLayer: QgsVectorLayer):
-        if popLayer.dataProvider().name() == "ogr":
-            if popLayer.dataProvider().storageType() == "GPKG":
-                df = gpd.read_file(popLayer.source())
-            elif popLayer.dataProvider().storageType() == "ESRI Shapefile":
-                gpkg, lyrparam = popLayer.source().split('|', 1)
-                lyr = lyrparam.split('=')[1]
-                df = gpd.read_file(gpkg, layer=lyr)
-            elif popLayer.dataProvider().storageType() == "GeoJSON":
-                gpkg, geomparam = popLayer.source().split('|', 1)  # pylint: disable=unused-variable
-                df = gpd.read_file(gpkg)
-
-        return df
 
     def makePopTotalsSqlSelect(self, table):
         sql = f'SELECT 0 as {self.distField}, \'{tr("Unassigned")}\' as name, SUM({self.popField}) as {self.popField}'
@@ -235,18 +220,16 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         return True
 
-    def createUnassigned(self):
+    def createDistricts(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
         self.totalPop = self.popTotals[self.popField]
 
-        l = QgsVectorLayer(f'{self.path}|layername=districts', '__districts', 'ogr')
-        feat = QgsFeature(l.fields())
-        for fld, value in self.popTotals.items():
-            if l.fields().lookupField(fld) != -1:
-                feat.setAttribute(fld, value)
-        l.dataProvider().addFeature(feat)
-        l.updateExtents()
-        del l
+        with spatialite_connect(self.path) as db:
+            sql = f"INSERT INTO districts ({self.distField}, name, {', '.join(self.popTotals)}) " \
+                "VALUES (?,?,{','.join('?'*len(self.popTotals))})"
+            db.execute(sql, [0, tr("Unassigned")] + list(self.popTotals.values()))
+            sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
+            db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
 
         return True
 
@@ -354,7 +337,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                 return False
 
             if self.createDistLayer():
-                self.createUnassigned()
+                self.createDistricts()
                 self.setProgress(2)
             else:
                 return False

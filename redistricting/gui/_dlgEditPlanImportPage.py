@@ -22,16 +22,24 @@
  *                                                                         *
  ***************************************************************************/
 """
+import csv
+import os
 from io import IOBase
 from itertools import islice
-import os
-import csv
-from typing import Iterable, Union
-from osgeo import gdal
+from typing import (
+    Iterable,
+    Union
+)
 
-from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QWizardPage, QTableWidgetItem, QLabel
+from osgeo import gdal
 from qgis.core import QgsVectorLayer
+from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtWidgets import (
+    QLabel,
+    QTableWidgetItem,
+    QWizardPage
+)
+
 from .ui.WzpEditPlanImportPage import Ui_wzpImport
 
 
@@ -254,7 +262,7 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
             self.gbQuote.setEnabled(False)
             return
 
-        with open(self.fileImportFrom.path, newline='') as csvfile:  # pylint: disable=unspecified-encoding,consider-using-with
+        with open(self.fileImportFrom.path, newline='', encoding="utf-8-sig") as csvfile:  # pylint: disable=unspecified-encoding,consider-using-with
             sample = csvfile.read(1024)
             sniffer = csv.Sniffer()
             dialect = sniffer.sniff(sample)

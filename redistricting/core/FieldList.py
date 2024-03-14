@@ -29,7 +29,8 @@ from typing import (
     Iterator,
     List,
     TypeVar,
-    Union
+    Union,
+    overload
 )
 
 from .Field import Field
@@ -41,7 +42,19 @@ class FieldList(Generic[T]):
     def __init__(self, fields: List[T] = None):
         self._fields: List[T] = fields or []
 
-    def __getitem__(self, key) -> Union[T, FieldList[T]]:
+    @overload
+    def __getitem__(self, key: str) -> T:
+        ...
+
+    @overload
+    def __getitem__(self, key: int) -> T:
+        ...
+
+    @overload
+    def __getitem__(self, key: slice) -> FieldList[T]:
+        ...
+
+    def __getitem__(self, key: Union[str, int, slice]) -> Union[T, FieldList[T]]:
         if isinstance(key, str):
             item = next((f for f in self._fields if f.fieldName == key), None)
             if item is None:

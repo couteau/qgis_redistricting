@@ -91,7 +91,7 @@ class PlanBuilder(BasePlanBuilder):
 
     def createLayers(self, plan: RedistrictingPlan):
         def taskCompleted():
-            plan._totalPopulation = self._createLayersTask.totalPop  # pylint: disable=protected-access
+            plan.updateTotalPopulation(self._createLayersTask.totalPop)
             self._createLayersTask = None
             plan.addLayersFromGeoPackage(self._geoPackagePath)
             if self._importer:
@@ -174,10 +174,10 @@ class PlanBuilder(BasePlanBuilder):
             'geo-id-field': self._geoIdField,
             'geo-id-caption': self._geoIdCaption,
             'dist-field': self._distField,
-            'pop-layer': self._popLayer.id(),
+            'pop-layer': self._popLayer.id() if self._geoLayer != self._popLayer else None,
             'pop-join-field': self._popJoinField if self._popJoinField != self._geoIdField else None,
             'pop-field': self._popField,
-            'geo-layer': self._geoLayer.id() if self._geoLayer != self._popLayer else None,
+            'geo-layer': self._geoLayer.id(),
             'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
             'pop-fields': [field.serialize() for field in self._popFields],
             'data-fields': [field.serialize() for field in self._dataFields],

@@ -183,7 +183,7 @@ class BasePlanBuilder(PlanValidator):
 
         return self
 
-    def setJoinField(self, value: str):
+    def setPopJoinField(self, value: str):
         if value is not None and not isinstance(value, str):
             raise ValueError(tr('Population join field must be a string'))
 
@@ -305,7 +305,14 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def appendDataField(self, field: str, isExpression: bool = False, caption: str = None, sumfield=None, pctbase=None) -> Self:
+    def appendDataField(
+        self,
+        field: str,
+        isExpression: bool = False,
+        caption: str = None,
+        sumfield=None,
+        pctbase=None
+    ) -> Self:
         ...
 
     @overload
