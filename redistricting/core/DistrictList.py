@@ -422,7 +422,6 @@ class DistrictList(QObject):
             df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
         else:
             df = self._data.iloc[:, 1:-1]
-        df = df.fillna('')
         df.columns.name = tr("District")
         return df
 

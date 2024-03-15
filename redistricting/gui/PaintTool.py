@@ -259,7 +259,6 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
         self._assignmentEditor.assignFeaturesToDistrict(features, target, source, self.inTransaction)
         self.inTransaction = True
-        self._layer.triggerRepaint()
         if endEdit:
             self._assignmentEditor.endEditCommand()
 

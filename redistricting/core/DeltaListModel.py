@@ -78,17 +78,17 @@ class DeltaListModel(QAbstractTableModel):
             {
                 'name': f'new_{self._plan.popField}',
                 'caption': tr('Population'),
-                'format': '{:,}'
+                'format': '{:,.0f}'
             },
             {
                 'name': self._plan.popField,
                 'caption': tr('Population') + ' - ' + tr('Change'),
-                'format': '{:+,}'
+                'format': '{:+,.0f}'
             },
             {
                 'name': 'deviation',
                 'caption': tr('Deviation'),
-                'format': '{:,}'
+                'format': '{:,.0f}'
             },
             {
                 'name': 'pct_deviation',
@@ -104,12 +104,12 @@ class DeltaListModel(QAbstractTableModel):
                 {
                     'name': f'new_{fn}',
                     'caption': field.caption,
-                    'format': '{:,}'
+                    'format': '{:,.0f}'
                 },
                 {
                     'name': fn,
                     'caption': field.caption + ' - ' + tr('Change'),
-                    'format': '{:+,}'
+                    'format': '{:+,.0f}'
                 }
             ])
 
@@ -121,12 +121,12 @@ class DeltaListModel(QAbstractTableModel):
                     {
                         'name': f'new_{fn}',
                         'caption': field.caption,
-                        'format': '{:,}'
+                        'format': '{:,.0f}'
                     },
                     {
                         'name': fn,
                         'caption': field.caption + ' - ' + tr('Change'),
-                        'format': '{:+,}'
+                        'format': '{:+,.0f}'
                     }
                 ])
 

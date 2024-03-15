@@ -257,12 +257,12 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
     def undo(self):
         if self._plan and self._plan.assignLayer:
             self._plan.assignLayer.undoStack().undo()
-            self._plan.assignLayer.triggerRepaint()
+            # self._plan.assignLayer.triggerRepaint()
 
     def redo(self):
         if self._plan and self._plan.assignLayer:
             self._plan.assignLayer.undoStack().redo()
-            self._plan.assignLayer.triggerRepaint()
+            # self._plan.assignLayer.triggerRepaint()
 
     def setTargetDistrict(self, district):
         i = self.cmbTarget.model().indexFromDistrict(district)

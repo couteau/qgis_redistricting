@@ -89,11 +89,9 @@ class PlanAssignmentEditor(QObject):
 
     def endEditCommand(self):
         self._assignLayer.endEditCommand()
-        self._assignLayer.triggerRepaint()
 
     def cancelEditCommand(self):
         self._assignLayer.destroyEditCommand()
-        self._assignLayer.triggerRepaint()
 
     def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
         self._clearError()

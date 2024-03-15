@@ -355,5 +355,3 @@ class AggregateDistrictDataTask(AggregateDataTask):
             db.commit()
 
         self.distLayer.reload()
-        if self.includeGeometry:
-            self.distLayer.triggerRepaint()

@@ -261,7 +261,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         text = self._plan.districts.getAsCsv(selection)
         mime = QMimeData()
         mime.setHtml(html)
-        mime.setData("application/csv", text)
+        mime.setData("application/csv", text.encode())
         QgsApplication.instance().clipboard().setMimeData(mime)
 
     def copyToClipboard(self):
