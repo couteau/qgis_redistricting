@@ -1,9 +1,9 @@
 # Mandatory items:
 [general]
 name=QGIS Redistricting
-qgisMinimumVersion=3.18
+qgisMinimumVersion=3.28
 description=Tool for drawing districting plans from geographic units
-version=0.0.4-alpha
+version=0.0.5-alpha
 author=Cryptodira
 email=stuart@cryptodira.org
 
