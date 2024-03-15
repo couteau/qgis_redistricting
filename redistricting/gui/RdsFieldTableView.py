@@ -71,10 +71,10 @@ from ..core import (
 class FieldListModel(QAbstractTableModel):
 
     _headings = [
-        QCoreApplication.translate('Redistricting', 'Field'),
-        QCoreApplication.translate('Redistricting', 'Caption'),
-        QCoreApplication.translate('Redistricting', '∑'),
-        QCoreApplication.translate('Redistricting', '%')
+        tr('Redistricting', 'Field'),
+        tr('Redistricting', 'Caption'),
+        tr('Redistricting', '∑'),
+        tr('Redistricting', '%')
     ]
 
     def __init__(self, fields: Union[FieldList, List[Field]] = None, popFields: Union[FieldList, list[Field]] = None, parent=None):
@@ -83,6 +83,8 @@ class FieldListModel(QAbstractTableModel):
             self._data: FieldList = fields[:]
         elif isinstance(fields, list) and all(isinstance(f, Field) for f in fields):
             self._data: FieldList = FieldList(fields)
+        elif fields is None:
+            self._data = FieldList()
         else:
             raise ValueError(tr("fields must be a FieldList or a list of Fields"))
 
