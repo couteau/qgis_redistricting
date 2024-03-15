@@ -214,20 +214,22 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             'reock REAL,' \
             'convexhull REAL)'
 
-        if createGpkgTable(self.path, 'districts', sql, srid=self.srid):
+        success, error = createGpkgTable(self.path, 'districts', sql, srid=self.srid)
+        if success:
             with closing(spatialite_connect(self.path)) as db:
                 db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
+        else:
+            return False, error
 
-        return True
+        return True, None
 
     def createDistricts(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
         self.totalPop = self.popTotals[self.popField]
 
         with spatialite_connect(self.path) as db:
-            sql = f"INSERT INTO districts ({self.distField}, name, {', '.join(self.popTotals)}) " \
-                "VALUES (?,?,{','.join('?'*len(self.popTotals))})"
-            db.execute(sql, [0, tr("Unassigned")] + list(self.popTotals.values()))
+            sql = f"INSERT INTO districts ({', '.join(self.popTotals)}) VALUES ({','.join('?'*len(self.popTotals))})"
+            db.execute(sql, list(self.popTotals.values()))
             sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
             db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
 
@@ -268,17 +270,18 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             fieldNames.append(f.fieldName)
 
         sql += ')'
-        if createGpkgTable(self.path, 'assignments', sql, srid=self.srid):
+        success, error = createGpkgTable(self.path, 'assignments', sql, srid=self.srid)
+        if success:
             with closing(spatialite_connect(self.path)) as db:
                 db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
                 for field in self.geoFields:
                     db.execute(f'CREATE INDEX idx_assignments_{field.fieldName} ON assignments ({field.fieldName})')
                 db.commit()
         else:
-            return False
+            return False, error
 
         self.assignFields = fieldNames
-        return True
+        return True, None
 
     def importSourceData(self):
         total = self.geoLayer.featureCount()
@@ -336,15 +339,19 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                 self.exception = error
                 return False
 
-            if self.createDistLayer():
+            success, error = self.createDistLayer()
+            if success:
                 self.createDistricts()
                 self.setProgress(2)
             else:
+                self.exception = error
                 return False
 
-            if self.createAssignLayer():
+            success, error = self.createAssignLayer()
+            if success:
                 self.importSourceData()
             else:
+                self.exception = error
                 return False
         except CanceledError:
             return False

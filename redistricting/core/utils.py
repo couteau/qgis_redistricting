@@ -142,7 +142,7 @@ except ImportError:
 
                     sql = f"SELECT {','.join(cols)} FROM {table}"
                     if isinstance(rows, slice):
-                        sql = f"{sql} OFFSET {rows.start} LIMIT {rows.stop - rows.start}"
+                        sql = f"{sql} LIMIT {rows.start}, {rows.stop - rows.start}"
                     elif isinstance(rows, int):
                         sql = f"{sql} LIMIT {rows}"
 
@@ -407,15 +407,9 @@ def createGeoPackage(gpkg):
             for f in gpkg.parent.glob(pattern):
                 f.unlink()
 
-        gdal.UseExceptions()
-        drv: gdal.Driver = gdal.GetDriverByName("GPKG")
-        ds: gdal.Dataset = drv.Create(
-            str(gpkg), 0, 0, 0,
-            options=["VERSION=1.4", "ADD_GPKG_OGR_CONTENTS=YES",
-                     "METADATA_TABLES=YES", "DATETIME_FORMAT=UTC"]
-        )
-        ds.Close()
-    except (PermissionError, RuntimeError) as e:
+        with spatialite_connect(gpkg) as db:
+            db.executescript(CREATE_GPKG_SQL)
+    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
         return False, e
 
     return True, None
@@ -433,12 +427,12 @@ def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
             db.execute(f'SELECT gpkgAddGeometryTriggers("{table}", "{geom_column_name}")')
             if create_spatial_index:
                 db.execute(f'SELECT gpkgAddSpatialIndex("{table}", "{geom_column_name}")')
-            # db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
-            # db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
-    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError):
-        return False
+            db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
+            db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
+    except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+        return False, e
 
-    return True
+    return True, None
 
 
 DFLT_ALLOWED_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

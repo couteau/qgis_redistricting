@@ -46,12 +46,14 @@ from qgis.core import (
     QgsLayerTreeLayer,
     QgsMapLayer,
     QgsMapLayerType,
+    QgsMessageLog,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext,
     QgsVectorLayer
 )
 from qgis.gui import QgisInterface
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import (
     QCoreApplication,
     QSettings,
@@ -125,9 +127,9 @@ class Redistricting:
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
 
+        self.unloading = False
         self.project = QgsProject.instance()
         self.projectClosing = False
-        self.projectSignalsConnected = False
 
         self.importer = None
 
@@ -232,25 +234,29 @@ class Redistricting:
 
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
-        if not self.projectSignalsConnected:
-            self.project.readProjectWithContext.connect(self.onReadProject)
-            self.project.writeProject.connect(self.onWriteProject)
+        QgsApplication.instance().aboutToQuit.connect(self.onQuit)
 
+        self.project.readProjectWithContext.connect(self.onReadProject)
+        self.project.writeProject.connect(self.onWriteProject)
+
+        if Qgis.versionInt() < 33400:
+            # prior to v. 3.34, there is no signal that gets triggered
+            # before a project is closed, but removeAll comes close
+            self.project.removeAll.connect(self.onProjectClosing)
+        else:
             self.project.aboutToBeCleared.connect(self.onProjectClosing)
 
-            # layersWillBeRemoved signal is triggered when a project is
-            # closed or when the user removes a layer, and there seems
-            # to be no way to disinguish. We use a flag set in the
-            # signal handler for the project cleared signal (the closest
-            # thing to a 'project closed' signal QGIS seems to have) to
-            # ignore this signal when triggered in the context of a
-            # project closing
-            self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
+        # layersWillBeRemoved signal is triggered when a project is
+        # closed or when the user removes a layer, and there seems
+        # to be no way to disinguish. We use a flag set in the
+        # signal handler for the project cleared signal (the closest
+        # thing to a 'project closed' signal QGIS seems to have) to
+        # ignore this signal when triggered in the context of a
+        # project closing
+        self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
 
-            self.project.layersAdded.connect(self.updateNewPlanAction)
-            self.project.layersRemoved.connect(self.updateNewPlanAction)
-
-            self.projectSignalsConnected = True
+        self.project.layersAdded.connect(self.updateNewPlanAction)
+        self.project.layersRemoved.connect(self.updateNewPlanAction)
 
         self.districtCopyActions.hookCanvasMenu()
         self.iface.layerTreeView().clicked.connect(self.layerChanged)
@@ -443,19 +449,23 @@ class Redistricting:
         if not self.pendingChangesWidget:
             self.pendingChangesWidget = self.setupPendingChangesWidget()
 
+        self.unloading = False
         self.setActivePlan(self.activePlan)
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
-
-        if self.projectSignalsConnected:
-            self.project.readProjectWithContext.disconnect(self.onReadProject)
-            self.project.writeProject.disconnect(self.onWriteProject)
-            self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
-            self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
-            self.project.layersAdded.disconnect(self.updateNewPlanAction)
-            self.project.layersRemoved.disconnect(self.updateNewPlanAction)
-            self.projectSignalsConnected = False
+        self.unloading = True
+        self.project.readProjectWithContext.disconnect(self.onReadProject)
+        self.project.writeProject.disconnect(self.onWriteProject)
+        if Qgis.versionInt() < 33400:
+            # prior to v. 3.34, there is no signal that gets triggered
+            # before a project is closed, but removeAll comes close
+            self.project.removeAll.connect(self.onProjectClosing)
+        else:
+            self.project.aboutToBeCleared.connect(self.onProjectClosing)
+        self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
+        self.project.layersAdded.disconnect(self.updateNewPlanAction)
+        self.project.layersRemoved.disconnect(self.updateNewPlanAction)
 
         self.districtCopyActions.unhookCanvasMenu()
         self.iface.layerTreeView().clicked.disconnect(self.layerChanged)
@@ -479,6 +489,8 @@ class Redistricting:
 
         # remove the toolbar
         del self.toolbar
+
+        QgsApplication.instance().aboutToQuit.disconnect(self.onQuit)
 
     def setupToolboxDockWidget(self):
         """Create the dockwidget with tools for painting districts."""
@@ -617,6 +629,9 @@ class Redistricting:
 
     # --------------------------------------------------------------------------
 
+    def onQuit(self):
+        self.unloading = True
+
     def layerChanged(self, layer: QgsMapLayer):  # pylint: disable=unused-argument
         g = self.iface.layerTreeView().currentGroupNode()
         if g.isVisible():
@@ -663,24 +678,20 @@ class Redistricting:
         storage.writeActivePlan(self.activePlan)
 
     def onProjectClosing(self):
+        if self.unloading:
+            return
+
         self.projectClosing = True
         self.clear()
 
     def onLayersWillBeRemoved(self, layerIds):
-        if self.projectClosing:
+        if self.projectClosing or self.unloading:
             self.projectClosing = False
         else:
-            deletePlans = set()
-            for layer in layerIds:
-                for plan in self.redistrictingPlans:
-                    if plan.geoLayer.id() == layer:
-                        plan.geoLayer = None
-                    elif plan.popLayer.id() == layer:
-                        deletePlans.add(plan)
-                    elif plan.assignLayer.id() == layer:
-                        deletePlans.add(plan)
-                    elif plan.distLayer.id() == layer:
-                        deletePlans.add(plan)
+            deletePlans = {
+                plan for plan in self.redistrictingPlans for layer in layerIds
+                if layer in {plan.geoLayer.id(), plan.popLayer.id(), plan.assignLayer.id(), plan.distLayer.id()}
+            }
 
             for plan in deletePlans:
                 self.removePlan(plan)
@@ -1081,7 +1092,8 @@ class Redistricting:
             self.project.setDirty()
 
     def clear(self):
-        self.setActivePlan(None)
+        if self.activePlan is not None:
+            self.setActivePlan(None)
         self.redistrictingPlans.clear()
         self.planMenu.clear()
         del self.planActions
@@ -1173,23 +1185,33 @@ class Redistricting:
         return None
 
     def setActivePlan(self, plan):
-        self.canvas.unsetMapTool(self.mapTool)
+        if not sip.isdeleted(self.canvas):
+            self.canvas.unsetMapTool(self.mapTool)
 
         if isinstance(plan, str):
             try:
                 plan = UUID(plan)
             except ValueError:
+                QgsMessageLog.logMessage(
+                    self.tr('Plan id {uuid} not found').format(uuid=plan), 'Redistricting', Qgis.Warning)
                 return
 
         if isinstance(plan, UUID):
-            plan = self.planById(plan)
-            if not plan:
+            p = self.planById(plan)
+            if not p:
+                QgsMessageLog.logMessage(
+                    self.tr('Plan id {uuid} not found').format(uuid=str(plan)), 'Redistricting', Qgis.Warning)
                 return
+            plan = p
 
         if plan is not None and not isinstance(plan, RedistrictingPlan):
+            QgsMessageLog.logMessage(
+                self.tr('Invalid plan: {plan}').format(plan=repr(plan)), 'Redistricting', Qgis.Critical)
             return
 
         if plan is not None and not plan.isValid():
+            QgsMessageLog.logMessage(
+                self.tr('Cannot activate incomplete plan {plan}').format(plan=plan.name), 'Redistricting', Qgis.Critical)
             return
 
         if self.activePlan != plan or self.activePlan is None:

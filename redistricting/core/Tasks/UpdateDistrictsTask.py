@@ -36,17 +36,20 @@ import geopandas as gpd
 import pandas as pd
 import pyproj
 import shapely.ops
+from packaging import version
 from qgis.core import (
     QgsAggregateCalculator,
     QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
-    QgsFeatureRequest
+    QgsFeatureRequest,
+    QgsGeometry
 )
 from qgis.PyQt.QtCore import (
     QRunnable,
     QThreadPool
 )
+from shapely import wkt
 from shapely.geometry import (
     MultiPolygon,
     Polygon
@@ -171,7 +174,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         total = len(self.geoFields) + 1
         self.splits = {}
         for field in self.geoFields:
-            g = data.dropna(subset=field.fieldName)[[field.fieldName] + cols].groupby([field.fieldName])
+            g = data.dropna(subset=[field.fieldName])[[field.fieldName] + cols].groupby([field.fieldName])
             splits_data = g.filter(lambda x: x[self.distField].nunique() > 1)
 
             splitpop = splits_data[[field.fieldName] + cols] \
@@ -200,7 +203,10 @@ class AggregateDistrictDataTask(AggregateDataTask):
         area = cea.area
 
         data['polsbypopper'] = 4 * math.pi * area / (cea.length**2)
-        data['reock'] = area / cea.minimum_bounding_circle().area
+        if version.parse(gpd.__version__) < version.parse('1.0.0'):
+            data['reock'] = cea.apply(lambda g: g.area / QgsGeometry.fromWkt(g.wkt).minimalEnclosingCircle()[0].area())
+        else:
+            data['reock'] = area / cea.minimum_bounding_circle().area
         data['convexhull'] = area / cea.convex_hull.area
 
     def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
@@ -268,7 +274,11 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
 
                 self.calcDistrictMetrics(data)
-                self.data = data.to_wkt()
+
+                # self.data = data.to_wkt()
+                data["wkt_geom"] = data["geometry"].apply(wkt.dumps)
+                data = data.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
+                self.data = data
             else:
                 assign.drop(columns="geometry", inplace=True)
                 if self.updateDistricts is not None:

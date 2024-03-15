@@ -325,7 +325,8 @@ class DistrictList(QObject):
         for field in self._plan.dataFields:
             fn = makeFieldName(field)
             if field.pctbase and field.pctbase in self._data.columns:
-                self._data[f'pct_{fn}'] = self._data[fn].div(self._data[field.pctbase], fill_value=0)
+                self._data[f'pct_{fn}'] = self._data[fn].astype("Float64") \
+                    .div(self._data[field.pctbase].astype("Float64"), fill_value=0)
 
     def loadData(self):
         if not self._plan.isValid():
@@ -344,9 +345,10 @@ class DistrictList(QObject):
 
             if self._data.loc[1:, "deviation"].isna().any():
                 self._data.loc[1:, "deviation"] = \
-                    self._data.loc[1:, self.popField].sub(self._data.loc[1:, "members"] * self.ideal)
+                    self._data.loc[1:, self.popField].astype("Float64").sub(
+                        self._data.loc[1:, "members"].astype("Int64") * self.ideal)
                 self._data.loc[1:, "pct_deviation"] = \
-                    self._data.loc[1:, "deviation"].div(self._data.loc[1:, "members"] * self.ideal)
+                    self._data.loc[1:, "deviation"].div(self._data.loc[1:, "members"].astype("Int64") * self.ideal)
 
             if self._data.loc[1:, "name"].isna().any():
                 self._data.loc[1:, "name"] = tr("District") + " " + self._data.loc[1: "district"].astype(str)

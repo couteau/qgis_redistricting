@@ -643,7 +643,7 @@ class RedistrictingPlan(ErrorListMixin, QObject):
             self._setDistLayer(None)
         elif layer == self._popLayer:
             self._popLayer = None
-        elif self._geoLayer:
+        elif layer == self._geoLayer:
             self._geoLayer = None
 
     def _updateLayerNames(self):

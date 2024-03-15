@@ -239,7 +239,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def setTargetDistrict(self, value):
         self._distTarget = value
 
-    @ property
+    @property
     def geoField(self):
         return self._geoField
 

@@ -51,6 +51,10 @@ class AggregatePendingChangesTask(AggregateDataTask):
         self.assignments = assignments
 
     def run(self):
+        def checkCanceled():
+            if self.isCanceled():
+                raise CanceledError()
+
         debug_thread()
 
         try:
@@ -69,7 +73,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                     data.append(v[dindex])
             df_new = pd.DataFrame({f"new_{self.distField}": data}, index=index)
 
-            self.checkCanceled()
+            checkCanceled()
 
             if self.assignments is None:
                 with self._connectSqlOgrSqlite(self.assignLayer.dataProvider()) as db:
@@ -78,7 +82,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                         db,
                         index_col="fid"
                     )
-                self.checkCanceled()
+                checkCanceled()
 
             pending = self.assignments.loc[index].join(df_new)
             pending = pending[pending[f'new_{self.distField}'] != pending[f'old_{self.distField}']]
@@ -94,12 +98,12 @@ class AggregatePendingChangesTask(AggregateDataTask):
                 .drop(columns=f"old_{self.distField}")\
                 .groupby(f'new_{self.distField}')\
                 .sum(numeric_only=True)
-            self.checkCanceled()
+            checkCanceled()
             olddist = pending\
                 .drop(columns=f"new_{self.distField}")\
                 .groupby(f'old_{self.distField}')\
                 .sum(numeric_only=True)
-            self.checkCanceled()
+            checkCanceled()
 
             data = newdist.sub(olddist, fill_value=0)
             dist = self.assignments\
@@ -107,7 +111,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                 .drop(columns=self.geoIdField)\
                 .groupby(f"old_{self.distField}")\
                 .sum()
-            self.checkCanceled()
+            checkCanceled()
             dist = dist.loc[dist.index.intersection(data.index)]
 
             new = pd.DataFrame(0, index=data.index.difference(dist.index), columns=dist.columns)
@@ -126,7 +130,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                 if f.pctbase:
                     data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{f.pctbase}"]
 
-            self.checkCanceled()
+            checkCanceled()
 
             cols = [f"new_{self.popField}", self.popField, "deviation", "pct_deviation"]
             for f in self.popFields:
@@ -139,7 +143,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                     cols.append(f"pct_{f.fieldName}")
 
             self.data = data[cols]
-            self.checkCanceled()
+            checkCanceled()
         except CanceledError:
             self.data = None
             return False

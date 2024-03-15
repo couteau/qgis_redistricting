@@ -185,9 +185,7 @@ class TestPluginInit:
 
     def test_init_gui(self, plugin):
         plugin.initGui()
-        assert plugin.projectSignalsConnected
         plugin.unload()
-        assert not plugin.projectSignalsConnected
 
     def test_add_layer_enables_newplan(self, plugin, datadir, qtbot):
         plugin.initGui()

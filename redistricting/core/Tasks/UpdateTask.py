@@ -80,7 +80,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self._prog_stop = 100
 
     def setProgressIncrement(self, start: int, stop: int):
-        self.setProgress(start)
+        super().setProgress(start)
         self._prog_start = start
         self._prog_stop = stop
 

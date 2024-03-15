@@ -28,7 +28,6 @@ class TestUpdatePendingChangesTask:
         assert t.exception is None
 
     def test_run(self, plan: RedistrictingPlan):
-        plan.delta.detachSignals()
         plan.assignLayer.startEditing()
         f = next(plan.assignLayer.getFeatures())
         i = plan.assignLayer.fields().lookupField(plan.distField)
