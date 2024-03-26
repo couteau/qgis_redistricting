@@ -22,11 +22,20 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
 from .ui.DlgNewDistrict import Ui_dlgNewDistrict
-from ..core import RedistrictingPlan
 
 
 class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):

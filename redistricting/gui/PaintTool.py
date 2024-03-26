@@ -51,10 +51,8 @@ from qgis.PyQt.QtGui import (
     QPixmap
 )
 
-from ..core import (
-    RedistrictingPlan,
-    tr
-)
+from ..models import RedistrictingPlan
+from ..utils import tr
 
 
 class PaintMode(IntEnum):

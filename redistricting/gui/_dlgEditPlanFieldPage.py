@@ -38,12 +38,13 @@ from qgis.PyQt.QtWidgets import (
     QWizardPage
 )
 
-from redistricting.core import defaults
-from redistricting.core.utils import matchField
-
-from ..core import (
+from ..models import (
     DataField,
-    Field,
+    Field
+)
+from ..services import defaults
+from ..utils import (
+    matchField,
     tr
 )
 from .RdsFieldTableView import FieldListModel
@@ -53,7 +54,7 @@ from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
 class PopFieldDelegate(QStyledItemDelegate):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._popFields: list[Field] = []
+        self.popFields: list[Field] = []
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         if index.column() == 3:
@@ -62,7 +63,7 @@ class PopFieldDelegate(QStyledItemDelegate):
             rect = option.rect
             editor.setGeometry(rect)
             editor.setEditable(False)
-            editor.addItems([f.caption for f in self._popFields])
+            editor.addItems([f.caption for f in self.popFields])
             return editor
         return super().createEditor(parent, option, index)
 
@@ -114,7 +115,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         self.fieldsModel.popFields = popFields
 
         delegate: PopFieldDelegate = self.tblDataFields.itemDelegateForColumn(3)
-        delegate._popFields = popFields
+        delegate.popFields = popFields
 
         self.tblDataFields.setColumnWidth(0, 120)
         self.tblDataFields.setColumnWidth(1, 120)

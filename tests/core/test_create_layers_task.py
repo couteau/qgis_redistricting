@@ -22,12 +22,12 @@ import pathlib
 import pytest
 from qgis.core import QgsVectorLayer
 
-from redistricting.core.Field import (
+from redistricting.models import (
     DataField,
-    Field
+    Field,
+    RedistrictingPlan
 )
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.Tasks.CreateLayersTask import CreatePlanLayersTask
+from redistricting.services.Tasks.CreateLayersTask import CreatePlanLayersTask
 
 # pylint: disable=protected-access
 

@@ -18,8 +18,10 @@
 """
 import pytest
 
-from redistricting.core.Field import Field
-from redistricting.core.FieldList import FieldList
+from redistricting.models import (
+    Field,
+    FieldList
+)
 
 # pylint: disable=no-self-use
 

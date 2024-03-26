@@ -31,9 +31,8 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
 from qgis.utils import iface
 
-from ..core import (
-    FieldList,
-    RedistrictingPlan,
+from ..models import RedistrictingPlan
+from ..utils import (
     showHelp,
     tr
 )
@@ -209,8 +208,7 @@ class DlgEditPlan(QWizard):
     def createPlan(self):
         if not self.isComplete():
             return None
-        plan = RedistrictingPlan(parent=QgsProject.instance(), name=self.field(
-            'planName'), numDistricts=self.field('numDistricts'))
+        plan = RedistrictingPlan(name=self.field('planName'), numDistricts=self.field('numDistricts'))
         plan.numSeats = self.field('numSeats')
         plan.description = self.field('description')
         plan.geoLayer = self.field('sourceLayer')

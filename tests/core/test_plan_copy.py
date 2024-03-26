@@ -26,10 +26,8 @@ from qgis.core import (
     QgsProject
 )
 
-from redistricting.core import (
-    PlanCopier,
-    RedistrictingPlan
-)
+from redistricting.models import RedistrictingPlan
+from redistricting.services import PlanCopier
 
 # pylint: disable=protected-access
 

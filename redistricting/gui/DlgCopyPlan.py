@@ -37,10 +37,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..core import (
-    RedistrictingPlan,
-    tr
-)
+from ..models import RedistrictingPlan
+from ..utils import tr
 from .ui.DlgCopyPlan import Ui_dlgCopyPlan
 
 
@@ -70,7 +68,7 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
     @property
     def copyAssignments(self) -> bool:
         return self.cbxCopyAssignments.isChecked()
-    
+
     @property
     def description(self) -> str:
         return self.txtDescription.toPlainText()

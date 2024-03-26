@@ -25,7 +25,7 @@ from qgis.core import (
     QgsProject
 )
 
-from redistricting.core import (
+from redistricting.models import (
     DataField,
     Field,
     RedistrictingPlan
@@ -85,7 +85,7 @@ class TestPlan:
         assert plan.totalPopulation == 0
         assert len(plan.geoFields) == 0
         assert len(plan.dataFields) == 0
-        assert len(plan.districts) == 6
+        assert len(plan.districts) == 1
         assert plan.districts[0].name == 'Unassigned'
 
     def test_new_plan_is_not_valid(self):

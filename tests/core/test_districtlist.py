@@ -16,87 +16,84 @@
  *                                                                         *
  ***************************************************************************/
 """
-import pandas as pd
 import pytest
 
-from redistricting.core.District import District
-from redistricting.core.DistrictList import DistrictList
+from redistricting.models import (
+    District,
+    DistrictList
+)
 
 
 class TestDistrictList:
     @pytest.fixture
-    def district_list(self, plan) -> DistrictList:
-        return DistrictList(plan)
+    def district(self):
+        district = District(2, name="District 2")
+        return district
 
     @pytest.fixture
-    def district(self, district_list: DistrictList) -> District:
-        return district_list['2']
+    def district_list_with_district(self, district):
+        district_list = DistrictList()
+        district_list.numDistricts = 2
+        district_list.append(district)
+        return district_list
 
-    @pytest.fixture
-    def dataframe(self, datadir):
-        df: pd.DataFrame = pd.read_json(
-            str((datadir / 'test.json').resolve())
-        )
-        df.set_index('district', inplace=True)  # pylint: disable=no-member
-        return df
-
-    @pytest.fixture
-    def unassigned(self, district_list) -> District:
-        return district_list['0']
-
-    def test_create(self, district_list):
-        assert len(district_list) == 6
+    def test_create(self):
+        district_list = DistrictList()
+        assert len(district_list) == 1
         assert district_list[0].name == 'Unassigned'
+        assert district_list.byindex[0].name == 'Unassigned'
 
-    def test_contains(self, district_list, district):
-        assert district in district_list
-        assert 2 in district_list
-        assert '2' in district_list
+    def test_access_nonexistent_district_raises_error(self):
+        district_list = DistrictList()
+        with pytest.raises(KeyError):
+            district_list[1]  # pylint: disable=pointless-statement
 
-    def test_keys(self, district_list):
-        assert list(district_list.keys()) == list(range(6))
+    def test_add_district_allows_access_by_district_number(self, district_list_with_district, district):
+        assert district_list_with_district[2] == district
 
-    def test_values(self, district_list, district, unassigned):
-        values = list(district_list.values())
-        assert len(values) == 6
-        assert values[0] == unassigned
-        assert values[2] == district
-        assert values[1].name == "1"
+    def add_district_allows_access_by_index(self, district_list_with_district, district):
+        assert district_list_with_district.byindex[1] == district
 
-    def test_items(self, district_list):
+    def add_district_allows_access_by_byname(self, district_list_with_district, district):
+        assert district_list_with_district.byname["District 2"] == district
+
+    def test_contains(self, district_list_with_district, district):
+        assert district in district_list_with_district
+        assert 2 in district_list_with_district
+
+    def test_keys(self, district_list_with_district):
+        assert list(district_list_with_district.keys()) == [0, 2]
+
+    def test_values(self, district_list_with_district, district):
+        values = list(district_list_with_district.values())
+        assert len(values) == 2
+        assert values[1] == district
+
+    def test_items(self):
+        district_list = DistrictList()
         items = list(district_list.items())
         assert isinstance(items[0], tuple)
         assert isinstance(items[0][0], int)
         assert isinstance(items[0][1], District)
 
-    def test_index(self, district_list, district):
-        assert district_list.index(district) == 2
+    def test_index(self, district_list_with_district, district):
+        assert district_list_with_district.index(district) == 1
 
-    def test_getitem(self, district_list, district):
-        assert district_list['2'] == district
-        assert district_list[2] == district
-        with pytest.raises(IndexError):
-            district_list[6]  # pylint: disable=pointless-statement
+    def test_getitem(self, district_list_with_district, district):
+        assert district_list_with_district[2] is district
+        with pytest.raises(KeyError):
+            district_list_with_district[3]  # pylint: disable=pointless-statement
 
-        with pytest.raises(IndexError):
-            district_list['7']  # pylint: disable=pointless-statement
+        with pytest.raises(ValueError):
+            district_list_with_district['3']  # pylint: disable=pointless-statement
 
-        l = district_list[1:]
+    def test_getitem_slice_returns_district_list(self, district_list_with_district, district):
+        l = district_list_with_district[1:]
         assert isinstance(l, DistrictList)
-        assert len(l) == 5
-        assert l[1] == district
+        assert len(l) == 1
+        assert l.byindex[0] == district
 
-        l = district_list['reock']
+    def test_getitem_slice_returns_value_list(self, district_list_with_district):
+        l = district_list_with_district[0:2, 'deviation']
         assert isinstance(l, list)
-        assert len(l) == 6
-
-    def test_loaddata(self, district_list):
-        district_list.loadData()
-        assert len(district_list) == 6
-        assert district_list.district[1].population == 44684
-
-    def test_update_data(self, district_list, dataframe):
-        district_list.setData(dataframe)
-        assert len(district_list) == 6
-        assert district_list[1].population == 44684
-        assert district_list[2].population == 46916
+        assert len(l) == 2

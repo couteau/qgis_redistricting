@@ -19,16 +19,19 @@
 import pandas as pd
 import pytest
 
-from redistricting.core.DeltaList import DeltaList
-from redistricting.core.Plan import RedistrictingPlan
+from redistricting.models import (
+    Delta,
+    DeltaList,
+    RedistrictingPlan
+)
 
 # pylint: disable=no-self-use
 
 
 class TestDeltaList:
     @pytest.fixture
-    def empty_delta_list(self, plan: RedistrictingPlan) -> DeltaList:
-        return DeltaList(plan)
+    def empty_delta_list(self, mock_plan: RedistrictingPlan) -> DeltaList:
+        return DeltaList(mock_plan)
 
     @pytest.fixture
     def delta_list(self, empty_delta_list: DeltaList):
@@ -40,9 +43,9 @@ class TestDeltaList:
                 'vap_nh_black': 20,
                 'vap_apblack': 25,
                 'vap_nh_white': 40
-            }],
-            index='district'
+            }]
         )
+        df.set_index('district', drop=False, inplace=True)
         empty_delta_list._data = df  # pylint: disable=protected-access
         return empty_delta_list
 
@@ -55,5 +58,7 @@ class TestDeltaList:
 
     def test_getitem(self, delta_list: DeltaList):
         assert delta_list['1'] == delta_list[0]
-        assert delta_list[0].name == 'Council District 1'
-        assert delta_list[0].district == 1
+        assert isinstance(delta_list[0], Delta)
+        assert delta_list[0, 0] == 1
+        assert delta_list[0, 1] == 100
+        assert delta_list['vap_total'] == [80]

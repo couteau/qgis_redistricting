@@ -19,13 +19,11 @@
 import pytest
 from qgis.PyQt.QtCore import QVariant
 
-from redistricting.core.Exception import RdsException
-from redistricting.core.Field import (
+from redistricting.exception import RdsException
+from redistricting.models import (
     DataField,
     Field
 )
-
-# pylint: disable=no-self-use
 
 
 class TestField:
@@ -146,8 +144,8 @@ class TestDataField:
         assert field.layer == block_layer
         assert not field.isExpression
         assert field.caption == 'APBVAP'
-        assert field.sum
-        assert field.pctbase == 'vap_total'
+        assert field.sum  # pylint: disable=no-member
+        assert field.pctbase == 'vap_total'  # pylint: disable=no-member
 
     def test_makeqgsfield_field(self, data_field):
         qf = data_field.makeQgsField()

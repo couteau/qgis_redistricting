@@ -22,7 +22,7 @@ import re
 import pytest
 from pytest_mock.plugin import MockerFixture
 
-import redistricting.core.PlanImport
+import redistricting.services.PlanImport
 
 
 class TestPlanImport:
@@ -35,7 +35,7 @@ class TestPlanImport:
         return str((datadir / 'tuscaloosa_be.csv').resolve())
 
     def test_import_shapefile_non_existent_file_sets_error(self, new_plan):
-        p = redistricting.core.PlanImport.ShapefileImporter()
+        p = redistricting.services.PlanImport.ShapefileImporter()
         p.setSourceFile('/notafile.txt')
         p.setDistField('district')
         result = p.importPlan(new_plan)
@@ -44,7 +44,7 @@ class TestPlanImport:
         assert msg is not None and re.search('not exist', msg)
 
     def test_import_shapefile_bad_shapefile_sets_error(self, new_plan, datadir):
-        p = redistricting.core.PlanImport.ShapefileImporter()
+        p = redistricting.services.PlanImport.ShapefileImporter()
         p.setSourceFile(datadir / 'tuscaloosa_be.csv')
         p.setDistField('district')
         result = p.importPlan(new_plan)
@@ -54,8 +54,8 @@ class TestPlanImport:
 
     def test_import_shapefile(self, new_plan, shapefile, mocker: MockerFixture):
         task = mocker.patch('redistricting.core.PlanImport.ImportShapeFileTask')
-        add = mocker.patch.object(redistricting.core.PlanImport.QgsApplication.taskManager(), 'addTask')
-        p = redistricting.core.PlanImport.ShapefileImporter()
+        add = mocker.patch.object(redistricting.services.PlanImport.QgsApplication.taskManager(), 'addTask')
+        p = redistricting.services.PlanImport.ShapefileImporter()
         p.setSourceFile(shapefile)
         p.setDistField('district')
         p.importPlan(new_plan)
@@ -64,7 +64,7 @@ class TestPlanImport:
         p.deleteLater()
 
     def test_import_assignments_non_existent_file_sets_error(self, new_plan):
-        p = redistricting.core.PlanImport.AssignmentImporter()
+        p = redistricting.services.PlanImport.AssignmentImporter()
         p.setSourceFile('/notafile.txt')
         result = p.importPlan(new_plan)
         assert not result
@@ -74,8 +74,8 @@ class TestPlanImport:
 
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
         task = mocker.patch('redistricting.core.PlanImport.ImportAssignmentFileTask')
-        add = mocker.patch.object(redistricting.core.PlanImport.QgsApplication.taskManager(), 'addTask')
-        p = redistricting.core.PlanImport.AssignmentImporter()
+        add = mocker.patch.object(redistricting.services.PlanImport.QgsApplication.taskManager(), 'addTask')
+        p = redistricting.services.PlanImport.AssignmentImporter()
         p.setSourceFile(assignmentfile)
         p.importPlan(new_plan)
         task.assert_called_once()

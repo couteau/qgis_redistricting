@@ -1,6 +1,7 @@
 """QGIS Redistricting Plugin test fixtures"""
 import pathlib
 import shutil
+from uuid import uuid4
 
 import pytest
 from pytest_mock import MockerFixture
@@ -10,10 +11,10 @@ from qgis.core import (
     QgsVectorLayer
 )
 
-from redistricting.core.DistrictList import DistrictList
-from redistricting.core.FieldList import FieldList
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.PlanBuilder import PlanBuilder
+from redistricting.models.DistrictList import DistrictList
+from redistricting.models.FieldList import FieldList
+from redistricting.models.Plan import RedistrictingPlan
+from redistricting.services.PlanBuilder import PlanBuilder
 
 # pylint: disable=redefined-outer-name, unused-argument
 
@@ -163,22 +164,25 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
 
 
 @pytest.fixture
-def mock_plan(mocker: MockerFixture, assign_layer, dist_layer, block_layer):
+def mock_plan(mocker: MockerFixture):
     plan = mocker.create_autospec(
-        spec=RedistrictingPlan,
-        spec_set=True,
-        instance=True
+        spec=RedistrictingPlan('mock_plan', 5, uuid4()),
+        spec_set=True
     )
-    type(plan).assignLayer = mocker.PropertyMock(return_value=assign_layer)
-    type(plan).distLayer = mocker.PropertyMock(return_value=dist_layer)
-    type(plan).popLayer = mocker.PropertyMock(return_value=block_layer)
-    type(plan).geoLayer = mocker.PropertyMock(return_value=block_layer)
+    type(plan).name = mocker.PropertyMock(return_value="test")
+    type(plan).id = mocker.PropertyMock(return_value=uuid4())
+    type(plan).description = mocker.PropertyMock(return_value="description")
+    type(plan).assignLayer = mocker.PropertyMock(return_value=mocker.create_autospec(spec=QgsVectorLayer, instance=True))
+    type(plan).distLayer = mocker.PropertyMock(return_value=mocker.create_autospec(spec=QgsVectorLayer, instance=True))
+    type(plan).popLayer = mocker.PropertyMock(return_value=mocker.create_autospec(spec=QgsVectorLayer, instance=True))
+    type(plan).geoLayer = mocker.PropertyMock(return_value=mocker.create_autospec(spec=QgsVectorLayer, instance=True))
     type(plan).distField = mocker.PropertyMock(return_value='district')
     type(plan).geoIdField = mocker.PropertyMock(return_value='geoid20')
     type(plan).geoJoinField = mocker.PropertyMock(return_value='geoid20')
     type(plan).popJoinField = mocker.PropertyMock(return_value='geoid20')
     type(plan).popField = mocker.PropertyMock(return_value='pop_total')
     type(plan).numDistricts = mocker.PropertyMock(return_value=5)
+    type(plan).numSeats = mocker.PropertyMock(return_value=5)
 
     districts = mocker.create_autospec(spec=DistrictList, spec_set=True, instance=True)
     type(plan).districts = mocker.PropertyMock(return_value=districts)

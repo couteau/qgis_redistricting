@@ -20,13 +20,13 @@ import pytest
 from pytestqt.plugin import QtBot
 from qgis.core import Qgis
 
-from redistricting.core import (
+from redistricting.exception import RdsException
+from redistricting.models import (
     DataField,
     Field,
-    PlanEditor,
-    RdsException,
     RedistrictingPlan
 )
+from redistricting.services import PlanEditor
 
 
 class TestPlanEditor:

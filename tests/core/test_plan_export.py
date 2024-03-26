@@ -18,15 +18,16 @@
 """
 import pytest
 from pytest_mock.plugin import MockerFixture
+
 import redistricting
-from redistricting.core import PlanExporter
+from redistricting.services import PlanExporter
 
 
 class TestPlanExport:
     @pytest.fixture
-    def export(self, plan, datadir):
+    def export(self, mock_plan, datadir):
         return PlanExporter(
-            plan,
+            mock_plan,
             datadir / 'test.csv',
             datadir / 'test.shp',
             None,

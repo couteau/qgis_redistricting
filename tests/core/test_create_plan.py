@@ -16,75 +16,154 @@
  *                                                                         *
  ***************************************************************************/
 """
+from uuid import uuid4
+
 import pytest
 from pytest_mock.plugin import MockerFixture
-from qgis.core import QgsTask
+from qgis.core import QgsVectorLayer
 
-from redistricting.core import (
-    PlanBuilder,
-    RdsException
-)
-from redistricting.core.PlanBuilder import QgsApplication
+from redistricting.models.Plan import RedistrictingPlan
+from redistricting.services import PlanBuilder
+from redistricting.services.PlanBuilder import QgsApplication
+from redistricting.services.Tasks import CreatePlanLayersTask
 
 # pylint: disable=protected-access
 
 
 class TestPlanCreator:
+    @pytest.fixture
+    def mock_geo_l(self, mocker: MockerFixture):
+        return mocker.create_autospec(spec=QgsVectorLayer, instance=True)
 
     @pytest.fixture
-    def creator(self, block_layer):
+    def creator(self, mock_geo_l):
         return PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setPopLayer(block_layer) \
+            .setGeoLayer(mock_geo_l) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
 
-    def test_createlayer_create(self, block_layer):
+    def test_createlayer_create(self, mocker: MockerFixture):
+        layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         creator = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setGeoLayer(block_layer) \
+            .setGeoLayer(layer) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
 
         assert creator.validate()
         assert creator._numSeats == 5
-        assert creator._geoLayer == block_layer
+        assert creator._geoLayer == layer
         assert creator._geoJoinField == 'geoid20'
         assert creator._popJoinField == 'geoid20'
 
     def test_createlayers_triggers_background_task_when_plan_is_valid(
         self,
         datadir,
-        block_layer,
         mocker: MockerFixture
     ):
         mock = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
+        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
+        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        task_class = mocker.patch('redistricting.services.PlanBuilder.CreatePlanLayersTask', spec=CreatePlanLayersTask)
+        task_class.return_value = mocker.create_autospec(spec=CreatePlanLayersTask, instance=True)
+        task_class.return_value.taskCompleted = mocker.MagicMock()
+        task_class.return_value.taskTerminated = mocker.MagicMock()
+        task_class.return_value.progressChanged = mocker.MagicMock()
 
         c = PlanBuilder() \
             .setGeoPackagePath(str((datadir / 'test_plan.gpkg').resolve())) \
             .setName('test') \
             .setNumDistricts(5) \
-            .setGeoLayer(block_layer) \
+            .setGeoLayer(mocker.create_autospec(spec=QgsVectorLayer, instance=True)) \
             .setGeoIdField('geoid20') \
             .setPopField('pop_total')
         c.createPlan()
         task = c._createLayersTask
-        assert isinstance(task, QgsTask)
+        assert isinstance(task, CreatePlanLayersTask)
         assert not c.errors()
         mock.assert_called_once_with(task)
 
-    def test_plan_is_valid(self, block_layer, gpkg_path):
-        plan = PlanBuilder() \
+    def test_create_plan_create_layers_false(self, mocker: MockerFixture):
+        layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
+        layer.id.return_value = uuid4()
+        layer.isValid.return_value = True
+        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
+        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+
+        builder = PlanBuilder() \
             .setName('test') \
             .setNumDistricts(5) \
-            .setGeoLayer(block_layer) \
+            .setGeoLayer(layer) \
             .setGeoIdField('geoid20') \
-            .setPopField('pop_total') \
-            .createPlan(createLayers=False)
-        plan.addLayersFromGeoPackage(gpkg_path)
-        assert plan.isValid()
+            .setPopField('pop_total')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_called_once()
+        json = plan_class.deserialize.call_args[0][0]
+        assert {'name': 'test', 'description': '', 'deviation': 0.0, 'num-districts': 5,
+                'geo-layer': layer.id(), 'geo-id-field': 'geoid20', 'pop-field': 'pop_total',
+                'geo-fields': [], 'data-fields': [], 'pop-fields': []}.items() <= json.items()
+        assert builder._createLayersTask is None
+
+    def test_create_plan_invalid_builder_no_plan(self, mocker: MockerFixture):
+        layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
+        layer.id.return_value = uuid4()
+        layer.isValid.return_value = True
+        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
+        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+
+        # no name
+        builder = PlanBuilder() \
+            .setNumDistricts(5) \
+            .setGeoLayer(layer) \
+            .setGeoIdField('geoid20') \
+            .setPopField('pop_total')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_not_called()
+
+        # no num districts
+        builder = PlanBuilder() \
+            .setName('test') \
+            .setGeoLayer(layer) \
+            .setGeoIdField('geoid20') \
+            .setPopField('pop_total')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_not_called()
+
+        # no geo layer
+        builder = PlanBuilder() \
+            .setName('test') \
+            .setNumDistricts(5) \
+            .setGeoIdField('geoid20') \
+            .setPopField('pop_total')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_not_called()
+
+        # no geo field
+        builder = PlanBuilder() \
+            .setName('test') \
+            .setNumDistricts(5) \
+            .setGeoLayer(layer) \
+            .setPopField('pop_total')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_not_called()
+
+        # no pop field
+        builder = PlanBuilder() \
+            .setName('test') \
+            .setNumDistricts(5) \
+            .setGeoLayer(layer) \
+            .setGeoIdField('geoid20')
+
+        builder.createPlan(createLayers=False)
+        plan_class.deserialize.assert_not_called()
 
     def test_set_num_seats(self, creator: PlanBuilder):
         creator.setNumDistricts(45)
@@ -112,28 +191,13 @@ class TestPlanCreator:
         with pytest.raises(ValueError):
             creator.setNumDistricts('1')
 
-    def test_set_nonexistent_fields_no_validate(self, creator: PlanBuilder):
+    def test_validate_pop_layer_fields_not_found_no_validate(self, creator: PlanBuilder):
         assert creator._validatePopLayer()
-        creator.setPopJoinField('not_a_field')
+        creator._popLayer.fields.return_value.lookupField.return_value = -1
         assert not creator._validatePopLayer()
-        creator.setPopJoinField(None)
 
+    def test_append_nonexistent_field_raises_error(self, creator: PlanBuilder, mock_geo_l: QgsVectorLayer):
         assert creator._validatePopLayer()
-        creator.setPopField('not_a_field')
-        assert not creator._validatePopLayer()
-        creator.setPopField('pop_total')
-
-    def test_append_nonexistent_field_raises_error(self, creator: PlanBuilder):
-        assert creator._validatePopLayer()
-        with pytest.raises(RdsException):
+        mock_geo_l.fields.return_value.lookupField.return_value = -1
+        with pytest.raises(ValueError):
             creator.appendPopField('not_a_field')
-
-    def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
-        plan = creator.createPlan(createLayers=False)
-        assert hasattr(plan.districts[0], 'pop_total')
-        assert not plan._updater._needDemographicUpdate
-
-        creator.appendPopField('vap_total')
-        plan = creator.createPlan(createLayers=False)
-        assert plan.popFields[0].field == 'vap_total'
-        assert hasattr(plan.districts[0], 'vap_total')

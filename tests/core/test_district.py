@@ -17,42 +17,57 @@
  ***************************************************************************/
 """
 import pytest
-from pytestqt.plugin import QtBot
 
-from redistricting.core import (
+from redistricting.models import (
     District,
-    RedistrictingPlan
+    Unassigned
 )
-
-# pylint: disable=no-self-use
 
 
 class TestDistrict:
     @pytest.fixture
-    def district(self, plan: RedistrictingPlan):
-        return District(1, plan.districts)
+    def district(self):
+        return District(1)
 
-    def test_create(self, plan: RedistrictingPlan):
-        district = District(1, plan.districts)
+    def test_create(self):
+        district = District(1)
         assert district.district == 1
-        assert district.name == 'Council District 1'
-        assert district.description == 'Joe Blow\'s old district'
+        assert district.name == "1"
+        assert district.members == 1
+        assert district.description == ""
+        assert district.population == 0
+        assert district.deviation == 0
+        assert district.pct_deviation == 0
 
-    def test_multimember(self, plan: RedistrictingPlan):
-        d = District(2, plan.districts)
-        d["members"] = 2
-        d["name"] = 'District 2'
-        assert d.ideal == 2 * 227036 // 5
+    def test_multimember(self):
+        d = District(1, members=2)
+        assert d.members == 2
 
     def test_population(self, district: District):
-        assert district.population == 44684
+        assert district.population == 0
 
-    def test_valid(self, district: District):
-        assert district.isValid()
+    def test_set_property_modifies_property(self, district: District):
+        district.name = 'New Name'
+        assert district.name == 'New Name'
+        district.description = "Discrict description"
+        assert district.description == "Discrict description"
 
-    def test_properties(self, plan: RedistrictingPlan, qtbot: QtBot):
-        district = plan.districts[1]
-        with qtbot.waitSignal(plan.districts.districtChanged, check_params_cb=lambda d: d == district):
-            plan.districts[1].name = 'New Name'
-        f = next(plan.distLayer.getFeatures(f"{plan.distField} = 1"), None)
-        assert f['name'] == 'New Name'
+    def test_getitem_int_getsitem(self, district: District):
+        assert district[0] == 1
+        assert district[1] == "1"
+        assert district[2] == 1
+
+    def test_set_district_raises_exception(self, district: District):
+        with pytest.raises(AttributeError):
+            district.district = 2
+
+        with pytest.raises(IndexError):
+            district["district"] = 2
+
+        with pytest.raises(IndexError):
+            district[0] = 2
+
+    def test_unassigned_set_name_raises_exception(self):
+        district = Unassigned()
+        with pytest.raises(AttributeError):
+            district.name = "New Name"

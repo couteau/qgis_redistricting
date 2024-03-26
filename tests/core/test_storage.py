@@ -23,8 +23,8 @@ from pytestqt.plugin import QtBot
 from qgis.core import QgsProject
 from qgis.PyQt.QtXml import QDomDocument
 
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.storage import ProjectStorage
+from redistricting.models import RedistrictingPlan
+from redistricting.services import ProjectStorage
 
 
 class TestStorage:
@@ -69,11 +69,11 @@ class TestStorage:
     def test_write_plan(
         self,
         empty_storage: ProjectStorage,
-        plan: RedistrictingPlan,
+        mock_plan: RedistrictingPlan,
         dist_layer,
         block_layer
     ):
-        empty_storage.writeRedistrictingPlans([plan])
+        empty_storage.writeRedistrictingPlans([mock_plan])
         l, result = QgsProject.instance().readListEntry('redistricting', 'redistricting-plans')
         assert result
         assert len(l) == 1
@@ -83,7 +83,7 @@ class TestStorage:
         assert j['geo-layer'] == block_layer.id()
         assert j['dist-layer'] == dist_layer.id()
 
-    def test_write_active_plan(self, empty_storage: ProjectStorage, plan):
-        empty_storage.writeActivePlan(plan)
+    def test_write_active_plan(self, empty_storage: ProjectStorage, mock_plan):
+        empty_storage.writeActivePlan(mock_plan)
         planid, _ = QgsProject.instance().readEntry('redistricting', 'active-plan')
-        assert planid == str(plan.id)
+        assert planid == str(mock_plan.id)

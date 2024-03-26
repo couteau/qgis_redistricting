@@ -22,12 +22,30 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
-from qgis.PyQt.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
-from qgis.PyQt.QtGui import QFont, QColor
-from qgis.PyQt.QtWidgets import QWidget, QDialog, QHeaderView
+from typing import (
+    Optional,
+    Union
+)
+
+from qgis.PyQt.QtCore import (
+    QAbstractTableModel,
+    QModelIndex,
+    Qt,
+    pyqtSignal
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QFont
+)
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QHeaderView,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
+from ..utils import tr
 from .ui.DlgSelectPlan import Ui_dlgSelectPlan
-from ..core import RedistrictingPlan, tr
 
 
 class PlanListModel(QAbstractTableModel):

@@ -53,15 +53,17 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..core import (
-    DistrictDataModel,
+from ..models import (
     Field,
     PlanStats,
-    RedistrictingPlan,
+    RedistrictingPlan
+)
+from ..utils import (
     showHelp,
     tr
 )
 from .DistrictActions import DistrictActions
+from .DistrictDataModel import DistrictDataModel
 from .DlgEditFields import DlgEditFields
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget

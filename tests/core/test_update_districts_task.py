@@ -16,26 +16,26 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.Tasks.UpdateDistrictsTask import (
+from redistricting.models.Plan import RedistrictingPlan
+from redistricting.services.Tasks.UpdateDistrictsTask import (
     AggregateDistrictDataTask
 )
 
 
 class TestUpdateDistrictsTask:
 
-    def test_create(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan)
+    def test_create(self, mock_plan: RedistrictingPlan):
+        t = AggregateDistrictDataTask(mock_plan)
         assert t.exception is None
         assert not t.updateDistricts
 
-    def test_run(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan)
+    def test_run(self, mock_plan: RedistrictingPlan):
+        t = AggregateDistrictDataTask(mock_plan)
         t.run()
         assert t.data is not None
 
-    def test_run_subset(self, plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(plan, [2, 3])
+    def test_run_subset(self, mock_plan: RedistrictingPlan):
+        t = AggregateDistrictDataTask(mock_plan, [2, 3])
         result = t.run()
         assert result
         assert t.data is not None

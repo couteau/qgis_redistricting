@@ -22,11 +22,21 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
+from .FieldListModels import GeoFieldsModel
 from .ui.DlgExportPlan import Ui_dlgExportPlan
-from ..core import RedistrictingPlan, GeoFieldsModel
 
 
 class DlgExportPlan(Ui_dlgExportPlan, QDialog):

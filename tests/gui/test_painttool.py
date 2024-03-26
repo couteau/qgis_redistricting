@@ -9,23 +9,21 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QMouseEvent
 
-from redistricting.core import (
-    PlanAssignmentEditor,
-    RedistrictingPlan
-)
 from redistricting.gui import (
     PaintDistrictsTool,
     PaintMode
 )
+from redistricting.models import RedistrictingPlan
+from redistricting.services import PlanAssignmentEditor
 
 # pylint: disable=protected-access
 
 
 class TestPaintTool:
     @pytest.fixture
-    def tool(self, qgis_canvas, plan: RedistrictingPlan) -> PaintDistrictsTool:
-        plan.delta.setAssignLayer(None)
-        return PaintDistrictsTool(qgis_canvas, plan)
+    def tool(self, qgis_canvas, mock_plan: RedistrictingPlan) -> PaintDistrictsTool:
+        mock_plan.delta.setAssignLayer(None)
+        return PaintDistrictsTool(qgis_canvas, mock_plan)
 
     @pytest.fixture
     def active_tool(self, qgis_canvas: QgsMapCanvas, tool: PaintDistrictsTool,
@@ -70,15 +68,15 @@ class TestPaintTool:
         tool.setSourceDistrict(None)
         assert tool.sourceDistrict() is None
 
-    def test_set_invalid_geofield_throws_exception(self, tool: PaintDistrictsTool, plan):
-        assert len(plan.geoFields) > 0
-        assert tool.plan == plan
+    def test_set_invalid_geofield_throws_exception(self, tool: PaintDistrictsTool, mock_plan):
+        assert len(mock_plan.geoFields) > 0
+        assert tool.plan == mock_plan
         with pytest.raises(ValueError):
             tool.setGeoField('district')
 
-    def test_no_plan_geofields_can_set_any_geolayer_field(self, tool: PaintDistrictsTool, plan):
-        plan.geoFields.clear()
-        assert 'district' not in plan.geoFields
+    def test_no_plan_geofields_can_set_any_geolayer_field(self, tool: PaintDistrictsTool, mock_plan):
+        mock_plan.geoFields.clear()
+        assert 'district' not in mock_plan.geoFields
         tool.setGeoField('district')
         assert tool.geoField == 'district'
 

@@ -33,12 +33,12 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..core import (
+from ..models import (
     GeoField,
     RedistrictingPlan
 )
-from ..core.PlanSplitsModel import SplitsModel
-from ..core.utils import tr
+from ..utils import tr
+from .PlanSplitsModel import SplitsModel
 from .ui.DlgSplits import Ui_dlgSplits
 
 

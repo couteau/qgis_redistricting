@@ -47,13 +47,15 @@ from qgis.PyQt.QtGui import (
 )
 from qgis.PyQt.QtWidgets import QDockWidget
 
-from ..core import (
+from ..models import (
     District,
-    GeoFieldsModel,
-    RedistrictingPlan,
+    RedistrictingPlan
+)
+from ..utils import (
     showHelp,
     tr
 )
+from .FieldListModels import GeoFieldsModel
 from .ui.DistrictTools import Ui_qdwDistrictTools
 
 

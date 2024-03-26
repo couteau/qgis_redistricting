@@ -23,9 +23,11 @@
  ***************************************************************************/
 """
 from qgis.PyQt.QtWidgets import QDockWidget
-from .ui.PendingChanges import Ui_qdwPendingChanges
+
+from ..models import RedistrictingPlan
+from .DeltaListModel import DeltaListModel
 from .RdsOverlayWidget import OverlayWidget
-from ..core import RedistrictingPlan, DeltaListModel
+from .ui.PendingChanges import Ui_qdwPendingChanges
 
 
 class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
