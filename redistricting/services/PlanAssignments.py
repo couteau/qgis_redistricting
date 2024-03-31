@@ -34,7 +34,6 @@ from typing import (
 import pandas as pd
 from qgis.core import (
     Qgis,
-    QgsApplication,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
@@ -48,7 +47,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .Tasks import AggregatePendingChangesTask
+from .DeltaUpdate import DeltaUpdateService
 
 if TYPE_CHECKING:
     from ..models import RedistrictingPlan
@@ -68,41 +67,10 @@ class PlanAssignmentEditor(QObject):
         self._undoStack = self._assignLayer.undoStack()
         self._error = None
         self._errorLevel: Qgis.MessageLevel = 0
-        self._pendingTask: AggregatePendingChangesTask = None
         self._assignments: pd.DataFrame = None
         self._popData: pd.DataFrame = None
 
-        self._assignLayer.afterCommitChanges.connect(self.commitChanges)
-        self._assignLayer.afterRollBack.connect(self.rollback)
         self._undoStack.indexChanged.connect(self.undoChanged)
-
-    def isUpdatingPending(self):
-        return self._pendingTask is not None and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete
-
-    def updatePendingData(self):
-        def taskCompleted():
-            self._plan.delta.update(self._pendingTask.data)
-            self._assignments = self._pendingTask.assignments
-            self._popData = self._pendingTask.popData
-            self._pendingTask = None
-
-        def taskTerminated():
-            if self._pendingTask.exception:
-                self._setError(str(self._pendingTask.exception), Qgis.Warning)
-            self._pendingTask = None
-
-        if self._pendingTask and self._pendingTask.status() < self._pendingTask.TaskStatus.Complete:
-            return self._pendingTask
-
-        if not self._assignLayer or not self._assignLayer.editBuffer() or self._undoStack.index() == 0:
-            self.clear()
-            return None
-
-        self._pendingTask = AggregatePendingChangesTask(self._plan, self._popData, self._assignments)
-        self._pendingTask.taskCompleted.connect(taskCompleted)
-        self._pendingTask.taskTerminated.connect(taskTerminated)
-        QgsApplication.taskManager().addTask(self._pendingTask)
-        return self._pendingTask
 
     def error(self):
         return (self._error, self._errorLevel)
@@ -205,14 +173,7 @@ class PlanAssignmentEditor(QObject):
             self.assignFeaturesToDistrict(self._assignLayer.getFeatures(list(fids)), dist)
 
     def undoChanged(self, index):  # pylint: disable=unused-argument
-        self.updatePendingData()
         self.assignmentsChanged.emit()
-
-    def commitChanges(self):
-        self._plan.delta.clear()
-
-    def rollback(self):
-        self._plan.delta.clear()
 
 
 class AssignmentsService(QObject):
@@ -220,14 +181,16 @@ class AssignmentsService(QObject):
     editingStopped = pyqtSignal("PyQt_PyObject")
     assignmentsChanged = pyqtSignal("PyQt_PyObject")
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, updateService: DeltaUpdateService, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._editors: dict[RedistrictingPlan, PlanAssignmentEditor] = {}
+        self._updateService = updateService
 
     def startEditing(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
         if plan not in self._editors:
             self._editors[plan] = PlanAssignmentEditor(plan)
             self._editors[plan].assignmentsChanged.connect(self.assignmentsChanged)
+            self._updateService.watchPlan(plan)
 
         self.editingStarted.emit(plan)
         return self._editors[plan]
@@ -236,3 +199,4 @@ class AssignmentsService(QObject):
         if plan in self._editors:
             del self._editors[plan]
             self.editingStopped.emit(plan)
+            self._updateService.unwatchPlan(plan)

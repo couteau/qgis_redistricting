@@ -54,6 +54,7 @@ from ..gui import (
 )
 from ..models import RedistrictingPlan
 from ..services import (
+    ActionRegistry,
     AssignmentImporter,
     DistrictUpdater,
     LayerTreeManager,
@@ -103,6 +104,8 @@ class PlanController(BaseController):
         self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
         self.planActions = QActionGroup(self.iface.mainWindow())
 
+        self.actions = ActionRegistry()
+
         self.createActions()
 
     def load(self):
@@ -125,73 +128,78 @@ class PlanController(BaseController):
         self.project.cleared.disconnect(self.clearPlanMenu)
 
     def createActions(self):
-        self.actionShowPlanManager = QAction(
+        self.actionShowPlanManager = self.actions.createAction(
+            'actionShowPlanManager',
             QIcon(':/plugins/redistricting/planmanager.svg'),
             tr('Plan Manager'),
-            self.iface.mainWindow()
+            callback=self.showPlanManager,
+            parent=self.iface.mainWindow()
         )
-        self.actionShowPlanManager.triggered.connect(self.showPlanManager)
-        self.toolbar.addAction(self.actionShowPlanManager)
         self.menu.addAction(self.actionShowPlanManager)
-
         self.menuButton.clicked.connect(self.actionShowPlanManager.trigger)
 
-        self.actionNewPlan = QAction(
+        self.actionNewPlan = self.actions.createAction(
+            'actionNewPlan',
             QIcon(':/plugins/redistricting/addplan.svg'),
             tr('New Redistricting Plan'),
-            self.iface.mainWindow()
+            tooltip=tr('Create a new redistricting plan'),
+            callback=self.newPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionNewPlan.triggered.connect(self.newPlan)
-        self.actionNewPlan.setStatusTip(tr('Create a new redistricting plan'))
         self.actionNewPlan.setEnabled(False)
         self.menu.addAction(self.actionNewPlan)
 
-        self.actionEditPlan = QAction(
+        self.actionEditPlan = self.actions.createAction(
+            'actionEditPlan',
             QIcon(':/plugins/redistricting/icon.png'),
             tr('Edit Plan'),
-            self.iface.mainWindow()
+            callback=self.editPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionEditPlan.triggered.connect(self.editPlan)
         self.actionEditPlan.setEnabled(False)
         self.menu.addAction(self.actionEditPlan)
 
-        self.actionCopyPlan = QAction(
+        self.actionCopyPlan = self.actions.createAction(
+            'actionCopyPlan',
             QIcon(':/plugins/redistricting/copyplan.svg'),
             tr('Copy Plan'),
-            self.iface.mainWindow()
+            tooltip=tr('Copy the active plan to a new redistricting plan'),
+            callback=self.copyPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionCopyPlan.triggered.connect(self.copyPlan)
-        self.actionCopyPlan.setStatusTip(tr('Copy the active plan to a new redistricting plan'))
         self.actionCopyPlan.setEnabled(False)
         self.menu.addAction(self.actionCopyPlan)
 
-        self.actionImportAssignments = QAction(
+        self.actionImportAssignments = self.actions.createAction(
+            'actionImportAssignments',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Equivalency File'),
-            self.iface.mainWindow()
+            tooltip=tr('Import equivalency file to district field'),
+            callback=self.importPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionImportAssignments.triggered.connect(self.importPlan)
-        self.actionImportAssignments.setStatusTip(tr('Import equivalency file to district field'))
         self.actionImportAssignments.setEnabled(False)
         self.menu.addAction(self.actionImportAssignments)
 
-        self.actionImportShapefile = QAction(
+        self.actionImportShapefile = self.actions.createAction(
+            'actionImportShapefile',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Shapefile'),
-            self.iface.mainWindow()
+            tooltip=tr('Import assignments from sahpefile'),
+            callback=self.importShapefile,
+            parent=self.iface.mainWindow()
         )
-        self.actionImportShapefile.triggered.connect(self.importShapefile)
-        self.actionImportShapefile.setStatusTip(tr('Import assignments from sahpefile'))
         self.actionImportShapefile.setEnabled(False)
         self.menu.addAction(self.actionImportShapefile)
 
-        self.actionExportPlan = QAction(
+        self.actionExportPlan = self.actions.createAction(
+            'actionExportPlan',
             QIcon(':/plugins/redistricting/exportplan.svg'),
             tr('Export Plan'),
-            self.iface.mainWindow()
+            tooltip=tr('Export plan as equivalency and/or shapefile'),
+            callback=self.exportPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionExportPlan.triggered.connect(self.exportPlan)
-        self.actionExportPlan.setStatusTip(tr('Export plan as equivalency and/or shapefile'))
         self.actionExportPlan.setEnabled(False)
         self.menu.addAction(self.actionExportPlan)
 

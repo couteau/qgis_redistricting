@@ -19,7 +19,6 @@
 import pytest
 from qgis.PyQt.QtCore import QVariant
 
-from redistricting.exception import RdsException
 from redistricting.models import (
     DataField,
     Field
@@ -55,11 +54,11 @@ class TestField:
         assert field.caption == 'VTD'
 
     def test_bad_field(self, block_layer):
-        with pytest.raises(RdsException):
+        with pytest.raises(ValueError):
             Field(block_layer, 'not_a_field')
 
     def test_bad_expr(self, block_layer):
-        with pytest.raises(RdsException):
+        with pytest.raises(ValueError):
             Field(block_layer, 'not_a_field + still_not', True)
 
     def test_getvalue_field(self, block_layer, field):

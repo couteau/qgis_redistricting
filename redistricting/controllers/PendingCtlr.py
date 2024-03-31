@@ -32,6 +32,10 @@ from qgis.PyQt.QtWidgets import QAction
 
 from ..gui import DockPendingChanges
 from ..models import RedistrictingPlan
+from ..services import (
+    DeltaUpdateService,
+    PlanManager
+)
 from ..utils import tr
 from .BaseCtlr import BaseController
 
@@ -42,11 +46,13 @@ class PendingChangesController(BaseController):
         self,
         iface,
         project,
-        planManager,
+        planManager: PlanManager,
         toolbar,
+        deltaService: DeltaUpdateService,
         parent: Optional[QObject] = None
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
+        self.deltaService = deltaService
         self.dockwidget: DockPendingChanges = None
         self.actionToggle: QAction = None
 
@@ -63,7 +69,7 @@ class PendingChangesController(BaseController):
     def setupPendingChangesWidget(self):
         """Create the dockwidget with displays the impact of pending
         changes on affected districts."""
-        dockwidget = DockPendingChanges(None)
+        dockwidget = DockPendingChanges(self.deltaService)
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, dockwidget)
 
         self.actionToggle = dockwidget.toggleViewAction()

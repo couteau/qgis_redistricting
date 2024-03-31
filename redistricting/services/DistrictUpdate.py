@@ -125,8 +125,8 @@ class DistrictUpdater(QObject):
             self.cancelUpdate(plan)
 
         if not self.planIsUpdating(plan):
-            districts = set(districts)
-            self.updateStarted.emit(plan, list(districts) if districts else None)
+            districts = set(districts) if districts is not None else set()
+            self.updateStarted.emit(plan, list(districts))
             updateTask = AggregateDistrictDataTask(
                 plan,
                 updateDistricts=districts,

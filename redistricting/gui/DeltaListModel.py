@@ -42,12 +42,11 @@ from ..utils import tr
 
 
 class DeltaListModel(QAbstractTableModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._plan = None
         self._fields = []
         self._delta = None
-        self.setPlan(plan)
 
     def setPlan(self, plan: RedistrictingPlan):
         if plan != self._plan:
@@ -58,7 +57,6 @@ class DeltaListModel(QAbstractTableModel):
                 self._plan.dataFieldsChanged.disconnect(self.updateFields)
                 self._delta.updateStarted.disconnect(self.startUpdate)
                 self._delta.updateComplete.disconnect(self.endUpdate)
-                self._delta.updateTerminated.disconnect(self.cancelUpdate)
             self._plan = plan
             if self._plan:
                 self._plan.popFieldChanged.connect(self.updateFields)
@@ -68,7 +66,6 @@ class DeltaListModel(QAbstractTableModel):
                 self.updateFields()
                 self._delta.updateStarted.connect(self.startUpdate)
                 self._delta.updateComplete.connect(self.endUpdate)
-                self._delta.updateTerminated.connect(self.cancelUpdate)
             else:
                 self._delta = None
                 self._fields = []
@@ -168,11 +165,10 @@ class DeltaListModel(QAbstractTableModel):
 
         return QVariant()
 
-    def startUpdate(self):
-        self.beginResetModel()
+    def startUpdate(self, plan):
+        if plan == self._plan:
+            self.beginResetModel()
 
-    def endUpdate(self):
-        self.endResetModel()
-
-    def cancelUpdate(self):
-        self.endResetModel()
+    def endUpdate(self, plan):
+        if plan == self._plan:
+            self.endResetModel()

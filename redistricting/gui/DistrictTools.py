@@ -63,14 +63,14 @@ class DistrictSelectModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...):
         super().__init__(parent)
         self._districts = plan.districts
-        self._districts.districtChanged.connect(self.districtNameChanged)
+        self._districts.districtNameChanged.connect(self.districtNameChanged)
         self._offset = 2
 
     def updateDistricts(self):
         self.beginResetModel()
         self.endResetModel()
 
-    def districtNameChanged(self, district: District):  # pylint: disable=unused-argument
+    def districtNameChanged(self, district: District):
         idx = self._districts.index(district)
         index = self.createIndex(idx + self._offset, 0)
         self.dataChanged.emit(index, index, {Qt.DisplayRole})
@@ -190,7 +190,15 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
     @plan.setter
     def plan(self, value: RedistrictingPlan):
         if self._plan:
-            self._plan.planChanged.disconnect(self.reloadFields)
+            self._plan.nameChanged.disconnect(self.updateName)
+            self._plan.geoFieldsChanged.connect(self.updateGeographies)
+            self._plan.geoIdCaptionChanged.connect(self.updateGeographies)
+            self._plan.districtAdded.connect(self.cmbSource.model().updateDistricts)
+            self._plan.districtAdded.connect(self.cmbTarget.model().updateDistricts)
+            self._plan.districtRemoved.connect(self.cmbSource.model().updateDistricts)
+            self._plan.districtRemoved.connect(self.cmbTarget.model().updateDistricts)
+            self._plan.districtNameChanged.connect(self.cmbSource.model().updateDistricts)
+            self._plan.districtNameChanged.connect(self.cmbTarget.model().updateDistricts)
             self._plan.assignLayer.undoStack().undoTextChanged.disconnect(self.btnUndo.setToolTip)
             self._plan.assignLayer.undoStack().redoTextChanged.disconnect(self.btnRedo.setToolTip)
             self._plan.assignLayer.undoStack().canUndoChanged.disconnect(self.btnUndo.setEnabled)
@@ -212,16 +220,26 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             self.cmbGeoSelect.setCurrentIndex(i)
 
             self.cmbSource.blockSignals(True)
-            self.cmbSource.setModel(DistrictSelectModel(self._plan, self))
+            sourceModel = DistrictSelectModel(self._plan, self)
+            self.cmbSource.setModel(sourceModel)
             self.cmbSource.setCurrentIndex(0)
             self.cmbSource.blockSignals(False)
 
             self.cmbTarget.blockSignals(True)
-            self.cmbTarget.setModel(TargetDistrictModel(self._plan, self))
+            targetModel = TargetDistrictModel(self._plan, self)
+            self.cmbTarget.setModel(targetModel)
             self.cmbTarget.setCurrentIndex(0)
             self.cmbTarget.blockSignals(False)
 
-            self._plan.planChanged.connect(self.reloadFields)
+            self._plan.nameChanged.connect(self.updateName)
+            self._plan.geoFieldsChanged.connect(self.updateGeographies)
+            self._plan.geoIdCaptionChanged.connect(self.updateGeographies)
+            self._plan.districtAdded.connect(sourceModel.updateDistricts)
+            self._plan.districtAdded.connect(targetModel.updateDistricts)
+            self._plan.districtRemoved.connect(sourceModel.updateDistricts)
+            self._plan.districtRemoved.connect(targetModel.updateDistricts)
+            self._plan.districtNameChanged.connect(sourceModel.updateDistricts)
+            self._plan.districtNameChanged.connect(targetModel.updateDistricts)
             self._plan.assignLayer.undoStack().canUndoChanged.connect(self.btnUndo.setEnabled)
             self._plan.assignLayer.undoStack().canRedoChanged.connect(self.btnRedo.setEnabled)
             self._plan.assignLayer.undoStack().undoTextChanged.connect(self.btnUndo.setToolTip)
@@ -270,30 +288,24 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         i = self.cmbTarget.model().indexFromDistrict(district)
         self.cmbTarget.setCurrentIndex(i)
 
-    def reloadFields(self, plan, prop):
-        if plan != self._plan:
-            return
+    def updateGeographies(self):
+        index = self.cmbGeoSelect.currentIndex()
+        if self._plan.geoFields:
+            model = GeoFieldsModel(self._plan, self)
+        else:
+            model = QgsFieldModel(self)
+            model.setLayer(self._plan.assignLayer)
 
-        if 'districts' in prop:
-            self.cmbSource.model().updateDistricts()
-            self.cmbTarget.model().updateDistricts()
-        elif 'geo-fields' in prop:
-            index = self.cmbGeoSelect.currentIndex()
-            if self._plan.geoFields:
-                model = GeoFieldsModel(self._plan, self)
-            else:
-                model = QgsFieldModel(self)
-                model.setLayer(self._plan.assignLayer)
+        self.cmbGeoSelect.setModel(model)
+        self.cmbGeoSelect.setCurrentIndex(index)
+        if isinstance(model, QgsFieldModel):
+            field = model.fields().field(index).name()
+        else:
+            field = model.fields[index].fieldName
+        self.geoFieldChanged.emit(field)
 
-            self.cmbGeoSelect.setModel(model)
-            self.cmbGeoSelect.setCurrentIndex(index)
-            if isinstance(model, QgsFieldModel):
-                field = model.fields().field(index).name()
-            else:
-                field = model.fields[index].fieldName
-            self.geoFieldChanged.emit(field)
-        elif 'name' in prop:
-            self.lblPlanName.setText(self._plan.name)
+    def updateName(self):
+        self.lblPlanName.setText(self._plan.name)
 
     def cmbGeoFieldChanged(self, index):
         if index == -1:

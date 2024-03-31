@@ -22,6 +22,9 @@
  *                                                                         *
  ***************************************************************************/
 """
+from .actions import ActionRegistry
+from .DeltaUpdate import DeltaUpdateService
+from .DistrictCopy import DistrictCopier
 from .DistrictUpdate import DistrictUpdater
 from .ErrorList import ErrorListMixin
 from .LayerTreeManager import LayerTreeManager
@@ -43,10 +46,10 @@ from .PlanStyle import PlanStylerService
 from .storage import ProjectStorage
 
 __all__ = (
-    'PlanManager', 'LayerTreeManager',
+    'ActionRegistry', 'PlanManager', 'LayerTreeManager',
     'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
-    'DistrictUpdater',
-    'PlanAssignmentEditor', 'AssignmentsService',
+    'DistrictUpdater', 'DeltaUpdateService',
+    'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
     'ProjectStorage', 'ErrorListMixin'
 )

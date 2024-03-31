@@ -63,7 +63,10 @@ from .controllers import (
     PlanController
 )
 from .services import (
+    ActionRegistry,
     AssignmentsService,
+    DeltaUpdateService,
+    DistrictCopier,
     DistrictUpdater,
     LayerTreeManager,
     PlanImportService,
@@ -80,6 +83,8 @@ class Redistricting:
         self.name = self.__class__.__name__
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
+
+        self.actionRegistry = ActionRegistry()
 
         self.unloading = False
         self.project = QgsProject.instance()
@@ -107,9 +112,11 @@ class Redistricting:
         self.planManager = PlanManager(iface)
         self.layerTreeManger = LayerTreeManager(iface)
         self.planStyler = PlanStylerService(self.planManager, iface)
+        self.deltaService = DeltaUpdateService(iface)
         self.updaterService = DistrictUpdater(iface)
-        self.importService = PlanImportService(self.updaterService, self.iface)
-        self.assignmentsService = AssignmentsService(iface)
+        self.importService = PlanImportService(self.updaterService, iface)
+        self.assignmentsService = AssignmentsService(self.deltaService, iface)
+        self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService, iface)
 
         self.planController = PlanController(
             iface,
@@ -137,6 +144,8 @@ class Redistricting:
             self.planManager,
             self.toolbar,
             self.assignmentsService,
+            self.districtCopier,
+            self.updaterService,
             iface
         )
 
@@ -145,6 +154,7 @@ class Redistricting:
             self.project,
             self.planManager,
             self.toolbar,
+            self.deltaService,
             iface
         )
 

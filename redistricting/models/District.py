@@ -30,11 +30,23 @@ from typing import (
     overload
 )
 
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
+
 from ..utils import tr
 from .columns import DistrictColumns
 
 
-class District:
+class District(QObject):
+    WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
+                           DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
+
+    nameChanged = pyqtSignal()
+    membersChanged = pyqtSignal()
+    descriptionChanged = pyqtSignal()
+
     district: int
     name: str
     members: int
@@ -43,12 +55,14 @@ class District:
     pct_deviation: float
 
     def __init__(self, district: int, fid: int = -1, **kwargs):
+        super().__init__()
         assert kwargs.pop(DistrictColumns.DISTRICT, district) == district
         scores = {
             'polsbypopper': kwargs.pop('polsbypopper', 0.0),
             'reock': kwargs.pop('reock', 0.0),
             'convexhull': kwargs.pop('convexhull', 0.0)
         }
+        self._description = kwargs.pop("description", "")
         self._data = {
             DistrictColumns.DISTRICT: district,
             DistrictColumns.NAME: kwargs.pop(DistrictColumns.NAME, str(district)),
@@ -61,7 +75,6 @@ class District:
         } | kwargs | scores
         self._district = district
         self._fid = fid
-        self._description = kwargs.pop("description", "")
 
     @overload
     def __getitem__(self, index: Union[str, int]) -> Any:
@@ -85,8 +98,8 @@ class District:
         return value
 
     def __setitem__(self, key: Union[int, str], value: Any):
-        if key in ("district", 0):
-            raise IndexError("district field is readonly")
+        if key not in District.WRITABLE_ATTRIBUTES:
+            raise IndexError(f"Field '{key}' is readonly")
 
         if isinstance(key, int):
             if 0 <= key < len(self._data):
@@ -95,6 +108,10 @@ class District:
                 raise IndexError(f"no item at index {key}")
 
         self._data[key] = value
+        if key == DistrictColumns.NAME:
+            self.nameChanged.emit()
+        elif key == DistrictColumns.MEMBERS:
+            self.membersChanged.emit()
 
     def __eq__(self, __value: "District"):
         return self._district == __value._district and self._data == __value._data
@@ -150,6 +167,7 @@ class District:
     @description.setter
     def description(self, value):
         self._description = value
+        self.descriptionChanged.emit()
 
     @property
     def columns(self):
@@ -173,7 +191,4 @@ class Unassigned(District):
         super().__init__(district, fid, **kwargs)
 
     def __setitem__(self, key: Union[str, int, slice], value: Any):
-        if key in (DistrictColumns.NAME, int(DistrictColumns.NAME), DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS)):
-            raise IndexError(tr("District {key} field is readonly for Unassigned goegraphies").format(key=key))
-
-        return super().__setitem__(key, value)
+        raise IndexError(tr("'{key}' field is readonly for Unassigned goegraphies").format(key=key))

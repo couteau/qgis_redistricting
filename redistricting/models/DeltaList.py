@@ -73,7 +73,6 @@ class Delta:
 class DeltaList(QObject):
     updateStarted = pyqtSignal('PyQt_PyObject')
     updateComplete = pyqtSignal('PyQt_PyObject')
-    updateTerminated = pyqtSignal('PyQt_PyObject')
 
     def __init__(self, plan: "RedistrictingPlan", parent: Optional[QObject] = None) -> None:
         super().__init__(parent)

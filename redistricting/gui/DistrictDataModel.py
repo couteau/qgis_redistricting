@@ -24,6 +24,7 @@
 """
 from typing import (
     Any,
+    Iterable,
     Union
 )
 
@@ -107,7 +108,8 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
 
         if self._districts is not None:
-            self._districts.districtChanged.disconnect(self.districtChanged)
+            self._districts.districtNameChanged.disconnect(self.districtChanged)
+            self._districts.districtMembersChanged.disconnect(self.deviationChanged)
             self._plan.dataFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.popFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.deviationChanged.disconnect(self.deviationChanged)
@@ -122,7 +124,8 @@ class DistrictDataModel(QAbstractTableModel):
             self._headings = []
 
         if self._districts is not None:
-            self._districts.districtChanged.connect(self.districtChanged)
+            self._districts.districtNameChanged.connect(self.districtChanged)
+            self._districts.districtMembersChanged.connect(self.deviationChanged)
             self._plan.dataFieldsChanged.connect(self.updatePlanFields)
             self._plan.popFieldsChanged.connect(self.updatePlanFields)
             self._plan.deviationChanged.connect(self.deviationChanged)
@@ -145,7 +148,7 @@ class DistrictDataModel(QAbstractTableModel):
         if parent.isValid() or self._districts is None:
             return 0
 
-        return len(self._districts.columns)
+        return len(self._keys)
 
     def data(self, index, role=Qt.DisplayRole):
         value = QVariant()
@@ -219,7 +222,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._districts.headings[section]
+            return self._headings[section]
 
         return None
 
@@ -230,7 +233,7 @@ class DistrictDataModel(QAbstractTableModel):
 
         return f
 
-    def districtsUpdated(self, districts: Union[list[int], None]):
+    def districtsUpdated(self, districts: Union[Iterable[int], None]):
         if districts:
             for d in districts:
                 self.dataChanged.emit(

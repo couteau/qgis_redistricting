@@ -184,10 +184,10 @@ def mock_plan(mocker: MockerFixture):
     type(plan).numDistricts = mocker.PropertyMock(return_value=5)
     type(plan).numSeats = mocker.PropertyMock(return_value=5)
 
-    districts = mocker.create_autospec(spec=DistrictList, spec_set=True, instance=True)
+    districts = mocker.create_autospec(spec=DistrictList(), spec_set=True, instance=True)
     type(plan).districts = mocker.PropertyMock(return_value=districts)
 
-    pop_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
+    pop_fields = mocker.create_autospec(spec=FieldList(), spec_set=True, instance=True)
     type(plan).popFields = mocker.PropertyMock(return_value=pop_fields)
 
     data_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)

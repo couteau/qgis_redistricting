@@ -58,11 +58,15 @@ from ..models import (
     PlanStats,
     RedistrictingPlan
 )
+from ..services import (
+    ActionRegistry,
+    DistrictCopier,
+    DistrictUpdater
+)
 from ..utils import (
     showHelp,
     tr
 )
-from .DistrictActions import DistrictActions
 from .DistrictDataModel import DistrictDataModel
 from .DlgEditFields import DlgEditFields
 from .DlgSplits import DlgSplitDetail
@@ -155,46 +159,15 @@ class StatsModel(QAbstractTableModel):
 
 
 class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
-    @property
-    def plan(self) -> RedistrictingPlan:
-        return self._plan
-
-    @plan.setter
-    def plan(self, value: RedistrictingPlan):
-        if self._plan:
-            self._plan.planChanged.disconnect(self.planChanged)
-            self._plan.districtsUpdating.disconnect(self.lblWaiting.start)
-            self._plan.districtsUpdated.disconnect(self.lblWaiting.stop)
-            self._plan.districtUpdateTerminated.disconnect(self.lblWaiting.stop)
-
-        if self._dlgSplits:
-            self._dlgSplits.close()
-            self._dlgSplits = None
-
-        self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
-        self._plan = value
-        self._model.plan = value
-
-        if self._plan is None:
-            self.btnAddFields.setEnabled(False)
-            self.btnRecalculate.setEnabled(False)
-            self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
-            self._statsModel.setStats(None)
-        else:
-            self._plan.planChanged.connect(self.planChanged)
-            self._plan.districtsUpdating.connect(self.lblWaiting.start)
-            self._plan.districtsUpdated.connect(self.lblWaiting.stop)
-            self._plan.districtUpdateTerminated.connect(self.lblWaiting.stop)
-            self.btnAddFields.setEnabled(True)
-            self.btnRecalculate.setEnabled(True)
-            self.lblPlanName.setText(self._plan.name)
-            self._statsModel.setStats(self._plan.stats)
-
-    def __init__(self, plan: RedistrictingPlan, districtCopier: DistrictActions, parent: QObject = None):
+    def __init__(self, updateService: DistrictUpdater, districtCopier: DistrictCopier, parent: QObject = None):
         super().__init__(parent)
         self.setupUi(self)
 
         self.districtCopier = districtCopier
+        self.updateService = updateService
+        self.updateService.updateStarted.connect(self.updateStarted)
+        self.updateService.updateComplete.connect(self.updateComplete)
+        self.updateService.updateTerminated.connect(self.updateTerminated)
 
         self.fieldStats: Dict[Field, QWidget] = {}
 
@@ -226,7 +199,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._dlgSplits: DlgSplitDetail = None
 
         self._plan: RedistrictingPlan = None
-        self.plan = plan
+
+        self.actionRegistry = ActionRegistry()
 
         self.actionCopy = QAction(
             QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
@@ -241,19 +215,54 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tblDataTable.customContextMenuRequested.connect(self.createDataTableConextMenu)
 
-    def planChanged(self, plan: RedistrictingPlan, props: set[str]):  # pylint: disable=unused-argument
-        if plan != self._plan:
-            return
+    @property
+    def plan(self) -> RedistrictingPlan:
+        return self._plan
 
-        if "name" in props:
-            self.lblPlanName.setText(plan.name)
+    @plan.setter
+    def plan(self, value: RedistrictingPlan):
+        if self._dlgSplits:
+            self._dlgSplits.close()
+            self._dlgSplits = None
+
+        self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
+        self._plan = value
+        self._model.plan = value
+
+        if self._plan is None:
+            self.btnAddFields.setEnabled(False)
+            self.btnRecalculate.setEnabled(False)
+            self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
+            self._statsModel.setStats(None)
+        else:
+            self._plan.nameChanged.connect(self.planChanged)
+            self.btnAddFields.setEnabled(True)
+            self.btnRecalculate.setEnabled(True)
+            self.lblPlanName.setText(self._plan.name)
+            self._statsModel.setStats(self._plan.stats)
+
+    def planChanged(self, name):
+        self.lblPlanName.setText(name)
+
+    def updateStarted(self, plan: RedistrictingPlan):
+        if plan == self._plan:
+            self.lblWaiting.start()
+
+    def updateComplete(self, plan: RedistrictingPlan, districts: Optional[set[int]] = None):
+        if plan == self._plan:
+            self.lblWaiting.stop()
+            self._model.districtsUpdated(districts)
+
+    def updateTerminated(self, plan: RedistrictingPlan):
+        if plan == self._plan:
+            self.lblWaiting.stop()
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)
         dlg.exec_()
 
     def recalculate(self):
-        self._plan.updateDistricts(False)
+        self.updateService.updateDistricts(self._plan, needDemographics=True, needSplits=True)
 
     def copyMimeDataToClipboard(self, selection: Optional[list[QModelIndex]] = None):
         """Copy district data to clipboard in html table format"""
@@ -298,17 +307,17 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         idx = self.tblDataTable.indexAt(pos)
         district = self._plan.districts[idx.row()]
 
-        menu.addAction(self.districtCopier.actionCopyDistrict)
-        self.districtCopier.actionCopyDistrict.setData(district.district)
-        self.districtCopier.actionCopyDistrict.setEnabled(district.district != 0)
-        menu.addAction(self.districtCopier.actionPasteDistrict)
-        self.districtCopier.actionPasteDistrict.setData(district.district)
-        self.districtCopier.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self._plan))
-        menu.addAction(self.districtCopier.actionZoomToDistrict)
-        self.districtCopier.actionZoomToDistrict.setData(district.district)
-        menu.addAction(self.districtCopier.actionFlashDistrict)
-        self.districtCopier.actionFlashDistrict.setData(district.district)
-        self.districtCopier.actionFlashDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.actionRegistry.actionCopyDistrict)
+        self.actionRegistry.actionCopyDistrict.setData(district.district)
+        self.actionRegistry.actionCopyDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.actionRegistry.actionPasteDistrict)
+        self.actionRegistry.actionPasteDistrict.setData(district.district)
+        self.actionRegistry.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self._plan))
+        menu.addAction(self.actionRegistry.actionZoomToDistrict)
+        self.actionRegistry.actionZoomToDistrict.setData(district.district)
+        menu.addAction(self.actionRegistry.actionFlashDistrict)
+        self.actionRegistry.actionFlashDistrict.setData(district.district)
+        self.actionRegistry.actionFlashDistrict.setEnabled(district.district != 0)
         menu.exec(self.tblDataTable.mapToGlobal(pos))
 
     def btnHelpClicked(self):

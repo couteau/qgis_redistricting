@@ -37,6 +37,11 @@ from qgis.core import (
 from qgis.PyQt.QtXml import QDomDocument
 
 from ..models import RedistrictingPlan
+from .columns import DistrictColumns
+from .DistrictIO import (
+    DistrictReader,
+    DistrictWriter
+)
 from .schema import (
     checkMigrateSchema,
     schemaVersion
@@ -74,12 +79,40 @@ class ProjectStorage:
     def setVersion(self):
         self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
+    def readDistricts(self, plan: RedistrictingPlan):
+        columns = [plan.distField, DistrictColumns.MEMBERS, plan.popField,
+                   DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
+                   "description"]
+        for f in plan.popFields:
+            columns.append(f.fieldName)
+        for f in plan.dataFields:
+            columns.append(f.fieldName)
+
+        districtReader = DistrictReader(plan.distLayer, plan.distField, columns)
+        for district in districtReader.readFromLayer():
+            if district.district == 0:
+                plan.districts[0].update(district[:])
+            else:
+                plan.districts.append(district)
+
+    def writeDistricts(self, plan: RedistrictingPlan):
+        columns = [plan.distField, DistrictColumns.MEMBERS, plan.popField,
+                   DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
+                   "description"]
+        for f in plan.popFields:
+            columns.append(f.fieldName)
+        for f in plan.dataFields:
+            columns.append(f.fieldName)
+        writer = DistrictWriter(plan.distLayer, plan.distField, columns)
+        writer.writeToLayer(plan.districts)
+
     def writeRedistrictingPlans(self, plans: Iterable[RedistrictingPlan]):
         l: List[str] = []
         for p in plans:
             data = p.serialize()
             jsonPlan = json.dumps(data)
             l.append(jsonPlan)
+            self.writeDistricts(p)
         self._project.writeEntry('redistricting', 'redistricting-plans', l)
         self.setVersion()
 
@@ -96,6 +129,7 @@ class ProjectStorage:
                     del planJson['pop-layer']
 
                 plan = RedistrictingPlan.deserialize(planJson, parent=self._project)
+                self.readDistricts(plan)
                 if plan is not None:
                     plans.append(plan)
         return plans

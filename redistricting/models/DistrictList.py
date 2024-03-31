@@ -25,11 +25,13 @@
 from typing import (
     Any,
     Optional,
+    Union,
     overload
 )
 
 from qgis.PyQt.QtCore import (
     QObject,
+    QSignalMapper,
     pyqtSignal
 )
 
@@ -41,7 +43,9 @@ from .District import (
 
 
 class DistrictList(QObject):
-    districtChanged = pyqtSignal('PyQt_PyObject')
+    districtNameChanged = pyqtSignal(QObject)
+    districtMembersChanged = pyqtSignal(QObject)
+    districtDescriptionChanged = pyqtSignal(QObject)
 
     class _IndexAccessor:
         def __init__(self, lst: "DistrictList"):
@@ -103,18 +107,24 @@ class DistrictList(QObject):
 
             raise KeyError(tr("Invalid key passed to DistrictList.byname"))
 
-    def __init__(self, parent: Optional[QObject] = None):
-        super().__init__(parent)
+    def __init__(self, numDistricts=0):
+        super().__init__()
+        self._nameSignalMapper = QSignalMapper(self)
+        self._nameSignalMapper.mappedObject.connect(self.districtNameChanged)
+        self._membersSignalMapper = QSignalMapper(self)
+        self._membersSignalMapper.mappedObject.connect(self.districtMembersChanged)
+        self._descripSignalMapper = QSignalMapper(self)
+        self._descripSignalMapper.mappedObject.connect(self.districtDescriptionChanged)
 
         self._districts: dict[int, District] = {0: Unassigned()}
         self._indexaccessor = DistrictList._IndexAccessor(self)
         self._nameaccessor = DistrictList._NameAccessor(self)
-        self._numDistricts = 0
+        self._numDistricts = numDistricts
 
     # pylint: disable=protected-access
     @classmethod
-    def clone(cls, from_list: "DistrictList", districts: Optional[list[District]] = None, parent: Optional[QObject] = None):
-        instance = cls(parent)
+    def clone(cls, from_list: "DistrictList", districts: Optional[list[District]] = None):
+        instance = cls()
         if districts is not None:
             instance._districts = {d.district: d for d in districts}
         instance._numDistricts = from_list._numDistricts
@@ -188,7 +198,29 @@ class DistrictList(QObject):
 
     def append(self, district: District):
         assert 0 < district.district <= self.numDistricts
+        self._nameSignalMapper.setMapping(district, district)
+        self._membersSignalMapper.setMapping(district, district)
+        self._descripSignalMapper.setMapping(district, district)
+        district.nameChanged.connect(self._nameSignalMapper.map)
+        district.membersChanged.connect(self._membersSignalMapper.map)
+        district.descriptionChanged.connect(self._descripSignalMapper.map)
         self._districts[district.district] = district
+
+    def remove(self, district: District):
+        # attempt to remove Unassigned raises error unless list is a slice that excludes Unassigned
+        if district.district == 0 and 0 in self._districts:
+            raise ValueError(tr("Cannot remove Unassigned"))
+
+        if district.district in self._districts:
+            district.nameChanged.disconnect(self._nameSignalMapper.map)
+            district.membersChanged.disconnect(self._membersSignalMapper.map)
+            district.descriptionChanged.disconnect(self._descripSignalMapper.map)
+            self._nameSignalMapper.removeMappings(district)
+            self._membersSignalMapper.removeMappings(district)
+            self._descripSignalMapper.removeMappings(district)
+            del self._districts[district.district]
+        else:
+            raise ValueError(tr("District {district} not found in District List").format(district=district.district))
 
     @property
     def numDistricts(self) -> int:
@@ -208,8 +240,12 @@ class DistrictList(QObject):
         return self._nameaccessor
 
     # stats
-    def _avgScore(self, score: str):
-        return sum(d[score] for d in self._districts.values() if d.district != 0) / (len(self._districts) - 1)
+    def _avgScore(self, score: str) -> Union[float, None]:
+        count = len(self._districts) - int(0 in self._districts)
+        if count == 0:
+            return None
+
+        return sum(d[score] for d in self._districts.values() if d.district != 0) / count
 
     @property
     def avgPolsbyPopper(self):

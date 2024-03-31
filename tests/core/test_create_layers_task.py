@@ -57,7 +57,7 @@ class TestCreateLayersTask:
         assert gpkg.exists()
         layer.deleteLater()
 
-    @ pytest.mark.parametrize(('datafields', 'geofields'), [
+    @pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
         (['vap_apblack', 'vap_hispanic', 'vap_nh_white'], []),
         (['vap_apblack - vap_nh_black'], []),

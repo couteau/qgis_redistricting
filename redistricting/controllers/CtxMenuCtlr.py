@@ -83,7 +83,7 @@ class ContextMenuController(BaseController):
             tr('Export Plan'),
             self.iface.mainWindow()
         )
-        action.triggered(self.contextMenuSlot(planController.exportPlan))
+        action.triggered.connect(self.contextMenuSlot(planController.exportPlan))
         self.contextMenu.addAction(action)
 
         self.contextAction.setMenu(self.contextMenu)

@@ -25,12 +25,13 @@ from typing import (
     TYPE_CHECKING,
     Optional
 )
-from uuid import UUID
+from uuid import (
+    UUID,
+    uuid4
+)
 
 from qgis.core import (
-    Qgis,
     QgsLayerTreeGroup,
-    QgsMessageLog,
     QgsProject
 )
 from qgis.PyQt.QtCore import QObject
@@ -48,19 +49,21 @@ class LayerTreeManager(QObject):
 
     @property
     def planRoot(self):
-        group = self.root.findGroup(tr('Redistricting Plans'))
-        if group is not None and not group.customProperty("redistricting-plan-root", False):
-            group = None
-
-        if group is None:
-            group = self.root.addGroup(tr('Redistricting Plans'))
+        for group in self.root.findGroups(False):
+            if group.customProperty('redistricting-plan-root', False) is True:
+                break
+        else:
+            name = tr("Redistricting Plans")
+            if self.root.findGroup(name) is not None:
+                name = f"{name}-{str(uuid4())}"
+            group = QgsLayerTreeGroup(name)
             group.setCustomProperty('redistricting-plan-root', True)
+
         return group
 
     def createGroup(self, plan: "RedistrictingPlan"):
         if not plan.isValid():
-            QgsMessageLog.logMessage(tr("Cannot add incomplete plan to layer tree"), "Redistricting", Qgis.Warning)
-            return
+            raise ValueError(tr("Cannot add incomplete plan to layer tree"))
 
         group = QgsLayerTreeGroup(plan.name)
         group.setCustomProperty('redistricting-plan-id', str(plan.id))

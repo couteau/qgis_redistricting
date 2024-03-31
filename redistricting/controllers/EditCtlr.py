@@ -142,7 +142,7 @@ class EditAssignmentsController(BaseController):
 
         dockwidget.geoFieldChanged.connect(self.mapTool.setGeoField)
         dockwidget.sourceChanged.connect(self.mapTool.setSourceDistrict)
-        dockwidget.targetChanged.connect(self.setDistTarget)
+        dockwidget.targetChanged.connect(self.mapTool.setTargetDistrict)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
         dockwidget.btnPaintRectangle.setDefaultAction(self.actionPaintRectangle)
         dockwidget.btnSelectByGeography.setDefaultAction(self.actionSelectByGeography)

@@ -71,7 +71,10 @@ class RedistrictingPlan(QObject):
     dataFieldsChanged = pyqtSignal()
     districtAdded = pyqtSignal("PyQt_PyObject")  # district
     districtRemoved = pyqtSignal("PyQt_PyObject")  # district
-    assignmentsChanged = pyqtSignal("PyQt_PyObject")  # list of changed districts
+    districtNameChanged = pyqtSignal(QObject)  # district
+    districtMembersChanged = pyqtSignal(QObject)  # district
+    districtDescriptionChanged = pyqtSignal(QObject)  # district
+    assignmentsChanged = pyqtSignal(QObject)  # list of changed districts
     validChanged = pyqtSignal()
 
     def __init__(self, name='', numDistricts: int = None, uuid: UUID = None, parent: Optional[QObject] = None):
@@ -112,7 +115,10 @@ class RedistrictingPlan(QObject):
         self._popFields = FieldList[Field]()
         self._dataFields = FieldList[DataField]()
 
-        self._districts = DistrictList(self)
+        self._districts = DistrictList(self._numDistricts)
+        self._districts.districtNameChanged.connect(self.districtNameChanged)
+        self._districts.districtMembersChanged.connect(self.districtMembersChanged)
+        self._districts.districtDescriptionChanged.connect(self.districtDescriptionChanged)
         self._stats = PlanStats(self)
         self._delta = DeltaList(self)
 
@@ -259,6 +265,7 @@ class RedistrictingPlan(QObject):
     def _setNumDistricts(self, value: int):
         if self._numDistricts != value:
             self._numDistricts = value
+            self._districts.numDistricts = value
             self.numDistrictsChanged.emit(self._numDistricts)
 
     @property

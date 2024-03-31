@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from qgis.core import (
     QgsFeature,
     QgsVectorLayer
@@ -7,10 +9,11 @@ from ..models import (
     District,
     Unassigned
 )
+from .columns import DistrictColumns
 
 
 class DistrictReader:
-    def __init__(self, distLayer: QgsVectorLayer, distField="district", columns: list[str] = None):
+    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns.DISTRICT, columns: list[str] = None):
         self._distLayer = distLayer
         self._distField = distField
         self._columns = columns
@@ -28,7 +31,7 @@ class DistrictReader:
 
 
 class DistrictWriter:
-    def __init__(self, distLayer: QgsVectorLayer, distField="district", columns: list[str] = None):
+    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns, columns: list[str] = None):
         self._layer = distLayer
         self._distField = distField
         self._fields = self._layer.fields()
@@ -46,7 +49,7 @@ class DistrictWriter:
             }
         self._dist_idx = self._fields.indexFromName(self._distField)
 
-    def writeToLayer(self, districts: list[District]):
+    def writeToLayer(self, districts: Iterable[District]):
         def changeAttributes(dist: District, feature: QgsFeature):
             values = {}
             for idx, field in self._field_map.items():
