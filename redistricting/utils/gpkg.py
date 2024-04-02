@@ -129,8 +129,10 @@ def spatialite_connect(
     return con
 
 
+# user_version 1.4
 CREATE_GPKG_SQL = """
 SELECT gpkgCreateBaseTables();
+PRAGMA user_version=0x000028a0;
 CREATE TABLE gpkg_ogr_contents (
     table_name    TEXT NOT NULL PRIMARY KEY,
     feature_count INTEGER DEFAULT NULL
@@ -163,7 +165,8 @@ def createGeoPackage(gpkg):
             for f in gpkg.parent.glob(pattern):
                 f.unlink()
 
-        with spatialite_connect(gpkg) as db:
+        with spatialite_connect(gpkg, isolation_level="EXCLUSIVE") as db:
+            db.execute("BEGIN EXCLUSIVE")
             db.executescript(CREATE_GPKG_SQL)
     except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
         return False, e
