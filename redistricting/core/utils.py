@@ -376,7 +376,7 @@ def spatialite_connect(
 # user_version 1.4
 CREATE_GPKG_SQL = """
 SELECT gpkgCreateBaseTables();
-PRAGMA user_version=0x000028a0");
+PRAGMA user_version=0x000028a0;
 CREATE TABLE gpkg_ogr_contents (
     table_name    TEXT NOT NULL PRIMARY KEY,
     feature_count INTEGER DEFAULT NULL
