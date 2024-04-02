@@ -61,6 +61,7 @@ class ImportShapeFileTask(QgsTask):
         self.importDistField = importDistField
         self.exception = None
         self.errors = []
+        self.setDependentLayers([self.assignLayer])
 
     def makeProjection(self, layer: QgsVectorLayer):
         crsSrc = layer.crs()
@@ -88,12 +89,13 @@ class ImportShapeFileTask(QgsTask):
     def run(self):
         debug_thread()
         try:
+            assignLayer = QgsVectorLayer(self.assignLayer.source())
             layer = QgsVectorLayer(self.shapeFile)
             sindex = layer.fields().lookupField(self.importDistField)
             if sindex == -1:
                 self.exception = ValueError('invalid source field for shapefile import')
                 return False
-            dindex = self.assignLayer.fields().lookupField(self.distField)
+            dindex = assignLayer.fields().lookupField(self.distField)
             if dindex == -1:
                 self.exception = ValueError('invalid district field for shapefile import')
                 return False
@@ -113,16 +115,16 @@ class ImportShapeFileTask(QgsTask):
                     dist = d.id()+1
                 distmap[d[sindex]] = dist
 
-            total = self.assignLayer.featureCount()
+            total = assignLayer.featureCount()
             count = 0
             f: QgsFeature
-            self.assignLayer.startEditing()
-            for f in self.assignLayer.getFeatures():
+            assignLayer.startEditing()
+            for f in assignLayer.getFeatures():
                 g: QgsGeometry = f.geometry()
                 for d in layer.getFeatures(index.intersects(g.boundingBox())):
                     i = g.intersection(d.geometry())
                     if not i.isEmpty() and i.area() > g.area() / 2:
-                        self.assignLayer.changeAttributeValue(f.id(), dindex, distmap[d[sindex]])
+                        assignLayer.changeAttributeValue(f.id(), dindex, distmap[d[sindex]])
                         break
                 else:
                     self.errors.append(f.id())
@@ -131,7 +133,7 @@ class ImportShapeFileTask(QgsTask):
                 if self.isCanceled():
                     raise CanceledError()
                 self.setProgress(100*count/total)
-            self.assignLayer.commitChanges(True)
+            assignLayer.commitChanges(True)
 
         except CanceledError:
             return False
