@@ -224,16 +224,15 @@ class RedistrictingPlan(QObject):
 
     def isValid(self):
         """Test whether plan meets minimum specifications for use"""
-        return bool(
-            self.name and
-            self.assignLayer and
-            self.distLayer and
-            self.geoLayer and
-            self.geoIdField and
-            self.popField and
-            self.distField and
-            self.numDistricts >= 2
-        )
+        return self.assignLayer is not None and \
+            self.distLayer is not None and \
+            bool(
+                self.name and
+                self.geoLayer and
+                self.geoIdField and
+                self.popField and
+                self.distField
+            ) and self.numDistricts >= 2
 
     def isComplete(self):
         # all districts allocated and all seats allocated and no unallocated population

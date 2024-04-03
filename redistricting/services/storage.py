@@ -80,8 +80,8 @@ class ProjectStorage:
         self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
     def readDistricts(self, plan: RedistrictingPlan):
-        columns = [plan.distField, DistrictColumns.MEMBERS, plan.popField,
-                   DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
+        columns = [plan.distField, str(DistrictColumns.MEMBERS), plan.popField,
+                   str(DistrictColumns.DEVIATION), str(DistrictColumns.PCT_DEVIATION),
                    "description"]
         for f in plan.popFields:
             columns.append(f.fieldName)
