@@ -56,7 +56,7 @@ class LayerTreeManager(QObject):
             name = tr("Redistricting Plans")
             if self.root.findGroup(name) is not None:
                 name = f"{name}-{str(uuid4())}"
-            group = QgsLayerTreeGroup(name)
+            group = self.root.addGroup(name)
             group.setCustomProperty('redistricting-plan-root', True)
 
         return group

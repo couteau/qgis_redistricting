@@ -26,6 +26,7 @@ from .actions import ActionRegistry
 from .DeltaUpdate import DeltaUpdateService
 from .DistrictCopy import DistrictCopier
 from .DistrictUpdate import DistrictUpdater
+from .DistrictValid import DistrictValidator
 from .ErrorList import ErrorListMixin
 from .LayerTreeManager import LayerTreeManager
 from .PlanAssignments import (
@@ -48,7 +49,7 @@ from .storage import ProjectStorage
 __all__ = (
     'ActionRegistry', 'PlanManager', 'LayerTreeManager',
     'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
-    'DistrictUpdater', 'DeltaUpdateService',
+    'DistrictUpdater', 'DeltaUpdateService', 'DistrictValidator',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
     'ProjectStorage', 'ErrorListMixin'

@@ -214,9 +214,9 @@ class Redistricting:
         if Qgis.versionInt() < 33400:
             # prior to v. 3.34, there is no signal that gets triggered
             # before a project is closed, but removeAll comes close
-            self.project.removeAll.connect(self.onProjectClosing)
+            self.project.removeAll.disconnect(self.onProjectClosing)
         else:
-            self.project.aboutToBeCleared.connect(self.onProjectClosing)
+            self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
         self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
 
         self.iface.layerTreeView().clicked.disconnect(self.layerChanged)

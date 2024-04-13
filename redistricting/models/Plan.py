@@ -26,6 +26,7 @@ import pathlib
 from numbers import Number
 from typing import (
     Any,
+    Iterable,
     List,
     Optional,
     Union
@@ -124,7 +125,7 @@ class RedistrictingPlan(QObject):
 
         self._updateDistricts = set()
 
-        QgsProject.instance().layerWillBeRemoved.connect(self.layerRemoved)
+        QgsProject.instance().layersWillBeRemoved.connect(self.layerRemoved)
 
     def __copy__(self):
         data = self.serialize()
@@ -226,9 +227,9 @@ class RedistrictingPlan(QObject):
         """Test whether plan meets minimum specifications for use"""
         return self.assignLayer is not None and \
             self.distLayer is not None and \
+            self.geoLayer is not None and \
             bool(
                 self.name and
-                self.geoLayer and
                 self.geoIdField and
                 self.popField and
                 self.distField
@@ -575,17 +576,17 @@ class RedistrictingPlan(QObject):
 
         return True
 
-    def layerRemoved(self, layer):
+    def layerRemoved(self, layers: Iterable[QgsVectorLayer]):
         valid = self.isValid()
-
-        if layer == self._assignLayer:
-            self._setAssignLayer(None)
-        elif layer == self._distLayer:
-            self._setDistLayer(None)
-        elif layer == self._popLayer:
-            self._popLayer = None
-        elif layer == self._geoLayer:
-            self._geoLayer = None
+        for layer in layers:
+            if layer == self._assignLayer:
+                self._setAssignLayer(None)
+            elif layer == self._distLayer:
+                self._setDistLayer(None)
+            elif layer == self._popLayer:
+                self._popLayer = None
+            elif layer == self._geoLayer:
+                self._geoLayer = None
 
         if self.isValid() != valid:
             self.validChanged.emit()

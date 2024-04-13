@@ -258,7 +258,7 @@ class PlanController(BaseController):
     def showPlanManager(self):
         """Display the plan manager window"""
         dlg = DlgSelectPlan(self.planManager, self.iface.mainWindow())
-        dlg.newPlan.connect(self.newPlan)
+        dlg.newPlan.connect(self.actionNewPlan.triggered)
         dlg.planSelected.connect(self.selectPlan)
         dlg.planEdited.connect(self.editPlan)
         dlg.planDeleted.connect(self.deletePlan)
@@ -470,14 +470,15 @@ class PlanController(BaseController):
         self.styler.stylePlan(plan)
         self.layerTreeManager.createGroup(plan)
         self.planManager.appendPlan(plan)
+        self.project.setDirty()
 
-    def buildPlan(self, builder: PlanBuilder, importer: AssignmentImporter):
+    def buildPlan(self, builder: PlanBuilder, importer: Optional[AssignmentImporter] = None):
         def layersCreated(plan: RedistrictingPlan):
             nonlocal progress
             self.appendPlan(plan)
             self.endProgress(progress)
 
-            if importer:
+            if importer is not None:
                 progress = self.startProgress(tr('Importing assignments...'))
                 progress.canceled.connect(importer.cancel)
                 importer.progressChanged.connect(progress.setValue)

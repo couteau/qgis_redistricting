@@ -129,8 +129,8 @@ class PlanManager(QObject):
 
     def clear(self):
         self.setActivePlan(None)
-        self._plans = []
         self._plansById = {}
+        self._plans = []
 
     def extend(self, plans: Iterable[RedistrictingPlan]):
         for plan in plans:
