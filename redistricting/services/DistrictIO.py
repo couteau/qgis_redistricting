@@ -13,27 +13,39 @@ from .columns import DistrictColumns
 
 
 class DistrictReader:
-    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns.DISTRICT, columns: list[str] = None):
+    def __init__(
+            self,
+            distLayer: QgsVectorLayer,
+            distField=DistrictColumns.DISTRICT,
+            popField=DistrictColumns.POPULATION,
+            columns: list[str] = None
+    ):
         self._distLayer = distLayer
         self._distField = distField
+        self._popField = popField
         self._columns = columns
 
     def readFromLayer(self) -> list[District]:
         result: list[District] = []
         f: QgsFeature
         for f in self._distLayer.getFeatures():
+            attrs = f.attributeMap()
+            data = dict.fromkeys(self._columns)
+            data.update({k: v for k, v in f.attributeMap().items() if k in data})
+            data[DistrictColumns.POPULATION] = attrs[self._popField]
             if f[self._distField] == 0:
-                result.append(Unassigned(**f.attributeMap()))
+                result.append(Unassigned(**data))
             else:
-                result.append(District(**f.attributeMap()))
+                result.append(District(**data))
 
         return sorted(result, key=lambda s: s.district)
 
 
 class DistrictWriter:
-    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns, columns: list[str] = None):
+    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns, popField=DistrictColumns.POPULATION, columns: list[str] = None):
         self._layer = distLayer
         self._distField = distField
+        self._popField = popField
         self._fields = self._layer.fields()
         if columns is not None:
             self._field_map = {
