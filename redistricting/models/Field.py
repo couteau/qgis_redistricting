@@ -77,7 +77,15 @@ class Field:
         self._index = -1
         self.setLayer(layer)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}('{self.field}')"
+
     def setLayer(self, layer: QgsVectorLayer):
+        if layer is None:
+            self._layer = None
+            self._index = -1
+            return
+
         if not self.validate(layer):
             raise ValueError(self._error)
 

@@ -36,8 +36,11 @@ from qgis.core import (
 )
 from qgis.PyQt.QtXml import QDomDocument
 
-from ..models import RedistrictingPlan
-from .columns import DistrictColumns
+from ..models import (
+    CompactnessScores,
+    DistrictColumns,
+    RedistrictingPlan
+)
 from .DistrictIO import (
     DistrictReader,
     DistrictWriter
@@ -90,13 +93,14 @@ class ProjectStorage:
                 columns.append(f.fieldName)
             if f.pctbase:
                 columns.append(f'pct_{f.fieldName}')
+        columns.extend([s.value for s in CompactnessScores])
 
         districtReader = DistrictReader(plan.distLayer, plan.distField, plan.popField, columns)
         for district in districtReader.readFromLayer():
             if district.district == 0:
                 plan.districts[0].update(district[:])
             else:
-                plan.districts.append(district)
+                plan.districts.add(district)
 
     def writeDistricts(self, plan: RedistrictingPlan):
         columns = [plan.distField, DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
@@ -106,6 +110,7 @@ class ProjectStorage:
             columns.append(f.fieldName)
         for f in plan.dataFields:
             columns.append(f.fieldName)
+        columns.extend([s.value for s in CompactnessScores])
         writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
         writer.writeToLayer(plan.districts)
 

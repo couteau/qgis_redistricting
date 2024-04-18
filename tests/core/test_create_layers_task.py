@@ -79,20 +79,26 @@ class TestCreateLayersTask:
         assert result
         assert task.totalPop == 227036
         assert gpkg.exists()
+        try:
+            a = QgsVectorLayer(f'{str(gpkg)}|layername=assignments')
 
-        a = QgsVectorLayer(f'{str(gpkg)}|layername=assignments')
+            assert a.isValid()
+            assert a.featureCount() == 6567
+            for f in p.geoFields:
+                assert a.fields().lookupField(f.fieldName) != -1
+            del a
 
-        assert a.isValid()
-        assert a.featureCount() == 6567
-        for f in p.geoFields:
-            assert a.fields().lookupField(f.fieldName) != -1
-
-        d = QgsVectorLayer(f'{str(gpkg)}|layername=districts')
-
-        assert d.isValid()
-        assert d.featureCount() == 6
-        for f in p.dataFields:
-            assert d.fields().lookupField(f.fieldName) != -1
+            d = QgsVectorLayer(f'{str(gpkg)}|layername=districts')
+            try:
+                assert d.isValid()
+                assert d.featureCount() == 1
+                for f in p.dataFields:
+                    assert d.fields().lookupField(f.fieldName) != -1
+            finally:
+                del d
+        finally:
+            p._setAssignLayer(None)
+            p._setDistLayer(None)
 
     def test_create_layers_cancel(self, block_layer, datadir: pathlib.Path):
         p = RedistrictingPlan('test_create_layers', 5)

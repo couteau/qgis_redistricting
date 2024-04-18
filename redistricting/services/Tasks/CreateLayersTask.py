@@ -44,6 +44,10 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 
 from ...exception import CanceledError
+from ...models import (
+    CompactnessScores,
+    DistrictColumns
+)
 from ...utils import (
     SqlAccess,
     createGeoPackage,
@@ -110,8 +114,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
 
-        d = {self.distField: 0, 'name': 'Unassigned'}
-        d[self.popField], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, self.popField, context=context)
+        d = {DistrictColumns.DISTRICT: 0, DistrictColumns.NAME: 'Unassigned'}
+        d[DistrictColumns.POPULATION], _ = \
+            popLayer.aggregate(QgsAggregateCalculator.Sum, self.popField, context=context)
         for field in self.popFields:
             d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
         for field in self.dataFields:
@@ -120,7 +125,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         return d
 
     def makePopTotalsSqlSelect(self, table):
-        sql = f'SELECT 0 as {self.distField}, \'{tr("Unassigned")}\' as name, SUM({self.popField}) as {self.popField}'
+        sql = f'SELECT 0 as {DistrictColumns.DISTRICT}, \'{tr("Unassigned")}\' as {DistrictColumns.NAME}, SUM({self.popField}) as {DistrictColumns.POPULATION}'
 
         for field in self.popFields:
             sql += f', SUM({field.field}) as {field.fieldName}'
@@ -152,14 +157,23 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.validatePopFields(self.popLayer)
 
     def createDistLayer(self):
+        fld = self.popLayer.fields()[self.popField]
+        if fld.type() in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
+                          QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
+            poptype = 'INTEGER'
+        elif fld.type() == QVariant.Double:
+            poptype = 'REAL'
+        else:
+            raise ValueError(f'Field {self.popField} has invalid field type for population field')
+
         sql = 'CREATE TABLE districts (' \
             'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
-            f'{self.distField} INTEGER UNIQUE NOT NULL,' \
-            'name TEXT DEFAULT \'\',' \
-            'members INTEGER DEFAULT 1,' \
-            f'{self.popField} REAL DEFAULT 0,' \
-            'deviation REAL DEFAULT 0,' \
-            'pct_deviation REAL DEFAULT 0,'
+            f'{DistrictColumns.DISTRICT} INTEGER UNIQUE NOT NULL,' \
+            f'{DistrictColumns.NAME} TEXT DEFAULT \'\',' \
+            f'{DistrictColumns.MEMBERS} INTEGER DEFAULT 1,' \
+            f'{DistrictColumns.POPULATION} {poptype} DEFAULT 0,' \
+            f'{DistrictColumns.DEVIATION} {poptype} DEFAULT 0,' \
+            f'{DistrictColumns.PCT_DEVIATION} REAL DEFAULT 0,'
 
         fieldNames = {self.distField, 'name', 'members', self.popField, 'deviation', 'pct_deviation'}
 
@@ -210,9 +224,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             sql += f'{f.fieldName} {tp},'
             fieldNames.add(f.fieldName)
 
-        sql += 'polsbypopper REAL,' \
-            'reock REAL,' \
-            'convexhull REAL)'
+        sql += f'{CompactnessScores.POLSBYPOPPER} REAL,' \
+            f'{CompactnessScores.REOCK} REAL,' \
+            f'{CompactnessScores.CONVEXHULL} REAL)'
 
         success, error = createGpkgTable(self.path, 'districts', sql, srid=self.srid)
         if success:
@@ -225,13 +239,13 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
     def createDistricts(self):
         self.popTotals = self.getPopFieldTotals(self.popLayer)
-        self.totalPop = self.popTotals[self.popField]
+        self.totalPop = self.popTotals[DistrictColumns.POPULATION]
 
         with spatialite_connect(self.path) as db:
             sql = f"INSERT INTO districts ({', '.join(self.popTotals)}) VALUES ({','.join('?'*len(self.popTotals))})"
             db.execute(sql, list(self.popTotals.values()))
-            sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
-            db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
+            # sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
+            # db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
 
         return True
 

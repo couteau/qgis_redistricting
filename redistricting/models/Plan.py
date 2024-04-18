@@ -23,13 +23,14 @@
  ***************************************************************************/
 """
 import pathlib
+from itertools import repeat
 from numbers import Number
 from typing import (
     Any,
-    Iterable,
     List,
     Optional,
-    Union
+    Union,
+    overload
 )
 from uuid import (
     UUID,
@@ -37,6 +38,9 @@ from uuid import (
 )
 
 from qgis.core import (
+    Qgis,
+    QgsFeatureRequest,
+    QgsMessageLog,
     QgsProject,
     QgsVectorLayer
 )
@@ -47,6 +51,10 @@ from qgis.PyQt.QtCore import (
 
 from ..exception import RdsException
 from ..utils import tr
+from .columns import (
+    CompactnessScores,
+    DistrictColumns
+)
 from .DeltaList import DeltaList
 from .District import District
 from .DistrictList import DistrictList
@@ -75,7 +83,7 @@ class RedistrictingPlan(QObject):
     districtNameChanged = pyqtSignal(QObject)  # district
     districtMembersChanged = pyqtSignal(QObject)  # district
     districtDescriptionChanged = pyqtSignal(QObject)  # district
-    assignmentsChanged = pyqtSignal(QObject)  # list of changed districts
+    assignmentsChanged = pyqtSignal("PyQt_PyObject")  # list of changed districts
     validChanged = pyqtSignal()
 
     def __init__(self, name='', numDistricts: int = None, uuid: UUID = None, parent: Optional[QObject] = None):
@@ -120,12 +128,10 @@ class RedistrictingPlan(QObject):
         self._districts.districtNameChanged.connect(self.districtNameChanged)
         self._districts.districtMembersChanged.connect(self.districtMembersChanged)
         self._districts.districtDescriptionChanged.connect(self.districtDescriptionChanged)
-        self._stats = PlanStats(self)
-        self._delta = DeltaList(self)
+        self._stats = PlanStats(self, self)
+        self._delta = DeltaList(self, self)
 
         self._updateDistricts = set()
-
-        QgsProject.instance().layersWillBeRemoved.connect(self.layerRemoved)
 
     def __copy__(self):
         data = self.serialize()
@@ -192,12 +198,11 @@ class RedistrictingPlan(QObject):
         if 'geo-layer' in data:
             geoLayer = QgsProject.instance().mapLayer(data['geo-layer'])
             plan._setGeoLayer(geoLayer)
-
         plan._geoJoinField = data.get('geo-join-field')
 
         if 'pop-layer' in data:
             popLayer = QgsProject.instance().mapLayer(data.get('pop-layer'))
-            plan._popLayer = popLayer
+            plan._setPopLayer(popLayer)
         plan._popJoinField = data.get('pop-join-field', '')
         plan._popField = data.get('pop-field')
 
@@ -287,7 +292,7 @@ class RedistrictingPlan(QObject):
 
     @property
     def allocatedSeats(self):
-        return sum(d.members for d in self._districts)
+        return sum(d.members for d in self._districts if d.district != 0)
 
     @property
     def description(self) -> str:
@@ -308,23 +313,40 @@ class RedistrictingPlan(QObject):
             self.deviationChanged.emit(self._deviation)
 
     @property
+    def distField(self) -> str:
+        return self._distField or 'district'
+
+    @property
     def geoIdField(self) -> str:
         return self._geoIdField
 
     @property
-    def distField(self) -> str:
-        return self._distField or 'district'
+    def geoIdCaption(self) -> str:
+        return self._geoIdCaption or self._geoIdField
+
+    def _setGeoIdCaption(self, value: str):
+        if (self._geoIdCaption is None and value != self._geoIdField) \
+                or (value is None and self.geoIdCaption != self._geoIdField):
+            if value == self._geoIdField:
+                self._geoIdCaption = None
+            else:
+                self._geoIdCaption = value
+            self.geoIdCaptionChanged.emit(self.geoIdCaption)
 
     @property
     def geoLayer(self) -> QgsVectorLayer:
         return self._geoLayer
 
     def _setGeoLayer(self, value: QgsVectorLayer):
-        if not isinstance(value, QgsVectorLayer) or not value.isValid():
+        if value is not None and (not isinstance(value, QgsVectorLayer) or not value.isValid()):
             raise ValueError(tr("Geography layer must be a valid vector layer"))
 
         if self._geoLayer != value:
+            if self._geoLayer is not None:
+                self._geoLayer.willBeDeleted.disconnect(self.layerDestroyed)
             self._geoLayer = value
+            if self._geoLayer is not None:
+                self._geoLayer.willBeDeleted.connect(self.layerDestroyed)
             for f in self._geoFields:
                 f.setLayer(self._geoLayer)
 
@@ -340,12 +362,18 @@ class RedistrictingPlan(QObject):
         return self._popLayer or self._geoLayer
 
     def _setPopLayer(self, value: QgsVectorLayer):
-        if not isinstance(value, QgsVectorLayer) or not value.isValid():
+        if value is not None and (not isinstance(value, QgsVectorLayer) or not value.isValid()):
             raise ValueError("Population layer must be a valid vector layer")
 
         if self.popLayer != value:
+            if self._popLayer is not None:
+                self._popLayer.willBeDeleted.disconnect(self.layerDestroyed)
+
             if value == self._geoLayer:
                 self._popLayer = None
+            else:
+                self._popLayer = value
+                self._popLayer.willBeDeleted.connect(self.layerDestroyed)
 
             self.updatePopFields(self.popLayer)
 
@@ -377,26 +405,21 @@ class RedistrictingPlan(QObject):
             self.popFieldChanged.emit()
 
     @property
-    def geoIdCaption(self) -> str:
-        return self._geoIdCaption or self._geoIdField
-
-    def _setGeoIdCaption(self, value: str):
-        if (self._geoIdCaption is None and value != self._geoIdField) \
-                or (value is None and self.geoIdCaption != self._geoIdField):
-            if value == self._geoIdField:
-                self._geoIdCaption = None
-            else:
-                self._geoIdCaption = value
-            self.geoIdCaptionChanged.emit(self.geoIdCaption)
-
-    @property
     def assignLayer(self) -> QgsVectorLayer:
         return self._assignLayer
 
     def _setAssignLayer(self, value: QgsVectorLayer):
+        if self._assignLayer is not None:
+            if value is not None:
+                QgsMessageLog.logMessage(
+                    "Plan assignments layer should not normally be changed", 'Plugins', Qgis.Warning)
+            self._assignLayer.willBeDeleted.disconnect(self.layerDestroyed)
+
         self._assignLayer = value
 
         if self._assignLayer is not None:
+            self._assignLayer.willBeDeleted.connect(self.layerDestroyed)
+
             if self._geoIdField is None:
                 field = self._assignLayer.fields()[1]
                 if field:
@@ -446,7 +469,7 @@ class RedistrictingPlan(QObject):
                     new[fid] = value
 
         old = {
-            f[dindex] for f in self._assignLayer.dataProvider().getFeatures(list(new.keys()))
+            f[dindex] for f in self._assignLayer.dataProvider().getFeatures(QgsFeatureRequest(list(new.keys())))
         }
         self._updateDistricts = set(new.values()) | old
 
@@ -454,7 +477,7 @@ class RedistrictingPlan(QObject):
         self._updateDistricts = set()
 
     def signalChangedAssignments(self):
-        self.assignmentsChanged(self._updateDistricts)
+        self.assignmentsChanged.emit(self._updateDistricts)
         self._updateDistricts = set()
 
     @property
@@ -462,8 +485,14 @@ class RedistrictingPlan(QObject):
         return self._distLayer
 
     def _setDistLayer(self, value: QgsVectorLayer):
+        if self._distLayer is not None:
+            if value is not None:
+                QgsMessageLog.logMessage("Plan districts layer should not normally be changed", 'Plugins', Qgis.Warning)
+            self._distLayer.willBeDeleted.disconnect(self.layerDestroyed)
+
         self._distLayer = value
         if self._distLayer is not None:
+            self._distLayer.willBeDeleted.connect(self.layerDestroyed)
             if self._distField:
                 idx = self._distLayer.fields().lookupField(self._distField)
                 if idx == -1:
@@ -509,7 +538,18 @@ class RedistrictingPlan(QObject):
 
         self._geoFields.clear()
         self._geoFields.extend(value)
+        self._stats.splits.initSplits()
         self.geoFieldsChanged.emit()
+
+    @property
+    def districtColumns(self):
+        cols = list(DistrictColumns)
+        for f in self.popFields:
+            cols.append(f.fieldName)
+        for f in self.dataFields:
+            cols.append(f.fieldName)
+        cols.extend(list(CompactnessScores))
+        return cols
 
     @property
     def totalPopulation(self):
@@ -523,14 +563,35 @@ class RedistrictingPlan(QObject):
     def districts(self) -> DistrictList:
         return self._districts
 
-    def addDistrict(self, district: District):
-        self._districts.append(district)
-        self.districtAdded.emit(district)
+    @overload
+    def addDistrict(self, district: int, name: str = '', members: int = 1, description: str = '') -> District:
+        ...
 
-    def removeDistrict(self, district: District):
+    @overload
+    def addDistrict(self, district: District) -> District:
+        ...
+
+    def addDistrict(self, district: Union[int, District], name: str = '', members: int = 1, description: str = '') -> District:
+        if not isinstance(district, District):
+            cols = dict(zip(self.districtColumns, repeat(0)))
+            cols[DistrictColumns.DISTRICT] = district
+            cols[DistrictColumns.NAME] = name
+            cols[DistrictColumns.MEMBERS] = members
+            cols[DistrictColumns.DEVIATION] = -self.ideal * members
+            cols[DistrictColumns.PCT_DEVIATION] = -1.0
+            cols['description'] = description
+            district = District(**cols)
+
+        self._districts.add(district)
+        self.districtAdded.emit(district)
+        return district
+
+    def removeDistrict(self, district: Union[District, int]):
         if district in self._districts:
             self._districts.remove(district)
             self.districtRemoved.emit(district)
+        else:
+            QgsMessageLog.logMessage(tr("removeDistrict: district not found in plan"), "Plugins", Qgis.Warning)
 
     @property
     def delta(self):
@@ -576,17 +637,17 @@ class RedistrictingPlan(QObject):
 
         return True
 
-    def layerRemoved(self, layers: Iterable[QgsVectorLayer]):
+    def layerDestroyed(self):
+        layer = self.sender()
         valid = self.isValid()
-        for layer in layers:
-            if layer == self._assignLayer:
-                self._setAssignLayer(None)
-            elif layer == self._distLayer:
-                self._setDistLayer(None)
-            elif layer == self._popLayer:
-                self._popLayer = None
-            elif layer == self._geoLayer:
-                self._geoLayer = None
+        if layer == self._assignLayer:
+            self._setAssignLayer(None)
+        elif layer == self._distLayer:
+            self._setDistLayer(None)
+        elif layer == self._geoLayer:
+            self._setGeoLayer(None)
+        elif layer == self._popLayer:
+            self._setPopLayer(None)
 
         if self.isValid() != valid:
             self.validChanged.emit()

@@ -34,6 +34,7 @@ from .PlanAssignments import (
     PlanAssignmentEditor
 )
 from .PlanBuilder import PlanBuilder
+from .PlanColors import getColorForDistrict
 from .PlanCopy import PlanCopier
 from .PlanEdit import PlanEditor
 from .PlanExport import PlanExporter
@@ -48,7 +49,7 @@ from .storage import ProjectStorage
 
 __all__ = (
     'ActionRegistry', 'PlanManager', 'LayerTreeManager',
-    'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
+    'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService', 'getColorForDistrict',
     'DistrictUpdater', 'DeltaUpdateService', 'DistrictValidator',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',

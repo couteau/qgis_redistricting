@@ -26,8 +26,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
-    Optional,
-    Union
+    Optional
 )
 
 from qgis.core import (
@@ -73,7 +72,6 @@ class PlanStylerService(QObject):
         QgsProject.instance().cleared.connect(self.clear)
         self._assignRenderer: QgsCategorizedSymbolRenderer = None
         self._distRenderer: QgsCategorizedSymbolRenderer = None
-        self._ramp: QgsColorRamp = None
         self._labelsEnabled = False
         self._labeling: QgsVectorLayerSimpleLabeling = None
         self._numDistricts = 0
@@ -125,12 +123,12 @@ class PlanStylerService(QObject):
         self._labeling = QgsVectorLayerSimpleLabeling(layerSettings)
 
     def createRenderers(self, numDistricts):
-        self._ramp = QgsLimitedRandomColorRamp(count=numDistricts+1, satMin=50, satMax=100)
-        self.createAssignmentRenderer(numDistricts)
-        self.createDistrictRenderer(numDistricts)
+        ramp = QgsLimitedRandomColorRamp(count=numDistricts+1, satMin=50, satMax=100)
+        self.createAssignmentRenderer(numDistricts, ramp)
+        self.createDistrictRenderer(numDistricts, ramp)
         self._numDistricts = numDistricts
 
-    def createAssignmentRenderer(self, numDistricts):
+    def createAssignmentRenderer(self, numDistricts, ramp: QgsColorRamp):
         symbol = QgsSymbol.defaultSymbol(DISTRICT_GEOMETRY_TYPE)
         symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.NoPen))
         symbol.symbolLayer(0).setStrokeWidth(0)
@@ -145,12 +143,12 @@ class PlanStylerService(QObject):
             categoryList.append(category)
 
         assignRenderer = QgsCategorizedSymbolRenderer(self._attrName, categoryList)
-        assignRenderer.updateColorRamp(self._ramp)
+        assignRenderer.updateColorRamp(ramp)
         idx = assignRenderer.categoryIndexForValue(None)
         assignRenderer.updateCategorySymbol(idx, symbol)
         self._assignRenderer = assignRenderer
 
-    def createDistrictRenderer(self, numDistricts):
+    def createDistrictRenderer(self, numDistricts, ramp: QgsColorRamp):
         symbol = QgsSymbol.defaultSymbol(DISTRICT_GEOMETRY_TYPE)
         symbol.symbolLayer(0).setStrokeColor(QColor('white'))
         symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.SolidLine))
@@ -162,7 +160,7 @@ class PlanStylerService(QObject):
         for dist in range(0, numDistricts+1):
             sym = symbol.clone()
             if dist != 0:
-                sym.symbolLayer(0).setFillColor(self.colorForDistrict(dist))
+                sym.symbolLayer(0).setFillColor(ramp.color(dist/ramp.count()))
             category = QgsRendererCategory()
             category.setValue(None if dist == 0 else dist)
             category.setSymbol(sym)
@@ -186,8 +184,3 @@ class PlanStylerService(QObject):
                 self._labeling = plan.distLayer.labeling().clone()
             else:
                 self.createLabels()
-
-    def colorForDistrict(self, district: Union[int, None]):
-        if district is None:
-            district = 0
-        return self._ramp.color(district/self._ramp.count())

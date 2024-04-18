@@ -54,7 +54,6 @@ from ..gui import (
 )
 from ..models import RedistrictingPlan
 from ..services import (
-    ActionRegistry,
     AssignmentImporter,
     DistrictUpdater,
     LayerTreeManager,
@@ -103,8 +102,6 @@ class PlanController(BaseController):
 
         self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
         self.planActions = QActionGroup(self.iface.mainWindow())
-
-        self.actions = ActionRegistry()
 
         self.createActions()
 

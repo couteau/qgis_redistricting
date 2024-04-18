@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 from pytest_mock import MockerFixture
 from qgis.core import (
+    QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsProject,
     QgsVectorLayer
@@ -14,9 +15,10 @@ from qgis.core import (
 from redistricting.models.DistrictList import DistrictList
 from redistricting.models.FieldList import FieldList
 from redistricting.models.Plan import RedistrictingPlan
+from redistricting.services.DistrictIO import DistrictReader
 from redistricting.services.PlanBuilder import PlanBuilder
 
-# pylint: disable=redefined-outer-name, unused-argument
+# pylint: disable=redefined-outer-name, unused-argument, protected-access
 
 
 @pytest.fixture
@@ -28,6 +30,12 @@ def datadir(tmp_path: pathlib.Path):
     shutil.copytree(s, d)
     yield d
     shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.fixture
+def qgis_app_with_path(qgis_app: QgsApplication, datadir: pathlib.Path):
+    qgis_app.setPrefixPath(str(datadir))
+    QgsProject.instance().setOriginalPath(str(datadir))
 
 
 @pytest.fixture
@@ -75,6 +83,7 @@ def valid_plan(minimal_plan: RedistrictingPlan, block_layer, gpkg_path):
     minimal_plan._setPopField('pop_total')
     # pylint: enable=protected-access
     minimal_plan.addLayersFromGeoPackage(gpkg_path)
+    QgsProject.instance().addMapLayers([minimal_plan.distLayer, minimal_plan.assignLayer], False)
     return minimal_plan
 
 
@@ -126,12 +135,19 @@ def plan(block_layer, assign_layer, dist_layer):
 
     }, None)
 
+    r = DistrictReader(dist_layer, popField='pop_total')
+    for d in r.readFromLayer():
+        if d.district == 0:
+            p.districts[0].update(d)
+        else:
+            p.districts.add(d)
+
     yield p
 
     p.deleteLater()
 
 
-@ pytest.fixture
+@pytest.fixture
 def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
     dst = datadir / 'tuscaloosa_new_plan.gpkg'
 
@@ -152,14 +168,13 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .createPlan(createLayers=False)
     del b
 
-    update = mocker.patch.object(p, 'updateDistricts')
-    update.return_value = None
-
     p.addLayersFromGeoPackage(dst)
-    p.totalPopulation = 227036
+    p.updateTotalPopulation(227036)
 
     yield p
 
+    p._setAssignLayer(None)
+    p._setDistLayer(None)
     p.deleteLater()
 
 
@@ -192,6 +207,9 @@ def mock_plan(mocker: MockerFixture):
 
     data_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
     type(plan).dataFields = mocker.PropertyMock(return_value=data_fields)
+
+    geo_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
+    type(plan).geoFields = mocker.PropertyMock(return_value=geo_fields)
 
     return plan
 

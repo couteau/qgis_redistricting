@@ -59,7 +59,7 @@ from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
 class PlanEditor(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
 
-    def __init__(self, planUpdater: DistrictUpdater, parent: QObject = None):
+    def __init__(self, parent: QObject = None, planUpdater: DistrictUpdater = None):
         super().__init__(parent)
         self._updater = planUpdater
         self._updateAssignLayerTask = None
@@ -266,8 +266,9 @@ class PlanEditor(BasePlanBuilder):
                 self._updateGeoFields()
 
             self.endPlanUpdate()
-        except:  # pylint: disable=bare-except
+        except Exception as e:  # pylint: disable=broad-except
             self.cancelPlanUpdate()
+            self.pushError(e, Qgis.Critical)
 
         return self._plan
 
@@ -283,27 +284,31 @@ class PlanEditor(BasePlanBuilder):
         self._oldvalues = None
         self._modifiedFields = modifiedFields
 
-        updateGeometry = updateSplits = updateDemographics = False
-        if "geo-fields" in modifiedFields:
-            updateSplits = True
+        if self._updater:
+            updateGeometry = updateSplits = updateDemographics = False
+            if "geo-fields" in modifiedFields:
+                updateSplits = True
 
-        if modifiedFields & {"data-fields", "pop-fields", "pop-field", "pop-layer"}:
-            updateSplits = True
-            updateDemographics = True
+            if modifiedFields & {"data-fields", "pop-fields", "pop-field", "pop-layer"}:
+                updateSplits = True
+                updateDemographics = True
 
-        if "num-districts" in modifiedFields:
-            updateGeometry = True
+            if "num-districts" in modifiedFields:
+                updateGeometry = True
 
-        if updateSplits or updateDemographics or updateGeometry:
-            self._updater.updateDistricts(
-                self._plan,
-                needDemographics=updateDemographics,
-                needGeometry=updateGeometry,
-                needSplits=updateSplits,
-                force=True
-            )
+            if updateSplits or updateDemographics or updateGeometry:
+                self._updater.updateDistricts(
+                    self._plan,
+                    needDemographics=updateDemographics,
+                    needGeometry=updateGeometry,
+                    needSplits=updateSplits,
+                    force=True
+                )
 
     def cancelPlanUpdate(self):
+        if self._oldvalues is None:
+            return
+
         self._plan._name = self._oldvalues.get('name')
         self._plan._description = self._oldvalues.get('description', '')
         self._plan._numDistricts = self._oldvalues.get('num-districts')

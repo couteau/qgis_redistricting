@@ -30,6 +30,7 @@ from typing import (
 import pandas as pd
 
 from ...exception import CanceledError
+from ...models import DistrictColumns
 from ...utils import tr
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
@@ -120,19 +121,21 @@ class AggregatePendingChangesTask(AggregateDataTask):
             members = [self.districts[d].members for d in dist.index]
             dist["members"] = members
 
-            data[f"new_{self.popField}"] = dist[self.popField] + data[self.popField]
-            data["deviation"] = data[f"new_{self.popField}"] - (dist["members"] * self.ideal)
+            data[f"new_{DistrictColumns.POPULATION}"] = dist[DistrictColumns.POPULATION] + \
+                data[DistrictColumns.POPULATION]
+            data["deviation"] = data[f"new_{DistrictColumns.POPULATION}"] - (dist["members"] * self.ideal)
             data["pct_deviation"] = data["deviation"] / (dist["members"] * self.ideal)
             for f in self.popFields:
                 data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
             for f in self.dataFields:
                 data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
-                if f.pctbase:
-                    data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{f.pctbase}"]
+                pctbase = DistrictColumns.POPULATION if f.pctbase == self.popField else f.pctbase
+                if pctbase:
+                    data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{pctbase}"]
 
             checkCanceled()
 
-            cols = [f"new_{self.popField}", self.popField, "deviation", "pct_deviation"]
+            cols = [f"new_{DistrictColumns.POPULATION}", DistrictColumns.POPULATION, "deviation", "pct_deviation"]
             for f in self.popFields:
                 cols.append(f"new_{f.fieldName}")
                 cols.append(f.fieldName)

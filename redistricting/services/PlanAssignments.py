@@ -173,7 +173,7 @@ class PlanAssignmentEditor(QObject):
             self.assignFeaturesToDistrict(self._assignLayer.getFeatures(list(fids)), dist)
 
     def undoChanged(self, index):  # pylint: disable=unused-argument
-        self.assignmentsChanged.emit()
+        self.assignmentsChanged.emit(self._plan)
 
 
 class AssignmentsService(QObject):
@@ -185,6 +185,9 @@ class AssignmentsService(QObject):
         super().__init__(parent)
         self._editors: dict[RedistrictingPlan, PlanAssignmentEditor] = {}
         self._updateService = updateService
+
+    def isEditing(self, plan: RedistrictingPlan) -> bool:
+        return plan in self._editors
 
     def startEditing(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
         if plan not in self._editors:

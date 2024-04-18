@@ -124,7 +124,7 @@ class SplitsList:
     def initSplits(self):
         oldSplits = self._splits
         self._splits: dict[str, Splits] = {
-            f.fieldName: Splits(self._plan, f, self._plan.stats) for f in self._plan.geoFields
+            f.fieldName: Splits(self._plan, f) for f in self._plan.geoFields
         }
         if oldSplits is not None:
             for f, s in oldSplits.items():
@@ -136,8 +136,8 @@ class PlanStats(QObject):
     statsUpdating = pyqtSignal()
     statsUpdated = pyqtSignal()
 
-    def __init__(self, plan: "RedistrictingPlan"):
-        super().__init__(plan)
+    def __init__(self, plan: "RedistrictingPlan", parent: Optional[QObject] = None):
+        super().__init__(parent)
         self._plan = plan
         self._cutEdges = None
         self._splits = SplitsList(plan)
@@ -171,17 +171,26 @@ class PlanStats(QObject):
     def totalPopulation(self):
         return self._plan.totalPopulation
 
-    @property
+    # stats
+    def _avgScore(self, score: str) -> Union[float, None]:
+        values = self._plan.districts[1:, score]
+        count = len(values)
+        if count == 0:
+            return None
+
+        return sum(values) / count
+
+    @ property
     def avgPolsbyPopper(self):
-        return self._plan.districts.avgPolsbyPopper
+        return self._avgScore("polsbypopper")
 
-    @property
+    @ property
     def avgReock(self):
-        return self._plan.districts.avgReock
+        return self._avgScore("reock")
 
-    @property
+    @ property
     def avgConvexHull(self):
-        return self._plan.districts.avgConvexHull
+        return self._avgScore("convexhull")
 
     def updateGeoFields(self):
         self.statsUpdating.emit()

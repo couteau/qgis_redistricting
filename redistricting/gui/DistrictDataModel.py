@@ -25,6 +25,7 @@
 from typing import (
     Any,
     Iterable,
+    Sequence,
     Union
 )
 
@@ -45,12 +46,15 @@ from qgis.PyQt.QtGui import (
 
 from ..models import (
     District,
+    DistrictColumns,
     DistrictList,
     RedistrictingPlan,
     Unassigned
 )
-from ..models.columns import DistrictColumns
-from ..services.DistrictValid import DistrictValidator
+from ..services import (
+    DistrictValidator,
+    getColorForDistrict
+)
 from ..utils import tr
 
 
@@ -62,9 +66,9 @@ class DistrictDataModel(QAbstractTableModel):
         self._keys = []
         self._headings = []
         self._plan = None
-        self._districts: DistrictList = None
-        self.plan = plan
+        self._districts: Union[DistrictList, Sequence[District]] = []
         self._validator = DistrictValidator()
+        self.plan = plan
 
     @ property
     def plan(self) -> RedistrictingPlan:
@@ -72,7 +76,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def updatePlanFields(self):
         self.beginResetModel()
-        self._keys = [str(f) for f in DistrictColumns]
+        self._keys = list(DistrictColumns)
         self._headings = [
             tr('District'),
             tr('Name'),
@@ -107,33 +111,39 @@ class DistrictDataModel(QAbstractTableModel):
     def plan(self, value: RedistrictingPlan):
         self.beginResetModel()
 
-        if self._districts is not None:
-            self._districts.districtNameChanged.disconnect(self.districtChanged)
-            self._districts.districtMembersChanged.disconnect(self.deviationChanged)
+        if self._plan is not None:
+            self._plan.districtNameChanged.disconnect(self.districtChanged)
+            self._plan.districtMembersChanged.disconnect(self.deviationChanged)
             self._plan.dataFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.popFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.deviationChanged.disconnect(self.deviationChanged)
+            self._plan.districtAdded.disconnect(self.districtListChanged)
+            self._plan.districtRemoved.disconnect(self.districtListChanged)
 
         self._plan = value
         if self._plan:
             self._districts = self._plan.districts
             self.updatePlanFields()
-        else:
-            self._districts = None
-            self._keys = []
-            self._headings = []
-
-        if self._districts is not None:
-            self._districts.districtNameChanged.connect(self.districtChanged)
-            self._districts.districtMembersChanged.connect(self.deviationChanged)
+            self._plan.districtNameChanged.connect(self.districtChanged)
+            self._plan.districtMembersChanged.connect(self.deviationChanged)
             self._plan.dataFieldsChanged.connect(self.updatePlanFields)
             self._plan.popFieldsChanged.connect(self.updatePlanFields)
             self._plan.deviationChanged.connect(self.deviationChanged)
+            self._plan.districtAdded.connect(self.districtListChanged)
+            self._plan.districtRemoved.connect(self.districtListChanged)
+        else:
+            self._districts = []
+            self._keys = []
+            self._headings = []
 
         self.endResetModel()
 
     def deviationChanged(self):
         self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+
+    def districtListChanged(self):
+        self.beginResetModel()
+        self.endResetModel()
 
     def districtChanged(self, district: District):
         row = self._districts.index(district)
@@ -152,62 +162,74 @@ class DistrictDataModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         value = QVariant()
-        if role in (Qt.DisplayRole, Qt.EditRole):
-            row = index.row()
-            col = index.column()
-            district = self._districts.byindex[row]
+        try:
+            if role in (Qt.DisplayRole, Qt.EditRole):
+                row = index.row()
+                col = index.column()
+                district = self._districts.byindex[row]
 
-            if isinstance(district, Unassigned):
-                if col == 0:
-                    return self._districts[0, "name"]
-                if col == 1:
+                if isinstance(district, Unassigned):
+                    if col == 0:
+                        return self._districts[0, "name"]
+                    if col == 1:
+                        return QVariant()
+
+                key = self._keys[col]
+                if key[:3] == 'pct' and key != 'pct_deviation':
+                    pctbase = self._plan.dataFields[key[4:]].pctbase
+                    if pctbase in self._keys and district[pctbase] != 0:
+                        value = district[key[4:]] / district[pctbase]
+                    else:
+                        value = None
+                else:
+                    value = district[key]
+
+                if pd.isna(value):
                     return QVariant()
 
-            value = self._districts[row, col]
-            if pd.isna(value):
-                return QVariant()
+                if key == 'deviation':
+                    value = f'{value:+,}'
+                elif key == 'pct_deviation':
+                    value = f'{value:+.2%}'
+                elif key in {'polsbypopper', 'reock', 'convexhull'}:
+                    value = f'{value:.3}'
+                elif key[:3] == 'pct':
+                    value = f'{value:.2%}'
+                elif isinstance(value, (int, np.integer)):
+                    value = f'{value:,}'
+                elif isinstance(value, (float, np.floating)):
+                    value = f'{value:,.2f}'
 
-            key = self._keys[col]
-            if key == 'deviation':
-                value = f'{value:+,}'
-            elif key == 'pct_deviation':
-                value = f'{value:+.2%}'
-            elif key in {'polsbypopper', 'reock', 'convexhull'}:
-                value = f'{value:.3}'
-            elif key[:3] == 'pct':
-                value = f'{value:.2%}'
-            elif isinstance(value, (int, np.integer)):
-                value = f'{value:,}'
-            elif isinstance(value, (float, np.floating)):
-                value = f'{value:,.2f}'
+            elif role == Qt.BackgroundRole:
+                row = index.row()
+                col = index.column()
+                if col == 0:
+                    color = getColorForDistrict(self._plan, self._districts.byindex[row].district)
+                    value = QBrush(color)
 
-        elif role == Qt.BackgroundRole:
-            row = index.row()
-            col = index.column()
-            if col == 0:
-                value = QBrush(self._districts[row].color) if row != 0 else QBrush(QColor(160, 160, 160))
+            elif role == Qt.FontRole:
+                row = index.row()
+                col = index.column()
+                if row > 0 and col in {0, 4, 5}:
+                    value = QFont()
+                    value.setBold(True)
 
-        elif role == Qt.FontRole:
-            row = index.row()
-            col = index.column()
-            if row > 0 and col in {0, 4, 5}:
-                value = QFont()
-                value.setBold(True)
+            elif role == Qt.TextAlignmentRole:
+                if index.column() == 0:
+                    value = Qt.AlignCenter
 
-        elif role == Qt.TextAlignmentRole:
-            if index.column() == 0:
-                value = Qt.AlignCenter
-
-        elif role == Qt.TextColorRole:
-            row = index.row()
-            col = index.column()
-            if col == 0:
-                value = QColor(55, 55, 55)
-            elif 4 <= col <= 5:
-                if self._districts[row].isValid():
-                    value = QColor(99, 196, 101)
-                else:
-                    value = QColor(207, 99, 92)
+            elif role == Qt.TextColorRole:
+                row = index.row()
+                col = index.column()
+                if col == 0:
+                    value = QColor(55, 55, 55)
+                elif 4 <= col <= 5:
+                    if self._districts[row].isValid():
+                        value = QColor(99, 196, 101)
+                    else:
+                        value = QColor(207, 99, 92)
+        except Exception as e:  # pylint: disable=broad-exception-caught, unused-variable
+            return QVariant()
 
         return value
 

@@ -132,7 +132,7 @@ class Splits(QObject):
     splitUpdating = pyqtSignal()
     splitUpdated = pyqtSignal()
 
-    def __init__(self, plan: "RedistrictingPlan", field: "Field", parent: Optional["PlanStats"] = None):
+    def __init__(self, plan: "RedistrictingPlan", field: "Field", parent: Optional[QObject] = None):
         super().__init__(parent)
         self.data = pd.DataFrame()
         self.field = field

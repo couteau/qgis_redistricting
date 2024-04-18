@@ -12,12 +12,13 @@ from qgis.core import (
     QgsVectorLayer
 )
 
+from ..models import DistrictColumns
 from ..utils import (
     spatialite_connect,
     tr
 )
 
-schemaVersion = version.parse('1.0.2')
+schemaVersion = version.parse('1.0.3')
 
 
 class fieldSchema(TypedDict):
@@ -256,7 +257,7 @@ def _updateDistLayer(data: dict):
                 sql = "UPDATE districts SET name = ?, description = ? WHERE district = ?"
                 db.executemany(sql, [(f["name"], f["description"], f["district"]) for f in data["districts"]])
             else:
-                sql = "UPDATE districts SET name = ?, WHERE district = ?"
+                sql = "UPDATE districts SET name = ? WHERE district = ?"
                 db.executemany(sql, [(f["name"], f["district"]) for f in data["districts"]])
 
 
@@ -298,14 +299,31 @@ def migrateSchema1_0_1_to_1_0_2(data: dict):
     return data, version.parse('1.0.2')
 
 
+def migrateSchema1_0_2_to_1_0_3(data):
+    distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
+    if distLayer is None:
+        return
+
+    geoPackagePath, _ = distLayer.source().split('|', 1)
+
+    if data['pop-field'] != DistrictColumns.POPULATION and distLayer.fields().lookupField(data['pop-field']) != -1:
+        with spatialite_connect(geoPackagePath) as db:
+            sql = f"ALTER TABLE districts RENAME COLUMN {data['pop-field']} TO {DistrictColumns.POPULATION}"
+            db.execute(sql)
+
+    return data, version.parse('1.0.3')
+
+
 migrations: dict[version.Version, Callable[[dict], tuple[dict, version.Version]]] = {
     version.parse('1.0.0'): migrateSchema1_0_0_to_1_0_1,
-    version.parse('1.0.1'): migrateSchema1_0_1_to_1_0_2
+    version.parse('1.0.1'): migrateSchema1_0_1_to_1_0_2,
+    version.parse('1.0.2'): migrateSchema1_0_2_to_1_0_3
 }
 
 schemas = {
     version.parse('1.0.0'): planSchema1_0_0,
     version.parse('1.0.1'): planSchema1_0_1,
+    version.parse('1.0.2'): planSchema,
     schemaVersion: planSchema
 }
 

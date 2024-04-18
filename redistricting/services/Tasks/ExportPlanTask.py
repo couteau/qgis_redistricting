@@ -46,6 +46,8 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 from qgis.utils import spatialite_connect
 
+from redistricting.models.columns import DistrictColumns
+
 from ...exception import RdsException
 from ...utils import tr
 from ._debug import debug_thread
@@ -101,7 +103,6 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         self.distLayer = plan.distLayer
 
-        self.popJoinField = plan.popJoinField
         self.popField = plan.popField
         self.popFields = plan.popFields
         self.dataFields = plan.dataFields
@@ -123,11 +124,11 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         if self.includeDemographics:
             fieldNames |= {
-                self.popField: makeDbfFieldName(self.popField, fields),
+                'population': 'population',
                 'deviation': 'deviation',
                 'pct_deviation': 'pct_dev'
             }
-            fields.append(QgsField(fieldNames[self.popField], QVariant.LongLong, 'Integer64', 18, 0))
+            fields.append(QgsField('population', QVariant.LongLong, 'Integer64', 18, 0))
             fields.append(QgsField('deviation', QVariant.Double))
             fields.append(QgsField('pct_dev', QVariant.Double))
 
@@ -194,9 +195,21 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         features = []
         for f in self.distLayer.getFeatures(request):
-            if (dist := self.districts[str(f['district'])]) is not None:
+            if (dist := self.districts[f['district']]) is not None:
                 feat = QgsFeature()
-                data = [getattr(dist, srcFld) or 0 for srcFld in fieldNames]
+                data = []
+                for srcFld in fieldNames:
+                    if srcFld[:3] == "pct" and srcFld != DistrictColumns.PCT_DEVIATION:
+                        basefld = srcFld[4:]
+                        pctbase = self.dataFields[basefld].pctbase
+                        if pctbase == self.popField:
+                            pctbase = DistrictColumns.POPULATION
+                        if dist[basefld] is None or not dist[pctbase]:
+                            data.append(0)
+                        else:
+                            data.append(dist[basefld] / dist[pctbase])
+                    else:
+                        data.append(dist[srcFld])
                 feat.setAttributes(data)
                 feat.setGeometry(f.geometry())
                 features.append(feat)

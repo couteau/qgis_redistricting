@@ -34,7 +34,7 @@ class TestDistrictList:
     def district_list_with_district(self, district):
         district_list = DistrictList()
         district_list.numDistricts = 2
-        district_list.append(district)
+        district_list.add(district)
         return district_list
 
     def test_create(self):
@@ -94,6 +94,10 @@ class TestDistrictList:
         assert l.byindex[0] == district
 
     def test_getitem_slice_returns_value_list(self, district_list_with_district):
-        l = district_list_with_district[0:2, 'deviation']
+        l = district_list_with_district[:, 'deviation']
         assert isinstance(l, list)
         assert len(l) == 2
+        assert l[0] is None
+        l = district_list_with_district[3:, 'deviation']
+        assert isinstance(l, list)
+        assert len(l) == 0

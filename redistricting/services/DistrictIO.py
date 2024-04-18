@@ -4,12 +4,13 @@ from qgis.core import (
     QgsFeature,
     QgsVectorLayer
 )
+from qgis.PyQt.QtCore import QVariant
 
 from ..models import (
     District,
+    DistrictColumns,
     Unassigned
 )
-from .columns import DistrictColumns
 
 
 class DistrictReader:
@@ -23,16 +24,25 @@ class DistrictReader:
         self._distLayer = distLayer
         self._distField = distField
         self._popField = popField
-        self._columns = columns
+        if columns is None:
+            self._columns = self._distLayer.fields().names()
+        else:
+            self._columns = columns
 
     def readFromLayer(self) -> list[District]:
         result: list[District] = []
+
         f: QgsFeature
         for f in self._distLayer.getFeatures():
-            attrs = f.attributeMap()
-            data = dict.fromkeys(self._columns)
-            data.update({k: v for k, v in f.attributeMap().items() if k in data})
-            data[DistrictColumns.POPULATION] = attrs[self._popField]
+            data = {
+                k: None if isinstance(v, QVariant) and v.isNull() else v
+                for k, v in f.attributeMap().items() if k in self._columns
+            }
+
+            if self._popField != DistrictColumns.POPULATION and self._popField in data:
+                data[DistrictColumns.POPULATION] = data[self._popField]
+                del data[self._popField]
+
             if f[self._distField] == 0:
                 result.append(Unassigned(**data))
             else:

@@ -72,8 +72,8 @@ class PlanValidator(ErrorListMixin, QObject):
         self._distLayer: QgsVectorLayer = None
 
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None):
-        instance = cls(parent)
+    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
+        instance = cls(parent, **kwargs)
         instance._plan = plan
 
         instance._name = plan.name

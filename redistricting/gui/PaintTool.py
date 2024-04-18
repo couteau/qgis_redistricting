@@ -52,6 +52,7 @@ from qgis.PyQt.QtGui import (
 )
 
 from ..models import RedistrictingPlan
+from ..services import AssignmentsService
 from ..utils import tr
 
 
@@ -179,7 +180,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     MinPixelZoom = 20
 
-    def __init__(self, canvas: QgsMapCanvas, plan: RedistrictingPlan = None):
+    def __init__(self, canvas: QgsMapCanvas, assignmentsService: AssignmentsService):
         super().__init__(canvas)
         self._plan = None
         self._geoField = None
@@ -199,7 +200,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
         self.buttonsPressed = Qt.NoButton
 
-        self.plan = plan
+        self._assignmentsService = assignmentsService
 
     @ property
     def plan(self):
@@ -208,6 +209,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     @ plan.setter
     def plan(self, value: RedistrictingPlan):
         if self._plan != value:
+            if self._plan is not None and self._assignmentsService.isEditing(self._plan):
+                self._assignmentsService.endEditing(self._plan)
+
+            self.canvas().unsetMapTool(self)
             self._plan = value
             self._layer = self._plan.assignLayer if self._plan is not None else None
             if self._layer:
@@ -403,10 +408,11 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._distTarget is not None
 
     def activate(self):
-        self._assignmentEditor = self.plan.startEditing()
+        self._assignmentEditor = self._assignmentsService.startEditing(self._plan)
         return super().activate()
 
     def deactivate(self):
+        self._assignmentsService.endEditing(self._plan)
         self._assignmentEditor = None
         return super().deactivate()
 

@@ -11,3 +11,18 @@ class DistrictColumns(str, Enum):
 
     def __int__(self):
         return list(self.__class__).index(self)
+
+    def __str__(self):
+        return self.value
+
+
+class CompactnessScores(str, Enum):
+    POLSBYPOPPER = "polsbypopper"
+    REOCK = "reock"
+    CONVEXHULL = "convexhull"
+
+    def __int__(self):
+        return list(self.__class__).index(self)
+
+    def __str__(self):
+        return self.value

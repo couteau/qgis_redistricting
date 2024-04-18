@@ -24,9 +24,9 @@ from redistricting.services.Tasks.ExportPlanTask import (
 
 
 class TestExportPlanTask:
-    def test_export_plan(self, mock_plan, datadir: pathlib.Path):
+    def test_export_plan(self, plan, datadir: pathlib.Path):
         t = ExportRedistrictingPlanTask(
-            mock_plan,
+            plan,
             shapeFileName=str((datadir / 'test_export.shp').resolve()),
             equivalencyFileName=str((datadir / 'test_export.csv').resolve()))
         result = t.run()

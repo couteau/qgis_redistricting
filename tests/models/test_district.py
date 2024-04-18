@@ -39,6 +39,18 @@ class TestDistrict:
         assert district.deviation == 0
         assert district.pct_deviation == 0
 
+    def test_create_with_name_sets_name(self):
+        district = District(1, name="District 1")
+        assert district.name == "District 1"
+
+    def test_create_with_members_sets_members(self):
+        district = District(1, members=2)
+        assert district.members == 2
+
+    def test_create_with_description_sets_description(self):
+        district = District(1, description="District 1 description")
+        assert district.description == "District 1 description"
+
     def test_multimember(self):
         d = District(1, members=2)
         assert d.members == 2
@@ -66,6 +78,15 @@ class TestDistrict:
 
         with pytest.raises(IndexError):
             district[0] = 2
+
+    def test_create_unassigned(self):
+        district = Unassigned()
+        assert district.district == 0
+        assert district.name == "Unassigned"
+        assert district.population == 0
+        assert district.members is None
+        assert district.deviation is None
+        assert district.pct_deviation is None
 
     def test_unassigned_set_name_raises_exception(self):
         district = Unassigned()

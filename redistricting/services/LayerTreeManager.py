@@ -52,6 +52,8 @@ class LayerTreeManager(QObject):
         for group in self.root.findGroups(False):
             if group.customProperty('redistricting-plan-root', False) is True:
                 break
+            if group.customProperty('redistricting-plan-id', None) is not None:
+                return self.root
         else:
             name = tr("Redistricting Plans")
             if self.root.findGroup(name) is not None:

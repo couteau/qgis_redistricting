@@ -43,6 +43,7 @@ from qgis.PyQt.QtCore import (
 from ..models import RedistrictingPlan
 from ..utils import tr
 from .BasePlanBuilder import BasePlanBuilder
+from .DistrictIO import DistrictReader
 from .Tasks import CreatePlanLayersTask
 
 
@@ -57,10 +58,10 @@ class PlanBuilder(BasePlanBuilder):
         self._createLayersTask = None
 
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
         # using deepcopy forces duplication of the data and geo fields
         newplan = deepcopy(plan)
-        instance = super().fromPlan(newplan, parent)
+        instance = super().fromPlan(newplan, parent, **kwargs)
         instance._plan = None  # pylint: disable=protected-access
         return instance
 
@@ -93,6 +94,9 @@ class PlanBuilder(BasePlanBuilder):
             self._createLayersTask = None
 
             plan.addLayersFromGeoPackage(self._geoPackagePath)
+            reader = DistrictReader(plan.distLayer)
+            unassigned = reader.readFromLayer()[0]
+            plan.districts[0].update(unassigned)
             QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
             self.layersCreated.emit(plan)
 

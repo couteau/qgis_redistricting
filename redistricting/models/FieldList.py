@@ -42,6 +42,9 @@ class FieldList(Generic[T]):
     def __init__(self, fields: List[T] = None):
         self._fields: List[T] = fields or []
 
+    def __repr__(self) -> str:
+        return f"[{','.join(repr(f) for f in self._fields)}]"
+
     @overload
     def __getitem__(self, key: str) -> T:
         ...

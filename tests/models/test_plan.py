@@ -20,10 +20,6 @@ from uuid import UUID
 
 import pytest
 from pytestqt.plugin import QtBot
-from qgis.core import (
-    Qgis,
-    QgsProject
-)
 
 from redistricting.models import (
     DataField,
@@ -92,19 +88,20 @@ class TestPlan:
         plan = RedistrictingPlan('test', 5)
         assert not plan.isValid()
 
-    def test_assign_name_updates_layer_names(self, gpkg_path):
+    def test_assign_name_updates_layer_names(self, gpkg_path, qtbot: QtBot):
         plan = RedistrictingPlan('oldname', 45)
         plan.addLayersFromGeoPackage(gpkg_path)
         assert plan.distLayer.name() == 'oldname_districts'
         assert plan._assignLayer.name() == 'oldname_assignments'
-        assert plan._group.groupName == "Redistricting Plan - oldname"
-        plan._setName('newname')
+        with qtbot.wait_signal(plan.nameChanged):
+            plan._setName('newname')
         assert plan.distLayer.name() == 'newname_districts'
         assert plan._assignLayer.name() == 'newname_assignments'
-        assert plan._group.groupName == "Redistricting Plan - newname"
+        plan._setAssignLayer(None)
+        plan._setDistLayer(None)
 
     def test_datafields_assign(self, valid_plan: RedistrictingPlan, block_layer, qtbot: QtBot):
-        with qtbot.waitSignal(valid_plan.planChanged):
+        with qtbot.waitSignal(valid_plan.dataFieldsChanged):
             valid_plan._setDataFields(  # pylint: disable=protected-access
                 [DataField(block_layer, 'vap_nh_black', False)]
             )
@@ -112,7 +109,7 @@ class TestPlan:
 
     # pylint: disable-next=unused-argument
     def test_geofields_assign(self, valid_plan: RedistrictingPlan, block_layer, mock_taskmanager, qtbot: QtBot):
-        with qtbot.waitSignal(valid_plan.planChanged):
+        with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             valid_plan._setGeoFields([Field(block_layer, 'vtdid20', False)])  # pylint: disable=protected-access
         assert len(valid_plan.geoFields) == 1
         assert len(valid_plan.stats.splits) == 1
@@ -120,23 +117,15 @@ class TestPlan:
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):
         plan = RedistrictingPlan('test', 5)
         gpkg = datadir / 'dummy.gpkg'
-        plan.addLayersFromGeoPackage(gpkg)
-        assert plan.error() is not None
+        with pytest.raises(ValueError, match=f'File {gpkg} does not exist'):
+            plan.addLayersFromGeoPackage(gpkg)
 
-    def test_addgeopackage_adds_layers_to_project_and_group_when_valid_gpkg(self, datadir):
+    def test_addgeopackage_adds_layers_to_project_when_valid_gpkg(self, datadir):
         plan = RedistrictingPlan('test', 5)
         gpkg = datadir / 'tuscaloosa_plan.gpkg'
         plan.addLayersFromGeoPackage(gpkg)
-        assert plan.error() is None
         assert plan._assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
-        assert QgsProject.instance().mapLayersByName('test_assignments')
-        assert QgsProject.instance().mapLayersByName('test_districts')
         assert plan.geoIdField == 'geoid20'
-        assert plan._group._group.findLayer(plan._assignLayer.id())  # pylint: disable=protected-access
-        assert plan._group._group.findLayer(plan.distLayer.id())  # pylint: disable=protected-access
-
-    def test_addgeopackage_set_error_when_plan_is_invalid(self, datadir):
-        plan = RedistrictingPlan('test', 5)
-        plan.addLayersFromGeoPackage(datadir / 'test_plan.gpkg')
-        assert plan.error() == (f'File {datadir / "test_plan.gpkg"} does not exist', Qgis.Critical)
+        plan._setAssignLayer(None)
+        plan._setDistLayer(None)

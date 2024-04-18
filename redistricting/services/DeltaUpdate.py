@@ -47,9 +47,9 @@ class DeltaUpdateService(ErrorListMixin, QObject):
     def watchPlan(self, plan: RedistrictingPlan):
         if plan not in self._deltas:
             delta = DeltaUpdate(plan)
-            self._commitSignals.setMapping(plan, plan)
-            self._rollbackSignals.setMapping(plan, plan)
-            self._assignmentChangedSignals.setMapping(plan, plan)
+            self._commitSignals.setMapping(plan.assignLayer, plan)
+            self._rollbackSignals.setMapping(plan.assignLayer, plan)
+            self._assignmentChangedSignals.setMapping(plan.assignLayer.undoStack(), plan)
             plan.assignLayer.afterCommitChanges.connect(self._commitSignals.map)
             plan.assignLayer.afterRollBack.connect(self._rollbackSignals.map)
             plan.assignLayer.undoStack().indexChanged.connect(self._assignmentChangedSignals.map)
@@ -60,9 +60,9 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             plan.assignLayer.afterCommitChanges.disconnect(self._commitSignals.map)
             plan.assignLayer.afterRollBack.disconnect(self._rollbackSignals.map)
             plan.assignLayer.undoStack().indexChanged.disconnect(self._assignmentChangedSignals.map)
-            self._commitSignals.removeMappings(plan)
-            self._rollbackSignals.removeMappings(plan)
-            self._assignmentChangedSignals.removeMappings(plan)
+            self._commitSignals.removeMappings(plan.assignLayer)
+            self._rollbackSignals.removeMappings(plan.assignLayer)
+            self._assignmentChangedSignals.removeMappings(plan.assignLayer.undoStack())
             del self._deltas[plan]
 
     def isUpdating(self, plan: RedistrictingPlan):
@@ -88,7 +88,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         if task.exception:
             self.setError(str(task.exception))
         self._deltas[plan].task = None
-        self.updateTerminated(plan, task.isCanceled(), task.exception)
+        self.updateTerminated.emit(plan, task.isCanceled(), task.exception)
 
     def updatePendingData(self, plan: RedistrictingPlan):
         if plan not in self._deltas:
@@ -99,7 +99,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             return delta.task
 
         if delta.plan.assignLayer is None \
-                or not delta.plan.assignLayer.editBuffer() is None \
+                or delta.plan.assignLayer.editBuffer() is None \
                 or delta.plan.assignLayer.undoStack().index() == 0:
             plan.delta.clear()
             return None
@@ -116,7 +116,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
 
         return task
 
-    def undoChanged(self, index, plan):  # pylint: disable=unused-argument
+    def undoChanged(self, plan: RedistrictingPlan):  # pylint: disable=unused-argument
         self.updatePendingData(plan)
 
     def commitChanges(self, plan: RedistrictingPlan):

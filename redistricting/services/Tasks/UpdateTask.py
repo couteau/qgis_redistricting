@@ -23,7 +23,6 @@
  ***************************************************************************/
 """
 from typing import (
-    TYPE_CHECKING,
     Literal,
     Optional,
     Sequence,
@@ -43,23 +42,22 @@ from qgis.core import (
     QgsVectorLayer
 )
 
+from ...models import (
+    DataField,
+    DistrictColumns,
+    Field,
+    RedistrictingPlan
+)
 from ...utils import (
     LayerReader,
     SqlAccess
 )
 
-if TYPE_CHECKING:
-    from ...models import (
-        DataField,
-        Field,
-        RedistrictingPlan
-    )
-
 
 class AggregateDataTask(SqlAccess, QgsTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
-    def __init__(self, plan: 'RedistrictingPlan', description: str):
+    def __init__(self, plan: RedistrictingPlan, description: str):
         super().__init__(description, QgsTask.AllFlags)
         self.plan = plan
         self.assignLayer: QgsVectorLayer = plan.assignLayer
@@ -69,8 +67,8 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.geoIdField: str = plan.geoIdField
         self.popJoinField: str = plan.popJoinField
         self.popField: str = plan.popField
-        self.popFields: Sequence['Field'] = plan.popFields
-        self.dataFields: Sequence['DataField'] = plan.dataFields
+        self.popFields: Sequence[Field] = plan.popFields
+        self.dataFields: Sequence[DataField] = plan.dataFields
         self.totalPopulation = plan.totalPopulation
         self.ideal = plan.ideal
         self.districts = plan.districts
@@ -151,6 +149,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
             order=self.popJoinField,
             read_geometry=False
         )
+        df.rename(columns={self.popField: str(DistrictColumns.POPULATION)}, inplace=True)
         for f in self.popFields:
             if f.isExpression:
                 df.loc[:, f.fieldName] = df.query(f.field)

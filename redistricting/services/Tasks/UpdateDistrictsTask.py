@@ -55,6 +55,8 @@ from shapely.geometry import (
     Polygon
 )
 
+from redistricting.models.columns import DistrictColumns
+
 from ...utils import (
     spatialite_connect,
     tr
@@ -210,8 +212,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
         data['convexhull'] = area / cea.convex_hull.area
 
     def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
-        if self.popField in cols:
-            self.totalPopulation = data[self.popField].sum()
+        if DistrictColumns.POPULATION in cols:
+            self.totalPopulation = data[DistrictColumns.POPULATION].sum()
         else:
             context = QgsExpressionContext()
             context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
@@ -238,8 +240,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 self.setProgressIncrement(20, 40)
                 popdf = self.loadPopData()
                 assign: gpd.GeoDataFrame = assign.join(popdf)
-                cols += [self.popField] + [f.fieldName for f in self.popFields] + [f.fieldName for f in self.dataFields]
-                self.totalPopulation = int(assign[self.popField].sum())
+                cols += [DistrictColumns.POPULATION] + [f.fieldName for f in self.popFields] + \
+                    [f.fieldName for f in self.dataFields]
+                self.totalPopulation = int(assign[DistrictColumns.POPULATION].sum())
 
             self.setProgressIncrement(40, 50)
             if self.includeSplits:
@@ -288,17 +291,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 self.updateProgress(total, total)
 
-            # Account for districts with no assignments --
-            # otherwise, they will never be updated in the database
-            if self.updateDistricts is None:
-                zero = set(range(0, self.numDistricts+1)) - set(self.data.index)
-            else:
-                zero = self.updateDistricts - set(self.data.index)
-
-            if zero:
-                df = pd.DataFrame(0, index=list(zero), columns=self.data.columns)
-                self.data = pd.concat([self.data, df]).sort_index()
-
             name = pd.Series(
                 [
                     self.distList[d].name if d in self.distList else str(d)
@@ -318,11 +310,15 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             if self.includeDemographics:
                 ideal = round(self.totalPopulation / self.numSeats)
-                deviation = self.data[self.popField].sub(members * ideal)
+                deviation = self.data[DistrictColumns.POPULATION].sub(members * ideal)
                 pct_dev = deviation.div(members * ideal)
-                df = pd.DataFrame({'name': name, 'members': members, 'deviation': deviation, 'pct_deviation': pct_dev})
+                df = pd.DataFrame({DistrictColumns.NAME.value: name, DistrictColumns.MEMBERS.value: members,
+                                  DistrictColumns.DEVIATION.value: deviation, DistrictColumns.PCT_DEVIATION.value: pct_dev})
+                # for f in self.dataFields:
+                #     if f.pctbase and f.pctbase in self.data.columns:
+                #         self.data[f'pct_{f.fieldName}'] = (self.data[f.fieldName] / self.data[f.pctbase]).fillna(0)
             else:
-                df = pd.DataFrame({'name': name, 'members': members})
+                df = pd.DataFrame({DistrictColumns.NAME.value: name, DistrictColumns.MEMBERS.value: members})
 
             self.data = self.data.join(df)
 
@@ -340,8 +336,19 @@ class AggregateDistrictDataTask(AggregateDataTask):
         with spatialite_connect(self.geoPackagePath) as db:
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.data.columns)}
 
-            data = [d._asdict() for d in self.data.itertuples()]
+            # Account for districts with no assignments --
+            # otherwise, they will never be updated in the database
+            if self.updateDistricts is None:
+                zero = set(range(0, self.numDistricts+1)) - set(self.data.index)
+            else:
+                zero = self.updateDistricts - set(self.data.index)
 
+            if zero:
+                sql = f"DELETE FROM districts WHERE {self.distField} IN ({','.join(str(d) for d in zero)})"
+                db.execute(sql)
+                db.commit()
+
+            data = [d._asdict() for d in self.data.itertuples()]
             sql = "UPDATE districts " \
                 f"SET {','.join([f'{field} = {param}' for field, param in fields.items()])} " \
                 f"WHERE {self.distField} = :Index"

@@ -40,6 +40,15 @@ from .columns import DistrictColumns
 
 
 class District(QObject):
+    BASE_COLUMNS = [
+        DistrictColumns.DISTRICT,
+        DistrictColumns.NAME,
+        DistrictColumns.MEMBERS,
+        DistrictColumns.POPULATION,
+        DistrictColumns.DEVIATION,
+        DistrictColumns.PCT_DEVIATION,
+    ]
+    SCORE_COLUMNS = ['polsbypopper', 'reock', 'convexhull']
     WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
                            DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
 
@@ -54,27 +63,26 @@ class District(QObject):
     deviation: int
     pct_deviation: float
 
-    def __init__(self, district: int, fid: int = -1, **kwargs):
+    def __init__(self, district: int, fid: int = -1, *, description="", **kwargs):
         super().__init__()
-        assert kwargs.pop(DistrictColumns.DISTRICT, district) == district
-        scores = {
-            'polsbypopper': kwargs.pop('polsbypopper', 0.0),
-            'reock': kwargs.pop('reock', 0.0),
-            'convexhull': kwargs.pop('convexhull', 0.0)
-        }
-        self._description = kwargs.pop("description", "")
-        self._data = {
-            DistrictColumns.DISTRICT: district,
-            DistrictColumns.NAME: kwargs.pop(DistrictColumns.NAME, str(district)),
-            DistrictColumns.MEMBERS: kwargs.pop(DistrictColumns.MEMBERS, 1),
-            DistrictColumns.POPULATION: kwargs.pop(DistrictColumns.POPULATION, 0),
-            DistrictColumns.DEVIATION: kwargs.pop(DistrictColumns.DEVIATION, 0),
-            DistrictColumns.PCT_DEVIATION: kwargs.pop(DistrictColumns.PCT_DEVIATION, 0.0),
-
-
-        } | kwargs | scores
         self._district = district
         self._fid = fid
+        self._description = description
+        self._data = {
+            DistrictColumns.DISTRICT: self._district,
+            DistrictColumns.NAME: str(district),
+            DistrictColumns.MEMBERS: 1,
+            DistrictColumns.POPULATION: 0,
+            DistrictColumns.DEVIATION: 0,
+            DistrictColumns.PCT_DEVIATION: 0.0,
+        }
+        self.update(kwargs)
+
+    def __repr__(self):
+        return f"District({self._district} - '{self.name}' ({self.population}))"
+
+    def clone(self):
+        return self.__class__(fid=self._fid, description=self._description, **self._data)
 
     @overload
     def __getitem__(self, index: Union[str, int]) -> Any:
@@ -175,20 +183,41 @@ class District(QObject):
 
     def extend(self, columns: Iterable[str]):
         data = self._data
-        self._data = dict.fromkeys(columns)
-        self.update(data)
+        addcols = [c for c in columns if c not in District.BASE_COLUMNS and c not in District.SCORE_COLUMNS]
+        self._data = dict.fromkeys(District.BASE_COLUMNS + addcols + District.SCORE_COLUMNS)
+        self._data.update(data)
 
+    @overload
+    def update(self, data: "District"):
+        ...
+
+    @overload
     def update(self, data: dict[str, Any]):
-        self._data.update({k: v for k, v in data.items() if k in self._data})
+        ...
+
+    def update(self, data: Union["District", dict[str, Any]]):
+        if isinstance(data, District):
+            data = data[:]
+
+        newkeys = [k for k in data.keys() if k not in District.BASE_COLUMNS + District.SCORE_COLUMNS]
+        self._data = dict.fromkeys(District.BASE_COLUMNS + newkeys + District.SCORE_COLUMNS) | self._data | data
 
 
 class Unassigned(District):
     def __init__(self, district: Literal[0] = 0, fid=-1, **kwargs):
         assert district == 0
-        kwargs[DistrictColumns.NAME] = tr("Unassigned")
-        kwargs[DistrictColumns.DEVIATION] = None
-        kwargs[DistrictColumns.PCT_DEVIATION] = None
         super().__init__(district, fid, **kwargs)
 
     def __setitem__(self, key: Union[str, int, slice], value: Any):
         raise IndexError(tr("'{key}' field is readonly for Unassigned goegraphies").format(key=key))
+
+    def update(self, data: Union["District", dict[str, Any]]):
+        super().update(data)
+
+        self._data[DistrictColumns.NAME] = tr("Unassigned")
+        self._data[DistrictColumns.MEMBERS] = None
+        self._data[DistrictColumns.DEVIATION] = None
+        self._data[DistrictColumns.PCT_DEVIATION] = None
+        self._data['polsbypopper'] = None
+        self._data['reock'] = None
+        self._data['convexhul'] = None

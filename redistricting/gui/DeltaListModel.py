@@ -34,6 +34,7 @@ from qgis.PyQt.QtCore import (
 
 from ..models import (
     DataField,
+    DistrictColumns,
     Field,
     RedistrictingPlan,
     makeFieldName
@@ -75,12 +76,12 @@ class DeltaListModel(QAbstractTableModel):
     def updateFields(self):
         self._fields = [
             {
-                'name': f'new_{self._plan.popField}',
+                'name': f'new_{DistrictColumns.POPULATION}',
                 'caption': tr('Population'),
                 'format': '{:,.0f}'
             },
             {
-                'name': self._plan.popField,
+                'name': DistrictColumns.POPULATION,
                 'caption': tr('Population') + ' - ' + tr('Change'),
                 'format': '{:+,.0f}'
             },

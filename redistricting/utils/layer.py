@@ -215,7 +215,7 @@ class LayerReader(SqlAccess):
             sql = f"SELECT {cols} from {self.getTableName(self._layer)}"
             if filt:
                 filt = {f: f"{f'{v}' if isinstance(v, str) else v}" for f, v in filt.items()}
-                sql = f"{sql} WHERE {'AND'.join(f'{f} = {v}' for f,v in filt.items())}"
+                sql = f"{sql} WHERE {' AND '.join(f'{f} = {v}' for f,v in filt.items())}"
             if order:
                 sql = f"{sql} ORDER BY {order}"
             return sql

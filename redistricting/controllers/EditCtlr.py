@@ -48,7 +48,7 @@ from ..models import (
     RedistrictingPlan
 )
 from ..services import (
-    PlanAssignmentEditor,
+    AssignmentsService,
     PlanCopier
 )
 from ..utils import tr
@@ -62,67 +62,103 @@ class EditAssignmentsController(BaseController):
         project,
         planManager,
         toolbar,
-        assignmentEditor: PlanAssignmentEditor,
+        assignmentsService: AssignmentsService,
         parent: Optional[QObject] = None
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
-        self.assignmentEditor = assignmentEditor
+        self.assignmentsService = assignmentsService
         self.canvas = self.iface.mapCanvas()
         self.dockwidget: DockRedistrictingToolbox = None
         self.actionToggle: QAction = None
 
-        self.mapTool = PaintDistrictsTool(self.canvas)
+        self.mapTool = PaintDistrictsTool(self.canvas, self.assignmentsService)
+        self.sourceDistrict: District = None
+        self.targetDistrict: District = None
 
-        self.actionStartPaintDistricts = QAction(
+        self.actionStartPaintDistricts = self.actions.createAction(
+            'actionStartPaintDistricts',
             QIcon(':/plugins/redistricting/paintpalette.svg'),
             tr('Paint districts'),
-            self.iface.mainWindow()
+            callback=self.startPaintDistricts,
+            parent=self.iface.mainWindow()
         )
-        self.actionStartPaintDistricts.triggered.connect(self.startPaintDistricts)
         self.actionStartPaintDistricts.setEnabled(False)
 
-        self.actionPaintRectangle = QAction(
+        self.actionPaintRectangle = self.actions.createAction(
+            'actionPaintRectangle',
             QIcon(':/plugins/redistricting/paintrubberband.svg'),
             tr('Paint districts within selection rectangle'),
-            self.iface.mainWindow()
+            callback=self.startPaintRectangle,
+            parent=self.iface.mainWindow()
         )
-        self.actionPaintRectangle.triggered.connect(self.startPaintRectangle)
         self.actionPaintRectangle.setEnabled(False)
 
-        self.actionSelectByGeography = QAction(
+        self.actionSelectByGeography = self.actions.createAction(
+            'actionSelectByGeography',
             QgsApplication.getThemeIcon('/mActionSelectFreehand.svg'),
             tr('Select by geography units'),
-            self.iface.mainWindow()
+            callback=self.selectByGeography,
+            parent=self.iface.mainWindow()
         )
-        self.actionSelectByGeography.triggered.connect(self.selectByGeography)
         self.actionSelectByGeography.setEnabled(False)
 
-        self.actionCommitPlanChanges = QAction(
+        self.actionCommitPlanChanges = self.actions.createAction(
+            'actionCommitPlanChanges',
             QgsApplication.getThemeIcon('/mActionSaveAllEdits.svg'),
             tr('Commit changes'),
-            self.iface.mainWindow()
+            tr('Save all districting changes to the underlying layer'),
+            callback=self.onCommitChanges,
+            parent=self.iface.mainWindow()
         )
-        self.actionCommitPlanChanges.triggered.connect(self.onCommitChanges)
-        self.actionCommitPlanChanges.setStatusTip(tr('Save all districting changes to the underlying layer'))
         self.actionCommitPlanChanges.setEnabled(False)
 
-        self.actionSaveAsNew = QAction(
+        self.actionSaveAsNew = self.actions.createAction(
+            'actionSaveAsNew',
             QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
             tr('Save as new'),
-            self.iface.mainWindow()
+            tr('Save all unsaved districting changes to a new redistricting plan'),
+            callback=self.saveChangesAsNewPlan,
+            parent=self.iface.mainWindow()
         )
-        self.actionSaveAsNew.triggered.connect(self.saveChangesAsNewPlan)
-        self.actionSaveAsNew.setStatusTip(tr('Save all unsaved districting changes to a new redistricting plan'))
         self.actionSaveAsNew.setEnabled(False)
 
-        self.actionRollbackPlanChanges = QAction(
+        self.actionRollbackPlanChanges = self.actions.createAction(
+            'actionRollbackPlanChanges',
             QgsApplication.getThemeIcon('/mActionCancelEdits.svg'),
             tr('Rollback changes'),
-            self.iface.mainWindow()
+            tr('Discard all unsaved districting changes'),
+            callback=self.onRollbackChanges,
+            parent=self.iface.mainWindow()
         )
-        self.actionRollbackPlanChanges.triggered.connect(self.onRollbackChanges)
-        self.actionRollbackPlanChanges.setStatusTip(tr('Discard all unsaved districting changes'))
         self.actionRollbackPlanChanges.setEnabled(False)
+
+        self.actionCreateDistrict = self.actions.createAction(
+            'actionCreateDistrict',
+            QgsApplication.getThemeIcon('/mActionAdd.svg'),
+            tr("Add district"),
+            tr('Create a new district and add it to the plan'),
+            callback=self.createDistrict,
+            parent=self.iface.mainWindow()
+        )
+        self.actionCreateDistrict.setEnabled(False)
+
+        self.actionEditTargetDistrict = self.actions.createAction(
+            'actionEditTargetDistrict',
+            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
+            tr('Edit district'),
+            callback=self.editDistrict,
+            parent=self.iface.mainWindow()
+        )
+        self.actionEditTargetDistrict.setEnabled(False)
+
+        self.actionEditSourceDistrict = self.actions.createAction(
+            'actionEditSourceDistrict',
+            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
+            tr('Edit district'),
+            callback=self.editDistrict,
+            parent=self.iface.mainWindow()
+        )
+        self.actionEditSourceDistrict.setEnabled(False)
 
     def load(self):
         self.createPlanToolsDockWidget()
@@ -141,8 +177,8 @@ class EditAssignmentsController(BaseController):
         dockwidget = DockRedistrictingToolbox(None)
 
         dockwidget.geoFieldChanged.connect(self.mapTool.setGeoField)
-        dockwidget.sourceChanged.connect(self.mapTool.setSourceDistrict)
-        dockwidget.targetChanged.connect(self.mapTool.setTargetDistrict)
+        dockwidget.sourceChanged.connect(self.sourceDistrictChanged)
+        dockwidget.targetChanged.connect(self.targetDistrictChanged)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
         dockwidget.btnPaintRectangle.setDefaultAction(self.actionPaintRectangle)
         dockwidget.btnSelectByGeography.setDefaultAction(self.actionSelectByGeography)
@@ -178,10 +214,17 @@ class EditAssignmentsController(BaseController):
         self.actionStartPaintDistricts.setEnabled(plan is not None)
         self.actionPaintRectangle.setEnabled(plan is not None)
         self.actionSelectByGeography.setEnabled(plan is not None)
+        self.actionCreateDistrict.setEnabled(
+            plan.allocatedDistricts < plan.numDistricts
+        )
+        self.actionEditTargetDistrict.setEnabled(False)
+        self.actionEditSourceDistrict.setEnabled(False)
 
     def connectPlanSignals(self, plan: RedistrictingPlan):
         plan.assignLayer.editingStarted.connect(self.editingStarted)
         plan.assignLayer.editingStopped.connect(self.editingStopped)
+        plan.districtAdded.connect(self.updateCreateDistrictActionEnabled)
+        plan.districtRemoved.connect(self.updateCreateDistrictActionEnabled)
 
     def editingStarted(self):
         if self.sender() == self.planManager.activePlan.assignLayer:
@@ -194,6 +237,12 @@ class EditAssignmentsController(BaseController):
             self.actionCommitPlanChanges.setEnabled(False)
             self.actionSaveAsNew.setEnabled(False)
             self.actionRollbackPlanChanges.setEnabled(False)
+
+    def updateCreateDistrictActionEnabled(self, _):
+        if self.sender() == self.planManager.activePlan:
+            self.actionCreateDistrict.setEnabled(
+                self.planManager.activePlan.allocatedDistricts < self.planManager.activePlan.numDistricts
+            )
 
     # action slots
 
@@ -235,6 +284,22 @@ class EditAssignmentsController(BaseController):
         self.planManager.activePlan.assignLayer.rollBack(True)
         self.planManager.activePlan.assignLayer.triggerRepaint()
 
+    def sourceDistrictChanged(self, district: District):
+        if district is None:
+            self.mapTool.setSourceDistrict(None)
+        else:
+            self.mapTool.setSourceDistrict(district.district)
+        self.actionEditSourceDistrict.setEnabled(district is not None and district.district != 0)
+        self.sourceDistrict = district
+
+    def targetDistrictChanged(self, district: District):
+        if district is None:
+            self.mapTool.setTargetDistrict(None)
+        else:
+            self.mapTool.setTargetDistrict(district.district)
+        self.actionEditTargetDistrict.setEnabled(district is not None and district.district != 0)
+        self.targetDistrict = district
+
     def createDistrict(self):
         if not self.checkActivePlan('create district'):
             return None
@@ -242,17 +307,47 @@ class EditAssignmentsController(BaseController):
         if self.planManager.activePlan.allocatedDistricts == self.planManager.activePlan.numDistricts:
             self.iface.messageBar().pushMessage(
                 self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.Warning)
-            self.dockwidget.setTargetDistrict(None)
             return None
 
         dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
-        if dlg.exec_() == QDialog.Rejected:
+        if dlg.exec() == QDialog.Rejected:
             return None
 
-        dist = District(dlg.districtNumber, name=dlg.districtName, members=dlg.members, description=dlg.description)
-        self.planManager.activePlan.districts.append(District)
+        dist = self.planManager.activePlan.addDistrict(
+            dlg.districtNumber, dlg.districtName, dlg.members, dlg.description)
+        self.project.setDirty()
         self.dockwidget.setTargetDistrict(dist)
         return dist.district
+
+    def editDistrict(self, district: District = None):
+        if not district:
+            if self.sender() == self.actionEditTargetDistrict:
+                district = self.targetDistrict
+            elif self.sender() == self.actionEditSourceDistrict:
+                district = self.sourceDistrict
+            else:
+                return
+
+        if district is None or district.district == 0:
+            return
+
+        dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
+        dlg.setWindowTitle(tr("Edit District"))
+        dlg.sbxDistrictNo.setReadOnly(True)
+        dlg.inpName.setText(district.name)
+        dlg.sbxMembers.setValue(district.members)
+        dlg.txtDescription.setPlainText(district.description)
+        if dlg.exec() == QDialog.Accepted:
+            district.name = dlg.districtName
+            district.members = dlg.members
+            district.description = dlg.description
+            self.project.setDirty()
+
+    def editSourceDistrict(self):
+        self.editDistrict(self.mapTool.sourceDistrict())
+
+    def editTargetDistrict(self):
+        self.editDistrict(self.mapTool.targetDistrict())
 
     # helper methods
 

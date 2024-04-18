@@ -42,6 +42,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..services import (
+    ActionRegistry,
     ErrorListMixin,
     PlanManager
 )
@@ -70,6 +71,7 @@ class BaseController(QObject):
             parent: Optional[QObject] = None
     ):
         super().__init__(parent)
+        self.actions = ActionRegistry()
         self.iface = iface
         self.project = project
         self.planManager = planManager

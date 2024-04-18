@@ -24,7 +24,9 @@
 """
 from typing import (
     Any,
+    Iterable,
     Optional,
+    OrderedDict,
     Union,
     overload
 )
@@ -107,7 +109,7 @@ class DistrictList(QObject):
 
             raise KeyError(tr("Invalid key passed to DistrictList.byname"))
 
-    def __init__(self, numDistricts=0):
+    def __init__(self, numDistricts=0, districts: Optional[Iterable[District]] = None):
         super().__init__()
         self._nameSignalMapper = QSignalMapper(self)
         self._nameSignalMapper.mappedObject.connect(self.districtNameChanged)
@@ -116,38 +118,47 @@ class DistrictList(QObject):
         self._descripSignalMapper = QSignalMapper(self)
         self._descripSignalMapper.mappedObject.connect(self.districtDescriptionChanged)
 
-        self._districts: dict[int, District] = {0: Unassigned()}
         self._indexaccessor = DistrictList._IndexAccessor(self)
         self._nameaccessor = DistrictList._NameAccessor(self)
         self._numDistricts = numDistricts
 
-    # pylint: disable=protected-access
-    @classmethod
-    def clone(cls, from_list: "DistrictList", districts: Optional[list[District]] = None):
-        instance = cls()
         if districts is not None:
-            instance._districts = {d.district: d for d in districts}
-        instance._numDistricts = from_list._numDistricts
-        return instance
-    # pylint: enable=protected-access
+            self._districts: dict[int, District] = OrderedDict()
+            for d in districts:
+                if d.district == 0:
+                    self._districts[0] = d
+                else:
+                    self.add(d)
+        else:
+            self._districts: dict[int, District] = OrderedDict({0: Unassigned()})
 
-    @overload
+    def __repr__(self):
+        return f"[{','.join(repr(d) for d in self._districts.values())}]"
+
+    def clone(self, districts: Optional[Iterable[District]] = None):
+        if districts is None:
+            districts = self._districts.values()
+
+        instance = self.__class__(self._numDistricts, [d.clone() for d in districts])
+        return instance
+
+    @ overload
     def __getitem__(self, index: int) -> District:
         ...
 
-    @overload
+    @ overload
     def __getitem__(self, index: slice) -> "DistrictList":
         ...
 
-    @overload
+    @ overload
     def __getitem__(self, index: tuple) -> Any:
         ...
 
     def __getitem__(self, index):
         if isinstance(index, tuple):
             index, field = index
-            if not isinstance(field, str):
-                raise ValueError(tr("Field index to DistrictList must be a string"))
+            if not isinstance(field, (str, int)):
+                raise ValueError(tr("Field index to DistrictList must be a str or int"))
         else:
             field = None
 
@@ -160,8 +171,7 @@ class DistrictList(QObject):
         if isinstance(index, slice):
             if field is not None:
                 return [d[field] for d in list(self._districts.values())[index]]
-
-            return DistrictList.clone(self, list(self._districts.values())[index])
+            return self.__class__(self._numDistricts, list(self._districts.values())[index])
 
         raise ValueError(tr("Invalid index to DistrictList"))
 
@@ -172,14 +182,22 @@ class DistrictList(QObject):
     def __len__(self):
         return len(self._districts)
 
-    def __contains__(self, index):
+    @ overload
+    def __contains__(self, index: District) -> bool:
+        ...
+
+    @ overload
+    def __contains__(self, index: int) -> bool:
+        ...
+
+    def __contains__(self, index) -> bool:
         if isinstance(index, District):
             return index.district in self._districts
 
         return index in self._districts
 
     def __bool__(self) -> bool:
-        return len(self._districts) == 1 and 0 in self._districts
+        return bool(self._districts)
 
     def keys(self):
         return self._districts.keys()
@@ -194,9 +212,22 @@ class DistrictList(QObject):
         return list(self._districts.values()).index(district)
 
     def clear(self):
-        self._districts = {0: Unassigned()}
+        newdict = OrderedDict()
+        if 0 in self._districts:
+            newdict[0] = Unassigned()
+            del self._districts[0]
 
-    def append(self, district: District):
+        for d in self._districts.values():
+            d.nameChanged.disconnect(self._nameSignalMapper.map)
+            d.membersChanged.disconnect(self._membersSignalMapper.map)
+            d.descriptionChanged.disconnect(self._descripSignalMapper.map)
+            self._nameSignalMapper.removeMappings(d)
+            self._membersSignalMapper.removeMappings(d)
+            self._descripSignalMapper.removeMappings(d)
+
+        self._districts = newdict
+
+    def add(self, district: District):
         assert 0 < district.district <= self.numDistricts
         self._nameSignalMapper.setMapping(district, district)
         self._membersSignalMapper.setMapping(district, district)
@@ -204,9 +235,15 @@ class DistrictList(QObject):
         district.nameChanged.connect(self._nameSignalMapper.map)
         district.membersChanged.connect(self._membersSignalMapper.map)
         district.descriptionChanged.connect(self._descripSignalMapper.map)
-        self._districts[district.district] = district
 
-    def remove(self, district: District):
+        self._districts[district.district] = district
+        self._districts = {key: self._districts[key] for key in sorted(self._districts.keys())}
+
+    def remove(self, district: Union[District, int]):
+        if isinstance(district, int):
+            if district in self._districts:
+                district = self._districts[district]
+
         # attempt to remove Unassigned raises error unless list is a slice that excludes Unassigned
         if district.district == 0 and 0 in self._districts:
             raise ValueError(tr("Cannot remove Unassigned"))
@@ -222,39 +259,19 @@ class DistrictList(QObject):
         else:
             raise ValueError(tr("District {district} not found in District List").format(district=district.district))
 
-    @property
+    @ property
     def numDistricts(self) -> int:
         return self._numDistricts
 
-    @numDistricts.setter
+    @ numDistricts.setter
     def numDistricts(self, value: int):
         assert value > 1
         self._numDistricts = value
 
-    @property
+    @ property
     def byindex(self):
         return self._indexaccessor
 
-    @property
+    @ property
     def byname(self):
         return self._nameaccessor
-
-    # stats
-    def _avgScore(self, score: str) -> Union[float, None]:
-        count = len(self._districts) - int(0 in self._districts)
-        if count == 0:
-            return None
-
-        return sum(d[score] for d in self._districts.values() if d.district != 0) / count
-
-    @property
-    def avgPolsbyPopper(self):
-        return self._avgScore("polsbypopper")
-
-    @property
-    def avgReock(self):
-        return self._avgScore("reock")
-
-    @property
-    def avgConvexHull(self):
-        return self._avgScore("convexhull")

@@ -53,7 +53,7 @@ class TestPlanImport:
         assert re.search('Invalid shapefile', msg)
 
     def test_import_shapefile(self, new_plan, shapefile, mocker: MockerFixture):
-        task = mocker.patch('redistricting.core.PlanImport.ImportShapeFileTask')
+        task = mocker.patch('redistricting.services.PlanImport.ImportShapeFileTask')
         add = mocker.patch.object(redistricting.services.PlanImport.QgsApplication.taskManager(), 'addTask')
         p = redistricting.services.PlanImport.ShapefileImporter()
         p.setSourceFile(shapefile)
@@ -73,7 +73,7 @@ class TestPlanImport:
         p.deleteLater()
 
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
-        task = mocker.patch('redistricting.core.PlanImport.ImportAssignmentFileTask')
+        task = mocker.patch('redistricting.services.PlanImport.ImportAssignmentFileTask')
         add = mocker.patch.object(redistricting.services.PlanImport.QgsApplication.taskManager(), 'addTask')
         p = redistricting.services.PlanImport.AssignmentImporter()
         p.setSourceFile(assignmentfile)

@@ -62,8 +62,8 @@ class BasePlanBuilder(PlanValidator):
 
     # pylint: disable=protected-access
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None):
-        instance = super().fromPlan(plan, parent)
+    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
+        instance = super().fromPlan(plan, parent, **kwargs)
         for f in instance._popFields:
             if instance._isVAP(f.field):
                 instance._vap = f

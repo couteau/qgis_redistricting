@@ -55,8 +55,8 @@ class DistrictUpdater(QObject):
         self._updateTasks: dict["RedistrictingPlan", AggregateDistrictDataTask] = {}
 
     def updateDistrictData(self, plan: "RedistrictingPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
-        for row in data.to_dict(orient="records"):
-            plan.districts[row["district"]].extend(row)
+        for district, row in data.to_dict(orient="index").items():
+            plan.districts[district].update(row)
 
     def updateStats(self, plan: "RedistrictingPlan", splitsData: dict[str, pd.DataFrame], cutEdges: int):
         plan.stats.setData(cutEdges, splitsData)
