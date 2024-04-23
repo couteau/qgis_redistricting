@@ -25,6 +25,7 @@ import pathlib
 from typing import Optional
 
 from qgis.core import (
+    QgsApplication,
     QgsProject,
     QgsVectorLayer
 )
@@ -107,8 +108,8 @@ class PlanController(BaseController):
 
     def load(self):
         self.planManager.activePlanChanged.connect(self.enableActivePlanActions)
-        self.planManager.planAdded.connect(self.addPlanToMenu)
-        self.planManager.planRemoved.connect(self.removePlanFromMenu)
+        self.planManager.planAdded.connect(self.planAdded)
+        self.planManager.planRemoved.connect(self.planRemoved)
         self.project.layersAdded.connect(self.enableNewPlan)
         self.project.layersRemoved.connect(self.enableNewPlan)
         self.project.cleared.connect(self.clearPlanMenu)
@@ -166,6 +167,16 @@ class PlanController(BaseController):
         )
         self.actionCopyPlan.setEnabled(False)
         self.menu.addAction(self.actionCopyPlan)
+
+        self.actionSaveAsNew = self.actions.createAction(
+            'actionSaveAsNew',
+            QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
+            tr('Save as new'),
+            tr('Save all unsaved districting changes to a new redistricting plan'),
+            callback=self.saveChangesAsNewPlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionSaveAsNew.setEnabled(False)
 
         self.actionImportAssignments = self.actions.createAction(
             'actionImportAssignments',
@@ -249,6 +260,14 @@ class PlanController(BaseController):
             action.triggered.disconnect(self.activatePlan)
             self.planMenu.removeAction(action)
             self.planActions.removeAction(action)
+
+    def planAdded(self, plan: RedistrictingPlan):
+        self.addPlanToMenu(plan)
+        self.updateService.watchPlan(plan)
+
+    def planRemoved(self, plan: RedistrictingPlan):
+        plan.assignmentsChanged.disconnect(self.updatePlan)
+        self.updateService.unwatchPlan(plan)
 
     # action slots
 
@@ -356,7 +375,28 @@ class PlanController(BaseController):
                 dlgCopyPlan.copyAssignments
             )
 
+    def saveChangesAsNewPlan(self):
+        if not self.checkActivePlan(self.tr('copy')):
+            return
+
+        dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
+        dlgCopyPlan.cbxCopyAssignments.hide()
+
+        if dlgCopyPlan.exec_() == QDialog.Accepted:
+            copier = PlanCopier(self.planManager.activePlan)
+            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
+                                   dlgCopyPlan.geoPackagePath, copyAssignments=True)
+            copier.copyBufferedAssignments(plan)
+            self.planManager.activePlan.assignLayer.rollBack(True)
+            self.appendPlan(plan)
+
     def importPlan(self):
+        def importComplete():
+            self.updateService.updateDistricts(
+                self.planManager.activePlan, needDemographics=True, needGeometry=True, needSplits=True
+            )
+            self.planManager.activePlan.assignLayer.triggerRepaint()
+
         if not self.checkActivePlan(tr('import')):
             return
 
@@ -374,7 +414,7 @@ class PlanController(BaseController):
             progress = self.startProgress(tr('Importing assignments...'))
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
-            importer.importComplete.connect(self.planManager.activePlan.assignLayer.triggerRepaint)
+            importer.importComplete.connect(importComplete)
             if not importer.importPlan(self.planManager.activePlan):
                 self.endProgress(progress)
 

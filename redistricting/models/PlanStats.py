@@ -178,7 +178,7 @@ class PlanStats(QObject):
         if count == 0:
             return None
 
-        return sum(values) / count
+        return sum(v for v in values if v is not None) / count
 
     @ property
     def avgPolsbyPopper(self):

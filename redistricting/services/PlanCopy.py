@@ -44,6 +44,7 @@ from qgis.utils import spatialite_connect
 
 from ..models.PlanSplits import Splits
 from ..utils import tr
+from .DistrictIO import DistrictReader
 from .ErrorList import ErrorListMixin
 from .PlanBuilder import PlanBuilder
 
@@ -107,6 +108,14 @@ class PlanCopier(ErrorListMixin, QObject):
                 split = Splits(plan, f, plan.stats)
                 split.setData(self._plan.stats.splits[f.fieldName].data.copy())
                 plan.stats.splits[f.fieldName] = split
+
+            reader = DistrictReader(
+                plan.distLayer,
+                distField=plan.distField,
+                popField=plan.popField,
+                columns=plan.districtColumns
+            )
+            reader.loadDistricts(plan)
 
             planCreated(plan)
 

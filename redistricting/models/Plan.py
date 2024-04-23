@@ -39,7 +39,6 @@ from uuid import (
 
 from qgis.core import (
     Qgis,
-    QgsFeatureRequest,
     QgsMessageLog,
     QgsProject,
     QgsVectorLayer
@@ -83,7 +82,6 @@ class RedistrictingPlan(QObject):
     districtNameChanged = pyqtSignal(QObject)  # district
     districtMembersChanged = pyqtSignal(QObject)  # district
     districtDescriptionChanged = pyqtSignal(QObject)  # district
-    assignmentsChanged = pyqtSignal("PyQt_PyObject")  # list of changed districts
     validChanged = pyqtSignal()
 
     def __init__(self, name='', numDistricts: int = None, uuid: UUID = None, parent: Optional[QObject] = None):
@@ -132,6 +130,9 @@ class RedistrictingPlan(QObject):
         self._delta = DeltaList(self, self)
 
         self._updateDistricts = set()
+
+    def __repr__(self):
+        return f"RedistrictingPlan(name={self.name}, numDistricts={self.numDistricts})"
 
     def __copy__(self):
         data = self.serialize()
@@ -451,34 +452,6 @@ class RedistrictingPlan(QObject):
                             layername=self._assignLayer.name()
                         )
                     )
-
-            self._assignLayer.beforeCommitChanges.connect(self.checkForChangedAssignments)
-            self._assignLayer.afterCommitChanges.connect(self.signalChangedAssignments)
-            self._assignLayer.afterRollBack.connect(self.clearChangedAssignments)
-
-    def checkForChangedAssignments(self):
-        dindex = self._assignLayer.fields().lookupField(self._distField)
-        if dindex == -1:
-            return
-
-        new = {}
-        changedAttrs: dict[int, dict[int, Any]] = self._assignLayer.editBuffer().changedAttributeValues()
-        for fid, attrs in changedAttrs.items():
-            for fld, value in attrs.items():
-                if fld == dindex:
-                    new[fid] = value
-
-        old = {
-            f[dindex] for f in self._assignLayer.dataProvider().getFeatures(QgsFeatureRequest(list(new.keys())))
-        }
-        self._updateDistricts = set(new.values()) | old
-
-    def clearChangedAssignments(self):
-        self._updateDistricts = set()
-
-    def signalChangedAssignments(self):
-        self.assignmentsChanged.emit(self._updateDistricts)
-        self._updateDistricts = set()
 
     @property
     def distLayer(self) -> QgsVectorLayer:

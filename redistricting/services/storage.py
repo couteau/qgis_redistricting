@@ -96,11 +96,7 @@ class ProjectStorage:
         columns.extend([s.value for s in CompactnessScores])
 
         districtReader = DistrictReader(plan.distLayer, plan.distField, plan.popField, columns)
-        for district in districtReader.readFromLayer():
-            if district.district == 0:
-                plan.districts[0].update(district[:])
-            else:
-                plan.districts.add(district)
+        districtReader.loadDistricts(plan)
 
     def writeDistricts(self, plan: RedistrictingPlan):
         columns = [plan.distField, DistrictColumns.MEMBERS, DistrictColumns.POPULATION,

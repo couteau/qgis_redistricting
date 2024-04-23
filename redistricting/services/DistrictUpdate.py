@@ -23,6 +23,7 @@
 """
 from typing import (
     TYPE_CHECKING,
+    Any,
     Iterable,
     Optional,
     Union
@@ -32,10 +33,12 @@ import geopandas as gpd
 import pandas as pd
 from qgis.core import (
     QgsApplication,
+    QgsFeatureRequest,
     QgsTask
 )
 from qgis.PyQt.QtCore import (
     QObject,
+    QSignalMapper,
     pyqtSignal
 )
 
@@ -53,6 +56,11 @@ class DistrictUpdater(QObject):
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._updateTasks: dict["RedistrictingPlan", AggregateDistrictDataTask] = {}
+        self._updateDistricts: dict["RedistrictingPlan", set[int]] = {}
+        self._beforeCommitSignals = QSignalMapper(self)
+        self._beforeCommitSignals.mappedObject.connect(self.checkForChangedAssignments)
+        self._afterCommitSignals = QSignalMapper(self)
+        self._afterCommitSignals.mappedObject.connect(self.signalChangedAssignments)
 
     def updateDistrictData(self, plan: "RedistrictingPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
         for district, row in data.to_dict(orient="index").items():
@@ -138,3 +146,37 @@ class DistrictUpdater(QObject):
             updateTask.taskTerminated.connect(self.updateTaskTerminated)
             self._updateTasks[plan] = updateTask
             QgsApplication.taskManager().addTask(updateTask)
+
+    def watchPlan(self, plan: "RedistrictingPlan"):
+        self._beforeCommitSignals.setMapping(plan.assignLayer, plan)
+        self._afterCommitSignals.setMapping(plan.assignLayer, plan)
+        plan.assignLayer.beforeCommitChanges.connect(self._beforeCommitSignals.map)
+        plan.assignLayer.afterCommitChanges.connect(self._afterCommitSignals.map)
+
+    def unwatchPlan(self, plan: "RedistrictingPlan"):
+        plan.assignLayer.beforeCommitChanges.disconnect(self._beforeCommitSignals.map)
+        plan.assignLayer.afterCommitChanges.disconnect(self._afterCommitSignals.map)
+        self._beforeCommitSignals.removeMappings(plan.assignLayer)
+        self._afterCommitSignals.removeMappings(plan.assignLayer)
+
+    def checkForChangedAssignments(self, plan: "RedistrictingPlan"):
+        dindex = plan.assignLayer.fields().lookupField(plan.distField)
+        if dindex == -1:
+            return
+
+        new = {}
+        changedAttrs: dict[int, dict[int, Any]] = plan.assignLayer.editBuffer().changedAttributeValues()
+        for fid, attrs in changedAttrs.items():
+            for fld, value in attrs.items():
+                if fld == dindex:
+                    new[fid] = value
+
+        old = {
+            f[dindex] for f in plan.assignLayer.dataProvider().getFeatures(QgsFeatureRequest(list(new.keys())))
+        }
+        self._updateDistricts[plan] = set(new.values()) | old
+
+    def signalChangedAssignments(self, plan: "RedistrictingPlan"):
+        if self._updateDistricts[plan]:
+            self.updateDistricts(plan, self._updateDistricts[plan], True, True, True)
+            del self._updateDistricts[plan]

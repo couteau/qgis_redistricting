@@ -23,8 +23,10 @@
 """
 from typing import Optional
 
-from pytest_qgis import QgsProject
-from qgis.core import QgsApplication
+from qgis.core import (
+    QgsApplication,
+    QgsProject
+)
 from qgis.gui import (
     QgisInterface,
     QgsMapMouseEvent

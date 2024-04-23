@@ -22,6 +22,8 @@
  *                                                                         *
  ***************************************************************************/
 """
+from typing import Optional
+
 from qgis.core import (
     Qgis,
     QgsApplication
@@ -53,9 +55,10 @@ class PlanExporter(ErrorListMixin, QObject):
         assignGeography: Field = None,
         includeUnassigned=False,
         includeDemographics=False,
-        includeMetrics=False
+        includeMetrics=False,
+        parent: Optional[QObject] = None
     ):
-        super().__init__(plan)
+        super().__init__(parent)
         self._plan = plan
         self.equivalencyFile = equivalencyFile
         self.shapeFile = shapeFile

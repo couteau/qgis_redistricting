@@ -55,12 +55,12 @@ from shapely.geometry import (
     Polygon
 )
 
-from redistricting.models.columns import DistrictColumns
-
+from ...models.columns import DistrictColumns
 from ...utils import (
     spatialite_connect,
     tr
 )
+from ..DistrictIO import DistrictReader
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
 
@@ -360,5 +360,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 f"VALUES ({','.join(fields.values())})"
             db.executemany(sql, data)
             db.commit()
+
+            reader = DistrictReader(self.plan.distLayer, self.distField, self.popField, self.plan.districtColumns)
+            reader.loadDistricts(self.plan)
 
         self.distLayer.reload()

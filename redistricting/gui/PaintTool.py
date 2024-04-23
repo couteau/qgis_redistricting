@@ -314,7 +314,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self.restoreCanvasPropertiesOverrides()
 
         if self._paintMode == PaintMode.PaintByGeography:
-            results: List[QgsMapToolIdentify.IdentifyResult] = \
+            results: list[QgsMapToolIdentify.IdentifyResult] = \
                 self.identify(e.x(), e.y(), [self._layer])
             if not results:
                 if self._dragging:

@@ -22,15 +22,18 @@
  *                                                                         *
  ***************************************************************************/
 """
-import os
 import pathlib
 import subprocess
+import sys
 
 # from pip import main as pipmain
 
 
 def python_executable():
-    return pathlib.Path(os.__file__).parents[2] / 'bin' / 'python'
+    if sys.platform == "win32":
+        return pathlib.Path(sys.prefix) / 'python.exe'
+
+    return pathlib.Path(sys.prefix) / 'bin' / 'python'
 
 
 def install_addon(pkg: str, *options):

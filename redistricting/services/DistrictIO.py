@@ -9,6 +9,7 @@ from qgis.PyQt.QtCore import QVariant
 from ..models import (
     District,
     DistrictColumns,
+    RedistrictingPlan,
     Unassigned
 )
 
@@ -49,6 +50,13 @@ class DistrictReader:
                 result.append(District(**data))
 
         return sorted(result, key=lambda s: s.district)
+
+    def loadDistricts(self, plan: RedistrictingPlan):
+        for district in self.readFromLayer():
+            if district.district == 0:
+                plan.districts[0].update(district)
+            else:
+                plan.districts.add(district)
 
 
 class DistrictWriter:
