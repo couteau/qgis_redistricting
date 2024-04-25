@@ -60,7 +60,7 @@ class DistrictUpdater(QObject):
         self._beforeCommitSignals = QSignalMapper(self)
         self._beforeCommitSignals.mappedObject.connect(self.checkForChangedAssignments)
         self._afterCommitSignals = QSignalMapper(self)
-        self._afterCommitSignals.mappedObject.connect(self.signalChangedAssignments)
+        self._afterCommitSignals.mappedObject.connect(self.startUpdateDistricts)
 
     def updateDistrictData(self, plan: "RedistrictingPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
         for district, row in data.to_dict(orient="index").items():
@@ -148,16 +148,18 @@ class DistrictUpdater(QObject):
             QgsApplication.taskManager().addTask(updateTask)
 
     def watchPlan(self, plan: "RedistrictingPlan"):
-        self._beforeCommitSignals.setMapping(plan.assignLayer, plan)
-        self._afterCommitSignals.setMapping(plan.assignLayer, plan)
-        plan.assignLayer.beforeCommitChanges.connect(self._beforeCommitSignals.map)
-        plan.assignLayer.afterCommitChanges.connect(self._afterCommitSignals.map)
+        if plan.assignLayer:
+            self._beforeCommitSignals.setMapping(plan.assignLayer, plan)
+            self._afterCommitSignals.setMapping(plan.assignLayer, plan)
+            plan.assignLayer.beforeCommitChanges.connect(self._beforeCommitSignals.map)
+            plan.assignLayer.afterCommitChanges.connect(self._afterCommitSignals.map)
 
     def unwatchPlan(self, plan: "RedistrictingPlan"):
-        plan.assignLayer.beforeCommitChanges.disconnect(self._beforeCommitSignals.map)
-        plan.assignLayer.afterCommitChanges.disconnect(self._afterCommitSignals.map)
-        self._beforeCommitSignals.removeMappings(plan.assignLayer)
-        self._afterCommitSignals.removeMappings(plan.assignLayer)
+        if plan.assignLayer:
+            plan.assignLayer.beforeCommitChanges.disconnect(self._beforeCommitSignals.map)
+            plan.assignLayer.afterCommitChanges.disconnect(self._afterCommitSignals.map)
+            self._beforeCommitSignals.removeMappings(plan.assignLayer)
+            self._afterCommitSignals.removeMappings(plan.assignLayer)
 
     def checkForChangedAssignments(self, plan: "RedistrictingPlan"):
         dindex = plan.assignLayer.fields().lookupField(plan.distField)
@@ -176,7 +178,7 @@ class DistrictUpdater(QObject):
         }
         self._updateDistricts[plan] = set(new.values()) | old
 
-    def signalChangedAssignments(self, plan: "RedistrictingPlan"):
+    def startUpdateDistricts(self, plan: "RedistrictingPlan"):
         if self._updateDistricts[plan]:
             self.updateDistricts(plan, self._updateDistricts[plan], True, True, True)
             del self._updateDistricts[plan]

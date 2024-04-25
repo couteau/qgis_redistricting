@@ -110,6 +110,9 @@ class DistrictController(BaseController):
         self.dockwidget.plan = plan
 
     def addCanvasContextMenuItems(self, menu: QMenu, event: QgsMapMouseEvent):
+        if self.planManager.activePlan is None:
+            return
+
         menu.addAction(self.actionCopyDistrict)
         self.actionCopyDistrict.setEnabled(self.districtCopier.canCopyAssignments(self.actionCopyDistrict, event))
 

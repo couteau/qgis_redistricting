@@ -22,6 +22,9 @@ class DistrictReader:
             popField=DistrictColumns.POPULATION,
             columns: list[str] = None
     ):
+        if distLayer is None:
+            raise ValueError("DistLayer is required to create DistrictReader")
+
         self._distLayer = distLayer
         self._distField = distField
         self._popField = popField
@@ -60,7 +63,15 @@ class DistrictReader:
 
 
 class DistrictWriter:
-    def __init__(self, distLayer: QgsVectorLayer, distField=DistrictColumns, popField=DistrictColumns.POPULATION, columns: list[str] = None):
+    def __init__(
+            self,
+            distLayer: QgsVectorLayer,
+            distField=DistrictColumns,
+            popField=DistrictColumns.POPULATION,
+            columns: list[str] = None
+    ):
+        if distLayer is None:
+            raise ValueError("DistLayer is required to create DistrictReader")
         self._layer = distLayer
         self._distField = distField
         self._popField = popField

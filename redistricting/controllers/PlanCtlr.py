@@ -266,7 +266,7 @@ class PlanController(BaseController):
         self.updateService.watchPlan(plan)
 
     def planRemoved(self, plan: RedistrictingPlan):
-        plan.assignmentsChanged.disconnect(self.updatePlan)
+        self.planRemoved(plan)
         self.updateService.unwatchPlan(plan)
 
     # action slots
@@ -386,9 +386,9 @@ class PlanController(BaseController):
             copier = PlanCopier(self.planManager.activePlan)
             plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                                    dlgCopyPlan.geoPackagePath, copyAssignments=True)
-            copier.copyBufferedAssignments(plan)
             self.planManager.activePlan.assignLayer.rollBack(True)
             self.appendPlan(plan)
+            copier.copyBufferedAssignments(plan)
 
     def importPlan(self):
         def importComplete():

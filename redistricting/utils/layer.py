@@ -156,13 +156,17 @@ class LayerReader(SqlAccess):
                 divisions = 10
                 lastchunk = 0
 
-            chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)]
-            if lastchunk:
-                chunks += [slice(fc-lastchunk, fc)]
+            if chunksize != -1:
+                chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)]
+                if lastchunk:
+                    chunks += [slice(fc-lastchunk, fc)]
 
-            df = pd.concat(
-                self.iterateWithProgress((gpd.read_file(source, rows=s, **kwargs) for s in chunks), len(chunks))
-            )
+                df = pd.concat(
+                    self.iterateWithProgress((gpd.read_file(source, rows=s, **kwargs) for s in chunks), len(chunks))
+                )
+            else:
+                df = gpd.read_file(source, **kwargs)
+
             if filt:
                 for f, v in filt.items():
                     df = df[df[f] == v]

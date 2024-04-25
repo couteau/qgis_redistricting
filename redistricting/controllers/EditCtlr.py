@@ -209,8 +209,9 @@ class EditAssignmentsController(BaseController):
         self.actionEditSourceDistrict.setEnabled(False)
 
     def connectPlanSignals(self, plan: RedistrictingPlan):
-        plan.assignLayer.editingStarted.connect(self.editingStarted)
-        plan.assignLayer.editingStopped.connect(self.editingStopped)
+        if plan.assignLayer:
+            plan.assignLayer.editingStarted.connect(self.editingStarted)
+            plan.assignLayer.editingStopped.connect(self.editingStopped)
         plan.districtAdded.connect(self.updateCreateDistrictActionEnabled)
         plan.districtRemoved.connect(self.updateCreateDistrictActionEnabled)
 

@@ -67,6 +67,7 @@ class LayerTreeManager(QObject):
         if not plan.isValid():
             raise ValueError(tr("Cannot add incomplete plan to layer tree"))
 
+        QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
         group = QgsLayerTreeGroup(plan.name)
         group.setCustomProperty('redistricting-plan-id', str(plan.id))
         group.addLayer(plan.assignLayer)

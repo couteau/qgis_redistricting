@@ -83,6 +83,9 @@ class ProjectStorage:
         self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
     def readDistricts(self, plan: RedistrictingPlan):
+        if plan.distLayer is None:
+            return
+
         columns = [plan.distField, DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
                    DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
                    "description"]
@@ -107,8 +110,9 @@ class ProjectStorage:
         for f in plan.dataFields:
             columns.append(f.fieldName)
         columns.extend([s.value for s in CompactnessScores])
-        writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
-        writer.writeToLayer(plan.districts)
+        if plan.distLayer:
+            writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
+            writer.writeToLayer(plan.districts)
 
     def writeRedistrictingPlans(self, plans: Iterable[RedistrictingPlan]):
         l: List[str] = []
