@@ -32,7 +32,8 @@ from uuid import (
 
 from qgis.core import (
     QgsLayerTreeGroup,
-    QgsProject
+    QgsProject,
+    QgsVectorLayer
 )
 from qgis.PyQt.QtCore import QObject
 
@@ -81,7 +82,10 @@ class LayerTreeManager(QObject):
             self.planRoot.removeChildNode(group)
 
     def planGroups(self) -> list[QgsLayerTreeGroup]:
-        return [g for g in self.planRoot.findGroups(False) if g.customProperty('redistricting-plan-id', None) is not None]
+        return [
+            g for g in self.planRoot.findGroups(False)
+            if g.customProperty('redistricting-plan-id', None) is not None
+        ]
 
     def getGroupForPlan(self, plan: "RedistrictingPlan"):
         if plan.id:
@@ -107,7 +111,7 @@ class LayerTreeManager(QObject):
         groups.remove(group)
         groups.insert(0, group)
 
-        plan_layers = [l.layer() for g in groups for l in g.findLayers()]
+        plan_layers: list[QgsVectorLayer] = [l.layer() for g in groups for l in g.findLayers()]
 
         self.root.setHasCustomLayerOrder(False)
         order = self.root.layerOrder()
@@ -119,6 +123,7 @@ class LayerTreeManager(QObject):
                 if not plans_added:
                     new_order.extend(plan_layers)
                     plans_added = True
+                layer.setLabelsEnabled(layer in (plan.distLayer, plan.assignLayer))
                 continue
 
             new_order.append(layer)

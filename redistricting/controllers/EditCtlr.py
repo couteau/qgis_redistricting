@@ -21,9 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional
+from typing import (
+    Iterable,
+    Optional
+)
 
-from qgis.core import QgsApplication
+from qgis.core import (
+    QgsApplication,
+    QgsFeature,
+    QgsVectorLayer
+)
 from qgis.gui import Qgis
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import (
@@ -67,9 +74,16 @@ class EditAssignmentsController(BaseController):
         self.dockwidget: DockRedistrictingToolbox = None
         self.actionToggle: QAction = None
 
-        self.mapTool = PaintDistrictsTool(self.canvas, self.assignmentsService)
+        self.mapTool = PaintDistrictsTool(self.canvas)
         self.sourceDistrict: District = None
         self.targetDistrict: District = None
+        self.geoField: str = None
+
+        self.mapTool.paintingStarted.connect(self.startPaintingFeatures)
+        self.mapTool.paintFatures.connect(self.paintFeatures)
+        self.mapTool.paintingComplete.connect(self.endPaintingFeatures)
+        self.mapTool.paintingCanceled.connect(self.endPaintingFeatures)
+        self.mapTool.selectFeatures.connect(self.selectFeatures)
 
         self.actionStartPaintDistricts = self.actions.createAction(
             'actionStartPaintDistricts',
@@ -164,7 +178,7 @@ class EditAssignmentsController(BaseController):
         """Create the dockwidget with tools for painting districts."""
         dockwidget = DockRedistrictingToolbox(None)
 
-        dockwidget.geoFieldChanged.connect(self.mapTool.setGeoField)
+        dockwidget.geoFieldChanged.connect(self.setGeoField)
         dockwidget.sourceChanged.connect(self.sourceDistrictChanged)
         dockwidget.targetChanged.connect(self.targetDistrictChanged)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
@@ -203,7 +217,7 @@ class EditAssignmentsController(BaseController):
         self.actionPaintRectangle.setEnabled(plan is not None)
         self.actionSelectByGeography.setEnabled(plan is not None)
         self.actionCreateDistrict.setEnabled(
-            plan.allocatedDistricts < plan.numDistricts
+            plan is not None and plan.allocatedDistricts < plan.numDistricts
         )
         self.actionEditTargetDistrict.setEnabled(False)
         self.actionEditSourceDistrict.setEnabled(False)
@@ -335,8 +349,53 @@ class EditAssignmentsController(BaseController):
             return
 
         self.mapTool.paintMode = mode
-        # if self.mapTool.targetDistrict() is None:
-        #    target = self.createDistrict()
-        #    self.mapTool.setTargetDistrict(target)
-        if self.mapTool.canActivate():
+        if self.planManager.activePlan is not None and self.targetDistrict is not None and self.geoField:
             self.canvas.setMapTool(self.mapTool)
+
+    def setGeoField(self, value):
+        if value and self.planManager.activePlan is not None and \
+                value != self.planManager.activePlan.geoIdField and \
+                value not in self.planManager.activePlan.geoFields:
+            raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
+        self.geoField = value
+
+    def startPaintingFeatures(self, target, source):
+        editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+        if source is not None:
+            msg = tr('Assign features to district %d from %d') % (target, source)
+        else:
+            msg = tr('Assign features to district %d') % target
+        editor.startEditCommand(msg)
+
+    def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: int, endEdit: bool):
+        editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+        if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
+            values = {str(feature.attribute(self.geoField)) for feature in features}
+            features = editor.getDistFeatures(
+                self.geoField, values, target, source)
+
+        editor.assignFeaturesToDistrict(features, target, source, self.planManager.activePlan.assignLayer.isEditable())
+        if endEdit:
+            editor.endEditCommand()
+
+    def endPaintingFeatures(self):
+        editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+        editor.endEditCommand()
+
+    def cancelPaintingFeaturees(self):
+        editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+        editor.cancelEditCommand()
+
+    def selectFeatures(
+        self,
+        features: Iterable[QgsFeature],
+        target: int,
+        source: int,
+        behavior: QgsVectorLayer.SelectBehavior
+    ):
+        if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
+            editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+            values = {str(feature.attribute(self.geoField)) for feature in features}
+            features = editor.getDistFeatures(self.geoField, values, target, source)
+
+        self.planManager.activePlan.assignLayer.selectByIds([f.id() for f in features], behavior)

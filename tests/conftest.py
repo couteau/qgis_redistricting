@@ -11,6 +11,7 @@ from qgis.core import (
     QgsProject,
     QgsVectorLayer
 )
+from qgis.PyQt.QtCore import pyqtBoundSignal
 
 from redistricting.models.DistrictList import DistrictList
 from redistricting.models.FieldList import FieldList
@@ -180,6 +181,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
 
 @pytest.fixture
 def mock_plan(mocker: MockerFixture):
+    mocker.patch('redistricting.models.Plan.pyqtSignal', spec=pyqtBoundSignal)
     plan = mocker.create_autospec(
         spec=RedistrictingPlan('mock_plan', 5, uuid4()),
         spec_set=True
@@ -198,6 +200,8 @@ def mock_plan(mocker: MockerFixture):
     type(plan).popField = mocker.PropertyMock(return_value='pop_total')
     type(plan).numDistricts = mocker.PropertyMock(return_value=5)
     type(plan).numSeats = mocker.PropertyMock(return_value=5)
+    type(plan).allocatedDistricts = mocker.PropertyMock(return_value=5)
+    type(plan).allocatedSeats = mocker.PropertyMock(return_value=5)
 
     districts = mocker.create_autospec(spec=DistrictList(), spec_set=True, instance=True)
     type(plan).districts = mocker.PropertyMock(return_value=districts)
@@ -210,6 +214,17 @@ def mock_plan(mocker: MockerFixture):
 
     geo_fields = mocker.create_autospec(spec=FieldList, spec_set=True, instance=True)
     type(plan).geoFields = mocker.PropertyMock(return_value=geo_fields)
+
+    plan.assignLayer.isEditable.return_value = False
+    plan.assignLayer.editingStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.editingStopped = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.afterRollBack = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.afterCommitChanges = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeRollBack = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeCommitChanges = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeEditingStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.allowCommitChanged = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.selectionChanged = mocker.create_autospec(spec=pyqtBoundSignal)
 
     return plan
 

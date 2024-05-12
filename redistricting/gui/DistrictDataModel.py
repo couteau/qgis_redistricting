@@ -192,7 +192,7 @@ class DistrictDataModel(QAbstractTableModel):
                 elif key == 'pct_deviation':
                     value = f'{value:+.2%}'
                 elif key in {'polsbypopper', 'reock', 'convexhull'}:
-                    value = f'{value:.3}'
+                    value = f'{value:0.3}'
                 elif key[:3] == 'pct':
                     value = f'{value:.2%}'
                 elif isinstance(value, (int, np.integer)):

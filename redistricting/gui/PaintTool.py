@@ -42,7 +42,8 @@ from qgis.gui import (
 )
 from qgis.PyQt.QtCore import (
     QRect,
-    Qt
+    Qt,
+    pyqtSignal
 )
 from qgis.PyQt.QtGui import (
     QColor,
@@ -51,9 +52,7 @@ from qgis.PyQt.QtGui import (
     QPixmap
 )
 
-from ..models import RedistrictingPlan
-from ..services import AssignmentsService
-from ..utils import tr
+from redistricting.models.Plan import RedistrictingPlan
 
 
 class PaintMode(IntEnum):
@@ -63,6 +62,12 @@ class PaintMode(IntEnum):
 
 
 class PaintDistrictsTool(QgsMapToolIdentify):
+    paintingStarted = pyqtSignal(int, int)
+    paintFatures = pyqtSignal("PyQt_PyObject", int, int, bool)
+    paintingComplete = pyqtSignal()
+    paintingCanceled = pyqtSignal()
+    selectFeatures = pyqtSignal("PyQt_PyObject", int, int, "PyQt_PyObject")
+
     PAINT_CURSOR = [
         # columns rows colors chars-per-pixel
         "16 16 3 1 ",
@@ -180,47 +185,34 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
     MinPixelZoom = 20
 
-    def __init__(self, canvas: QgsMapCanvas, assignmentsService: AssignmentsService):
+    def __init__(self, canvas: QgsMapCanvas):
         super().__init__(canvas)
-        self._plan = None
-        self._geoField = None
-        self._distTarget = None
-        self._distSource = None
-        self.inTransaction = False
+        self._distTarget: int = None
+        self._distSource: int = None
 
         pixmap = QPixmap(PaintDistrictsTool.PAINT_CURSOR24)
         self.setCursor(QCursor(
             pixmap, 2, 23)
         )
 
-        self._paintMode = PaintMode.PaintByGeography
+        self._paintMode: PaintMode = PaintMode.PaintByGeography
         self._selectRect = QRect(0, 0, 0, 0)
         self._dragging = False
         self._rubberBand = None
+        self._plan = None
+        self._layer = None
 
         self.buttonsPressed = Qt.NoButton
 
-        self._assignmentsService = assignmentsService
-
-    @ property
+    @property
     def plan(self):
         return self._plan
 
-    @ plan.setter
+    @plan.setter
     def plan(self, value: RedistrictingPlan):
         if self._plan != value:
-            if self._plan is not None and self._assignmentsService.isEditing(self._plan):
-                self._assignmentsService.endEditing(self._plan)
-
-            self.canvas().unsetMapTool(self)
             self._plan = value
             self._layer = self._plan.assignLayer if self._plan is not None else None
-            if self._layer:
-                self.inTransaction = self._layer.isEditable()
-
-            self._assignmentEditor = None
-            if self._plan and self._plan.geoFields and self._geoField not in self._plan.geoFields:
-                self._geoField = None
             self._distTarget = None
             self._distSource = None
 
@@ -243,27 +235,15 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._distTarget = value
 
     @property
-    def geoField(self):
-        return self._geoField
-
-    @property
-    def paintMode(self):
+    def paintMode(self) -> PaintMode:
         return self._paintMode
 
     @paintMode.setter
-    def paintMode(self, value):
+    def paintMode(self, value: PaintMode):
         self._paintMode = value
 
     def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit=True):
-        if self._geoField is not None and self._geoField != self._plan.geoIdField:
-            values = {str(feature.attribute(self._geoField)) for feature in features}
-            features = self._assignmentEditor.getDistFeatures(
-                self._geoField, values, target, source)
-
-        self._assignmentEditor.assignFeaturesToDistrict(features, target, source, self.inTransaction)
-        self.inTransaction = True
-        if endEdit:
-            self._assignmentEditor.endEditCommand()
+        self.paintFatures.emit(features, target, source, endEdit)
 
     def _selectFeatures(
         self,
@@ -272,12 +252,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         source,
         behavior: QgsVectorLayer.SelectBehavior = QgsVectorLayer.SetSelection,
     ):
-        if self.geoField is not None and self._geoField != self._plan.geoIdField:
-            values = {str(feature.attribute(self._geoField)) for feature in features}
-            features = self._assignmentEditor.getDistFeatures(
-                self._geoField, values, target, source)
-
-        self._layer.selectByIds([f.id() for f in features], behavior)
+        self.selectFeatures.emit(features, target, source, behavior)
 
     def canvasPressEvent(self, e: QgsMapMouseEvent):
         self.buttonsPressed = e.buttons()
@@ -290,10 +265,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._paintMode == PaintMode.PaintByGeography:
             r = self.searchRadiusMU(self.canvas())
             self.setCanvasPropertiesOverrides(r/4)
-            self._assignmentEditor.startEditCommand(
-                tr('Assign features to district {}').format(
-                    str(self.targetDistrict(self.buttonsPressed))
-                )
+            self.paintingStarted.emit(
+                self.targetDistrict(self.buttonsPressed),
+                self.sourceDistrict(self.buttonsPressed)
             )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             self._selectRect.setRect(e.x(), e.y(), e.x()+1, e.y()+1)
@@ -319,9 +293,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             if not results:
                 if self._dragging:
                     self._dragging = False
-                    self._assignmentEditor.endEditCommand()
+                    self.paintingComplete.emit()
                 else:
-                    self._assignmentEditor.cancelEditCommand()
+                    self.paintingCanceled.emit()
                 return
 
             self._paintFeatures(
@@ -402,23 +376,3 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     def keyPressEvent(self, e: QKeyEvent):
         if e.key() == Qt.Key_Escape:
             self.canvas().unsetMapTool(self)
-
-    def canActivate(self):
-        return self._layer is not None and \
-            self._distTarget is not None
-
-    def activate(self):
-        self._assignmentEditor = self._assignmentsService.startEditing(self._plan)
-        return super().activate()
-
-    def deactivate(self):
-        self._assignmentsService.endEditing(self._plan)
-        self._assignmentEditor = None
-        return super().deactivate()
-
-    def setGeoField(self, value):
-        if value and self._plan is not None and \
-                value != self._plan.geoIdField and \
-                self._plan.geoFields and value not in self._plan.geoFields:
-            raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
-        self._geoField = value

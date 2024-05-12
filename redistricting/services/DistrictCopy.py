@@ -1,3 +1,4 @@
+
 import io
 from typing import Optional
 from uuid import UUID
@@ -15,6 +16,7 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtWidgets import QAction
 
+from ..models import RedistrictingPlan
 from ..utils import (
     LayerReader,
     tr
@@ -36,7 +38,7 @@ class DistrictCopier(QObject):
         self.actionCopyDistrict = actions.createAction(
             name='actionCopyDistrict',
             icon=':/plugins/redistricting/copydistrict.svg',
-            text=str('Copy district'),
+            text=str('Copy District'),
             tooltip=tr('Copy district to clipboard'),
             callback=self.copyDistrict,
             parent=iface.mainWindow()
@@ -45,7 +47,7 @@ class DistrictCopier(QObject):
         self.actionPasteDistrict = actions.createAction(
             name='actionPasteDistrict',
             icon=QgsApplication.getThemeIcon('/mActionDuplicateFeature.svg'),
-            text=tr('Paste district'),
+            text=tr('Paste District'),
             tooltip=tr('Paste district from clipboard'),
             callback=self.pasteDistrict,
             parent=iface.mainWindow()
@@ -78,8 +80,11 @@ class DistrictCopier(QObject):
 
         return False
 
-    def canPasteAssignments(self, plan):
-        if self.planManager.activePlan is not None:
+    def canPasteAssignments(self, plan: RedistrictingPlan):
+        if plan is None:
+            plan = self.planManager.activePlan
+
+        if plan is not None:
             cb = QgsApplication.instance().clipboard()
             if cb.mimeData().hasFormat('application/x-redist-planid') and cb.mimeData().hasFormat('application/x-redist-assignments'):
                 planid = UUID(bytes=cb.mimeData().data('application/x-redist-planid').data())
@@ -102,7 +107,7 @@ class DistrictCopier(QObject):
         ).to_csv()
 
     def copyDistrict(self, dist: Optional[int] = None):
-        if dist is None:
+        if dist is None or isinstance(dist, bool):
             action = self.sender()
             if isinstance(action, QAction):
                 dist = action.data()
@@ -125,11 +130,16 @@ class DistrictCopier(QObject):
         assignments = pd.read_csv(io.StringIO(cb.mimeData().text()), index_col="fid")
 
         if not assignments.empty:
-            assign = self.assignmentsService.startEditing(self.planManager.activePlan)
+            groups = assignments.groupby(self.planManager.activePlan.distField).groups
+
+            assign = self.assignmentsService.getEditor(self.planManager.activePlan)
             assign.startEditCommand(tr('Paste district'))
-            assign.changeAssignments(
-                assignments.groupby(self.planManager.activePlan.distField).groups
-            )
+
+            # clear the current assignments for any districts that are being pasted
+            for d in groups.keys():
+                assign.reassignDistrict(d, 0)
+
+            assign.changeAssignments(groups)
             assign.endEditCommand()
 
     def zoomToDistrict(self, district: Optional[int]):

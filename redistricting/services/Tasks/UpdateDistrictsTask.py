@@ -134,6 +134,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.data: pd.DataFrame
         self.splits = {}
         self.cutEdges = None
+        self.contiguous = None
 
     def calcCutEdges(self, df: gpd.GeoDataFrame, distField) -> Union[int, None]:
         try:
@@ -256,7 +257,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 g_geom = assign[[self.distField, "geometry"]].groupby(self.distField)
                 total = len(g_geom)
                 count = 0
-                geoms = {}
+                geoms: dict[int, shapely.MultiPolygon] = {}
                 pool = QThreadPool()
                 tasks: list[DissolveWorker] = []
                 for g, v in g_geom["geometry"]:
@@ -272,8 +273,10 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 pool.waitForDone()
                 geoms |= {t.dist: t.merged for t in tasks}
+                contig = {t.dist: len(t.merged.geoms) == 1 for t in tasks}
 
                 data["geometry"] = pd.Series(geoms)
+                self.contiguous = pd.Series(contig)
                 data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
 
                 self.calcDistrictMetrics(data)
@@ -312,8 +315,12 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 ideal = round(self.totalPopulation / self.numSeats)
                 deviation = self.data[DistrictColumns.POPULATION].sub(members * ideal)
                 pct_dev = deviation.div(members * ideal)
-                df = pd.DataFrame({DistrictColumns.NAME.value: name, DistrictColumns.MEMBERS.value: members,
-                                  DistrictColumns.DEVIATION.value: deviation, DistrictColumns.PCT_DEVIATION.value: pct_dev})
+                df = pd.DataFrame(
+                    {DistrictColumns.NAME.value: name,
+                     DistrictColumns.MEMBERS.value: members,
+                     DistrictColumns.DEVIATION.value: deviation,
+                     DistrictColumns.PCT_DEVIATION.value: pct_dev}
+                )
                 # for f in self.dataFields:
                 #     if f.pctbase and f.pctbase in self.data.columns:
                 #         self.data[f'pct_{f.fieldName}'] = (self.data[f.fieldName] / self.data[f.pctbase]).fillna(0)

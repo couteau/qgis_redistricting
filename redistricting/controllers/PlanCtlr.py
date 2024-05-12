@@ -119,8 +119,8 @@ class PlanController(BaseController):
 
     def unload(self):
         self.planManager.activePlanChanged.disconnect(self.enableActivePlanActions)
-        self.planManager.planAdded.disconnect(self.addPlanToMenu)
-        self.planManager.planRemoved.disconnect(self.removePlanFromMenu)
+        self.planManager.planAdded.disconnect(self.planAdded)
+        self.planManager.planRemoved.disconnect(self.planRemoved)
         self.project.layersAdded.disconnect(self.enableNewPlan)
         self.project.layersRemoved.disconnect(self.enableNewPlan)
         self.project.cleared.disconnect(self.clearPlanMenu)
@@ -386,9 +386,11 @@ class PlanController(BaseController):
             copier = PlanCopier(self.planManager.activePlan)
             plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                                    dlgCopyPlan.geoPackagePath, copyAssignments=True)
-            self.planManager.activePlan.assignLayer.rollBack(True)
-            self.appendPlan(plan)
+
+            self.appendPlan(plan, False)
             copier.copyBufferedAssignments(plan)
+            self.planManager.activePlan.assignLayer.rollBack(True)
+            self.planManager.setActivePlan(plan)
 
     def importPlan(self):
         def importComplete():
@@ -422,7 +424,7 @@ class PlanController(BaseController):
         if not self.checkActivePlan(self.tr('import')):
             return
 
-        dlgImportPlan = DlgImportShape(self.planManager.activePlan, self.iface.mainWindow())
+        dlgImportPlan = DlgImportShape(self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
             importer = ShapefileImporter(self.iface) \
                 .setSourceFile(dlgImportPlan.shapefileFileName) \
@@ -503,10 +505,10 @@ class PlanController(BaseController):
 
     # helper methods
 
-    def appendPlan(self, plan: RedistrictingPlan):
+    def appendPlan(self, plan: RedistrictingPlan, makeActive=True):
         self.styler.stylePlan(plan)
         self.layerTreeManager.createGroup(plan)
-        self.planManager.appendPlan(plan)
+        self.planManager.appendPlan(plan, makeActive)
         self.project.setDirty()
 
     def buildPlan(self, builder: PlanBuilder, importer: Optional[AssignmentImporter] = None):

@@ -42,6 +42,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import (
     QObject,
+    QSignalMapper,
     QVariant,
     pyqtSignal
 )
@@ -98,6 +99,21 @@ class PlanAssignmentEditor(QObject):
 
     def cancelEditCommand(self):
         self._assignLayer.destroyEditCommand()
+
+    def reassignDistrict(self, district: int, newDistrict: int = 0):
+        context = QgsExpressionContext()
+        context.appendScopes(
+            QgsExpressionContextUtils.globalProjectLayerScopes(self._assignLayer))
+        request = QgsFeatureRequest()
+        request.setExpressionContext(context)
+        request.setFilterExpression(f"{self._distField} = {district}")
+        request.setFlags(QgsFeatureRequest.NoGeometry)
+        request.setSubsetOfAttributes([self._distField], self._assignLayer.fields())
+        findex = self._assignLayer.fields().indexFromName(self._distField)
+
+        f: QgsFeature
+        for f in self._assignLayer.getFeatures(request):
+            self._assignLayer.changeAttributeValue(f.id(), findex, newDistrict, district)
 
     def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
         self._clearError()
@@ -185,21 +201,33 @@ class AssignmentsService(QObject):
         super().__init__(parent)
         self._editors: dict[RedistrictingPlan, PlanAssignmentEditor] = {}
         self._updateService = updateService
+        self._endEditSignals = QSignalMapper(self)
+        self._endEditSignals.mappedObject.connect(self.endEditing)
 
     def isEditing(self, plan: RedistrictingPlan) -> bool:
         return plan in self._editors
+
+    def getEditor(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
+        return self.startEditing(plan)
 
     def startEditing(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
         if plan not in self._editors:
             self._editors[plan] = PlanAssignmentEditor(plan)
             self._editors[plan].assignmentsChanged.connect(self.assignmentsChanged)
             self._updateService.watchPlan(plan)
+            self._endEditSignals.setMapping(plan.assignLayer, plan)
+            plan.assignLayer.afterCommitChanges.connect(self._endEditSignals.map)
+            plan.assignLayer.afterRollBack.connect(self._endEditSignals.map)
 
-        self.editingStarted.emit(plan)
+            self.editingStarted.emit(plan)
+
         return self._editors[plan]
 
     def endEditing(self, plan: RedistrictingPlan):
         if plan in self._editors:
             del self._editors[plan]
-            self.editingStopped.emit(plan)
             self._updateService.unwatchPlan(plan)
+            plan.assignLayer.afterCommitChanges.disconnect(self._endEditSignals.map)
+            plan.assignLayer.afterRollBack.disconnect(self._endEditSignals.map)
+            self._endEditSignals.removeMappings(plan.assignLayer)
+            self.editingStopped.emit(plan)
