@@ -45,8 +45,8 @@ from qgis.PyQt.QtCore import QVariant
 
 from ...exception import CanceledError
 from ...models import (
-    CompactnessScores,
-    DistrictColumns
+    DistrictColumns,
+    StatsColumns
 )
 from ...utils import (
     SqlAccess,
@@ -224,9 +224,9 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             sql += f'{f.fieldName} {tp},'
             fieldNames.add(f.fieldName)
 
-        sql += f'{CompactnessScores.POLSBYPOPPER} REAL,' \
-            f'{CompactnessScores.REOCK} REAL,' \
-            f'{CompactnessScores.CONVEXHULL} REAL)'
+        sql += f'{StatsColumns.POLSBYPOPPER} REAL,' \
+            f'{StatsColumns.REOCK} REAL,' \
+            f'{StatsColumns.CONVEXHULL} REAL)'
 
         success, error = createGpkgTable(self.path, 'districts', sql, srid=self.srid)
         if success:

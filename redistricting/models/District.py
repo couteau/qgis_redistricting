@@ -36,7 +36,10 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .columns import DistrictColumns
+from .columns import (
+    DistrictColumns,
+    StatsColumns
+)
 
 
 class District(QObject):
@@ -48,7 +51,12 @@ class District(QObject):
         DistrictColumns.DEVIATION,
         DistrictColumns.PCT_DEVIATION,
     ]
-    SCORE_COLUMNS = ['polsbypopper', 'reock', 'convexhull']
+    STATS_COLUMNS = [
+        StatsColumns.POLSBYPOPPER,
+        StatsColumns.REOCK,
+        StatsColumns.CONVEXHULL,
+        StatsColumns.PIECES
+    ]
     WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
                            DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
 
@@ -183,8 +191,8 @@ class District(QObject):
 
     def extend(self, columns: Iterable[str]):
         data = self._data
-        addcols = [c for c in columns if c not in District.BASE_COLUMNS and c not in District.SCORE_COLUMNS]
-        self._data = dict.fromkeys(District.BASE_COLUMNS + addcols + District.SCORE_COLUMNS)
+        addcols = [c for c in columns if c not in District.BASE_COLUMNS and c not in District.STATS_COLUMNS]
+        self._data = dict.fromkeys(District.BASE_COLUMNS + addcols + District.STATS_COLUMNS)
         self._data.update(data)
 
     @overload
@@ -199,8 +207,8 @@ class District(QObject):
         if isinstance(data, District):
             data = data[:]
 
-        newkeys = [k for k in data.keys() if k not in District.BASE_COLUMNS + District.SCORE_COLUMNS]
-        self._data = dict.fromkeys(District.BASE_COLUMNS + newkeys + District.SCORE_COLUMNS) | self._data | data
+        newkeys = [k for k in data.keys() if k not in District.BASE_COLUMNS + District.STATS_COLUMNS]
+        self._data = dict.fromkeys(District.BASE_COLUMNS + newkeys + District.STATS_COLUMNS) | self._data | data
 
 
 class Unassigned(District):

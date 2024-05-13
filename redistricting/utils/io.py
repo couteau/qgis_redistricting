@@ -38,6 +38,8 @@ from shapely import wkb
 
 from .gpkg import spatialite_connect
 
+pd.options.mode.copy_on_write = "warn"
+
 DEC2FLOAT = psycopg2.extensions.new_type(
     psycopg2.extensions.DECIMAL.values,
     'DEC2FLOAT',

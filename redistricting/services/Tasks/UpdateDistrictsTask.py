@@ -42,6 +42,7 @@ from qgis.core import (
     QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
+    QgsFeature,
     QgsFeatureRequest,
     QgsGeometry
 )
@@ -131,10 +132,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.includeDemographics = includeDemographics
         self.includeSplits = includSplits
 
-        self.data: pd.DataFrame
+        self.data: Union[pd.DataFrame, gpd.GeoDataFrame]
         self.splits = {}
         self.cutEdges = None
-        self.contiguous = None
 
     def calcCutEdges(self, df: gpd.GeoDataFrame, distField) -> Union[int, None]:
         try:
@@ -173,6 +173,34 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
+    def calcFracks(self, field: 'GeoField', splitpop: pd.DataFrame):
+        if not isinstance(self.data, gpd.GeoDataFrame):
+            return
+
+        ref = field.layer.referencingRelations(field.index)[0]
+        geog_layer = ref.referencedLayer()
+        geog_join_field = ref.resolveReferencedField(field.field)
+
+        ctx = QgsExpressionContext()
+        ctx.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(geog_layer))
+
+        expr = QgsExpression(
+            f"""{geog_join_field} in ({','.join(f"'{i}'" for i in  splitpop.index.get_level_values(0).unique())})"""
+        )
+
+        request = QgsFeatureRequest(expr, ctx)
+
+        fracks = {}
+
+        f: QgsFeature
+        for f in geog_layer.getFeatures(request):
+            geom = shapely.from_wkb(f.geometry().asWkb())
+            i: gpd.GeoSeries
+            i = self.data.intersection(geom)
+            fracks[f[geog_join_field]] = i.apply(lambda g: len(g.geoms)).sum()
+
+        return fracks
+
     def calcSplits(self, data: pd.DataFrame, cols: list[str]):
         total = len(self.geoFields) + 1
         self.splits = {}
@@ -186,13 +214,15 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             if field.nameField and field.index and field.layer.referencingRelations(field.index):
                 names = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
-                splitpop = splitpop\
+                splitpop = splitpop \
                     .reset_index(level=1) \
                     .join(names) \
                     .set_index('district', append=True) \
                     .sort_values(by="__name")
             else:
                 splitpop = splitpop.sort_index()
+
+            # fracks = self.calcFracks(field, splitpop)
 
             self.splits[field.fieldName] = splitpop
             self.updateProgress(total, len(self.splits))
@@ -245,17 +275,15 @@ class AggregateDistrictDataTask(AggregateDataTask):
                     [f.fieldName for f in self.dataFields]
                 self.totalPopulation = int(assign[DistrictColumns.POPULATION].sum())
 
-            self.setProgressIncrement(40, 50)
-            if self.includeSplits:
-                self.calcSplits(assign, cols)
-
-            self.setProgressIncrement(50, 100)
+            self.setProgressIncrement(40, 90)
+            if self.updateDistricts is not None:
+                update = assign[assign[self.distField].isin(self.updateDistricts)]
+            else:
+                update = assign
             if self.includeGeometry:
-                if self.updateDistricts is not None:
-                    assign = assign[assign[self.distField].isin(self.updateDistricts)]
-                data = assign[cols].groupby(by=self.distField).sum()
-                g_geom = assign[[self.distField, "geometry"]].groupby(self.distField)
-                total = len(g_geom)
+                data = update[cols].groupby(by=self.distField).sum()
+                g_geom = update[[self.distField, "geometry"]].groupby(self.distField)
+                total = len(g_geom) + 1
                 count = 0
                 geoms: dict[int, shapely.MultiPolygon] = {}
                 pool = QThreadPool()
@@ -273,26 +301,30 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 pool.waitForDone()
                 geoms |= {t.dist: t.merged for t in tasks}
-                contig = {t.dist: len(t.merged.geoms) == 1 for t in tasks}
+                contig = {t.dist: len(t.merged.geoms) for t in tasks}
 
                 data["geometry"] = pd.Series(geoms)
-                self.contiguous = pd.Series(contig)
+                data["pieces"] = pd.Series(contig)
                 data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
 
                 self.calcDistrictMetrics(data)
+                count += 1
+                self.updateProgress(total, count)
 
                 # self.data = data.to_wkt()
                 data["wkt_geom"] = data["geometry"].apply(wkt.dumps)
                 data = data.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
                 self.data = data
             else:
-                assign.drop(columns="geometry", inplace=True)
-                if self.updateDistricts is not None:
-                    assign = assign[assign[self.distField].isin(self.updateDistricts)]
-                total = len(assign)
-                self.data = assign[cols].groupby(by=self.distField).sum()
+                update.drop(columns="geometry", inplace=True)
+                total = len(update)
+                self.data = update[cols].groupby(by=self.distField).sum()
 
                 self.updateProgress(total, total)
+
+            self.setProgressIncrement(90, 100)
+            if self.includeSplits:
+                self.calcSplits(assign, cols)
 
             name = pd.Series(
                 [
@@ -341,6 +373,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
             return
 
         with spatialite_connect(self.geoPackagePath) as db:
+            if self.distLayer.fields().lookupField("pieces") == -1:
+                db.execute("ALTER TABLE districts ADD COLUMN pieces INT")
+
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.data.columns)}
 
             # Account for districts with no assignments --

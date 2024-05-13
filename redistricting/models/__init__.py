@@ -23,8 +23,8 @@
  ***************************************************************************/
 """
 from .columns import (
-    CompactnessScores,
-    DistrictColumns
+    DistrictColumns,
+    StatsColumns
 )
 from .DeltaList import (
     Delta,
@@ -50,7 +50,7 @@ from .PlanSplits import (
 )
 from .PlanStats import PlanStats
 
-__all__ = ('CompactnessScores', 'DataField', 'Delta', 'DeltaList', 'District', 'DistrictColumns', 'DistrictList',
+__all__ = ('StatsColumns', 'DataField', 'Delta', 'DeltaList', 'District', 'DistrictColumns', 'DistrictList',
            'Field', 'FieldList', 'GeoField', 'makeFieldName',
            'PlanStats', 'RedistrictingPlan', 'Splits', 'SplitDistrict',
            'SplitGeography', 'Unassigned')

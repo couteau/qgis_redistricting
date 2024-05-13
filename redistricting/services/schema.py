@@ -243,6 +243,7 @@ def _updateDistLayer(data: dict):
         "deviation": "deviation REAL DEFAULT 0",
         "pct_deviation": "pct_deviation REAL DEFAULT 0",
         "description": "description TEXT",
+        "pieces": "pieces INT"
     }
     update_fields = []
     for f in fields:

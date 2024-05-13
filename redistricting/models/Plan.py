@@ -51,8 +51,8 @@ from qgis.PyQt.QtCore import (
 from ..exception import RdsException
 from ..utils import tr
 from .columns import (
-    CompactnessScores,
-    DistrictColumns
+    DistrictColumns,
+    StatsColumns
 )
 from .DeltaList import DeltaList
 from .District import District
@@ -521,7 +521,7 @@ class RedistrictingPlan(QObject):
             cols.append(f.fieldName)
         for f in self.dataFields:
             cols.append(f.fieldName)
-        cols.extend(list(CompactnessScores))
+        cols.extend(list(StatsColumns))
         return cols
 
     @property

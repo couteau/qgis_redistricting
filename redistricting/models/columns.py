@@ -16,10 +16,11 @@ class DistrictColumns(str, Enum):
         return self.value
 
 
-class CompactnessScores(str, Enum):
+class StatsColumns(str, Enum):
     POLSBYPOPPER = "polsbypopper"
     REOCK = "reock"
     CONVEXHULL = "convexhull"
+    PIECES = "pieces"
 
     def __int__(self):
         return list(self.__class__).index(self)

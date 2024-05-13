@@ -171,6 +171,10 @@ class PlanStats(QObject):
     def totalPopulation(self):
         return self._plan.totalPopulation
 
+    @property
+    def contiguous(self):
+        return not any(x - 1 for x in self._plan.districts[1:, 'pieces'] if x is not None)
+
     # stats
     def _avgScore(self, score: str) -> Union[float, None]:
         values = self._plan.districts[1:, score]

@@ -42,6 +42,7 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtGui import (
+    QColor,
     QContextMenuEvent,
     QFont,
     QKeySequence
@@ -77,12 +78,15 @@ from .ui.DistrictDataTable import Ui_qdwDistrictData
 class StatsModel(QAbstractTableModel):
     StatLabels = [
         tr('Population'),
-        tr('Avg. Polsby-Popper'),
-        tr('Avg. Reock'),
-        tr('Avg. Convex-Hull'),
-        tr('Cut Edges'),
+        tr('Continguous'),
+        tr('Compactness'),
+        tr('   Avg. Polsby-Popper'),
+        tr('   Avg. Reock'),
+        tr('   Avg. Convex-Hull'),
+        tr('   Cut Edges'),
         tr('Splits')
     ]
+    SPLITS_OFFSET = 8
 
     def __init__(self, stats: PlanStats, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -110,7 +114,7 @@ class StatsModel(QAbstractTableModel):
         if parent.isValid():
             return 0
 
-        c = 5
+        c = StatsModel.SPLITS_OFFSET - 1
         if self._stats:
             c += 1 + len(self._stats.splits)
         return c
@@ -120,7 +124,9 @@ class StatsModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
-            return self.StatLabels[section] if section <= 5 else '   ' + self._stats.splits.headings[section-6]
+            return StatsModel.StatLabels[section] \
+                if section < StatsModel.SPLITS_OFFSET \
+                else '   ' + self._stats.splits.headings[section-StatsModel.SPLITS_OFFSET]
 
         return None
 
@@ -133,25 +139,35 @@ class StatsModel(QAbstractTableModel):
             if row == 0:
                 result = f'{self._stats.totalPopulation:,}'
             elif row == 1:
+                result = tr('Yes') if self._stats.contiguous else tr('No')
+            elif row == 3:
                 avgPP = self._stats.avgPolsbyPopper
                 result = f'{avgPP:.3f}' if avgPP is not None else ''
-            elif row == 2:
+            elif row == 4:
                 avgReock = self._stats.avgReock
                 result = f'{avgReock:.3f}' if avgReock is not None else ''
-            elif row == 3:
+            elif row == 5:
                 avgCH = self._stats.avgConvexHull
                 result = f'{avgCH:.3f}' if avgCH is not None else ''
-            elif row == 4:
+            elif row == 6:
                 result = f'{self._stats.cutEdges:,}' if self._stats.cutEdges else ''
-            elif row == 5:
+            elif row in (2, StatsModel.SPLITS_OFFSET - 1):
                 result = None
-            elif row <= 6 + len(self._stats.splits):
-                result = f'{len(self._stats.splits[row-6]):,}'
+            elif row <= StatsModel.SPLITS_OFFSET + len(self._stats.splits):
+                result = f'{len(self._stats.splits[row-StatsModel.SPLITS_OFFSET]):,}'
             else:
                 result = None
         elif role == Qt.FontRole:
             result = QFont()
             result.setBold(True)
+        elif role == Qt.TextColorRole:
+            if row == 1:
+                if not self._stats.contiguous:
+                    result = QColor(Qt.red)
+                else:
+                    result = QColor(Qt.green)
+            else:
+                result = None
         else:
             result = None
 
