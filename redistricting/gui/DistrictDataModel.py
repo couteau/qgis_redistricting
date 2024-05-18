@@ -237,7 +237,7 @@ class DistrictDataModel(QAbstractTableModel):
         return False
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section + 1 < len(self._headings):
             return self._headings[section + 1]
 
         return None

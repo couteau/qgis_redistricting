@@ -147,7 +147,7 @@ class PlanController(BaseController):
         self.actionNewPlan.setEnabled(False)
         self.menu.addAction(self.actionNewPlan)
 
-        self.actionEditPlan = self.actions.createAction(
+        self.actionEditPlan = self.actions.createPlanAction(
             'actionEditPlan',
             QIcon(':/plugins/redistricting/icon.png'),
             tr('Edit Plan'),
@@ -157,7 +157,7 @@ class PlanController(BaseController):
         self.actionEditPlan.setEnabled(False)
         self.menu.addAction(self.actionEditPlan)
 
-        self.actionCopyPlan = self.actions.createAction(
+        self.actionCopyPlan = self.actions.createPlanAction(
             'actionCopyPlan',
             QIcon(':/plugins/redistricting/copyplan.svg'),
             tr('Copy Plan'),
@@ -178,7 +178,7 @@ class PlanController(BaseController):
         )
         self.actionSaveAsNew.setEnabled(False)
 
-        self.actionImportAssignments = self.actions.createAction(
+        self.actionImportAssignments = self.actions.createPlanAction(
             'actionImportAssignments',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Equivalency File'),
@@ -189,7 +189,7 @@ class PlanController(BaseController):
         self.actionImportAssignments.setEnabled(False)
         self.menu.addAction(self.actionImportAssignments)
 
-        self.actionImportShapefile = self.actions.createAction(
+        self.actionImportShapefile = self.actions.createPlanAction(
             'actionImportShapefile',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Shapefile'),
@@ -200,7 +200,7 @@ class PlanController(BaseController):
         self.actionImportShapefile.setEnabled(False)
         self.menu.addAction(self.actionImportShapefile)
 
-        self.actionExportPlan = self.actions.createAction(
+        self.actionExportPlan = self.actions.createPlanAction(
             'actionExportPlan',
             QIcon(':/plugins/redistricting/exportplan.svg'),
             tr('Export Plan'),
@@ -211,6 +211,25 @@ class PlanController(BaseController):
         self.actionExportPlan.setEnabled(False)
         self.menu.addAction(self.actionExportPlan)
 
+        self.actionDeletePlan = self.actions.createPlanAction(
+            'actionDeletePlan',
+            QIcon(':/plugins/redistricting/deleteplan.svg'),
+            tr('Delete Plan'),
+            tooltip=tr('Remove the selected plan from the project'),
+            callback=self.deletePlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionDeletePlan.setEnabled(False)
+
+        self.actionSelectPlan = self.actions.createPlanAction(
+            'actionSelectPlan',
+            QIcon(':/plugins/redistricting/selectplan.svg'),
+            tr('Delete Plan'),
+            tooltip=tr('Make the selected plan the active plan'),
+            callback=self.selectPlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionSelectPlan.setEnabled(False)
     # slots
 
     def enableActivePlanActions(self, plan: RedistrictingPlan):
@@ -244,6 +263,7 @@ class PlanController(BaseController):
             any(isinstance(layer, QgsVectorLayer)
                 for layer in self.project.mapLayers(True).values())
         )
+        self.actionSelectPlan.setEnabled(False)
 
     def addPlanToMenu(self, plan: RedistrictingPlan):
         action = QAction(text=plan.name, parent=self.planActions)
@@ -264,20 +284,18 @@ class PlanController(BaseController):
     def planAdded(self, plan: RedistrictingPlan):
         self.addPlanToMenu(plan)
         self.updateService.watchPlan(plan)
+        self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
     def planRemoved(self, plan: RedistrictingPlan):
         self.planRemoved(plan)
         self.updateService.unwatchPlan(plan)
+        self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
     # action slots
 
     def showPlanManager(self):
         """Display the plan manager window"""
         dlg = DlgSelectPlan(self.planManager, self.iface.mainWindow())
-        dlg.newPlan.connect(self.actionNewPlan.triggered)
-        dlg.planSelected.connect(self.selectPlan)
-        dlg.planEdited.connect(self.editPlan)
-        dlg.planDeleted.connect(self.deletePlan)
         dlg.exec()
 
     def newPlan(self):
@@ -351,9 +369,10 @@ class PlanController(BaseController):
                 if 'num-districts' in builder.modifiedFields:
                     self.styler.stylePlan(plan)
 
-    def copyPlan(self):
-        if not self.checkActivePlan(tr('copy')):
-            return
+    def copyPlan(self, plan=None):
+        if not isinstance(plan, RedistrictingPlan):
+            if not self.checkActivePlan(tr('copy')):
+                return
 
         dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
         if dlgCopyPlan.exec() == QDialog.Accepted:
@@ -392,15 +411,16 @@ class PlanController(BaseController):
             self.planManager.activePlan.assignLayer.rollBack(True)
             self.planManager.setActivePlan(plan)
 
-    def importPlan(self):
+    def importPlan(self, plan=None):
         def importComplete():
             self.updateService.updateDistricts(
                 self.planManager.activePlan, needDemographics=True, needGeometry=True, needSplits=True
             )
             self.planManager.activePlan.assignLayer.triggerRepaint()
 
-        if not self.checkActivePlan(tr('import')):
-            return
+        if not isinstance(plan, RedistrictingPlan):
+            if not self.checkActivePlan(tr('import')):
+                return
 
         dlgImportPlan = DlgImportPlan(self.planManager.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
@@ -420,9 +440,10 @@ class PlanController(BaseController):
             if not importer.importPlan(self.planManager.activePlan):
                 self.endProgress(progress)
 
-    def importShapefile(self):
-        if not self.checkActivePlan(self.tr('import')):
-            return
+    def importShapefile(self, plan=None):
+        if not isinstance(plan, RedistrictingPlan):
+            if not self.checkActivePlan(self.tr('import')):
+                return
 
         dlgImportPlan = DlgImportShape(self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
@@ -439,7 +460,7 @@ class PlanController(BaseController):
             if not importer.importPlan(self.planManager.activePlan):
                 self.endProgress(progress)
 
-    def exportPlan(self):
+    def exportPlan(self, plan=None):
         def planExported():
             self.iface.messageBar().pushMessage(
                 "Success", f"Export of {plan.name} complete!", level=Qgis.Success)
@@ -448,8 +469,9 @@ class PlanController(BaseController):
             for msg, level in export.errors():
                 self.iface.messageBar().pushMessage("Error", msg, level=level)
 
-        if not self.checkActivePlan(tr('export')):
-            return
+        if not isinstance(plan, RedistrictingPlan):
+            if not self.checkActivePlan(tr('export')):
+                return
 
         dlgExportPlan = DlgExportPlan(self.planManager.activePlan, self.iface.mainWindow())
         if dlgExportPlan.exec_() == QDialog.Accepted:

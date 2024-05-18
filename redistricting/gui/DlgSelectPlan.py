@@ -30,8 +30,7 @@ from typing import (
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
-    Qt,
-    pyqtSignal
+    Qt
 )
 from qgis.PyQt.QtGui import (
     QColor,
@@ -44,15 +43,22 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import RedistrictingPlan
+from ..services import (
+    ActionRegistry,
+    PlanManager
+)
 from ..utils import tr
 from .ui.DlgSelectPlan import Ui_dlgSelectPlan
 
 
 class PlanListModel(QAbstractTableModel):
-    def __init__(self, planList, activePlan, parent=None):
+    def __init__(self, planList: PlanManager, parent=None):
         super().__init__(parent)
         self.planList = planList
-        self.activePlan = activePlan
+        self.activePlan = planList.activePlan
+        self.planList.activePlanChanged.connect(self.planListUpdate)
+        self.planList.planAdded.connect(self.planListUpdate)
+        self.planList.planRemoved.connect(self.planListUpdate)
 
         self.header = [
             tr('Plan'),
@@ -112,20 +118,16 @@ class PlanListModel(QAbstractTableModel):
 
 
 class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
-    newPlan = pyqtSignal()
-    planSelected = pyqtSignal(RedistrictingPlan)
-    planEdited = pyqtSignal(RedistrictingPlan)
-    planDeleted = pyqtSignal(RedistrictingPlan)
-
-    def __init__(self, planList, activePlan, parent: Optional[QWidget] = None,
+    def __init__(self, planList: PlanManager, parent: Optional[QWidget] = None,
                  flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
+        self.registry = ActionRegistry()
         self.model = PlanListModel(
             planList,
-            activePlan,
             self
         )
+
         self.lvwPlans.setModel(self.model)
         self.lvwPlans.resizeColumnsToContents()
         self.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -155,26 +157,16 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
         return self.model.plan(index)
 
     def newPlanClicked(self):
-        self.accept()
-        self.newPlan.emit()
+        self.registry.actionNewPlan.trigger()
 
     def editPlan(self):
-        plan = self.currentPlan
-        if plan:
-            self.accept()
-            self.planEdited.emit(plan)
+        self.registry.actionEditPlan.triggerForPlan(self.currentPlan)
+        self.model.planListUpdate()
 
     def selectPlan(self):
-        plan = self.currentPlan
-        if plan and plan.isValid():
+        if self.currentPlan and self.currentPlan.isValid():
+            self.registry.actionSelectPlan.triggerForPlan(self.currentPlan)
             self.accept()
-            self.planSelected.emit(plan)
 
     def deletePlan(self):
-        plan = self.currentPlan
-        if plan:
-            self.planDeleted.emit(plan)
-            self.updatePlanList()
-
-    def updatePlanList(self):
-        self.model.planListUpdate()
+        self.registry.actionDeletePlan.triggerForPlan(self.currentPlan)
