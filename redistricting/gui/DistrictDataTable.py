@@ -31,7 +31,10 @@ from typing import (
     Optional
 )
 
-from qgis.core import QgsApplication
+from qgis.core import (
+    QgsApplication,
+    QgsProject
+)
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QCoreApplication,
@@ -49,6 +52,7 @@ from qgis.PyQt.QtGui import (
 )
 from qgis.PyQt.QtWidgets import (
     QAction,
+    QDialog,
     QDockWidget,
     QMenu,
     QWidget
@@ -64,12 +68,14 @@ from ..services import (
     DistrictCopier,
     DistrictUpdater
 )
+from ..services.clipboard import DistrictClipboardAccess
 from ..utils import (
     showHelp,
     tr
 )
 from .DistrictDataModel import DistrictDataModel
 from .DlgEditFields import DlgEditFields
+from .DlgNewDistrict import DlgNewDistrict
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
@@ -230,6 +236,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
         self.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tblDataTable.customContextMenuRequested.connect(self.createDataTableConextMenu)
+        self.tblDataTable.doubleClicked.connect(self.editDistrict)
 
     @property
     def plan(self) -> RedistrictingPlan:
@@ -284,8 +291,10 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         """Copy district data to clipboard in html table format"""
         if selection:
             selection = ((s.row(), s.column()) for s in selection)
-        html = self._plan.districts.getAsHtml(selection)
-        text = self._plan.districts.getAsCsv(selection)
+
+        clipboard = DistrictClipboardAccess()
+        html = clipboard.getAsHtml(self._plan, selection)
+        text = clipboard.getAsCsv(self._plan, selection)
         mime = QMimeData()
         mime.setHtml(html)
         mime.setData("application/csv", text.encode())
@@ -348,3 +357,21 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             else:
                 self._dlgSplits = DlgSplitDetail(self._plan, field, self.parent())
             self._dlgSplits.show()
+
+    def editDistrict(self, index: QModelIndex):
+        if index.row() == 0:
+            return
+
+        district = self._plan.districts[index.row()]
+        dlg = DlgNewDistrict(self.plan, self.parent())
+        dlg.setWindowTitle(tr("Edit District"))
+        dlg.sbxDistrictNo.setValue(district.district)
+        dlg.sbxDistrictNo.setReadOnly(True)
+        dlg.inpName.setText(district.name)
+        dlg.sbxMembers.setValue(district.members)
+        dlg.txtDescription.setPlainText(district.description)
+        if dlg.exec() == QDialog.Accepted:
+            district.name = dlg.districtName
+            district.members = dlg.members
+            district.description = dlg.description
+            QgsProject.instance().setDirty()

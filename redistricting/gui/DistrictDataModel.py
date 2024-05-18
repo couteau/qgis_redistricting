@@ -35,8 +35,7 @@ from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QObject,
-    Qt,
-    QVariant
+    Qt
 )
 from qgis.PyQt.QtGui import (
     QBrush,
@@ -48,8 +47,7 @@ from ..models import (
     District,
     DistrictColumns,
     DistrictList,
-    RedistrictingPlan,
-    Unassigned
+    RedistrictingPlan
 )
 from ..services import (
     DistrictValidator,
@@ -70,7 +68,7 @@ class DistrictDataModel(QAbstractTableModel):
         self._validator = DistrictValidator()
         self.plan = plan
 
-    @ property
+    @property
     def plan(self) -> RedistrictingPlan:
         return self._plan
 
@@ -79,7 +77,7 @@ class DistrictDataModel(QAbstractTableModel):
         self._keys = list(DistrictColumns)
         self._headings = [
             tr('District'),
-            tr('Name'),
+            tr('District'),
             tr('Members'),
             tr('Population'),
             tr('Deviation'),
@@ -95,7 +93,7 @@ class DistrictDataModel(QAbstractTableModel):
             if field.sum:
                 self._keys.append(fn)
                 self._headings.append(field.caption)
-            if field.pctbase and field.pctbase in self._keys:
+            if field.pctbase and (field.pctbase == self._plan.popField or field.pctbase in self._keys):
                 self._keys.append(f"pct_{fn}")
                 self._headings.append(f"%{field.caption}")
 
@@ -107,7 +105,7 @@ class DistrictDataModel(QAbstractTableModel):
         ])
         self.endResetModel()
 
-    @ plan.setter
+    @plan.setter
     def plan(self, value: RedistrictingPlan):
         self.beginResetModel()
 
@@ -158,25 +156,21 @@ class DistrictDataModel(QAbstractTableModel):
         if parent.isValid() or self._districts is None:
             return 0
 
-        return len(self._keys)
+        return len(self._keys) - 1
 
     def data(self, index, role=Qt.DisplayRole):
-        value = QVariant()
+        value = None
         try:
             if role in (Qt.DisplayRole, Qt.EditRole):
                 row = index.row()
-                col = index.column()
+                col = index.column() + 1
                 district = self._districts.byindex[row]
-
-                if isinstance(district, Unassigned):
-                    if col == 0:
-                        return self._districts[0, "name"]
-                    if col == 1:
-                        return QVariant()
 
                 key = self._keys[col]
                 if key[:3] == 'pct' and key != 'pct_deviation':
                     pctbase = self._plan.dataFields[key[4:]].pctbase
+                    if pctbase == self._plan.popField:
+                        pctbase = DistrictColumns.POPULATION
                     if pctbase in self._keys and district[pctbase] != 0:
                         value = district[key[4:]] / district[pctbase]
                     else:
@@ -185,7 +179,7 @@ class DistrictDataModel(QAbstractTableModel):
                     value = district[key]
 
                 if pd.isna(value):
-                    return QVariant()
+                    return None
 
                 if key == 'deviation':
                     value = f'{value:+,}'
@@ -229,7 +223,7 @@ class DistrictDataModel(QAbstractTableModel):
                     else:
                         value = QColor(207, 99, 92)
         except Exception as e:  # pylint: disable=broad-exception-caught, unused-variable
-            return QVariant()
+            return None
 
         return value
 
@@ -244,7 +238,7 @@ class DistrictDataModel(QAbstractTableModel):
 
     def headerData(self, section, orientation: Qt.Orientation, role):
         if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self._headings[section]
+            return self._headings[section + 1]
 
         return None
 

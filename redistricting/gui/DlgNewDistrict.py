@@ -43,12 +43,14 @@ class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
                  flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
+        self.sbxDistrictNo.setValue(0)
         self.sbxDistrictNo.setPlan(plan)
         self.sbxDistrictNo.setMaximum(plan.numDistricts)
 
         seatsLeft = plan.numSeats - plan.allocatedSeats
         distsLeft = plan.numDistricts - plan.allocatedDistricts
         self.sbxMembers.setMaximum(seatsLeft - distsLeft + 1)
+        self.sbxDistrictNo.valueChanged.connect(self.updateButton)
 
         i = 1
         for dist in plan.districts[1:]:
@@ -59,10 +61,8 @@ class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
         if (i > plan.numDistricts):
             # No more districts in the plan
             self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
-            self.reject()
-            return
-
-        self.sbxDistrictNo.setValue(i)
+        else:
+            self.sbxDistrictNo.setValue(i)
 
     def updateButton(self):
         self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
