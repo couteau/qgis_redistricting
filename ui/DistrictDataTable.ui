@@ -142,7 +142,7 @@
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QTableView" name="tblDataTable">
+      <widget class="RdsTableView" name="tblDataTable">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
          <horstretch>1</horstretch>
@@ -220,6 +220,13 @@ QHeaderView::section {
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>RdsTableView</class>
+   <extends>QTableView</extends>
+   <header>.RedistrictingWidgets</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

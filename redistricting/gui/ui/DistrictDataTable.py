@@ -67,7 +67,7 @@ class Ui_qdwDistrictData(object):
         self.splitter.setSizePolicy(sizePolicy)
         self.splitter.setOrientation(QtCore.Qt.Horizontal)
         self.splitter.setObjectName("splitter")
-        self.tblDataTable = QtWidgets.QTableView(self.splitter)
+        self.tblDataTable = RdsTableView(self.splitter)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
@@ -122,3 +122,4 @@ class Ui_qdwDistrictData(object):
         self.btnAddFields.setText(_translate("qdwDistrictData", "..."))
         self.btnHelp.setText(_translate("qdwDistrictData", "..."))
         self.gbxPlanStats.setTitle(_translate("qdwDistrictData", "Plan Statistics"))
+from .RedistrictingWidgets import RdsTableView
