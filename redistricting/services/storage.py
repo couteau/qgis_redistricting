@@ -86,7 +86,8 @@ class ProjectStorage:
         if plan.distLayer is None:
             return
 
-        columns = [plan.distField, DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
+        columns = [plan.distField, DistrictColumns.NAME,
+                   DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
                    DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
                    "description"]
         for f in plan.popFields:
@@ -102,7 +103,8 @@ class ProjectStorage:
         districtReader.loadDistricts(plan)
 
     def writeDistricts(self, plan: RedistrictingPlan):
-        columns = [plan.distField, DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
+        columns = [plan.distField, DistrictColumns.NAME,
+                   DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
                    DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
                    "description"]
         for f in plan.popFields:

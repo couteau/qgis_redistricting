@@ -30,6 +30,8 @@ class DistrictReader:
         self._popField = popField
         if columns is None:
             self._columns = self._distLayer.fields().names()
+            if "fid" in self._columns:
+                self._columns.remove("fid")
         else:
             self._columns = columns
 
@@ -48,9 +50,9 @@ class DistrictReader:
                 del data[self._popField]
 
             if f[self._distField] == 0:
-                result.append(Unassigned(**data))
+                result.append(Unassigned(fid=f.id(), **data))
             else:
-                result.append(District(**data))
+                result.append(District(fid=f.id(), **data))
 
         return sorted(result, key=lambda s: s.district)
 
@@ -80,7 +82,7 @@ class DistrictWriter:
             self._field_map = {
                 k: v
                 for k, v in map(lambda i, j: (i, j), self._fields.allAttributesList(), self._fields.names())
-                if k in columns and k not in [self._distField, "fid"]
+                if v in columns and v not in [self._distField, "fid"]
             }
         else:
             self._field_map = {
@@ -92,17 +94,22 @@ class DistrictWriter:
 
     def writeToLayer(self, districts: Iterable[District]):
         def changeAttributes(dist: District, feature: QgsFeature):
-            values = {}
             for idx, field in self._field_map.items():
+                if field not in dist:
+                    continue
+
                 value = dist[field]
                 if value != feature[idx]:
-                    values[idx] = value
-            if values:
-                feature.setAttributes(values)
-                if dist.fid == -1:
-                    self._layer.addFeature(feat)
-                else:
-                    self._layer.updateFeature(feat)
+                    feature.setAttribute(idx, value)
+
+            # if all population is assigned, delete the Unassigned feature
+            if dist[self._distField] == 0 and not dist[DistrictColumns.POPULATION]:
+                if dist.fid != -1:
+                    self._layer.deleteFeature(dist.fid)
+            elif dist.fid == -1:
+                self._layer.addFeature(feat)
+            else:
+                self._layer.updateFeature(feat)
 
         self._layer.startEditing()
         for d in districts:

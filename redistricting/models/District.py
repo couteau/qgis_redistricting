@@ -92,6 +92,9 @@ class District(QObject):
     def clone(self):
         return self.__class__(fid=self._fid, description=self._description, **self._data)
 
+    def __contains__(self, index: str):
+        return index in self._data
+
     @overload
     def __getitem__(self, index: Union[str, int]) -> Any:
         ...
