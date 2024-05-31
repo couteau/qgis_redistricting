@@ -59,17 +59,18 @@ class PlanAction(QAction):
             super().__init__(p1, p2, p3)
 
         self._plan = None
+        self.triggered.connect(self.triggerForPlan)
 
     def setTarget(self, plan: "RedistrictingPlan"):
         self._plan = plan
 
-    def triggerForPlan(self, plan: "RedistrictingPlan"):
-        self.setTarget(plan)
-        self.triggeredForPlan.emit(plan)
+    def triggerForPlan(self, plan: Union["RedistrictingPlan", bool]):
+        if isinstance(plan, bool):
+            plan = self._plan
+        else:
+            self.setTarget(plan)
 
-    def trigger(self):
-        self.triggeredForPlan.emit(self._plan)
-        super().trigger()
+        self.triggeredForPlan.emit(plan)
 
 
 class ActionRegistry:
