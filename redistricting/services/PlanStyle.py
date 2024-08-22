@@ -56,7 +56,7 @@ from qgis.PyQt.QtGui import (
 from .PlanManager import PlanManager
 
 if TYPE_CHECKING:
-    from ..models import RedistrictingPlan
+    from ..models import RdsPlan
 
 if Qgis.versionInt() > 33000:
     DISTRICT_GEOMETRY_TYPE = Qgis.GeometryType.Polygon
@@ -86,7 +86,7 @@ class PlanStylerService(QObject):
         self._numDistricts = 0
         self._attrName = "district"
 
-    def stylePlan(self, plan: 'RedistrictingPlan'):
+    def stylePlan(self, plan: 'RdsPlan'):
         if not self._assignRenderer:
             self.createRenderers(plan.numDistricts)
             self.createLabels()
@@ -176,7 +176,7 @@ class PlanStylerService(QObject):
 
         self._distRenderer = QgsCategorizedSymbolRenderer(self._attrName, categoryList)
 
-    def copyStyles(self, plan: RedistrictingPlan):
+    def copyStyles(self, plan: RdsPlan):
         if self._numDistricts >= plan.numDistricts:
             return
 

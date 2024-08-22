@@ -31,7 +31,7 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
 from qgis.utils import iface
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..utils import (
     showHelp,
     tr
@@ -49,9 +49,9 @@ iface: QgisInterface
 
 
 class DlgEditPlan(QWizard):
-    plan: RedistrictingPlan = None
+    plan: RdsPlan = None
 
-    def __init__(self, plan: RedistrictingPlan = None, parent=None, ):
+    def __init__(self, plan: RdsPlan = None, parent=None, ):
         super().__init__(parent)
         self.new = plan is None
         self.setWindowTitle(
@@ -188,7 +188,7 @@ class DlgEditPlan(QWizard):
                 return False
         return True
 
-    def updatePlan(self, plan: RedistrictingPlan):
+    def updatePlan(self, plan: RdsPlan):
         if not self.isComplete():
             return False
         plan.name = self.field('planName')
@@ -208,7 +208,7 @@ class DlgEditPlan(QWizard):
     def createPlan(self):
         if not self.isComplete():
             return None
-        plan = RedistrictingPlan(name=self.field('planName'), numDistricts=self.field('numDistricts'))
+        plan = RdsPlan(name=self.field('planName'), numDistricts=self.field('numDistricts'))
         plan.numSeats = self.field('numSeats')
         plan.description = self.field('description')
         plan.geoLayer = self.field('sourceLayer')

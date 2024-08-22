@@ -42,14 +42,14 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.utils import spatialite_connect
 
-from ..models.PlanSplits import Splits
+from ..models import RdsSplits
 from ..utils import tr
 from .DistrictIO import DistrictReader
 from .ErrorList import ErrorListMixin
 from .PlanBuilder import PlanBuilder
 
 if TYPE_CHECKING:
-    from ..models.Plan import RedistrictingPlan
+    from ..models.Plan import RdsPlan
 
 
 class PlanCopier(ErrorListMixin, QObject):
@@ -58,7 +58,7 @@ class PlanCopier(ErrorListMixin, QObject):
 
     def __init__(
         self,
-        sourcePlan: RedistrictingPlan
+        sourcePlan: RdsPlan
     ):
         super().__init__(sourcePlan)
         self._plan = sourcePlan
@@ -105,7 +105,7 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             for f in plan.geoFields:
-                split = Splits(plan, f, plan.stats)
+                split = RdsSplits(plan, f, plan.stats)
                 split.setData(self._plan.stats.splits[f.fieldName].data.copy())
                 plan.stats.splits[f.fieldName] = split
 
@@ -121,7 +121,7 @@ class PlanCopier(ErrorListMixin, QObject):
 
         return plan
 
-    def copyBufferedAssignments(self, target: RedistrictingPlan):
+    def copyBufferedAssignments(self, target: RdsPlan):
         if not self._plan.assignLayer.isEditable():
             return
 
@@ -132,7 +132,7 @@ class PlanCopier(ErrorListMixin, QObject):
             target.assignLayer.changeAttributeValues(fid, feat)
         target.assignLayer.commitChanges(True)
 
-    def copyAssignments(self, target: RedistrictingPlan, autocommit=True):
+    def copyAssignments(self, target: RdsPlan, autocommit=True):
         def progress():
             nonlocal count
             count += 1

@@ -22,7 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Union
+from typing import (
+    Iterable,
+    Union
+)
 
 from qgis.core import (
     Qgis,
@@ -60,6 +63,19 @@ class ErrorListMixin:
         self._errors.clear()
         self.pushError(error, level)
 
+    def pushErrors(self, errors: Iterable[Union[str, Exception]], level: Qgis.MessageLevel = Qgis.Warning):
+        """
+        Push the passed error onto the error list for the object and
+        log it to the Qgis message log with the "Redistricting" tag
+        :param error: the error to set on the object
+        :param level: the message level for the error: Info, Warning, Critical, etc.
+        """
+        for error in errors:
+            if isinstance(error, Exception):
+                error = str(error)
+            self._errors.append((error, level))
+            QgsMessageLog.logMessage(error, 'Redistricting', level)
+
     def pushError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.Warning):
         """
         Push the passed error onto the error list for the object and
@@ -67,10 +83,7 @@ class ErrorListMixin:
         :param error: the error to set on the object
         :param level: the message level for the error: Info, Warning, Critical, etc.
         """
-        if isinstance(error, Exception):
-            error = str(error)
-        self._errors.append((error, level))
-        QgsMessageLog.logMessage(error, 'Redistricting', level)
+        self.pushErrors((error,), level)
 
     def clearErrors(self):
         self._errors.clear()

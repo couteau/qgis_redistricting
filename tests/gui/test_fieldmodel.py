@@ -9,34 +9,32 @@ from redistricting.gui.RdsFieldTableView import (
     RdsFieldTableView
 )
 from redistricting.models import (
-    DataField,
-    Field,
-    FieldList
+    RdsDataField,
+    RdsField
 )
 
 
 class TestFieldTableView:
     @pytest.fixture
-    def field_list(self, block_layer) -> FieldList:
-        f = Field(block_layer, 'vtdid20')
-        return FieldList(fields=[f])
+    def field_list(self, block_layer) -> list[RdsField]:
+        f = RdsField(block_layer, 'vtdid20')
+        return [f]
 
     @pytest.fixture
-    def field_list_two(self, block_layer) -> FieldList:
-        l = [Field(block_layer, 'vtdid20'), Field(block_layer, 'countyid20')]
-        return FieldList(fields=l)
+    def field_list_two(self, block_layer) -> list[RdsField]:
+        return [RdsField(block_layer, 'vtdid20'), RdsField(block_layer, 'countyid20')]
 
     @pytest.fixture
-    def data_field_list(self, block_layer) -> FieldList:
-        f = DataField(block_layer, 'vap_nh_white')
-        return FieldList(fields=[f])
+    def data_field_list(self, block_layer) -> list[RdsDataField]:
+        f = RdsDataField(block_layer, 'vap_nh_white')
+        return [f]
 
     @pytest.fixture
     def field_list_model(self, field_list) -> FieldListModel:
         return FieldListModel(field_list)
 
     @pytest.fixture
-    def field_list_model_two(self, field_list_two: FieldList) -> FieldListModel:
+    def field_list_model_two(self, field_list_two) -> FieldListModel:
         return FieldListModel(field_list_two)
 
     @pytest.fixture

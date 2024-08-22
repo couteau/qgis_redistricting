@@ -4,7 +4,9 @@ from pytest_mock import MockerFixture
 from qgis.core import QgsProject
 from qgis.gui import QgisInterface
 
-from redistricting.models import RedistrictingPlan
+from redistricting.models import RdsPlan
+
+# pylint: disable=unused-argument,protected-access
 
 
 class TestLayerTreeManager:
@@ -19,13 +21,13 @@ class TestLayerTreeManager:
         project = QgsProject.instance()
         project.addMapLayer(block_layer, True)
 
-        plan1 = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        plan1 = mocker.create_autospec(spec=RdsPlan, instance=True)
         plan1.name = "Test1"
         plan1.id = uuid4()
         plan1.assignLayer = assign_layer
         plan1.distLayer = dist_layer
         manager.createGroup(plan1)
-        plan2 = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        plan2 = mocker.create_autospec(spec=RdsPlan, instance=True)
         plan2.name = "Test2"
         plan2.id = uuid4()
         plan2.assignLayer = assign_layer

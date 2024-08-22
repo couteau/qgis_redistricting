@@ -24,7 +24,7 @@
 """
 from qgis.PyQt.QtWidgets import QDockWidget
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..services import DeltaUpdateService
 from .DeltaListModel import DeltaListModel
 from .RdsOverlayWidget import OverlayWidget
@@ -48,11 +48,11 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
         self.deltaService.updateTerminated.connect(self.hideOverlay)
 
     @property
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         if self._plan != value:
             if self.lblWaiting.isVisible():
                 self.lblWaiting.stop()
@@ -61,7 +61,7 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
             if self.deltaService.isUpdating(self._plan):
                 self.lblWaiting.start()
 
-    def showOverlay(self, plan: RedistrictingPlan):
+    def showOverlay(self, plan: RdsPlan):
         if plan == self._plan:
             self.lblWaiting.start()
 

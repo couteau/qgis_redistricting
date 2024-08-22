@@ -4,22 +4,22 @@ from uuid import uuid4
 import pytest
 from pytest_mock import MockerFixture
 
-from redistricting.models.Plan import RedistrictingPlan
+from redistricting.models.Plan import RdsPlan
 from redistricting.services.PlanManager import PlanManager
 
 
 class TestPlanManager:
     @pytest.fixture
     def mock_plan(self, mocker: MockerFixture):
-        plan = mocker.create_autospec(spec=RedistrictingPlan)
+        plan = mocker.create_autospec(spec=RdsPlan)
         plan.id = uuid4()
         return plan
 
     @pytest.fixture
     def planmanager(self, mocker: MockerFixture, mock_plan):
         p = PlanManager()
-        plan1 = mocker.create_autospec(spec=RedistrictingPlan)
-        plan2 = mocker.create_autospec(spec=RedistrictingPlan)
+        plan1 = mocker.create_autospec(spec=RdsPlan)
+        plan2 = mocker.create_autospec(spec=RdsPlan)
         p.appendPlan(plan1, makeActive=False)
         p.appendPlan(plan2, makeActive=False)
         p.appendPlan(mock_plan, makeActive=False)
@@ -54,7 +54,7 @@ class TestPlanManager:
     def test_append_with_makeactive_true_activates_plan(self, planmanager, mocker: MockerFixture):
         assert len(planmanager) == 3
         assert planmanager.activePlan is None
-        plan = mocker.create_autospec(spec=RedistrictingPlan)
+        plan = mocker.create_autospec(spec=RdsPlan)
         planmanager.appendPlan(plan, makeActive=True)
         assert len(planmanager) == 4
         assert planmanager.activePlan == plan
@@ -62,7 +62,7 @@ class TestPlanManager:
     def test_append_with_makeactive_false_does_not_activate_plan(self, planmanager, mocker: MockerFixture):
         assert len(planmanager) == 3
         assert planmanager.activePlan is None
-        plan = mocker.create_autospec(spec=RedistrictingPlan)
+        plan = mocker.create_autospec(spec=RdsPlan)
         planmanager.appendPlan(plan, makeActive=False)
         assert len(planmanager) == 4
         assert planmanager.activePlan is None
@@ -70,8 +70,8 @@ class TestPlanManager:
     def test_extend(self, mocker: MockerFixture):
         p = PlanManager()
         assert len(p) == 0
-        plan1 = mocker.create_autospec(spec=RedistrictingPlan)
-        plan2 = mocker.create_autospec(spec=RedistrictingPlan)
+        plan1 = mocker.create_autospec(spec=RdsPlan)
+        plan2 = mocker.create_autospec(spec=RdsPlan)
         p.extend([plan1, plan2])
         assert len(p) == 2
 

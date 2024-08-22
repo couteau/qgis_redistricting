@@ -1,6 +1,9 @@
 
 import io
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 from uuid import UUID
 
 import pandas as pd
@@ -14,9 +17,8 @@ from qgis.PyQt.QtCore import (
     QMimeData,
     QObject
 )
-from qgis.PyQt.QtWidgets import QAction
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..utils import (
     LayerReader,
     tr
@@ -24,6 +26,11 @@ from ..utils import (
 from .actions import ActionRegistry
 from .PlanAssignments import AssignmentsService
 from .PlanManager import PlanManager
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class DistrictCopier(QObject):
@@ -80,7 +87,7 @@ class DistrictCopier(QObject):
 
         return False
 
-    def canPasteAssignments(self, plan: RedistrictingPlan):
+    def canPasteAssignments(self, plan: RdsPlan):
         if plan is None:
             plan = self.planManager.activePlan
 

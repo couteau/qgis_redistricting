@@ -2,7 +2,7 @@ import pandas as pd
 import pytest
 
 from redistricting.gui.DeltaListModel import DeltaListModel
-from redistricting.models import RedistrictingPlan
+from redistricting.models import RdsPlan
 from redistricting.services import PlanEditor
 
 # pylint: disable=unused-argument,protected-access
@@ -36,7 +36,7 @@ class TestDeltaModel:
         model._delta._data = df
         return model
 
-    def test_update_fields(self, empty_model: DeltaListModel, plan: RedistrictingPlan, block_layer):
+    def test_update_fields(self, empty_model: DeltaListModel, plan: RdsPlan, block_layer):
         e = PlanEditor.fromPlan(plan)
         e.appendDataField('vap_nh_black')
         e.updatePlan()

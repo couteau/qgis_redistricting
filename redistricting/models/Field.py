@@ -23,13 +23,7 @@
  ***************************************************************************/
 """
 import re
-from copy import copy
-from typing import (
-    Any,
-    Dict,
-    Optional,
-    Union
-)
+from typing import Union
 
 from qgis.core import (
     QgsApplication,
@@ -38,346 +32,223 @@ from qgis.core import (
     QgsExpressionContextUtils,
     QgsFeature,
     QgsField,
-    QgsProject,
     QgsVectorLayer
 )
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import (
+    QVariant,
+    pyqtSignal
+)
 from qgis.PyQt.QtGui import QIcon
 
-from ..utils import tr
+from .base import (
+    Factory,
+    RdsBaseModel
+)
+from .prop import rds_property
 
 
-def makeFieldName(field: "Field"):
-    if field.isExpression:
-        name = (field.caption or field.field).lower()
-        if not name.isidentifier():
-            name = re.sub(r'[^\w]+', '_', name)
-    else:
-        name = field.field
+class RdsField(RdsBaseModel):
+    captionChanged = pyqtSignal()
 
-    return name
+    layer: QgsVectorLayer = rds_property(private=True)
+    field: str = rds_property(private=True)
+    caption: str = None
 
+    def __pre_init__(self):
+        self._icon: QIcon = None
+        self._expression: QgsExpression = None
+        self._context: QgsExpressionContext = None
+        self._prepared = False
+        self._errors = []
 
-class Field:
-    def __init__(
-        self,
-        layer: QgsVectorLayer,
-        field: str,
-        isExpression: Union[bool, None] = None,  # None = autodetect
-        caption: Optional[str] = None
-    ):
-        if layer is None or field is None:
-            raise ValueError()
+    def __key__(self):
+        return self._field
 
-        self._layer: QgsVectorLayer = None
-        self._error = None
-        self._field = field
-        self._isExpression = isExpression if isExpression is not None else not field.isidentifier()
-        self._caption = caption or field
-        self._index = -1
-        self.setLayer(layer)
+    @rds_property(private=True, notify=captionChanged)
+    def caption(self) -> str:
+        if self._caption is None:
+            if self.qgsField() is not None:
+                self._caption = self.qgsField().displayName() or self.field
+            else:
+                self._caption = self.field
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}('{self.field}')"
+        return self._caption
 
-    def setLayer(self, layer: QgsVectorLayer):
-        if layer is None:
-            self._layer = None
-            self._index = -1
-            return
+    @caption.setter
+    def caption(self, value: str):
+        self._caption = value
 
-        if not self.validate(layer):
-            raise ValueError(self._error)
+    @property
+    def fieldName(self):
+        if self.field.isidentifier():
+            return self.field
 
-        if self._isExpression:
-            self._icon = QgsApplication.getThemeIcon("/mIconExpression.svg")
-        else:
-            self._icon = layer.fields().iconForField(self._index, False)
-            if self._caption is None or self._caption == self._field:
-                self._caption = layer.fields().field(self._index).displayName() or self._caption
+        if self._caption and self._caption.isidentifier():
+            return self._caption.lower()
 
-        self._layer = layer
+        return re.sub(r'[^\w]+', '_', (self._caption or self._field).lower())
 
-    def serialize(self) -> dict[str, Any]:
-        return {
-            'layer': self._layer.id(),
-            'field': self._field,
-            'expression': self._isExpression,
-            'caption': self._caption
-        }
+    @property
+    def expression(self):
+        if self._expression is None:
+            self._expression = QgsExpression(self.field)
 
-    @classmethod
-    def deserialize(cls, data: Dict[str, Any]):
-        if not 'field' in data:
-            return None
-        layer = QgsProject.instance().mapLayer(data.get('layer'))
-        return cls(layer, data['field'], data.get('expression', False), data.get('caption'))
+            if self._expression.hasParserError():
+                self._errors = [e.errorMsg for e in self._expression.parserErrors()]  # pylint: disable=not-an-iterable
 
-    def _validateExpr(self, layer):
-        if not self._isExpression:
-            return True
+        return self._expression
 
-        self._error = None
-        context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
-        e = QgsExpression(self._field)
-        result = e.prepare(context)
-        if e.hasEvalError():
-            self._error = e.evalErrorString()
-        elif e.hasParserError():
-            self._error = e.parserErrorString()
-        return result
+    @property
+    def icon(self):
+        if self._icon is None:
+            if self.expression.isField():
+                self._icon = self.layer.fields().iconForField(self.fieldIndex(), False)
+            else:
+                self._icon = QgsApplication.getThemeIcon("/mIconExpression.svg")
 
-    def validate(self, layer: QgsVectorLayer = None):
-        if layer is None:
-            layer = self._layer
+        return self._icon
 
-        self._error = None
-        if self._isExpression:
-            if not self._validateExpr(layer):
-                self._error = tr('Expression "{}" invalid for layer {}: {}').format(
-                    self.field, layer.name(), self._error)
-                return False
+    def _createContext(self) -> QgsExpressionContext:
+        return QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(self.layer))
 
-        else:
-            self._index = layer.fields().lookupField(self._field)
-            if self._index == -1:
-                self._error = tr('Field {} not found in layer {}').format(self._field, layer.name())
+    def errors(self) -> list[str]:
+        return self._errors
+
+    def isValid(self) -> bool:
+        if self._expression is None or self._context is None:
+            self.validate()
+        return not self._errors
+
+    def validate(self) -> bool:
+        self._errors = []
+        if not self.expression.isValid():
+            return False
+
+        if self._context is None:
+            self._context = self._createContext()
+
+        if not self._prepared:
+            self._prepared = self.expression.prepare(self._context)
+            if not self._prepared:
+                self._errors.append(self.expression.evalErrorString())
                 return False
 
         return True
 
-    @property
-    def layer(self) -> QgsVectorLayer:
-        return self._layer
-
-    @property
-    def field(self) -> str:
-        return self._field
-
-    @property
-    def isExpression(self) -> bool:
-        return self._isExpression
-
-    @property
-    def fieldName(self):
-        return makeFieldName(self)
-
-    @property
-    def index(self):
-        return self._index
-
-    @property
-    def icon(self) -> QIcon:
-        return self._icon
-
-    @property
-    def caption(self) -> str:
-        return self._caption
-
-    @caption.setter
-    def caption(self, value):
-        self._caption = value
-
-    def hasError(self):
-        return self._error is not None
-
-    def error(self):
-        return self._error
-
-    def fieldType(self, context: QgsExpressionContext = None, layer: QgsVectorLayer = None):
-        if layer is None:
-            layer = self._layer
-
-        if self.isExpression:
-            if not context:
-                context = QgsExpressionContext()
-                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(layer))
-                context.setFeature(next(layer.getFeatures()))
-            expr = QgsExpression(self.field)
-            result = expr.evaluate(context)
-            if expr.hasEvalError():
-                self._error = expr.evalErrorString()
-                return None
-
-            t = QVariant(result).type()
+    def prepare(self, context: QgsExpressionContext = None) -> bool:
+        self._prepared = False
+        if context is None:
+            self._context = self._createContext()
         else:
-            i = layer.fields().lookupField(self.field)
-            if i == -1:
-                self._error = tr(f'Field {self.field} not found')
-                return None
+            self._context = context
+        return self.validate()
 
-            t = layer.fields().field(i).type()
+    def getValue(self, feature: QgsFeature = None):
+        if feature is not None:
+            if not self._prepared:
+                self.prepare()
+            self._context.setFeature(feature)
+        return self._expression.evaluate(self._context)
 
-        return t
+    def fieldIndex(self):
+        return QgsExpression.expressionToLayerFieldIndex(self.field, self.layer)
 
-    def makeQgsField(self, context: QgsExpressionContext = None, name: str = None, layer=None):
-        self._error = None
+    def fieldType(self) -> QVariant.Type:
+        index = self.fieldIndex()
+        if index != -1:
+            return self.layer.fields().field(index).type()
 
+        if self._prepared or self.prepare():
+            if (f := self._context.feature()) is None:
+                f = next(self.layer.getFeatures(), None)
+
+            if f is not None:
+                v = self.getValue(f)
+                return QVariant(v).type()
+
+        return QVariant.Invalid
+
+    def qgsField(self) -> QgsField:
+        idx = self.fieldIndex()
+        if idx == -1:
+            return None
+
+        return self.layer.fields().field(idx)
+
+    def makeQgsField(self, name: str = None) -> QgsField:
         if name is None:
             name = self.fieldName
 
-        t = self.fieldType(context, layer)
-        if t is None:
+        t = self.fieldType()
+
+        if t is QVariant.Invalid:
             return None
 
-        return QgsField(name, QVariant.LongLong if t == QVariant.Int else t)
+        return QgsField(name, t)
 
-    def getValue(self, feature: QgsFeature, context: QgsExpressionContext = None):
-        if self._isExpression:
-            self._error = None
-            e = QgsExpression(self.field)
-            if not context:
-                context = QgsExpressionContext()
-                context.appendScopes(
-                    QgsExpressionContextUtils.globalProjectLayerScopes(self._layer))
-            context.setFeature(feature)
-            result = e.evaluate(context)
-            if e.hasEvalError():
-                self._error = e.evalErrorString()
-                return None
+
+class RdsGeoField(RdsField):
+    def _createNameField(self):
+        l = self.getRelatedLayer()
+        if l is None:
+            return None
+
+        if l.fields().lookupField("name") != -1:
+            nameField = RdsField(l, "name")
+        elif self.layer.fields().lookupField(l, "name30") != -1:
+            nameField = RdsField(l, "name30")
+        elif self.layer.fields().lookupField("name20") != -1:
+            nameField = RdsField(l, "name20")
+        elif self.layer.fields().lookupField("name10") != -1:
+            nameField = RdsField(l, "name10")
         else:
-            result = feature[self.field]
+            nameField = None
 
-        if isinstance(result, QVariant):
-            result = None
+        return nameField
 
-        return result
+    nameField: RdsField = rds_property(private=True, factory=Factory(_createNameField))
 
-
-class GeoField(Field):
-    def __init__(
-        self,
-        layer: QgsVectorLayer,
-        field: str,
-        isExpression: Union[bool, None] = None,
-        caption: Optional[str] = None
-    ):
-        self._nameField: Field = None
-        super().__init__(layer, field, isExpression, caption)
-
-    def getRelatedLayer(self):
-        if self._layer and self._index != -1:
-            relations = self._layer.referencingRelations(self._index)
+    def getRelation(self):
+        index = QgsExpression.expressionToLayerFieldIndex(self._field, self._layer)
+        if index != -1:
+            relations = self.layer.referencingRelations(index)
             if relations:
-                return relations[0].referencedLayer()
+                return relations[0]
+
         return None
 
-    def setLayer(self, layer: QgsVectorLayer):
-        super().setLayer(layer)
-        if self._nameField is None:
-            l = self.getRelatedLayer()
-            if l:
-                if l.fields().lookupField("name") != -1:
-                    self.setNameField("name")
-                elif self._layer.fields().lookupField("name20") != -1:
-                    self.setNameField("name20")
-                elif self._layer.fields().lookupField("name10") != -1:
-                    self.setNameField("name10")
+    def getRelatedLayer(self):
+        rel = self.getRelation()
+        if rel:
+            return rel.referencedLayer()
 
-    @property
-    def nameField(self):
-        return self._nameField
+        return None
 
-    def setNameField(self, value: Union[Field, str]):
-        if isinstance(value, str):
-            self._nameField = Field(self.getRelatedLayer(), value)
-        else:
-            self._nameField = copy(value)
+    def getName(self, feature) -> str:
+        rel = self.getRelation()
+        f = rel.getReferencedFeature(feature)
+        if f is not None:
+            return self._nameField.getValue(f)
 
-    def serialize(self):
-        nf = {'name-field': self._nameField.serialize()} \
-            if self._nameField else {}
-        return super().serialize() | nf
-
-    @classmethod
-    def deserialize(cls, data: dict[str, Any]):
-        field = super().deserialize(data)
-        if field:
-            nf = data.get('name-field')
-            if nf:
-                field._nameField = Field.deserialize(nf)  # pylint: disable=protected-access
-
-        return field
+        return None
 
 
-class DataField(Field):
-    def __init__(
-        self,
-        layer: QgsVectorLayer,
-        field: str,
-        isExpression: Union[bool, None] = None,
-        caption: Optional[str] = None,
-        sumfield: Optional[bool] = None,
-        pctbase: Optional[Union[Field, str]] = None
-    ):
-        super().__init__(layer, field, isExpression, caption)
+class RdsDataField(RdsField):
+    sumFieldChanged = pyqtSignal()
+    pctBaseChanged = pyqtSignal()
 
-        if self._isExpression:
-            e = QgsExpression(field)
-            context = QgsExpressionContext()
-            context.appendScopes(
-                QgsExpressionContextUtils.globalProjectLayerScopes(layer))
-            feature = next(layer.getFeatures())
-            context.setFeature(feature)
-            result = e.evaluate(context)
-            if e.hasEvalError():
-                self._error = e.evalErrorString()
-                self.isNumeric = False
-            else:
-                self.isNumeric = isinstance(result, (int, float))
-        elif self._index != -1:
-            self.isNumeric = layer.fields().field(self._index).isNumeric()
+    sumField: bool = rds_property(
+        private=True,
+        fvalid=lambda inst, value: value and inst.isNumeric(),
+        notify=sumFieldChanged,
+        factory=Factory(lambda self: self.isNumeric())
+    )
+    pctBase: Union[str, None] = rds_property(
+        private=True,
+        fvalid=lambda inst, value: None if not inst.isNumeric() else value,
+        notify=pctBaseChanged,
+        default=None
+    )
 
-        # sum
-        self._sum = self.isNumeric if sumfield is None else (sumfield and self.isNumeric)
-
-        if not self.isNumeric or isExpression:
-            self._pctbase = None
-        else:
-            if isinstance(pctbase, Field):
-                self._pctbase = pctbase.fieldName
-            else:
-                self._pctbase = pctbase
-
-    @property
-    def sum(self) -> bool:
-        return self._sum
-
-    @sum.setter
-    def sum(self, value: bool):
-        if value and not self.isNumeric:
-            return
-
-        if self._sum != value:
-            self._sum = value
-
-    @property
-    def pctbase(self) -> str:
-        return self._pctbase
-
-    @pctbase.setter
-    def pctbase(self, value: Union[str, Field]):
-        if not self.isNumeric and value is not None:
-            return
-
-        if isinstance(value, Field):
-            value = value.fieldName
-
-        if self._pctbase != value:
-            self._pctbase = value
-
-    def serialize(self):
-        return super().serialize() | {
-            'sum': self.sum,
-            'pctbase': self.pctbase,
-        }
-
-    @classmethod
-    def deserialize(cls, data):
-        instance = super().deserialize(data)
-        if instance:
-            instance.sum = data.get('sum', instance.sum) if instance.isNumeric else False  # pylint: disable=no-member
-            instance.pctbase = data.get('pctbase')
-
-        return instance
+    def isNumeric(self):
+        return self.fieldType() in (QVariant.Double, QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong)

@@ -1,4 +1,4 @@
-"""QGIS Redistricting Plugin - unit tests for RedistrictingPlan class
+"""QGIS Redistricting Plugin - unit tests for RdsPlan class
 
 /***************************************************************************
  *                                                                         *
@@ -22,7 +22,7 @@ import pytest
 from pytest_mock.plugin import MockerFixture
 from qgis.core import QgsVectorLayer
 
-from redistricting.models.Plan import RedistrictingPlan
+from redistricting.models.Plan import RdsPlan
 from redistricting.services import PlanBuilder
 from redistricting.services.PlanBuilder import QgsApplication
 from redistricting.services.Tasks import CreatePlanLayersTask
@@ -65,8 +65,9 @@ class TestPlanCreator:
         mocker: MockerFixture
     ):
         mock = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
-        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
-        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
         task_class = mocker.patch('redistricting.services.PlanBuilder.CreatePlanLayersTask', spec=CreatePlanLayersTask)
         task_class.return_value = mocker.create_autospec(spec=CreatePlanLayersTask, instance=True)
         task_class.return_value.taskCompleted = mocker.MagicMock()
@@ -90,8 +91,9 @@ class TestPlanCreator:
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
-        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         builder = PlanBuilder() \
             .setName('test') \
@@ -101,8 +103,8 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_called_once()
-        json = plan_class.deserialize.call_args[0][0]
+        deserialize.assert_called_once()
+        json = deserialize.call_args[0][1]
         assert {'name': 'test', 'description': '', 'deviation': 0.0, 'num-districts': 5,
                 'geo-layer': layer.id(), 'geo-id-field': 'geoid20', 'pop-field': 'pop_total',
                 'geo-fields': [], 'data-fields': [], 'pop-fields': []}.items() <= json.items()
@@ -112,8 +114,9 @@ class TestPlanCreator:
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        plan_class = mocker.patch('redistricting.services.PlanBuilder.RedistrictingPlan', spec=RedistrictingPlan)
-        plan_class.deserialize.return_value = mocker.create_autospec(spec=RedistrictingPlan, instance=True)
+        mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         # no name
         builder = PlanBuilder() \
@@ -123,7 +126,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_not_called()
+        deserialize.assert_not_called()
 
         # no num districts
         builder = PlanBuilder() \
@@ -133,7 +136,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_not_called()
+        deserialize.assert_not_called()
 
         # no geo layer
         builder = PlanBuilder() \
@@ -143,7 +146,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_not_called()
+        deserialize.assert_not_called()
 
         # no geo field
         builder = PlanBuilder() \
@@ -153,7 +156,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_not_called()
+        deserialize.assert_not_called()
 
         # no pop field
         builder = PlanBuilder() \
@@ -163,7 +166,7 @@ class TestPlanCreator:
             .setGeoIdField('geoid20')
 
         builder.createPlan(createLayers=False)
-        plan_class.deserialize.assert_not_called()
+        deserialize.assert_not_called()
 
     def test_set_num_seats(self, creator: PlanBuilder):
         creator.setNumDistricts(45)
@@ -196,8 +199,37 @@ class TestPlanCreator:
         creator._popLayer.fields.return_value.lookupField.return_value = -1
         assert not creator._validatePopLayer()
 
-    def test_append_nonexistent_field_raises_error(self, creator: PlanBuilder, mock_geo_l: QgsVectorLayer):
-        assert creator._validatePopLayer()
-        mock_geo_l.fields.return_value.lookupField.return_value = -1
-        with pytest.raises(ValueError):
-            creator.appendPopField('not_a_field')
+    def test_create_attribute_indicies(self, creator: PlanBuilder):
+        creator._geoLayer.storageType.return_value = 'ESRI Shapefile'
+        creator._geoLayer.fields.return_value.lookupField.return_value = 1
+        creator.createAttributeIndices()
+        assert creator._popLayer is creator._geoLayer
+        creator._geoLayer.fields().lookupField.assert_called_once_with('geoid20')
+        creator._geoLayer.dataProvider().createAttributeIndex.assert_called_once_with(1)
+
+    def test_create_attribute_indicies_different_pop_layer(self, creator: PlanBuilder, mocker: MockerFixture):
+        pop_layer: QgsVectorLayer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
+        pop_layer.storageType.return_value = 'ESRI Shapefile'
+        pop_layer.fields.return_value.lookupField.return_value = 2
+        creator.setPopLayer(pop_layer)
+        creator._geoLayer.storageType.return_value = 'ESRI Shapefile'
+        creator._geoLayer.fields.return_value.lookupField.return_value = 1
+        creator.createAttributeIndices()
+        creator._geoLayer.fields().lookupField.assert_called_once_with('geoid20')
+        creator._geoLayer.dataProvider().createAttributeIndex.assert_called_once_with(1)
+        creator._popLayer.fields().lookupField.assert_called_once_with('geoid20')
+        creator._popLayer.dataProvider().createAttributeIndex.assert_called_once_with(2)
+
+    def test_create_attribute_indicies_different_pop_join_field(self, creator: PlanBuilder, mocker: MockerFixture):
+        pop_layer: QgsVectorLayer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
+        pop_layer.storageType.return_value = 'ESRI Shapefile'
+        pop_layer.fields.return_value.lookupField.return_value = 2
+        creator.setPopLayer(pop_layer)
+        creator.setPopJoinField('pop_join_field')
+        creator._geoLayer.storageType.return_value = 'ESRI Shapefile'
+        creator._geoLayer.fields.return_value.lookupField.return_value = 1
+        creator.createAttributeIndices()
+        creator._geoLayer.fields().lookupField.assert_called_once_with('geoid20')
+        creator._geoLayer.dataProvider().createAttributeIndex.assert_called_once_with(1)
+        creator._popLayer.fields().lookupField.assert_called_once_with('pop_join_field')
+        creator._popLayer.dataProvider().createAttributeIndex.assert_called_once_with(2)

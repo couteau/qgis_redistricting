@@ -20,12 +20,16 @@
 import pathlib
 
 import pytest
-from qgis.core import QgsVectorLayer
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsProject,
+    QgsVectorLayer
+)
 
 from redistricting.models import (
-    DataField,
-    Field,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
 from redistricting.services.Tasks.CreateLayersTask import CreatePlanLayersTask
 
@@ -41,7 +45,10 @@ class TestCreateLayersTask:
     def test_create_layers_formats(self, datadir: pathlib.Path, sourcefile, pop_field, geoid_field):
         path = datadir / sourcefile
         layer = QgsVectorLayer(str(path), 'blocks', 'ogr')
-        p = RedistrictingPlan('test_create_layers', 5)
+        layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
+        QgsProject.instance().addMapLayer(layer, False)
+
+        p = RdsPlan('test_create_layers', 5)
         p._geoIdField = geoid_field
         p._popLayer = layer
         p._popJoinField = geoid_field
@@ -55,25 +62,24 @@ class TestCreateLayersTask:
         assert result
         assert task.totalPop == 227036
         assert gpkg.exists()
-        layer.deleteLater()
 
     @pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
-        (['vap_apblack', 'vap_hispanic', 'vap_nh_white'], []),
-        (['vap_apblack - vap_nh_black'], []),
-        ([], ['countyid20', 'vtdid20']),
-        ([], ['statefp20 || countyfp20']),
+        (['vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
+        (['vap_ap_black - vap_nh_black'], []),
+        ([], ['countyid', 'vtdid']),
+        ([], ['statefp || countyfp']),
     ])
     def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
-        p = RedistrictingPlan('test_create_layers', 5)
+        p = RdsPlan('test_create_layers', 5)
         p._popLayer = block_layer
-        p._geoIdField = 'geoid20'
+        p._geoIdField = 'geoid'
         p._popField = 'pop_total'
 
-        p._dataFields.extend([DataField(block_layer, f) for f in datafields])
-        p._geoFields.extend([Field(block_layer, f) for f in geofields])
+        p._dataFields.extend([RdsDataField(block_layer, f) for f in datafields])
+        p._geoFields.extend([RdsField(block_layer, f) for f in geofields])
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
-        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid20')
+        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid')
         result = task.run()
         assert task.exception is None
         assert result
@@ -92,7 +98,7 @@ class TestCreateLayersTask:
             try:
                 assert d.isValid()
                 assert d.featureCount() == 1
-                for f in p.dataFields:
+                for f in p.dataFields:  # pylint: disable=not-an-iterable
                     assert d.fields().lookupField(f.fieldName) != -1
             finally:
                 del d
@@ -101,7 +107,7 @@ class TestCreateLayersTask:
             p._setDistLayer(None)
 
     def test_create_layers_cancel(self, block_layer, datadir: pathlib.Path):
-        p = RedistrictingPlan('test_create_layers', 5)
+        p = RdsPlan('test_create_layers', 5)
         # pylint: disable=protected-access
         p._popLayer = block_layer
         p._geoIdField = 'geoid20'

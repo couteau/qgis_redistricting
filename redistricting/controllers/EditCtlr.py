@@ -22,6 +22,7 @@
  ***************************************************************************/
 """
 from typing import (
+    TYPE_CHECKING,
     Iterable,
     Optional
 )
@@ -38,10 +39,7 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import (
-    QAction,
-    QDialog
-)
+from qgis.PyQt.QtWidgets import QDialog
 
 from ..gui import (
     DlgNewDistrict,
@@ -50,12 +48,17 @@ from ..gui import (
     PaintMode
 )
 from ..models import (
-    District,
-    RedistrictingPlan
+    RdsDistrict,
+    RdsPlan
 )
 from ..services import AssignmentsService
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class EditAssignmentsController(BaseController):
@@ -75,12 +78,12 @@ class EditAssignmentsController(BaseController):
         self.actionToggle: QAction = None
 
         self.mapTool = PaintDistrictsTool(self.canvas)
-        self.sourceDistrict: District = None
-        self.targetDistrict: District = None
+        self.sourceDistrict: RdsDistrict = None
+        self.targetDistrict: RdsDistrict = None
         self.geoField: str = None
 
         self.mapTool.paintingStarted.connect(self.startPaintingFeatures)
-        self.mapTool.paintFatures.connect(self.paintFeatures)
+        self.mapTool.paintFeatures.connect(self.paintFeatures)
         self.mapTool.paintingComplete.connect(self.endPaintingFeatures)
         self.mapTool.paintingCanceled.connect(self.endPaintingFeatures)
         self.mapTool.selectFeatures.connect(self.selectFeatures)
@@ -201,7 +204,7 @@ class EditAssignmentsController(BaseController):
 
     # slots
 
-    def activePlanChanged(self, plan: RedistrictingPlan):
+    def activePlanChanged(self, plan: RdsPlan):
         if not sip.isdeleted(self.canvas):
             self.canvas.unsetMapTool(self.mapTool)
 
@@ -222,7 +225,7 @@ class EditAssignmentsController(BaseController):
         self.actionEditTargetDistrict.setEnabled(False)
         self.actionEditSourceDistrict.setEnabled(False)
 
-    def connectPlanSignals(self, plan: RedistrictingPlan):
+    def connectPlanSignals(self, plan: RdsPlan):
         if plan.assignLayer:
             plan.assignLayer.editingStarted.connect(self.editingStarted)
             plan.assignLayer.editingStopped.connect(self.editingStopped)
@@ -269,7 +272,7 @@ class EditAssignmentsController(BaseController):
         self.planManager.activePlan.assignLayer.rollBack(True)
         self.planManager.activePlan.assignLayer.triggerRepaint()
 
-    def sourceDistrictChanged(self, district: District):
+    def sourceDistrictChanged(self, district: RdsDistrict):
         if district is None:
             self.mapTool.setSourceDistrict(None)
         else:
@@ -277,7 +280,7 @@ class EditAssignmentsController(BaseController):
         self.actionEditSourceDistrict.setEnabled(district is not None and district.district != 0)
         self.sourceDistrict = district
 
-    def targetDistrictChanged(self, district: District):
+    def targetDistrictChanged(self, district: RdsDistrict):
         if district is None:
             self.mapTool.setTargetDistrict(None)
         else:
@@ -304,7 +307,7 @@ class EditAssignmentsController(BaseController):
         self.dockwidget.setTargetDistrict(dist)
         return dist.district
 
-    def editDistrict(self, district: District = None):
+    def editDistrict(self, district: RdsDistrict = None):
         if not district:
             if self.sender() == self.actionEditTargetDistrict:
                 district = self.targetDistrict

@@ -59,9 +59,8 @@ from qgis.utils import iface
 
 from ..exception import RdsException
 from ..models import (
-    DataField,
-    Field,
-    FieldList
+    RdsDataField,
+    RdsField
 )
 from ..utils import tr
 
@@ -71,36 +70,32 @@ from ..utils import tr
 class FieldListModel(QAbstractTableModel):
 
     _headings = [
-        tr('Redistricting', 'Field'),
+        tr('Redistricting', 'RdsField'),
         tr('Redistricting', 'Caption'),
         tr('Redistricting', '∑'),
         tr('Redistricting', '%')
     ]
 
-    def __init__(self, fields: Union[FieldList, List[Field]] = None, popFields: Union[FieldList, list[Field]] = None, parent=None):
+    def __init__(self, fields: list[RdsField] = None, popFields: list[RdsField] = None, parent=None):
         super().__init__(parent)
-        if isinstance(fields, FieldList):
-            self._data: FieldList = fields[:]
-        elif isinstance(fields, list) and all(isinstance(f, Field) for f in fields):
-            self._data: FieldList = FieldList(fields)
-        elif fields is None:
-            self._data = FieldList()
+        if fields is None:
+            self._data: list[RdsField] = []
         else:
-            raise ValueError(tr("fields must be a FieldList or a list of Fields"))
+            self._data: list[RdsField] = fields[:]
 
         self.popFields = popFields
         self._colCount = 3
         if self._data:
             self.fieldType = type(self._data[0])
         else:
-            self.fieldType = Field
+            self.fieldType = RdsField
 
     @pyqtProperty(list)
     def fields(self):
-        return list(self._data)
+        return self._data
 
     @fields.setter
-    def fields(self, value: List[Field]):
+    def fields(self, value: list[RdsField]):
         if len(value) == 0 and len(self._data) == 0:
             return
         if len(self._data):
@@ -109,7 +104,7 @@ class FieldListModel(QAbstractTableModel):
             self.endRemoveRows()
         if value is not None and len(value):
             self.beginInsertRows(QModelIndex(), 0, len(value))
-            self._data = FieldList(value)
+            self._data = value
             self.fieldType = type(self._data[0])
             self.endInsertRows()
 
@@ -118,22 +113,20 @@ class FieldListModel(QAbstractTableModel):
         return self._fieldType
 
     @fieldType.setter
-    def fieldType(self, value: Type[Field]):
+    def fieldType(self, value: Type[RdsField]):
         self._fieldType = value
-        self.setColCount(5 if self._fieldType == DataField else 3)
+        self.setColCount(5 if self._fieldType == RdsDataField else 3)
 
     @property
-    def popFields(self) -> FieldList:
+    def popFields(self) -> list[RdsField]:
         return self._popFields
 
     @popFields.setter
-    def popFields(self, value: Union[FieldList, list[Field]]):
+    def popFields(self, value: list[RdsField]):
         if value is None:
-            self._popFields = FieldList(self)
-        elif isinstance(value, FieldList):
-            self._popFields = value
+            self._popFields: list[RdsField] = []
         else:
-            self._popFields = FieldList(value)
+            self._popFields = value
 
     def setColCount(self, value):
         if value != self._colCount:
@@ -283,7 +276,7 @@ class FieldListModel(QAbstractTableModel):
 
         return f
 
-    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[Field, DataField, None]:
+    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[RdsField, RdsDataField, None]:
         for f in self._data:
             if f.field == field:
                 return None
@@ -308,10 +301,14 @@ class FieldListModel(QAbstractTableModel):
         return Qt.MoveAction | Qt.CopyAction
 
     def moveField(self, row_source, row_target):
-        row_a, row_b = max(row_source, row_target), min(row_source, row_target)
-        self.beginMoveRows(QModelIndex(), row_a, row_a, QModelIndex(), row_b)
-        self._data.move(row_a, row_b)
-        self.endMoveRows()
+        if 0 <= row_source < len(self._data) and 0 <= row_target < len(self._data):
+            self.beginMoveRows(QModelIndex(), row_source, row_source, QModelIndex(), row_target)
+            item = self._data[row_source]
+            del self._data[row_source]
+            self._data.insert(row_target, item)
+            self.endMoveRows()
+        else:
+            raise ValueError(tr("Source and target rows must be in list"))
 
 
 class RdsFieldTableView(QTableView):
@@ -395,7 +392,7 @@ class RdsFieldTableView(QTableView):
         return super().mouseReleaseEvent(e)
 
     @pyqtProperty(list, notify=fieldsChanged)
-    def fields(self) -> List[Field]:
+    def fields(self) -> List[RdsField]:
         m = self.model()
         if not isinstance(m, FieldListModel):
             return []

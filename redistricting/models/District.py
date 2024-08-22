@@ -22,7 +22,9 @@
  *                                                                         *
  ***************************************************************************/
 """
+from itertools import repeat
 from typing import (
+    Annotated,
     Any,
     Iterable,
     Literal,
@@ -30,33 +32,28 @@ from typing import (
     overload
 )
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
+from .base import (
+    Factory,
+    RdsBaseModel
+)
 from .columns import (
     DistrictColumns,
     StatsColumns
 )
+from .prop import (
+    MISSING,
+    in_range,
+    not_empty,
+    rds_property
+)
 
 
-class District(QObject):
-    BASE_COLUMNS = [
-        DistrictColumns.DISTRICT,
-        DistrictColumns.NAME,
-        DistrictColumns.MEMBERS,
-        DistrictColumns.POPULATION,
-        DistrictColumns.DEVIATION,
-        DistrictColumns.PCT_DEVIATION,
-    ]
-    STATS_COLUMNS = [
-        StatsColumns.POLSBYPOPPER,
-        StatsColumns.REOCK,
-        StatsColumns.CONVEXHULL,
-        StatsColumns.PIECES
-    ]
+class RdsDistrict(RdsBaseModel):
+    BASE_COLUMNS = list(DistrictColumns)
+    STATS_COLUMNS = list(StatsColumns)
     WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
                            DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
 
@@ -65,32 +62,35 @@ class District(QObject):
     descriptionChanged = pyqtSignal()
 
     district: int
-    name: str
-    members: int
-    population: int
-    deviation: int
-    pct_deviation: float
+    name: Annotated[str, not_empty] = rds_property(
+        notify=nameChanged, strict=True, factory=Factory(lambda self: str(self.district))
+    )
+    members: Annotated[int, in_range(0, 9999)] = rds_property(notify=membersChanged, strict=True, default=1)
+    population: int = 0
+    deviation: int = 0
+    pct_deviation: float = 0.0
+    description: str = rds_property(private=True, notify=descriptionChanged, strict=True, default="")
+    fid: int = -1
 
-    def __init__(self, district: int, fid: int = -1, *, description="", **kwargs):
-        super().__init__()
-        self._district = district
-        self._fid = fid
-        self._description = description
+    def __pre_init__(self):
         self._data = {
-            DistrictColumns.DISTRICT: self._district,
-            DistrictColumns.NAME: str(district),
+            DistrictColumns.DISTRICT: MISSING,
+            DistrictColumns.NAME: MISSING,
             DistrictColumns.MEMBERS: 1,
             DistrictColumns.POPULATION: 0,
             DistrictColumns.DEVIATION: 0,
             DistrictColumns.PCT_DEVIATION: 0.0,
         }
-        self.update(kwargs)
+        self._data.update(zip(RdsDistrict.STATS_COLUMNS, repeat(None)))
 
-    def __repr__(self):
-        return f"District({self._district} - '{self.name}' ({self.population}))"
+    def __post_init__(self, **data):
+        self.update(data)
+
+    def __key__(self):
+        return str(self.district)
 
     def clone(self):
-        return self.__class__(fid=self._fid, description=self._description, **self._data)
+        return self.__class__(fid=self._fid, description=self.description, **self._data)
 
     def __contains__(self, index: str):
         return index in self._data
@@ -117,7 +117,7 @@ class District(QObject):
         return value
 
     def __setitem__(self, key: Union[int, str], value: Any):
-        if key not in District.WRITABLE_ATTRIBUTES:
+        if key not in RdsDistrict.WRITABLE_ATTRIBUTES:
             raise IndexError(f"Field '{key}' is readonly")
 
         if isinstance(key, int):
@@ -127,66 +127,62 @@ class District(QObject):
                 raise IndexError(f"no item at index {key}")
 
         self._data[key] = value
-        if key == DistrictColumns.NAME:
-            self.nameChanged.emit()
-        elif key == DistrictColumns.MEMBERS:
-            self.membersChanged.emit()
 
-    def __eq__(self, __value: "District"):
-        return self._district == __value._district and self._data == __value._data
+    def __eq__(self, __value: "RdsDistrict"):
+        return self._data == __value._data
 
-    @property
+    def __getattr__(self, name):
+        if not name in self._data:
+            raise AttributeError(tr("District object has no attribute {name}").format(name=name))
+        return self._data[name]
+
+    @rds_property(readonly=True)
     def district(self):
-        return self._district
+        return self._data[DistrictColumns.DISTRICT]
 
-    @property
-    def fid(self):
-        return self._fid
+    @district.setter
+    def district(self, value: int):
+        self._data[DistrictColumns.DISTRICT] = value
 
-    @property
+    @name.getter
     def name(self):
         return self._data[DistrictColumns.NAME]
 
     @name.setter
     def name(self, value: str):
-        assert isinstance(value, str) and value != ""
-        try:
-            self[DistrictColumns.NAME] = value
-        except IndexError as e:
-            raise AttributeError(e) from e
+        self._data[DistrictColumns.NAME] = value
 
-    @property
+    @members.getter
     def members(self):
         return self._data[DistrictColumns.MEMBERS]
 
     @members.setter
     def members(self, value: int):
-        assert isinstance(value, int) and value > 0
-        try:
-            self[DistrictColumns.MEMBERS] = value
-        except IndexError as e:
-            raise AttributeError(e) from e
+        self._data[DistrictColumns.MEMBERS] = value
 
-    @property
+    @rds_property(strict=True)
     def population(self):
         return self._data[DistrictColumns.POPULATION]
 
-    @property
+    @population.setter
+    def population(self, value: int):
+        self._data[DistrictColumns.POPULATION] = value
+
+    @rds_property(strict=True)
     def deviation(self):
         return self._data[DistrictColumns.DEVIATION]
 
-    @property
+    @deviation.setter
+    def deviation(self, value: int):
+        self._data[DistrictColumns.DEVIATION] = value
+
+    @rds_property(strict=True)
     def pct_deviation(self):
         return self._data[DistrictColumns.PCT_DEVIATION]
 
-    @property
-    def description(self):
-        return self._description
-
-    @description.setter
-    def description(self, value):
-        self._description = value
-        self.descriptionChanged.emit()
+    @pct_deviation.setter
+    def pct_deviation(self, value: float):
+        self._data[DistrictColumns.PCT_DEVIATION] = value
 
     @property
     def columns(self):
@@ -194,41 +190,49 @@ class District(QObject):
 
     def extend(self, columns: Iterable[str]):
         data = self._data
-        addcols = [c for c in columns if c not in District.BASE_COLUMNS and c not in District.STATS_COLUMNS]
-        self._data = dict.fromkeys(District.BASE_COLUMNS + addcols + District.STATS_COLUMNS)
+        addcols = [c for c in columns if c not in RdsDistrict.BASE_COLUMNS and c not in RdsDistrict.STATS_COLUMNS]
+        self._data = dict.fromkeys(RdsDistrict.BASE_COLUMNS + addcols + RdsDistrict.STATS_COLUMNS)
         self._data.update(data)
 
     @overload
-    def update(self, data: "District"):
+    def update(self, data: "RdsDistrict"):
         ...
 
     @overload
     def update(self, data: dict[str, Any]):
         ...
 
-    def update(self, data: Union["District", dict[str, Any]]):
-        if isinstance(data, District):
+    def update(self, data: Union["RdsDistrict", dict[str, Any]]):
+        if isinstance(data, RdsDistrict):
+            self._fid = data.fid
             data = data[:]
 
-        newkeys = [k for k in data.keys() if k not in District.BASE_COLUMNS + District.STATS_COLUMNS]
-        self._data = dict.fromkeys(District.BASE_COLUMNS + newkeys + District.STATS_COLUMNS) | self._data | data
+        newkeys = [k for k in data.keys() if k not in RdsDistrict.BASE_COLUMNS + RdsDistrict.STATS_COLUMNS]
+        self._data = dict.fromkeys(RdsDistrict.BASE_COLUMNS + newkeys + RdsDistrict.STATS_COLUMNS) | self._data | data
 
 
-class Unassigned(District):
-    def __init__(self, district: Literal[0] = 0, fid=-1, **kwargs):
-        assert district == 0
-        super().__init__(district, fid, **kwargs)
+class RdsUnassigned(RdsDistrict):
+    district: Literal[0] = rds_property(
+        init=False, readonly=True, default=0, fget=RdsDistrict.district.fget, fset=RdsDistrict.district.fset)
+    name: str = rds_property(init=False, readonly=True, default=tr("Unassigned"),
+                             fget=RdsDistrict.name.fget, fset=RdsDistrict.name.fset)
+
+    def __pre_init__(self):
+        super().__pre_init__()
+        self._data[DistrictColumns.MEMBERS] = None
+        self._data[DistrictColumns.POPULATION] = None
+        self._data[DistrictColumns.DEVIATION] = None
+        self._data[DistrictColumns.PCT_DEVIATION] = None
 
     def __setitem__(self, key: Union[str, int, slice], value: Any):
         raise IndexError(tr("'{key}' field is readonly for Unassigned goegraphies").format(key=key))
 
-    def update(self, data: Union["District", dict[str, Any]]):
+    def update(self, data: Union["RdsDistrict", dict[str, Any]]):
         super().update(data)
 
         self._data[DistrictColumns.NAME] = tr("Unassigned")
         self._data[DistrictColumns.MEMBERS] = None
         self._data[DistrictColumns.DEVIATION] = None
         self._data[DistrictColumns.PCT_DEVIATION] = None
-        self._data['polsbypopper'] = None
-        self._data['reock'] = None
-        self._data['convexhul'] = None
+
+        self._data.update(zip(RdsDistrict.STATS_COLUMNS, repeat(None)))

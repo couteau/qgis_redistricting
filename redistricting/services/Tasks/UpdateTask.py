@@ -43,10 +43,10 @@ from qgis.core import (
 )
 
 from ...models import (
-    DataField,
     DistrictColumns,
-    Field,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
 from ...utils import (
     LayerReader,
@@ -57,7 +57,7 @@ from ...utils import (
 class AggregateDataTask(SqlAccess, QgsTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
-    def __init__(self, plan: RedistrictingPlan, description: str):
+    def __init__(self, plan: RdsPlan, description: str):
         super().__init__(description, QgsTask.AllFlags)
         self.plan = plan
         self.assignLayer: QgsVectorLayer = plan.assignLayer
@@ -67,8 +67,8 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.geoIdField: str = plan.geoIdField
         self.popJoinField: str = plan.popJoinField
         self.popField: str = plan.popField
-        self.popFields: Sequence[Field] = plan.popFields
-        self.dataFields: Sequence[DataField] = plan.dataFields
+        self.popFields: Sequence[RdsField] = plan.popFields
+        self.dataFields: Sequence[RdsDataField] = plan.dataFields
         self.totalPopulation = plan.totalPopulation
         self.ideal = plan.ideal
         self.districts = plan.districts
@@ -128,7 +128,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
         for f in self.popFields:
-            if f.isExpression:
+            if f.expression:
                 expr = QgsExpression(f.field)
                 expr.prepare(context)
                 cols += expr.referencedColumns()
@@ -136,7 +136,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
                 cols.append(f.field)
 
         for f in self.dataFields:
-            if f.isExpression:
+            if f.expression:
                 expr = QgsExpression(f.field)
                 expr.prepare(context)
                 cols += expr.referencedColumns()
@@ -151,10 +151,10 @@ class AggregateDataTask(SqlAccess, QgsTask):
         )
         df.rename(columns={self.popField: str(DistrictColumns.POPULATION)}, inplace=True)
         for f in self.popFields:
-            if f.isExpression:
+            if f.expression:
                 df.loc[:, f.fieldName] = df.query(f.field)
         for f in self.dataFields:
-            if f.isExpression:
+            if f.expression:
                 df.loc[:, f.fieldName] = df.query(f.field)
 
         return df

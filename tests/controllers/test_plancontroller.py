@@ -18,10 +18,7 @@ from redistricting import (
     gui,
     services
 )
-from redistricting.models import (
-    FieldList,
-    RedistrictingPlan
-)
+from redistricting.models import RdsPlan
 from redistricting.resources import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
 
@@ -84,9 +81,9 @@ class TestPlanController:
         dlg.geoIdCaption.return_value = 'Block'
         dlg.joinField.return_value = 'geoid20'
         dlg.popField.return_value = 'pop_total'
-        dlg.popFields.return_value = FieldList()
-        dlg.dataFields.return_value = FieldList()
-        dlg.geoFields.return_value = FieldList()
+        dlg.popFields.return_value = []
+        dlg.dataFields.return_value = []
+        dlg.geoFields.return_value = []
         dlg.gpkgPath.return_value = datadir / 'test_plan.gpkg'
 
         dlg.importPlan.return_value = False
@@ -216,7 +213,7 @@ class TestPlanController:
         controller_with_active_plan: controllers.PlanController,
         mock_edit_dlg: MagicMock,
         mock_editor: MagicMock,
-        mock_plan: RedistrictingPlan
+        mock_plan: RdsPlan
     ):
         builder = mock_editor.fromPlan.return_value
 
@@ -231,7 +228,7 @@ class TestPlanController:
         controller: controllers.PlanController,
         mock_edit_dlg: MagicMock,
         mock_editor: MagicMock,
-        mock_plan: RedistrictingPlan
+        mock_plan: RdsPlan
     ):
         builder = mock_editor.fromPlan.return_value
         controller.editPlan(mock_plan)

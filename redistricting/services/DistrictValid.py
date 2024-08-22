@@ -29,8 +29,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..models import (
-        District,
-        RedistrictingPlan
+        RdsDistrict,
+        RdsPlan
     )
 
 
@@ -38,7 +38,7 @@ class DistrictValidator:
     """Validate whether district population is within allowable deviation for plan
     """
 
-    def validateDistrict(self, plan: "RedistrictingPlan", district: "District"):
+    def validateDistrict(self, plan: "RdsPlan", district: "RdsDistrict"):
         maxDeviation = district.members * int(plan.totalPopulation * plan.deviation / plan.numDistricts)
         idealUpper = ceil(district.members * plan.totalPopulation / plan.numSeats) + maxDeviation
         idealLower = floor(district.members * plan.totalPopulation / plan.numSeats) - maxDeviation

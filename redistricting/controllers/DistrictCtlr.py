@@ -21,7 +21,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 
 from qgis.core import (
     QgsApplication,
@@ -36,7 +39,6 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtWidgets import (
-    QAction,
     QMenu,
     QToolBar
 )
@@ -51,6 +53,11 @@ from ..services import (
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class DistrictController(BaseController):

@@ -1,4 +1,4 @@
-"""QGIS Redistricting Plugin - unit tests for RedistrictingPlan class
+"""QGIS Redistricting Plugin - unit tests for RdsPlan class
 
 /***************************************************************************
  *                                                                         *
@@ -21,9 +21,9 @@ from pytestqt.plugin import QtBot
 from qgis.core import Qgis
 
 from redistricting.models import (
-    DataField,
-    Field,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
 from redistricting.services import PlanEditor
 
@@ -44,7 +44,7 @@ class TestPlanEditor:
         assert p is not None
         assert p.geoIdCaption == "Test Geog"
 
-    def test_signals(self, editor: PlanEditor, valid_plan: RedistrictingPlan, qtbot: QtBot):
+    def test_signals(self, editor: PlanEditor, valid_plan: RdsPlan, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.nameChanged,
                               check_params_cb=lambda p: p == 'new name'
                               ):
@@ -56,7 +56,7 @@ class TestPlanEditor:
     def test_datafields_append_adds_field(
         self,
         editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
+        valid_plan: RdsPlan,
         block_layer,
         qtbot: QtBot
     ):
@@ -64,18 +64,18 @@ class TestPlanEditor:
             editor.appendDataField('vap_apblack', False, 'APBVAP')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
-        assert isinstance(valid_plan.dataFields[0], DataField)
+        assert isinstance(valid_plan.dataFields[0], RdsDataField)
         assert valid_plan.dataFields[0].layer == block_layer
         assert valid_plan.dataFields[0].field == 'vap_apblack'
-        assert not valid_plan.dataFields[0].isExpression
+        assert not valid_plan.dataFields[0].expression
         assert valid_plan.dataFields[0].caption == 'APBVAP'
 
-        f1 = DataField(block_layer, 'pop_apblack', False, caption='APBPOP')
+        f1 = RdsDataField(block_layer, 'pop_apblack', False, caption='APBPOP')
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
             editor.appendDataField(f1)
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
-        assert isinstance(valid_plan.dataFields[1], DataField)
+        assert isinstance(valid_plan.dataFields[1], RdsDataField)
         assert valid_plan.dataFields[1].field == 'pop_apblack'
 
         editor.appendDataField('vap_nh_white')
@@ -84,7 +84,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def bvap_field_fld(self, block_layer):
-        return DataField(block_layer, 'vap_nh_black', False)
+        return RdsDataField(block_layer, 'vap_nh_black', False)
 
     @pytest.fixture
     def bvap_field_str(self):
@@ -94,7 +94,7 @@ class TestPlanEditor:
     def test_datafields_set_error_when_duplicate_field_added(
         self,
         editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
+        valid_plan: RdsPlan,
         field,
         mock_taskmanager,  # pylint: disable=unused-argument
         request
@@ -130,7 +130,7 @@ class TestPlanEditor:
         with pytest.raises(ValueError):
             editor.removeDataField(3)
 
-    def test_datafields_remove_field(self, editor: PlanEditor, valid_plan: RedistrictingPlan, qtbot: QtBot):
+    def test_datafields_remove_field(self, editor: PlanEditor, valid_plan: RdsPlan, qtbot: QtBot):
         editor.appendDataField('pop_apblack')
         editor.appendDataField('vap_apblack')
         editor.appendDataField('vap_nh_white')
@@ -157,7 +157,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def vtd_field_fld(self, block_layer):
-        return Field(block_layer, 'vtdid20', False)
+        return RdsField(block_layer, 'vtdid20', False)
 
     @pytest.fixture
     def vtd_field_str(self):
@@ -166,7 +166,7 @@ class TestPlanEditor:
     def test_geofields_append_adds_field(
         self,
         editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
+        valid_plan: RdsPlan,
         mock_taskmanager,  # pylint: disable=unused-argument
         block_layer,
         qtbot: QtBot
@@ -175,19 +175,19 @@ class TestPlanEditor:
             editor.appendGeoField('vtdid20', False, 'VTD')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
-        assert isinstance(valid_plan.geoFields[0], Field)
+        assert isinstance(valid_plan.geoFields[0], RdsField)
         assert valid_plan.geoFields[0].layer == block_layer
         assert valid_plan.geoFields[0].field == 'vtdid20'
-        assert not valid_plan.geoFields[0].isExpression
+        assert not valid_plan.geoFields[0].expression
         assert valid_plan.geoFields[0].caption == 'VTD'
 
-        f1 = Field(block_layer, 'statefp20 || countyfp20 || vtd', True, caption='VTD')
+        f1 = RdsField(block_layer, 'statefp20 || countyfp20 || vtd', True, caption='VTD')
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
         assert valid_plan.geoFields[1].field == 'statefp20 || countyfp20 || vtd'
-        assert valid_plan.geoFields[1].isExpression
+        assert valid_plan.geoFields[1].expression
 
         editor.appendGeoField('countyid20')
         editor.updatePlan()
@@ -197,7 +197,7 @@ class TestPlanEditor:
     def test_geofields_set_error_when_duplicate_field_added(
         self,
         editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
+        valid_plan: RdsPlan,
         mock_taskmanager,  # pylint: disable=unused-argument
         field,
         request
@@ -238,7 +238,7 @@ class TestPlanEditor:
     def test_geofields_remove_field(
         self,
         editor: PlanEditor,
-        valid_plan: RedistrictingPlan,
+        valid_plan: RdsPlan,
         vtd_field_fld,
         mock_taskmanager,  # pylint: disable=unused-argument
         qtbot: QtBot

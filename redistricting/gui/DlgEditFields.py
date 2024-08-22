@@ -35,14 +35,14 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
 
 
 class DlgEditFields(QDialog):
     def __init__(
         self,
-        plan: RedistrictingPlan,
+        plan: RdsPlan,
         parent: Optional[QWidget] = None,
         flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
     ):

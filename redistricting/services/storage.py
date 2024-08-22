@@ -38,7 +38,7 @@ from qgis.PyQt.QtXml import QDomDocument
 
 from ..models import (
     DistrictColumns,
-    RedistrictingPlan,
+    RdsPlan,
     StatsColumns
 )
 from .DistrictIO import (
@@ -82,7 +82,7 @@ class ProjectStorage:
     def setVersion(self):
         self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
 
-    def readDistricts(self, plan: RedistrictingPlan):
+    def readDistricts(self, plan: RdsPlan):
         if plan.distLayer is None:
             return
 
@@ -102,7 +102,7 @@ class ProjectStorage:
         districtReader = DistrictReader(plan.distLayer, plan.distField, plan.popField, columns)
         districtReader.loadDistricts(plan)
 
-    def writeDistricts(self, plan: RedistrictingPlan):
+    def writeDistricts(self, plan: RdsPlan):
         columns = [plan.distField, DistrictColumns.NAME,
                    DistrictColumns.MEMBERS, DistrictColumns.POPULATION,
                    DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION,
@@ -116,7 +116,7 @@ class ProjectStorage:
             writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
             writer.writeToLayer(plan.districts)
 
-    def writeRedistrictingPlans(self, plans: Iterable[RedistrictingPlan]):
+    def writeRedistrictingPlans(self, plans: Iterable[RdsPlan]):
         l: List[str] = []
         for p in plans:
             data = p.serialize()
@@ -126,7 +126,7 @@ class ProjectStorage:
         self._project.writeEntry('redistricting', 'redistricting-plans', l)
         self.setVersion()
 
-    def readRedistrictingPlans(self) -> List[RedistrictingPlan]:
+    def readRedistrictingPlans(self) -> List[RdsPlan]:
         plans = []
         self.migrate()
         l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
@@ -138,7 +138,7 @@ class ProjectStorage:
                     planJson['geo-layer'] = planJson['pop-layer']
                     del planJson['pop-layer']
 
-                plan = RedistrictingPlan.deserialize(planJson, parent=self._project)
+                plan = RdsPlan.deserialize(planJson, parent=self._project)
                 self.readDistricts(plan)
                 if plan is not None:
                     plans.append(plan)
@@ -155,7 +155,7 @@ class ProjectStorage:
                 pass
         return None
 
-    def writeActivePlan(self, plan: RedistrictingPlan):
+    def writeActivePlan(self, plan: RdsPlan):
         if plan is not None:
             self._project.writeEntry('redistricting', 'active-plan', str(plan.id))
         else:

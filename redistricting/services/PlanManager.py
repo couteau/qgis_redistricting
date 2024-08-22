@@ -38,7 +38,7 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 
 
 class PlanManager(QObject):
@@ -49,12 +49,12 @@ class PlanManager(QObject):
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._plans: list[RedistrictingPlan] = []
-        self._plansById: dict[UUID, RedistrictingPlan] = {}
+        self._plans: list[RdsPlan] = []
+        self._plansById: dict[UUID, RdsPlan] = {}
         self._activePlan = None
 
     @property
-    def activePlan(self) -> RedistrictingPlan:
+    def activePlan(self) -> RdsPlan:
         return self._activePlan
 
     def __bool__(self):
@@ -75,10 +75,10 @@ class PlanManager(QObject):
     def __iter__(self):
         return iter(self._plans)
 
-    def __contains__(self, plan: RedistrictingPlan):
+    def __contains__(self, plan: RdsPlan):
         return plan in self._plans
 
-    def setActivePlan(self, plan: Union[RedistrictingPlan, str, UUID, None]):
+    def setActivePlan(self, plan: Union[RdsPlan, str, UUID, None]):
         if isinstance(plan, str):
             try:
                 plan = UUID(plan)
@@ -95,7 +95,7 @@ class PlanManager(QObject):
                 return
             plan = p
 
-        if plan is not None and not isinstance(plan, RedistrictingPlan):
+        if plan is not None and not isinstance(plan, RdsPlan):
             QgsMessageLog.logMessage(
                 self.tr('Invalid plan: {plan}').format(plan=repr(plan)), 'Redistricting', Qgis.Critical)
             return
@@ -110,16 +110,16 @@ class PlanManager(QObject):
             self._activePlan = plan
             self.activePlanChanged.emit(plan)
 
-    def appendPlan(self, plan: RedistrictingPlan, makeActive=True):
-        assert isinstance(plan, RedistrictingPlan)
+    def appendPlan(self, plan: RdsPlan, makeActive=True):
+        assert isinstance(plan, RdsPlan)
         self._plans.append(plan)
         self._plansById[plan.id] = plan
         self.planAdded.emit(plan)
         if makeActive:
             self.setActivePlan(plan)
 
-    def removePlan(self, plan: RedistrictingPlan):
-        assert isinstance(plan, RedistrictingPlan)
+    def removePlan(self, plan: RdsPlan):
+        assert isinstance(plan, RdsPlan)
         if plan in self._plans:
             if self._activePlan is plan:
                 self.setActivePlan(None)
@@ -132,9 +132,9 @@ class PlanManager(QObject):
         self._plansById = {}
         self._plans = []
 
-    def extend(self, plans: Iterable[RedistrictingPlan]):
+    def extend(self, plans: Iterable[RdsPlan]):
         for plan in plans:
             self.appendPlan(plan, False)
 
-    def get(self, key: UUID) -> Union[RedistrictingPlan, None]:
+    def get(self, key: UUID) -> Union[RdsPlan, None]:
         return self._plansById.get(key)

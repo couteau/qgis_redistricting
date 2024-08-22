@@ -19,18 +19,18 @@
 import pytest
 
 from redistricting.models import (
-    District,
-    Unassigned
+    RdsDistrict,
+    RdsUnassigned
 )
 
 
 class TestDistrict:
     @pytest.fixture
     def district(self):
-        return District(1)
+        return RdsDistrict(1)
 
     def test_create(self):
-        district = District(1)
+        district = RdsDistrict(1)
         assert district.district == 1
         assert district.name == "1"
         assert district.members == 1
@@ -40,36 +40,36 @@ class TestDistrict:
         assert district.pct_deviation == 0
 
     def test_create_with_name_sets_name(self):
-        district = District(1, name="District 1")
+        district = RdsDistrict(1, name="District 1")
         assert district.name == "District 1"
 
     def test_create_with_members_sets_members(self):
-        district = District(1, members=2)
+        district = RdsDistrict(1, members=2)
         assert district.members == 2
 
     def test_create_with_description_sets_description(self):
-        district = District(1, description="District 1 description")
+        district = RdsDistrict(1, description="District 1 description")
         assert district.description == "District 1 description"
 
     def test_multimember(self):
-        d = District(1, members=2)
+        d = RdsDistrict(1, members=2)
         assert d.members == 2
 
-    def test_population(self, district: District):
+    def test_population(self, district: RdsDistrict):
         assert district.population == 0
 
-    def test_set_property_modifies_property(self, district: District):
+    def test_set_property_modifies_property(self, district: RdsDistrict):
         district.name = 'New Name'
         assert district.name == 'New Name'
         district.description = "Discrict description"
         assert district.description == "Discrict description"
 
-    def test_getitem_int_getsitem(self, district: District):
+    def test_getitem_int_getsitem(self, district: RdsDistrict):
         assert district[0] == 1
         assert district[1] == "1"
         assert district[2] == 1
 
-    def test_set_district_raises_exception(self, district: District):
+    def test_set_district_raises_exception(self, district: RdsDistrict):
         with pytest.raises(AttributeError):
             district.district = 2
 
@@ -80,7 +80,7 @@ class TestDistrict:
             district[0] = 2
 
     def test_create_unassigned(self):
-        district = Unassigned()
+        district = RdsUnassigned()
         assert district.district == 0
         assert district.name == "Unassigned"
         assert district.population == 0
@@ -89,6 +89,6 @@ class TestDistrict:
         assert district.pct_deviation is None
 
     def test_unassigned_set_name_raises_exception(self):
-        district = Unassigned()
+        district = RdsUnassigned()
         with pytest.raises(AttributeError):
             district.name = "New Name"

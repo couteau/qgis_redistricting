@@ -39,8 +39,8 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import (
-    DataField,
-    Field
+    RdsDataField,
+    RdsField
 )
 from ..services import defaults
 from ..utils import (
@@ -54,7 +54,7 @@ from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
 class PopFieldDelegate(QStyledItemDelegate):
     def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self.popFields: list[Field] = []
+        self.popFields: list[RdsField] = []
 
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         if index.column() == 3:
@@ -96,7 +96,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         super().__init__(parent)
         self.setupUi(self)
         self.fieldsModel = self.tblDataFields.model()
-        self.fieldsModel.fieldType = DataField
+        self.fieldsModel.fieldType = RdsDataField
         self.tblDataFields.setItemDelegateForColumn(3, PopFieldDelegate(self))
 
         self.registerField('dataFields', self.tblDataFields, 'fields', self.tblDataFields.fieldsChanged)
@@ -110,8 +110,8 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
     def initializePage(self):
         super().initializePage()
         popLayer = self.field("popLayer") or self.field("sourceLayer")
-        popField = Field(popLayer, self.field("popField"), False, tr("Total Population"))
-        popFields: list[Field] = [popField, *self.field("popFields")]
+        popField = RdsField(popLayer, self.field("popField"), False, tr("Total Population"))
+        popFields: list[RdsField] = [popField, *self.field("popFields")]
         self.fieldsModel.popFields = popFields
 
         delegate: PopFieldDelegate = self.tblDataFields.itemDelegateForColumn(3)

@@ -23,8 +23,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import pyqtProperty
 from qgis.gui import QgsFieldComboBox
+from qgis.PyQt.QtCore import pyqtProperty
 
 
 class RdsFieldComboBox(QgsFieldComboBox):

@@ -54,7 +54,7 @@ from .Tasks import (
 )
 
 if TYPE_CHECKING:
-    from ..models import RedistrictingPlan
+    from ..models import RdsPlan
 
 
 class PlanImporter(ErrorListMixin, QObject):
@@ -122,7 +122,7 @@ class PlanImporter(ErrorListMixin, QObject):
         self._importTask = None
         self.importTerminated.emit(self._plan)
 
-    def importPlan(self, plan: "RedistrictingPlan"):
+    def importPlan(self, plan: "RdsPlan"):
         self.clearErrors()
 
         self._plan = plan
@@ -281,7 +281,7 @@ class PlanImportService(QObject):
 
     def __init__(self, updater: DistrictUpdater, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._tasks: dict[RedistrictingPlan, QgsTask] = {}
+        self._tasks: dict[RdsPlan, QgsTask] = {}
         self._updater = updater
 
     def removeTask(self, plan):
@@ -294,7 +294,7 @@ class PlanImportService(QObject):
 
     def importEquivalencyFile(
         self,
-        plan: RedistrictingPlan,
+        plan: RdsPlan,
         source: Union[str, pathlib.Path],
         joinField: str,
         headerRow: bool = True,

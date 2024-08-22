@@ -34,12 +34,12 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from .ui.DlgNewDistrict import Ui_dlgNewDistrict
 
 
 class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None,
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None,
                  flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)

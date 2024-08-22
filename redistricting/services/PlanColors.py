@@ -4,10 +4,10 @@ from qgis.PyQt.QtGui import (
     QPalette
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 
 
-def getColorForDistrict(plan: RedistrictingPlan, district: int):
+def getColorForDistrict(plan: RdsPlan, district: int):
     renderer = plan.assignLayer.renderer()
     if isinstance(renderer, QgsCategorizedSymbolRenderer):
         idx = renderer.categoryIndexForValue(district)

@@ -23,8 +23,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import pyqtProperty
 from qgis.gui import QgsFileWidget
+from qgis.PyQt.QtCore import pyqtProperty
 
 
 class RdsFileWidget(QgsFileWidget):

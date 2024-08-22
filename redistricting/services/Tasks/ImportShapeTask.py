@@ -44,13 +44,13 @@ from ...utils import tr
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from ...models import RedistrictingPlan
+    from ...models import RdsPlan
 
 
 class ImportShapeFileTask(QgsTask):
     def __init__(
         self,
-        plan: RedistrictingPlan,
+        plan: RdsPlan,
         shapeFile,
         importDistField
     ):

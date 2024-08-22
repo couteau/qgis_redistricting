@@ -18,8 +18,11 @@
 """
 from pytest_mock import MockerFixture
 
-from redistricting.models.Field import GeoField
-from redistricting.models.PlanStats import PlanStats
+from redistricting.models.columns import StatsColumns
+from redistricting.models.Field import RdsGeoField
+from redistricting.models.Plan import RdsPlanStats
+
+# pylint: disable=protected-access
 
 
 class TestPlanStats:
@@ -28,10 +31,11 @@ class TestPlanStats:
         districts = type(mock_plan).districts
         districts.__getitem__.return_value = [0.5]
         geofields = type(mock_plan).geoFields
-        geofields.__iter__.return_value = [mocker.create_autospec(spec=GeoField, instance=True)]
-        stats = PlanStats(mock_plan)
+        geofields.__iter__.return_value = [mocker.create_autospec(spec=RdsGeoField, instance=True)]
+        stats = RdsPlanStats()
+        stats.districts = mock_plan.districts
+        stats.updateGeoFields(geofields)
         assert stats.cutEdges is None
-        assert stats.avgPolsbyPopper == 0.5
-        assert stats.avgReock == 0.5
-        assert stats.avgConvexHull == 0.5
+        for f in StatsColumns.CompactnessScores():
+            assert getattr(stats, f) == 0.5
         assert len(stats.splits) == 1

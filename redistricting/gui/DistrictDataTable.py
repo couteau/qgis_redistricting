@@ -26,7 +26,6 @@
 import csv
 import io
 from typing import (
-    Any,
     Dict,
     Optional
 )
@@ -36,7 +35,6 @@ from qgis.core import (
     QgsProject
 )
 from qgis.PyQt.QtCore import (
-    QAbstractTableModel,
     QCoreApplication,
     QMimeData,
     QModelIndex,
@@ -45,9 +43,7 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtGui import (
-    QColor,
     QContextMenuEvent,
-    QFont,
     QKeySequence
 )
 from qgis.PyQt.QtWidgets import (
@@ -59,9 +55,8 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import (
-    Field,
-    PlanStats,
-    RedistrictingPlan
+    RdsField,
+    RdsPlan
 )
 from ..services import (
     ActionRegistry,
@@ -78,106 +73,8 @@ from .DlgEditFields import DlgEditFields
 from .DlgNewDistrict import DlgNewDistrict
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
+from .StatsModel import StatsModel
 from .ui.DistrictDataTable import Ui_qdwDistrictData
-
-
-class StatsModel(QAbstractTableModel):
-    StatLabels = [
-        tr('Population'),
-        tr('Continguous'),
-        tr('Compactness'),
-        tr('   Avg. Polsby-Popper'),
-        tr('   Avg. Reock'),
-        tr('   Avg. Convex-Hull'),
-        tr('   Cut Edges'),
-        tr('Splits')
-    ]
-    SPLITS_OFFSET = 8
-
-    def __init__(self, stats: PlanStats, parent: Optional[QObject] = None):
-        super().__init__(parent)
-        self._stats = None
-        self.setStats(stats)
-
-    def setStats(self, value: PlanStats):
-        self.beginResetModel()
-        if self._stats:
-            self._stats.statsUpdating.disconnect(self.beginResetModel)
-            self._stats.statsUpdated.disconnect(self.endResetModel)
-            for s in self._stats.splits.values():
-                s.splitUpdating.disconnect(self.beginResetModel)
-                s.splitUpdated.disconnect(self.endResetModel)
-        self._stats = value
-        if self._stats:
-            self._stats.statsUpdating.connect(self.beginResetModel)
-            self._stats.statsUpdated.connect(self.endResetModel)
-            for s in self._stats.splits.values():
-                s.splitUpdating.connect(self.beginResetModel)
-                s.splitUpdated.connect(self.endResetModel)
-        self.endResetModel()
-
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        if parent.isValid():
-            return 0
-
-        c = StatsModel.SPLITS_OFFSET - 1
-        if self._stats:
-            c += 1 + len(self._stats.splits)
-        return c
-
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return 1 if not parent.isValid() else 0
-
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
-        if orientation == Qt.Vertical and role == Qt.DisplayRole:
-            return StatsModel.StatLabels[section] \
-                if section < StatsModel.SPLITS_OFFSET \
-                else '   ' + self._stats.splits.headings[section-StatsModel.SPLITS_OFFSET]
-
-        return None
-
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
-        if self._stats is None or not index.isValid() or index.column() != 0:
-            return None
-
-        row = index.row()
-        if role == Qt.DisplayRole:
-            if row == 0:
-                result = f'{self._stats.totalPopulation:,}'
-            elif row == 1:
-                result = tr('Yes') if self._stats.contiguous else tr('No')
-            elif row == 3:
-                avgPP = self._stats.avgPolsbyPopper
-                result = f'{avgPP:.3f}' if avgPP is not None else ''
-            elif row == 4:
-                avgReock = self._stats.avgReock
-                result = f'{avgReock:.3f}' if avgReock is not None else ''
-            elif row == 5:
-                avgCH = self._stats.avgConvexHull
-                result = f'{avgCH:.3f}' if avgCH is not None else ''
-            elif row == 6:
-                result = f'{self._stats.cutEdges:,}' if self._stats.cutEdges else ''
-            elif row in (2, StatsModel.SPLITS_OFFSET - 1):
-                result = None
-            elif row <= StatsModel.SPLITS_OFFSET + len(self._stats.splits):
-                result = f'{len(self._stats.splits[row-StatsModel.SPLITS_OFFSET]):,}'
-            else:
-                result = None
-        elif role == Qt.FontRole:
-            result = QFont()
-            result.setBold(True)
-        elif role == Qt.TextColorRole:
-            if row == 1:
-                if not self._stats.contiguous:
-                    result = QColor(Qt.red)
-                else:
-                    result = QColor(Qt.green)
-            else:
-                result = None
-        else:
-            result = None
-
-        return result
 
 
 class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
@@ -191,7 +88,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.updateService.updateComplete.connect(self.updateComplete)
         self.updateService.updateTerminated.connect(self.updateTerminated)
 
-        self.fieldStats: Dict[Field, QWidget] = {}
+        self.fieldStats: Dict[RdsField, QWidget] = {}
 
         self.tblDataTable.installEventFilter(self)
         self.lblWaiting = OverlayWidget(self.tblDataTable)
@@ -220,7 +117,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.btnHelp.clicked.connect(self.btnHelpClicked)
         self._dlgSplits: DlgSplitDetail = None
 
-        self._plan: RedistrictingPlan = None
+        self._plan: RdsPlan = None
 
         self.actionRegistry = ActionRegistry()
 
@@ -239,11 +136,11 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self.tblDataTable.doubleClicked.connect(self.editDistrict)
 
     @property
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         if self._dlgSplits:
             self._dlgSplits.close()
             self._dlgSplits = None
@@ -267,16 +164,16 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
     def planChanged(self, name):
         self.lblPlanName.setText(name)
 
-    def updateStarted(self, plan: RedistrictingPlan):
+    def updateStarted(self, plan: RdsPlan):
         if plan == self._plan:
             self.lblWaiting.start()
 
-    def updateComplete(self, plan: RedistrictingPlan, districts: Optional[set[int]] = None):
+    def updateComplete(self, plan: RdsPlan, districts: Optional[set[int]] = None):
         if plan == self._plan:
             self.lblWaiting.stop()
             self._model.districtsUpdated(districts)
 
-    def updateTerminated(self, plan: RedistrictingPlan):
+    def updateTerminated(self, plan: RdsPlan):
         if plan == self._plan:
             self.lblWaiting.stop()
 

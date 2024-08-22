@@ -1,4 +1,4 @@
-"""QGIS Redistricting Plugin - unit tests for RedistrictingPlan class
+"""QGIS Redistricting Plugin - unit tests for RdsPlan class
 
 /***************************************************************************
  *                                                                         *
@@ -23,7 +23,7 @@ from pytest_mock import MockerFixture
 from pytestqt.plugin import QtBot
 from qgis.core import Qgis
 
-from redistricting.models import RedistrictingPlan
+from redistricting.models import RdsPlan
 from redistricting.services import PlanCopier
 
 # pylint: disable=protected-access
@@ -31,10 +31,10 @@ from redistricting.services import PlanCopier
 
 class TestPlanCopier:
     @pytest.fixture
-    def copier(self, valid_plan: RedistrictingPlan):
+    def copier(self, valid_plan: RdsPlan):
         return PlanCopier(valid_plan)
 
-    def test_create(self, valid_plan: RedistrictingPlan):
+    def test_create(self, valid_plan: RdsPlan):
         copier = PlanCopier(valid_plan)
         assert copier._plan is valid_plan
 
@@ -70,7 +70,7 @@ class TestPlanCopier:
         assert not plan
         assert copier.errors() == [('create error', Qgis.Critical)]
 
-    def test_copy_assignments(self, copier: PlanCopier, new_plan: RedistrictingPlan):
+    def test_copy_assignments(self, copier: PlanCopier, new_plan: RdsPlan):
         with sqlite3.connect(new_plan.geoPackagePath) as db:
             c = db.execute('SELECT count(distinct district) FROM assignments')
             assert c.fetchone()[0] == 1

@@ -37,10 +37,14 @@ from qgis.PyQt.QtGui import (
     QIcon,
     QKeySequence
 )
-from qgis.PyQt.QtWidgets import QAction
 
 if TYPE_CHECKING:
-    from ..models import RedistrictingPlan
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
+
+if TYPE_CHECKING:
+    from ..models import RdsPlan
 
 
 class PlanAction(QAction):
@@ -61,10 +65,10 @@ class PlanAction(QAction):
         self._plan = None
         self.triggered.connect(self.triggerForPlan)
 
-    def setTarget(self, plan: "RedistrictingPlan"):
+    def setTarget(self, plan: "RdsPlan"):
         self._plan = plan
 
-    def triggerForPlan(self, plan: Union["RedistrictingPlan", bool]):
+    def triggerForPlan(self, plan: Union["RdsPlan", bool]):
         if isinstance(plan, bool):
             plan = self._plan
         else:

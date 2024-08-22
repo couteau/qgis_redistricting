@@ -33,11 +33,10 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
-    DataField,
     DistrictColumns,
-    Field,
-    RedistrictingPlan,
-    makeFieldName
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
 from ..utils import tr
 
@@ -49,7 +48,7 @@ class DeltaListModel(QAbstractTableModel):
         self._fields = []
         self._delta = None
 
-    def setPlan(self, plan: RedistrictingPlan):
+    def setPlan(self, plan: RdsPlan):
         if plan != self._plan:
             self.beginResetModel()
             if self._plan:
@@ -97,9 +96,9 @@ class DeltaListModel(QAbstractTableModel):
             }
         ]
 
-        field: Field
+        field: RdsField
         for field in self._plan.popFields:
-            fn = makeFieldName(field)
+            fn = field.fieldName
             self._fields.extend([
                 {
                     'name': f'new_{fn}',
@@ -113,10 +112,10 @@ class DeltaListModel(QAbstractTableModel):
                 }
             ])
 
-        field: DataField
+        field: RdsDataField
         for field in self._plan.dataFields:
-            fn = makeFieldName(field)
-            if field.sum:
+            fn = field.fieldName
+            if field.sumField:
                 self._fields.extend([
                     {
                         'name': f'new_{fn}',
@@ -130,7 +129,7 @@ class DeltaListModel(QAbstractTableModel):
                     }
                 ])
 
-            if field.pctbase:
+            if field.pctBase:
                 self._fields.append({
                     'name': f'pct_{fn}',
                     'caption': f'%{field.caption}',

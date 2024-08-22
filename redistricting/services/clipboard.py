@@ -33,7 +33,7 @@ from qgis.PyQt.QtCore import (
 from qgis.PyQt.QtGui import QBrush
 
 from ..gui import DistrictDataModel
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..utils import tr
 
 
@@ -65,7 +65,7 @@ class DistrictClipboardAccess:
         df.columns.name = tr("District")
         return df
 
-    def getAsHtml(self, plan: RedistrictingPlan, selection: Iterable[tuple[int, int]]) -> str:
+    def getAsHtml(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         def colorRowHeader(row):
             r = 0 if row == tr("Unassigned") else int(row)
             clr: QBrush = model.data(model.index(r, 0), Qt.BackgroundColorRole)
@@ -74,6 +74,6 @@ class DistrictClipboardAccess:
         df = self.getSelectionData(model, selection)
         return df.style.map_index(colorRowHeader).to_html(doctype_html=True)
 
-    def getAsCsv(self, plan: RedistrictingPlan, selection: Iterable[tuple[int, int]]) -> str:
+    def getAsCsv(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         model = DistrictDataModel(plan)
         return self.getSelectionData(model, selection).to_csv()

@@ -7,10 +7,10 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QVariant
 
 from ..models import (
-    District,
     DistrictColumns,
-    RedistrictingPlan,
-    Unassigned
+    RdsDistrict,
+    RdsPlan,
+    RdsUnassigned
 )
 
 
@@ -35,8 +35,8 @@ class DistrictReader:
         else:
             self._columns = columns
 
-    def readFromLayer(self) -> list[District]:
-        result: list[District] = []
+    def readFromLayer(self) -> list[RdsDistrict]:
+        result: list[RdsDistrict] = []
 
         f: QgsFeature
         for f in self._distLayer.getFeatures():
@@ -50,13 +50,13 @@ class DistrictReader:
                 del data[self._popField]
 
             if f[self._distField] == 0:
-                result.append(Unassigned(fid=f.id(), **data))
+                result.append(RdsUnassigned(fid=f.id(), **data))
             else:
-                result.append(District(fid=f.id(), **data))
+                result.append(RdsDistrict(fid=f.id(), **data))
 
         return sorted(result, key=lambda s: s.district)
 
-    def loadDistricts(self, plan: RedistrictingPlan):
+    def loadDistricts(self, plan: RdsPlan):
         for district in self.readFromLayer():
             if district.district == 0:
                 plan.districts[0].update(district)
@@ -92,8 +92,8 @@ class DistrictWriter:
             }
         self._dist_idx = self._fields.indexFromName(self._distField)
 
-    def writeToLayer(self, districts: Iterable[District]):
-        def changeAttributes(dist: District, feature: QgsFeature):
+    def writeToLayer(self, districts: Iterable[RdsDistrict]):
+        def changeAttributes(dist: RdsDistrict, feature: QgsFeature):
             for idx, field in self._field_map.items():
                 if field not in dist:
                     continue

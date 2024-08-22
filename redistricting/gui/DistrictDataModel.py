@@ -44,10 +44,9 @@ from qgis.PyQt.QtGui import (
 )
 
 from ..models import (
-    District,
     DistrictColumns,
-    DistrictList,
-    RedistrictingPlan
+    RdsDistrict,
+    RdsPlan
 )
 from ..services import (
     DistrictValidator,
@@ -57,19 +56,19 @@ from ..utils import tr
 
 
 class DistrictDataModel(QAbstractTableModel):
-    _plan: RedistrictingPlan = None
+    _plan: RdsPlan = None
 
-    def __init__(self, plan: RedistrictingPlan = None, parent: QObject = None):
+    def __init__(self, plan: RdsPlan = None, parent: QObject = None):
         super().__init__(parent)
         self._keys = []
         self._headings = []
         self._plan = None
-        self._districts: Union[DistrictList, Sequence[District]] = []
+        self._districts: Sequence[RdsDistrict] = []
         self._validator = DistrictValidator()
         self.plan = plan
 
     @property
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
     def updatePlanFields(self):
@@ -90,10 +89,10 @@ class DistrictDataModel(QAbstractTableModel):
 
         for field in self._plan.dataFields:
             fn = field.fieldName
-            if field.sum:
+            if field.sumField:
                 self._keys.append(fn)
                 self._headings.append(field.caption)
-            if field.pctbase and (field.pctbase == self._plan.popField or field.pctbase in self._keys):
+            if field.pctBase and (field.pctBase == self._plan.popField or field.pctBase in self._keys):
                 self._keys.append(f"pct_{fn}")
                 self._headings.append(f"%{field.caption}")
 
@@ -106,7 +105,7 @@ class DistrictDataModel(QAbstractTableModel):
         self.endResetModel()
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         self.beginResetModel()
 
         if self._plan is not None:
@@ -143,7 +142,7 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
         self.endResetModel()
 
-    def districtChanged(self, district: District):
+    def districtChanged(self, district: RdsDistrict):
         row = self._districts.index(district)
         start = self.createIndex(row, 1)
         end = self.createIndex(row, self.columnCount())
@@ -164,11 +163,11 @@ class DistrictDataModel(QAbstractTableModel):
             if role in (Qt.DisplayRole, Qt.EditRole):
                 row = index.row()
                 col = index.column() + 1
-                district = self._districts.byindex[row]
+                district = self._districts[row]
 
                 key = self._keys[col]
                 if key[:3] == 'pct' and key != 'pct_deviation':
-                    pctbase = self._plan.dataFields[key[4:]].pctbase
+                    pctbase = self._plan.dataFields[key[4:]].pctBase
                     if pctbase == self._plan.popField:
                         pctbase = DistrictColumns.POPULATION
                     if pctbase in self._keys and district[pctbase] != 0:

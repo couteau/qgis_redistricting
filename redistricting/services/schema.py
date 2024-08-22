@@ -260,6 +260,7 @@ def _updateDistLayer(data: dict):
             else:
                 sql = "UPDATE districts SET name = ? WHERE district = ?"
                 db.executemany(sql, [(f["name"], f["district"]) for f in data["districts"]])
+        distLayer.reload()
 
 
 def migrateSchema1_0_1_to_1_0_2(data: dict):
@@ -311,6 +312,7 @@ def migrateSchema1_0_2_to_1_0_3(data):
         with spatialite_connect(geoPackagePath) as db:
             sql = f"ALTER TABLE districts RENAME COLUMN {data['pop-field']} TO {DistrictColumns.POPULATION}"
             db.execute(sql)
+        distLayer.reload()
 
     return data, version.parse('1.0.3')
 

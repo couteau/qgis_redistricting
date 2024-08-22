@@ -21,23 +21,30 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 
 from qgis.PyQt.QtCore import (
     QObject,
     Qt
 )
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
 
 from ..gui import DockPendingChanges
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..services import (
     DeltaUpdateService,
     PlanManager
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class PendingChangesController(BaseController):
@@ -81,5 +88,5 @@ class PendingChangesController(BaseController):
         self.dockwidget = dockwidget
         return self.dockwidget
 
-    def activePlanChanged(self, plan: RedistrictingPlan):
+    def activePlanChanged(self, plan: RdsPlan):
         self.dockwidget.plan = plan

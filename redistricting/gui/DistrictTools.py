@@ -48,8 +48,8 @@ from qgis.PyQt.QtGui import (
 from qgis.PyQt.QtWidgets import QDockWidget
 
 from ..models import (
-    District,
-    RedistrictingPlan
+    RdsDistrict,
+    RdsPlan
 )
 from ..services import (
     ActionRegistry,
@@ -64,12 +64,12 @@ from .ui.DistrictTools import Ui_qdwDistrictTools
 
 
 class DistrictSelectModel(QAbstractListModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...):
+    def __init__(self, plan: RdsPlan, parent: Optional[QObject] = ...):
         super().__init__(parent)
         self._plan = plan
         self._plan.districtAdded.connect(self.updateDistricts)
         self._plan.districtRemoved.connect(self.updateDistricts)
-        self._plan.districtNameChanged.connect(self.districtNameChanged)
+        self._plan.districtDataChanged.connect(self.districtNameChanged)
         self._districts = plan.districts
         self._offset = 2
 
@@ -77,7 +77,7 @@ class DistrictSelectModel(QAbstractListModel):
         self.beginResetModel()
         self.endResetModel()
 
-    def districtNameChanged(self, district: District):
+    def districtNameChanged(self, district: RdsDistrict):
         idx = self._districts.index(district)
         index = self.createIndex(idx + self._offset, 0)
         self.dataChanged.emit(index, index, {Qt.DisplayRole})
@@ -145,7 +145,7 @@ class DistrictSelectModel(QAbstractListModel):
 
 
 class SourceDistrictModel(DistrictSelectModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(plan, parent)
         self._plan = plan
         self._offset = 3
@@ -194,7 +194,7 @@ class TargetDistrictModel(DistrictSelectModel):
 
 class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
-    _plan: RedistrictingPlan = None
+    _plan: RdsPlan = None
     geoFieldChanged = pyqtSignal(str)
     sourceChanged = pyqtSignal("PyQt_PyObject")
     targetChanged = pyqtSignal("PyQt_PyObject")
@@ -229,11 +229,11 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.plan = plan
 
     @property
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         if self._plan:
             self._plan.nameChanged.disconnect(self.updateName)
             self._plan.geoFieldsChanged.disconnect(self.updateGeographies)

@@ -22,7 +22,7 @@ import pytest
 from redistricting.models import (
     Delta,
     DeltaList,
-    RedistrictingPlan
+    RdsPlan
 )
 
 # pylint: disable=no-self-use
@@ -30,7 +30,7 @@ from redistricting.models import (
 
 class TestDeltaList:
     @pytest.fixture
-    def empty_delta_list(self, mock_plan: RedistrictingPlan) -> DeltaList:
+    def empty_delta_list(self, mock_plan: RdsPlan) -> DeltaList:
         return DeltaList(mock_plan)
 
     @pytest.fixture

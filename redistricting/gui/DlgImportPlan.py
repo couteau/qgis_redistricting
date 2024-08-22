@@ -35,13 +35,13 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..utils import tr
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
 
 
 class DlgImportPlan(QDialog):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setWindowTitle(tr("Import Equivalency File"))
         self.page = dlgEditPlanImportPage(self)

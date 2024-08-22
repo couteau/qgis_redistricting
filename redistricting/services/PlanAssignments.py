@@ -51,13 +51,13 @@ from ..utils import tr
 from .DeltaUpdate import DeltaUpdateService
 
 if TYPE_CHECKING:
-    from ..models import RedistrictingPlan
+    from ..models import RdsPlan
 
 
 class PlanAssignmentEditor(QObject):
     assignmentsChanged = pyqtSignal("PyQt_PyObject")
 
-    def __init__(self, plan: RedistrictingPlan, parent: QObject = None):
+    def __init__(self, plan: RdsPlan, parent: QObject = None):
         super().__init__(parent)
         if not plan.isValid():
             raise ValueError()
@@ -199,18 +199,18 @@ class AssignmentsService(QObject):
 
     def __init__(self, updateService: DeltaUpdateService, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._editors: dict[RedistrictingPlan, PlanAssignmentEditor] = {}
+        self._editors: dict[RdsPlan, PlanAssignmentEditor] = {}
         self._updateService = updateService
         self._endEditSignals = QSignalMapper(self)
         self._endEditSignals.mappedObject.connect(self.endEditing)
 
-    def isEditing(self, plan: RedistrictingPlan) -> bool:
+    def isEditing(self, plan: RdsPlan) -> bool:
         return plan in self._editors
 
-    def getEditor(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
+    def getEditor(self, plan: RdsPlan) -> PlanAssignmentEditor:
         return self.startEditing(plan)
 
-    def startEditing(self, plan: RedistrictingPlan) -> PlanAssignmentEditor:
+    def startEditing(self, plan: RdsPlan) -> PlanAssignmentEditor:
         if plan not in self._editors:
             self._editors[plan] = PlanAssignmentEditor(plan)
             self._editors[plan].assignmentsChanged.connect(self.assignmentsChanged)
@@ -223,7 +223,7 @@ class AssignmentsService(QObject):
 
         return self._editors[plan]
 
-    def endEditing(self, plan: RedistrictingPlan):
+    def endEditing(self, plan: RdsPlan):
         if plan in self._editors:
             del self._editors[plan]
             self._updateService.unwatchPlan(plan)

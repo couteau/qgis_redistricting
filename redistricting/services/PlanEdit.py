@@ -44,9 +44,11 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
-    DataField,
-    Field,
-    GeoField
+    RdsDataField,
+    RdsField,
+    RdsGeoField,
+    deserialize_model,
+    serialize_model
 )
 from ..utils import tr
 from .BasePlanBuilder import BasePlanBuilder
@@ -82,16 +84,16 @@ class PlanEditor(BasePlanBuilder):
         raise RuntimeError(tr("Cannot change {attribute} after plan creation").format(attribute=attribute))
 
     def setGeoIdField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("GeoID Field")
+        self.RaiseChangedReadonlyFieldError("GeoID RdsField")
 
     def setDistField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("District Field")
+        self.RaiseChangedReadonlyFieldError("District RdsField")
 
     def setGeoLayer(self, value: QgsVectorLayer):
         self.RaiseChangedReadonlyFieldError("Geography Layer")
 
     def setGeoJoinField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("Geography Join Field")
+        self.RaiseChangedReadonlyFieldError("Geography Join RdsField")
 
     @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
@@ -115,7 +117,7 @@ class PlanEditor(BasePlanBuilder):
                 )
                 return
             if fieldType is None:
-                self.setError(tr('Field type is required when adding fields by name'))
+                self.setError(tr('RdsField type is required when adding fields by name'))
                 return
 
             fields = [QgsField(fieldOrFieldName, fieldType)]
@@ -148,7 +150,7 @@ class PlanEditor(BasePlanBuilder):
     def _updatePopFields(self):
         if self._plan.distLayer:
             layer = self._plan.distLayer
-            addedFields: Set[Field] = set(self._popFields) - set(self._plan.popFields)
+            addedFields: Set[RdsField] = set(self._popFields) - set(self._plan.popFields)
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -158,11 +160,11 @@ class PlanEditor(BasePlanBuilder):
         if self._plan.distLayer:
             layer = self._plan.distLayer
 
-            addedFields: Set[DataField] = set(self._dataFields) - set(self._plan.dataFields)
+            addedFields: Set[RdsDataField] = set(self._dataFields) - set(self._plan.dataFields)
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-            removedFields: Set[DataField] = set(self._plan.dataFields) - set(self._dataFields)
+            removedFields: Set[RdsDataField] = set(self._plan.dataFields) - set(self._dataFields)
             if removedFields:
                 provider = layer.dataProvider()
                 for f in removedFields:
@@ -175,7 +177,7 @@ class PlanEditor(BasePlanBuilder):
 
     def _updateGeoFields(self):
         def removeFields():
-            removedFields: Set[Field] = set(self._plan.geoFields) - set(self._geoFields)
+            removedFields: Set[RdsField] = set(self._plan.geoFields) - set(self._geoFields)
             if removedFields:
                 provider = self._assignLayer.dataProvider()
                 fields = self._assignLayer.fields()
@@ -215,7 +217,7 @@ class PlanEditor(BasePlanBuilder):
 
         saveFields = self._plan.geoFields
         layer = self._plan.assignLayer
-        addedFields: Set[Field] = set(self._geoFields) - set(self._plan.geoFields)
+        addedFields: Set[RdsField] = set(self._geoFields) - set(self._plan.geoFields)
         if addedFields:
             self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -273,16 +275,18 @@ class PlanEditor(BasePlanBuilder):
         return self._plan
 
     def startPlanUpdate(self):
-        self._oldvalues = self._plan.serialize()
+        self._oldvalues = serialize_model(self._plan)
 
     def endPlanUpdate(self):
-        newvalues = self._plan.serialize()
+        newvalues = serialize_model(self._plan)
         modifiedFields = {
             k for k in newvalues if k not in self._oldvalues or newvalues[k] != self._oldvalues[k]
         }
         modifiedFields |= {k for k in self._oldvalues if k not in newvalues}
         self._oldvalues = None
         self._modifiedFields = modifiedFields
+        if modifiedFields:
+            QgsProject.instance().setDirty()
 
         if self._updater:
             updateGeometry = updateSplits = updateDemographics = False
@@ -309,13 +313,11 @@ class PlanEditor(BasePlanBuilder):
         if self._oldvalues is None:
             return
 
-        self._plan._name = self._oldvalues.get('name')
-        self._plan._description = self._oldvalues.get('description', '')
-        self._plan._numDistricts = self._oldvalues.get('num-districts')
-        self._plan._numSeats = self._oldvalues.get('num-seats')
-        self._plan._deviation = self._oldvalues.get('deviation', 0.0)
-
-        self._plan._totalPopulation = self._oldvalues.get('total-population', 0)
+        self._plan.name = self._oldvalues.get('name')
+        self._plan.description = self._oldvalues.get('description', '')
+        self._plan.numDistricts = self._oldvalues.get('num-districts')
+        self._plan.numSeats = self._oldvalues.get('num-seats')
+        self._plan.deviation = self._oldvalues.get('deviation', 0.0)
 
         self._plan._geoIdCaption = self._oldvalues.get('geo-id-caption', '')
 
@@ -325,22 +327,22 @@ class PlanEditor(BasePlanBuilder):
         self._plan._popJoinField = self._oldvalues.get('pop-join-field', '')
         self._plan._popField = self._oldvalues.get('pop-field')
 
-        self._plan._popFields.clear()
+        self._plan.popFields.clear()
         for field in self._oldvalues.get('pop-fields', []):
-            f = Field.deserialize(field)
+            f = deserialize_model(RdsField, field)
             if f:
-                self._plan._popFields.append(f)
+                self._plan.popFields.append(f)
 
-        self._plan._dataFields.clear()
+        self._plan.dataFields.clear()
         for field in self._oldvalues.get('data-fields', []):
-            f = DataField.deserialize(field)
+            f = deserialize_model(RdsDataField, field)
             if f:
-                self._plan._dataFields.append(f)
+                self._plan.dataFields.append(f)
 
         self._plan._geoFields.clear()
         for field in self._oldvalues.get('geo-fields', []):
-            f = GeoField.deserialize(field)
+            f = deserialize_model(RdsGeoField, field)
             if f:
-                self._plan._geoFields.append(f)
+                self._plan.geoFields.append(f)
 
         self._oldvalues = None

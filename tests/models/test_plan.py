@@ -1,4 +1,4 @@
-"""QGIS Redistricting Plugin - unit tests for RedistrictingPlan class
+"""QGIS Redistricting Plugin - unit tests for RdsPlan class
 
 /***************************************************************************
  *                                                                         *
@@ -22,10 +22,11 @@ import pytest
 from pytestqt.plugin import QtBot
 
 from redistricting.models import (
-    DataField,
-    Field,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
+from redistricting.models.serialize import serialize_model
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -33,40 +34,54 @@ from redistricting.models import (
 class TestPlan:
     @pytest.mark.parametrize('params',
                              [
-                                 ['', 2],
-                                 [None, 2],
-                                 [True, 2],
-                                 ['test', 1],
-                                 ['test', 1.5],
-                                 ['test', 2, False],
-                                 ['test', 2, 'd2a95531-0de4-4556-bbe0-bb251d2f2026']
+                                 {'name': 'test'},
+                                 {'name': None, 'numDistricts': 2},
+                                 {'name': True, 'numDistricts': 2},
+                                 {'name': 'test', 'numDistricts': 2.5},
+                                 {'name': 'test', 'numDistricts': 2, 'id': False},
+                                 {'name': 'test', 'numDistricts': 2, 'id': 'd2a95531-0de4-4556-bbe0-bb251d2f2026'}
                              ])
-    def test_create_plan_throws_valueerror_with_invalid_params(self, params):
-        with pytest.raises(ValueError, match='Cannot create redistricting plan'):
-            plan = RedistrictingPlan(*params)  # pylint: disable=unused-variable
+    def test_create_plan_throws_typeerror_with_wrong_type_params(self, params):
+        with pytest.raises(TypeError):
+            plan = RdsPlan(**params)  # pylint: disable=unused-variable
+
+    @pytest.mark.parametrize('params',
+                             [
+                                 {'name': '', 'numDistricts': 2},
+                                 {'name': 'test', 'numDistricts': 1},
+                                 {'name': 'test', 'numDistricts': 2001},
+                             ]
+                             )
+    def test_create_plan_throws_typeerror_with_invalid_params(self, params):
+        with pytest.raises(ValueError):
+            plan = RdsPlan(**params)  # pylint: disable=unused-variable
 
     @pytest.mark.parametrize('params,expected',
                              [
-                                 [['test'], ['test', 0, None]],
-                                 [['test', 5],  ['test', 5, None]],
+                                 [{'name': 'test', 'numDistricts': 5},  ['test', 5, None]],
                                  [
-                                     ['test', 2, UUID('d2a95531-0de4-4556-bbe0-bb251d2f2026')],
+                                     {'name': 'test', 'numDistricts': 2, 'id': UUID(
+                                         'd2a95531-0de4-4556-bbe0-bb251d2f2026')},
                                      ['test', 2, 'd2a95531-0de4-4556-bbe0-bb251d2f2026']
                                  ],
                              ])
     def test_create_plan_with_valid_params(self, params, expected):
-        plan = RedistrictingPlan(*params)
+        plan = RdsPlan(**params)
         assert plan.name == expected[0]
         assert plan.numDistricts == expected[1]
         assert isinstance(plan.id, UUID)
         if expected[2]:
             assert str(plan.id) == expected[2]
 
+    def test_repr(self, plan):
+        s = repr(plan)
+        assert s
+
     def test_create_plan_sets_expected_defaults(self):
-        plan = RedistrictingPlan('test', 5)
+        plan = RdsPlan('test', 5)
         assert plan.name == 'test'
         assert plan.numSeats == 5
-        assert plan._assignLayer is None
+        assert plan.assignLayer is None
         assert plan.distLayer is None
         assert plan.popLayer is None
         assert plan.popJoinField is None
@@ -82,50 +97,100 @@ class TestPlan:
         assert len(plan.geoFields) == 0
         assert len(plan.dataFields) == 0
         assert len(plan.districts) == 1
-        assert plan.districts[0].name == 'Unassigned'
+        assert plan.districts[0].name == 'Unassigned'  # pylint: disable=unsubscriptable-object
 
     def test_new_plan_is_not_valid(self):
-        plan = RedistrictingPlan('test', 5)
+        plan = RdsPlan('test', 5)
         assert not plan.isValid()
 
     def test_assign_name_updates_layer_names(self, gpkg_path, qtbot: QtBot):
-        plan = RedistrictingPlan('oldname', 45)
+        plan = RdsPlan('oldname', 45)
         plan.addLayersFromGeoPackage(gpkg_path)
-        assert plan.distLayer.name() == 'oldname_districts'
-        assert plan._assignLayer.name() == 'oldname_assignments'
-        with qtbot.wait_signal(plan.nameChanged):
-            plan._setName('newname')
-        assert plan.distLayer.name() == 'newname_districts'
-        assert plan._assignLayer.name() == 'newname_assignments'
-        plan._setAssignLayer(None)
-        plan._setDistLayer(None)
+        try:
+            assert plan.distLayer.name() == 'oldname_districts'
+            assert plan.assignLayer.name() == 'oldname_assignments'
+            with qtbot.wait_signal(plan.nameChanged):
+                plan.name = 'newname'
+            assert plan.distLayer.name() == 'newname_districts'
+            assert plan.assignLayer.name() == 'newname_assignments'
+        finally:
+            plan._setAssignLayer(None)
+            plan._setDistLayer(None)
 
-    def test_datafields_assign(self, valid_plan: RedistrictingPlan, block_layer, qtbot: QtBot):
+    def test_datafields_assign(self, valid_plan: RdsPlan, block_layer, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
-            valid_plan._setDataFields(  # pylint: disable=protected-access
-                [DataField(block_layer, 'vap_nh_black', False)]
-            )
+            valid_plan.dataFields = [RdsDataField(block_layer, 'vap_nh_black')]
+
         assert len(valid_plan.dataFields) == 1
 
     # pylint: disable-next=unused-argument
-    def test_geofields_assign(self, valid_plan: RedistrictingPlan, block_layer, mock_taskmanager, qtbot: QtBot):
+    def test_geofields_assign(self, valid_plan: RdsPlan, block_layer, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            valid_plan._setGeoFields([Field(block_layer, 'vtdid20', False)])  # pylint: disable=protected-access
+            valid_plan.geoFields = [RdsField(block_layer, 'vtdid20')]
         assert len(valid_plan.geoFields) == 1
         assert len(valid_plan.stats.splits) == 1
 
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):
-        plan = RedistrictingPlan('test', 5)
+        plan = RdsPlan('test', 5)
         gpkg = datadir / 'dummy.gpkg'
         with pytest.raises(ValueError, match=f'File {gpkg} does not exist'):
             plan.addLayersFromGeoPackage(gpkg)
 
     def test_addgeopackage_adds_layers_to_project_when_valid_gpkg(self, datadir):
-        plan = RedistrictingPlan('test', 5)
+        plan = RdsPlan('test', 5)
         gpkg = datadir / 'tuscaloosa_plan.gpkg'
         plan.addLayersFromGeoPackage(gpkg)
-        assert plan._assignLayer.name() == 'test_assignments'
+        assert plan.assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
         assert plan.geoIdField == 'geoid20'
         plan._setAssignLayer(None)
         plan._setDistLayer(None)
+
+    def test_serialize(self, plan: RdsPlan, block_layer, assign_layer, dist_layer):
+        data = serialize_model(plan)
+        assert data == {
+            'id': str(plan.id),
+            'name': 'test',
+            'description': '',
+            'num-districts': 5,
+            'num-seats': 5,
+            'deviation': 0.025,
+            'geo-layer': block_layer.id(),
+            'geo-join-field': 'geoid20',
+            'pop-layer': block_layer.id(),
+            'pop-join-field': 'geoid20',
+            'pop-field': 'pop_total',
+            'pop-fields': {
+                'vap_total': {'layer': block_layer.id(),
+                              'field': 'vap_total',
+                              'caption': 'VAP'}
+            },
+            'assign-layer': assign_layer.id(),
+            'geo-id-field': 'geoid20',
+            'geo-id-caption': 'geoid20',
+            'dist-layer': dist_layer.id(),
+            'dist-field': 'district',
+            'data-fields': {
+                'vap_ap_black': {'layer': block_layer.id(),
+                                 'field': 'vap_ap_black',
+                                 'caption': 'APBVAP',
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+                'vap_nh_white': {'layer': block_layer.id(),
+                                 'field': 'vap_nh_white',
+                                 'caption': 'WVAP',
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+                'vap_hispanic': {'layer': block_layer.id(),
+                                 'field': 'vap_hispanic',
+                                 'caption': 'HVAP',
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+            },
+            'geo-fields': {
+                'vtdid20': {'layer': assign_layer.id(),
+                            'field': 'vtdid20',
+                            'caption': 'VTD'}
+            },
+            'stats': {'total-population': 227036, 'splits': {'vtdid20': {'field': 'vtdid20', 'data': []}}}
+        }

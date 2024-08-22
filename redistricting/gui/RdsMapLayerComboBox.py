@@ -23,9 +23,9 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import pyqtProperty
-from qgis.gui import QgsMapLayerComboBox
 from qgis.core import QgsMapLayer
+from qgis.gui import QgsMapLayerComboBox
+from qgis.PyQt.QtCore import pyqtProperty
 
 
 class RdsMapLayerComboBox(QgsMapLayerComboBox):

@@ -40,7 +40,7 @@ from qgis.PyQt.QtCore import QObject
 from ..utils import tr
 
 if TYPE_CHECKING:
-    from ..models import RedistrictingPlan
+    from ..models import RdsPlan
 
 
 class LayerTreeManager(QObject):
@@ -64,7 +64,7 @@ class LayerTreeManager(QObject):
 
         return group
 
-    def createGroup(self, plan: "RedistrictingPlan"):
+    def createGroup(self, plan: "RdsPlan"):
         if not plan.isValid():
             raise ValueError(tr("Cannot add incomplete plan to layer tree"))
 
@@ -76,7 +76,7 @@ class LayerTreeManager(QObject):
         self.planRoot.addChildNode(group)
         return group
 
-    def removeGroup(self, plan: "RedistrictingPlan"):
+    def removeGroup(self, plan: "RdsPlan"):
         group = self.getGroupForPlan(plan)
         if group is not None:
             self.planRoot.removeChildNode(group)
@@ -87,7 +87,7 @@ class LayerTreeManager(QObject):
             if g.customProperty('redistricting-plan-id', None) is not None
         ]
 
-    def getGroupForPlan(self, plan: "RedistrictingPlan"):
+    def getGroupForPlan(self, plan: "RdsPlan"):
         if plan.id:
             for g in self.planRoot.findGroups():
                 if g.customProperty('redistricting-plan-id', None) == str(plan.id):
@@ -102,7 +102,7 @@ class LayerTreeManager(QObject):
 
         return UUID(planid)
 
-    def bringPlanToTop(self, plan: "RedistrictingPlan"):
+    def bringPlanToTop(self, plan: "RdsPlan"):
         group = self.getGroupForPlan(plan)
         if group is None:
             return
@@ -131,7 +131,7 @@ class LayerTreeManager(QObject):
         self.root.setHasCustomLayerOrder(True)
         self.root.setCustomLayerOrder(new_order)
 
-    def renameGroupAndLayers(self, plan: "RedistrictingPlan"):
+    def renameGroupAndLayers(self, plan: "RdsPlan"):
         group = self.getGroupForPlan(plan)
         if group is not None:
             group.setName(plan.name)

@@ -54,8 +54,8 @@ from ._debug import debug_thread
 
 if TYPE_CHECKING:
     from ...models import (
-        Field,
-        RedistrictingPlan
+        RdsField,
+        RdsPlan
     )
 
 
@@ -76,7 +76,7 @@ def makeDbfFieldName(fieldName, fields: QgsFields):
 class ExportRedistrictingPlanTask(QgsTask):
     def __init__(
         self,
-        plan: RedistrictingPlan,
+        plan: RdsPlan,
         exportShape: bool = True,
         shapeFileName: str = None,
         includeDemographics: bool = True,
@@ -84,7 +84,7 @@ class ExportRedistrictingPlanTask(QgsTask):
         includeUnassigned: bool = False,
         exportEquivalency: bool = True,
         equivalencyFileName: str = None,
-        assignGeography: Field = None
+        assignGeography: RdsField = None
     ):
         super().__init__(tr('Export assignments'), QgsTask.AllFlags)
         self.exportShape = exportShape and shapeFileName and plan.distLayer
@@ -168,6 +168,12 @@ class ExportRedistrictingPlanTask(QgsTask):
         return fields, fieldNames
 
     def _createDistrictsMemoryLayer(self):
+        def fieldByName(fieldName, fieldList: list[RdsField]):
+            for f in fieldList:
+                if f.field == fieldName:
+                    return f
+            return None
+
         if not self.includeUnassigned:
             flt = f'{self.distField} != 0 AND {self.distField} IS NOT NULL'
         else:
@@ -201,7 +207,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 for srcFld in fieldNames:
                     if srcFld[:3] == "pct" and srcFld != DistrictColumns.PCT_DEVIATION:
                         basefld = srcFld[4:]
-                        pctbase = self.dataFields[basefld].pctbase
+                        pctbase = fieldByName(basefld, self.dataFields)
                         if pctbase == self.popField:
                             pctbase = DistrictColumns.POPULATION
                         if dist[basefld] is None or not dist[pctbase]:

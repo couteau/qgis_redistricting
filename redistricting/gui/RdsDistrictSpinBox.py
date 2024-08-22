@@ -37,18 +37,18 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 
 
 class RdsDistrictSpinBox(QSpinBox):
     def __init__(self, parent: Optional[QWidget] = ...):
         super().__init__(parent)
-        self._plan: RedistrictingPlan = None
+        self._plan: RdsPlan = None
 
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
-    def setPlan(self, plan: RedistrictingPlan):
+    def setPlan(self, plan: RdsPlan):
         self._plan = plan
 
     def _findNextValidValue(self, value, steps):

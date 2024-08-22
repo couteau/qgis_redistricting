@@ -67,8 +67,8 @@ from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
     from ...models import (
-        GeoField,
-        RedistrictingPlan
+        RdsGeoField,
+        RdsPlan
     )
 
 
@@ -108,7 +108,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
     def __init__(
         self,
-        plan: 'RedistrictingPlan',
+        plan: 'RdsPlan',
         updateDistricts: Iterable[int] = None,
         includeDemographics=True,
         includeGeometry=True,
@@ -119,7 +119,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.setDependentLayers([plan.distLayer, plan._assignLayer, plan.popLayer])
 
-        self.geoFields: Sequence['GeoField'] = plan.geoFields
+        self.geoFields: Sequence['RdsGeoField'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
         self.numSeats: int = plan.numSeats
         self.geoPackagePath = plan.geoPackagePath
@@ -132,7 +132,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.includeDemographics = includeDemographics
         self.includeSplits = includSplits
 
-        self.data: Union[pd.DataFrame, gpd.GeoDataFrame]
+        self.data: Union[pd.DataFrame, gpd.GeoDataFrame] = None
         self.splits = {}
         self.cutEdges = None
 
@@ -155,7 +155,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         except ImportError:
             return None
 
-    def getSplitNames(self, field: 'GeoField', geoids: Iterable[str]):
+    def getSplitNames(self, field: 'RdsGeoField', geoids: Iterable[str]):
         ref = field.layer.referencingRelations(field.index)[0]
         name_layer = ref.referencedLayer()
         name_join_field = ref.resolveReferencedField(field.field)
@@ -173,7 +173,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
-    def calcFracks(self, field: 'GeoField', splitpop: pd.DataFrame):
+    def calcFracks(self, field: 'RdsGeoField', splitpop: pd.DataFrame):
         if not isinstance(self.data, gpd.GeoDataFrame):
             return
 

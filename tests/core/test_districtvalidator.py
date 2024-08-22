@@ -1,8 +1,8 @@
 from pytest_mock import MockerFixture
 
 from redistricting.models import (
-    District,
-    RedistrictingPlan
+    RdsDistrict,
+    RdsPlan
 )
 from redistricting.services.DistrictValid import DistrictValidator
 
@@ -10,13 +10,13 @@ from redistricting.services.DistrictValid import DistrictValidator
 class TestDistrictValidator:
     def test_validate_district(self, mocker: MockerFixture):
         v = DistrictValidator()
-        plan = mocker.create_autospec(spec=RedistrictingPlan)
+        plan = mocker.create_autospec(spec=RdsPlan)
         plan.totalPopulation = 500
         plan.numDistricts = 5
         plan.numSeats = 5
         plan.deviation = 0.05
 
-        district = mocker.create_autospec(spec=District)
+        district = mocker.create_autospec(spec=RdsDistrict)
         district.members = 1
 
         district.population = 100
@@ -40,13 +40,13 @@ class TestDistrictValidator:
 
     def test_validate_district_multi_member(self, mocker: MockerFixture):
         v = DistrictValidator()
-        plan = mocker.create_autospec(spec=RedistrictingPlan)
+        plan = mocker.create_autospec(spec=RdsPlan)
         plan.totalPopulation = 500
         plan.numDistricts = 5
         plan.numSeats = 5
         plan.deviation = 0.05
 
-        district = mocker.create_autospec(spec=District)
+        district = mocker.create_autospec(spec=RdsDistrict)
         district.members = 2
 
         district.population = 200

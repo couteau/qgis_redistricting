@@ -34,8 +34,8 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
-    Field,
-    RedistrictingPlan
+    RdsField,
+    RdsPlan
 )
 from ..utils import tr
 from .ErrorList import ErrorListMixin
@@ -49,10 +49,10 @@ class PlanExporter(ErrorListMixin, QObject):
 
     def __init__(
         self,
-        plan: RedistrictingPlan,
+        plan: RdsPlan,
         equivalencyFile=None,
         shapeFile=None,
-        assignGeography: Field = None,
+        assignGeography: RdsField = None,
         includeUnassigned=False,
         includeDemographics=False,
         includeMetrics=False,

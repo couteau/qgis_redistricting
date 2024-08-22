@@ -22,7 +22,10 @@
  ***************************************************************************/
 """
 import pathlib
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 
 from qgis.core import (
     QgsApplication,
@@ -36,7 +39,6 @@ from qgis.gui import (
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
-    QAction,
     QActionGroup,
     QDialog,
     QMenu,
@@ -53,7 +55,7 @@ from ..gui import (
     DlgImportShape,
     DlgSelectPlan
 )
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..services import (
     AssignmentImporter,
     DistrictUpdater,
@@ -68,6 +70,12 @@ from ..services import (
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+# annoyingly, Anaconda QGIS 3.36 converts QAction to a variable type reference instead of a type
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class PlanController(BaseController):
@@ -232,7 +240,7 @@ class PlanController(BaseController):
         self.actionSelectPlan.setEnabled(False)
     # slots
 
-    def enableActivePlanActions(self, plan: RedistrictingPlan):
+    def enableActivePlanActions(self, plan: RdsPlan):
         self.actionEditPlan.setEnabled(plan is not None)
         self.actionCopyPlan.setEnabled(plan is not None and plan.isValid())
         self.actionImportAssignments.setEnabled(plan is not None and plan.isValid())
@@ -265,7 +273,7 @@ class PlanController(BaseController):
         )
         self.actionSelectPlan.setEnabled(False)
 
-    def addPlanToMenu(self, plan: RedistrictingPlan):
+    def addPlanToMenu(self, plan: RdsPlan):
         action = QAction(text=plan.name, parent=self.planActions)
         action.setObjectName(plan.name)
         action.setToolTip(plan.description)
@@ -274,20 +282,20 @@ class PlanController(BaseController):
         action.triggered.connect(self.activatePlan)
         self.planMenu.addAction(action)
 
-    def removePlanFromMenu(self, plan: RedistrictingPlan):
+    def removePlanFromMenu(self, plan: RdsPlan):
         action = self.planActions.findChild(QAction, plan.name)
         if action:
             action.triggered.disconnect(self.activatePlan)
             self.planMenu.removeAction(action)
             self.planActions.removeAction(action)
 
-    def planAdded(self, plan: RedistrictingPlan):
+    def planAdded(self, plan: RdsPlan):
         self.addPlanToMenu(plan)
         self.updateService.watchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
-    def planRemoved(self, plan: RedistrictingPlan):
-        self.planRemoved(plan)
+    def planRemoved(self, plan: RdsPlan):
+        self.removePlanFromMenu(plan)
         self.updateService.unwatchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
@@ -344,7 +352,7 @@ class PlanController(BaseController):
 
     def editPlan(self, plan=None):
         """Open redistricting plan in the edit dialog"""
-        if not isinstance(plan, RedistrictingPlan):
+        if not isinstance(plan, RdsPlan):
             plan = self.planManager.activePlan
         if not plan:
             return
@@ -370,7 +378,7 @@ class PlanController(BaseController):
                     self.styler.stylePlan(plan)
 
     def copyPlan(self, plan=None):
-        if not isinstance(plan, RedistrictingPlan):
+        if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(tr('copy')):
                 return
 
@@ -418,7 +426,7 @@ class PlanController(BaseController):
             )
             self.planManager.activePlan.assignLayer.triggerRepaint()
 
-        if not isinstance(plan, RedistrictingPlan):
+        if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(tr('import')):
                 return
 
@@ -441,7 +449,7 @@ class PlanController(BaseController):
                 self.endProgress(progress)
 
     def importShapefile(self, plan=None):
-        if not isinstance(plan, RedistrictingPlan):
+        if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(self.tr('import')):
                 return
 
@@ -469,7 +477,7 @@ class PlanController(BaseController):
             for msg, level in export.errors():
                 self.iface.messageBar().pushMessage("Error", msg, level=level)
 
-        if not isinstance(plan, RedistrictingPlan):
+        if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(tr('export')):
                 return
 
@@ -499,7 +507,7 @@ class PlanController(BaseController):
         self.planManager.setActivePlan(plan)
         self.project.setDirty()
 
-    def deletePlan(self, plan: RedistrictingPlan):
+    def deletePlan(self, plan: RdsPlan):
         if plan in self.planManager:
             dlg = DlgConfirmDelete(plan, self.iface.mainWindow())
             if dlg.exec() == QDialog.Accepted:
@@ -527,14 +535,14 @@ class PlanController(BaseController):
 
     # helper methods
 
-    def appendPlan(self, plan: RedistrictingPlan, makeActive=True):
+    def appendPlan(self, plan: RdsPlan, makeActive=True):
         self.styler.stylePlan(plan)
         self.layerTreeManager.createGroup(plan)
         self.planManager.appendPlan(plan, makeActive)
         self.project.setDirty()
 
     def buildPlan(self, builder: PlanBuilder, importer: Optional[AssignmentImporter] = None):
-        def layersCreated(plan: RedistrictingPlan):
+        def layersCreated(plan: RdsPlan):
             nonlocal progress
             self.appendPlan(plan)
             self.endProgress(progress)
@@ -562,6 +570,6 @@ class PlanController(BaseController):
             self.endProgress(progress)
             self.pushErrors(builder.errors())
 
-    def triggerUpdate(self, plan: RedistrictingPlan):
+    def triggerUpdate(self, plan: RdsPlan):
         self.endProgress()
         self.updateService.updateDistricts(plan, needDemographics=True, needGeometry=True, needSplits=True)

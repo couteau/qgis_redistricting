@@ -16,7 +16,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.models.Plan import RedistrictingPlan
+import pytest
+from pytest_mock import MockerFixture
+
+from redistricting.models.Plan import RdsPlan
 from redistricting.services.Tasks.UpdateDistrictsTask import (
     AggregateDistrictDataTask
 )
@@ -24,22 +27,31 @@ from redistricting.services.Tasks.UpdateDistrictsTask import (
 
 class TestUpdateDistrictsTask:
 
-    def test_create(self, mock_plan: RedistrictingPlan):
+    @pytest.fixture(scope="class", autouse=True)
+    def patch_task(self, class_mocker: MockerFixture):
+        class_mocker.patch.object(AggregateDistrictDataTask, "setDependentLayers")
+
+    def test_create(self, mock_plan: RdsPlan):
         t = AggregateDistrictDataTask(mock_plan)
         assert t.exception is None
         assert not t.updateDistricts
 
-    def test_run(self, mock_plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(mock_plan)
+    def test_run(self, plan: RdsPlan):
+        t = AggregateDistrictDataTask(plan)
         t.run()
+        assert t.exception is None
         assert t.data is not None
 
-    def test_run_subset(self, mock_plan: RedistrictingPlan):
-        t = AggregateDistrictDataTask(mock_plan, [2, 3])
+    def test_run_subset(self, plan: RdsPlan):
+        t = AggregateDistrictDataTask(plan, [2, 3])
         result = t.run()
         assert result
         assert t.data is not None
         assert t.exception is None
         assert len(t.data.index) == 2
         assert t.totalPopulation == 227036
+
+    def test_finished(self, plan: RdsPlan):
+        t = AggregateDistrictDataTask(plan, [2, 3])
+        t.run()
         t.finished(True)

@@ -34,8 +34,8 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import (
-    GeoField,
-    RedistrictingPlan
+    RdsGeoField,
+    RdsPlan
 )
 from ..utils import tr
 from .PlanSplitsModel import SplitsModel
@@ -45,8 +45,8 @@ from .ui.DlgSplits import Ui_dlgSplits
 class DlgSplitDetail(Ui_dlgSplits, QDialog):
     def __init__(
             self,
-            plan: RedistrictingPlan,
-            geoField: GeoField,
+            plan: RdsPlan,
+            geoField: RdsGeoField,
             parent: Optional[QWidget] = None,
             flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
     ):
@@ -54,19 +54,19 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self.setupUi(self)
 
         self._model = None
-        self._plan: RedistrictingPlan = None
-        self._field: GeoField = None
+        self._plan: RdsPlan = None
+        self._field: RdsGeoField = None
 
         self.plan = plan
         self.geoField = geoField
         self.cmbGeography.currentIndexChanged.connect(self.geographyChanged)
 
     @property
-    def plan(self) -> RedistrictingPlan:
+    def plan(self) -> RdsPlan:
         return self._plan
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         if self._plan:
             self.plan.nameChanged.disconnect(self.planNameChanged)
             self.plan.geoFieldsChanged.disconnect(self.updateGeography)
@@ -93,11 +93,11 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])
 
     @property
-    def geoField(self) -> GeoField:
+    def geoField(self) -> RdsGeoField:
         return self._field
 
     @geoField.setter
-    def geoField(self, value: GeoField):
+    def geoField(self, value: RdsGeoField):
         self._field = value
         if self._plan and self._field:
             self._model = SplitsModel(self._plan.stats.splits[self._field], self)

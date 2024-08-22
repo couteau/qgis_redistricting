@@ -34,13 +34,13 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from .FieldListModels import GeoFieldsModel
 from .ui.DlgExportPlan import Ui_dlgExportPlan
 
 
 class DlgExportPlan(Ui_dlgExportPlan, QDialog):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 

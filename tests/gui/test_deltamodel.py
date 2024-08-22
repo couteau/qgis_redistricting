@@ -11,7 +11,9 @@ from redistricting.gui.DeltaListModel import DeltaListModel
 class TestDeltaModel:
     @pytest.fixture
     def empty_model(self, mock_plan):
-        return DeltaListModel(mock_plan)
+        model = DeltaListModel()
+        model.setPlan(mock_plan)
+        yield model
 
     @pytest.fixture
     def delta_model(self, mock_plan):
@@ -36,10 +38,11 @@ class TestDeltaModel:
             }],
             index='district'
         )
-        model = DeltaListModel(mock_plan)
+        model = DeltaListModel()
+        model.setPlan(mock_plan)
         model._delta.__bool__.return_value = True
         model._delta._data = df
-        return model
+        yield model
 
     def test_create(self, empty_model: DeltaListModel):
         assert empty_model.rowCount() == 4

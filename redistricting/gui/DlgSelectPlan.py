@@ -42,7 +42,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..services import (
     ActionRegistry,
     PlanManager
@@ -148,11 +148,11 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
             self.plan(current) is not None and self.plan(current).isValid())
         self.btnEdit.setEnabled(self.plan(current) is not None)
 
-    def plan(self, index) -> RedistrictingPlan:
+    def plan(self, index) -> RdsPlan:
         return self.model.plan(index)
 
     @property
-    def currentPlan(self) -> RedistrictingPlan:
+    def currentPlan(self) -> RdsPlan:
         index = self.lvwPlans.currentIndex()
         return self.model.plan(index)
 

@@ -32,11 +32,10 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QObject
 
 from ..models import (
-    DataField,
-    Field,
-    FieldList,
-    GeoField,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsGeoField,
+    RdsPlan
 )
 from ..utils import tr
 from .defaults import MAX_DISTRICTS
@@ -46,7 +45,7 @@ from .ErrorList import ErrorListMixin
 class PlanValidator(ErrorListMixin, QObject):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
-        self._plan: RedistrictingPlan = None
+        self._plan: RdsPlan = None
 
         self._name = ''
         self._description = ''
@@ -60,19 +59,19 @@ class PlanValidator(ErrorListMixin, QObject):
 
         self._geoLayer: QgsVectorLayer = None
         self._geoJoinField = None
-        self._geoFields = FieldList[GeoField]()
+        self._geoFields: list[RdsGeoField] = []
 
         self._popLayer: QgsVectorLayer = None
         self._popJoinField = None
         self._popField = None
-        self._popFields = FieldList[Field]()
-        self._dataFields = FieldList[DataField]()
+        self._popFields: list[RdsField] = []
+        self._dataFields: list[RdsDataField] = []
 
         self._assignLayer: QgsVectorLayer = None
         self._distLayer: QgsVectorLayer = None
 
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
+    def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
         instance = cls(parent, **kwargs)
         instance._plan = plan
 
@@ -199,8 +198,11 @@ class PlanValidator(ErrorListMixin, QObject):
                 result = result and self._validatePopField(f.field, f.caption)
 
             for f in self._dataFields:
-                if not f.validate(self._popLayer):
-                    self.pushError(f.error())
+                if f.layer != self._popLayer:
+                    raise ValueError(tr("Layer for field {field} should be plan poplayer").format(field=f.field))
+
+                if not f.validate():
+                    self.pushErrors(*f.errors())
                     result = False
 
         return result

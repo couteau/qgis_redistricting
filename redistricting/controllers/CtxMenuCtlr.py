@@ -21,7 +21,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 
 from qgis.core import (
     QgsMapLayerType,
@@ -31,16 +34,20 @@ from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
-    QAction,
     QMenu,
     QToolBar
 )
 
-from ..models import RedistrictingPlan
+from ..models import RdsPlan
 from ..services import PlanManager
 from ..utils import tr
 from .BaseCtlr import BaseController
 from .PlanCtlr import PlanController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class ContextMenuController(BaseController):
@@ -102,7 +109,7 @@ class ContextMenuController(BaseController):
             self.planManager.setActivePlan(planid)
             self.project.setDirty()
 
-    def planAdded(self, plan: RedistrictingPlan):
+    def planAdded(self, plan: RdsPlan):
         self.iface.addCustomActionForLayer(self.contextAction, plan.assignLayer)
         self.iface.addCustomActionForLayer(self.contextAction, plan.distLayer)
 

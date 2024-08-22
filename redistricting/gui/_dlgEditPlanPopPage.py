@@ -32,7 +32,7 @@ from qgis.PyQt.QtWidgets import (
     QWizardPage
 )
 
-from ..models import Field
+from ..models import RdsField
 from ..services import defaults
 from ..utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
@@ -123,7 +123,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
                 self.cmbPopField.setField(getDefaultField(layer, defaults.POP_TOTAL_FIELDS))
 
             self.cmbAddlPopField.setLayer(layer)
-            popFields: list[Field] = self.field('popFields')
+            popFields: list[RdsField] = self.field('popFields')
             for f in popFields:
                 f.setLayer(layer)
 

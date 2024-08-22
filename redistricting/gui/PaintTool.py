@@ -52,7 +52,7 @@ from qgis.PyQt.QtGui import (
     QPixmap
 )
 
-from redistricting.models.Plan import RedistrictingPlan
+from ..models import RdsPlan
 
 
 class PaintMode(IntEnum):
@@ -63,7 +63,7 @@ class PaintMode(IntEnum):
 
 class PaintDistrictsTool(QgsMapToolIdentify):
     paintingStarted = pyqtSignal(int, int)
-    paintFatures = pyqtSignal("PyQt_PyObject", int, int, bool)
+    paintFeatures = pyqtSignal("PyQt_PyObject", int, int, bool)
     paintingComplete = pyqtSignal()
     paintingCanceled = pyqtSignal()
     selectFeatures = pyqtSignal("PyQt_PyObject", int, int, "PyQt_PyObject")
@@ -209,7 +209,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         return self._plan
 
     @plan.setter
-    def plan(self, value: RedistrictingPlan):
+    def plan(self, value: RdsPlan):
         if self._plan != value:
             self._plan = value
             self._layer = self._plan.assignLayer if self._plan is not None else None
@@ -243,7 +243,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._paintMode = value
 
     def _paintFeatures(self, features: Iterable[QgsFeature], target, source, endEdit=True):
-        self.paintFatures.emit(features, target, source, endEdit)
+        self.paintFeatures.emit(features, target, source, endEdit)
 
     def _selectFeatures(
         self,
@@ -304,6 +304,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 self.sourceDistrict(self.buttonsPressed)
             )
             self._dragging = False
+            self.paintingComplete.emit()
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if self._dragging:
                 self._dragging = False

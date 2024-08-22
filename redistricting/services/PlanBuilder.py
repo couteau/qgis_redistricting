@@ -40,7 +40,11 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from ..models import RedistrictingPlan
+from ..models import (
+    RdsPlan,
+    deserialize_model,
+    serialize_model
+)
 from ..utils import tr
 from .BasePlanBuilder import BasePlanBuilder
 from .DistrictIO import DistrictReader
@@ -58,7 +62,7 @@ class PlanBuilder(BasePlanBuilder):
         self._createLayersTask = None
 
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
+    def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
         # using deepcopy forces duplication of the data and geo fields
         newplan = deepcopy(plan)
         instance = super().fromPlan(newplan, parent, **kwargs)
@@ -88,9 +92,9 @@ class PlanBuilder(BasePlanBuilder):
         self._geoPackagePath = value
         return self
 
-    def createLayers(self, plan: RedistrictingPlan):
+    def createLayers(self, plan: RdsPlan):
         def taskCompleted():
-            plan.updateTotalPopulation(self._createLayersTask.totalPop)
+            plan.stats.updateStats(self._createLayersTask.totalPop, 0, None)
             self._createLayersTask = None
 
             plan.addLayersFromGeoPackage(self._geoPackagePath)
@@ -128,7 +132,19 @@ class PlanBuilder(BasePlanBuilder):
 
         return self._createLayersTask
 
-    def createPlan(self, createLayers=True, planParent: Optional[QObject] = None):
+    def createAttributeIndices(self):
+        if self._geoLayer is not None and self._geoLayer.storageType() == 'ESRI Shapefile':
+            f = self._geoLayer.fields().lookupField(self._geoJoinField)
+            if f != -1:
+                self._geoLayer.dataProvider().createAttributeIndex(f)
+
+        if self._popLayer is not None and self._popLayer != self._geoLayer and \
+                self._popLayer.storageType() == 'ESRI Shapefile':
+            f = self._popLayer.fields().lookupField(self._popJoinField)
+            if f != -1:
+                self._popLayer.dataProvider().createAttributeIndex(f)
+
+    def createPlan(self, createLayers=True, planParent: Optional[QObject] = None) -> RdsPlan:
         self.clearErrors()
         self._isCancelled = False
 
@@ -181,22 +197,13 @@ class PlanBuilder(BasePlanBuilder):
             'pop-field': self._popField,
             'geo-layer': self._geoLayer.id(),
             'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
-            'pop-fields': [field.serialize() for field in self._popFields],
-            'data-fields': [field.serialize() for field in self._dataFields],
-            'geo-fields': [field.serialize() for field in self._geoFields],
+            'pop-fields': [serialize_model(field) for field in self._popFields],
+            'data-fields': [serialize_model(field) for field in self._dataFields],
+            'geo-fields': [serialize_model(field) for field in self._geoFields],
         }
-        if self._geoLayer is not None and self._geoLayer.storageType() == 'ESRI Shapefile':
-            f = self._geoLayer.fields().lookupField(self._geoIdField)
-            if f != -1:
-                self._geoLayer.dataProvider().createAttributeIndex(f)
+        plan = deserialize_model(RdsPlan, {k: v for k, v in data.items() if v is not None}, planParent)
 
-        if self._popLayer is not None and self._popLayer != self._geoLayer and \
-                self._popLayer.storageType() == 'ESRI Shapefile':
-            f = self._popLayer.fields().lookupField(self._geoJoinField)
-            if f != -1:
-                self._popLayer.dataProvider().createAttributeIndex(f)
-
-        plan = RedistrictingPlan.deserialize({k: v for k, v in data.items() if v is not None}, planParent)
+        self.createAttributeIndices()
 
         if createLayers:
             self.createLayers(plan)

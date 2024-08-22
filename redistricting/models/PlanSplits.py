@@ -23,7 +23,6 @@
  ***************************************************************************/
 """
 from typing import (
-    TYPE_CHECKING,
     Any,
     Optional,
     Sequence
@@ -35,12 +34,7 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from ..utils import tr
-
-if TYPE_CHECKING:
-    from .Field import Field
-    from .Plan import RedistrictingPlan
-    from .PlanStats import PlanStats
+from .base import BaseModel
 
 
 class SplitDistrict:
@@ -82,7 +76,7 @@ class SplitDistrict:
 
 
 class SplitGeography:
-    def __init__(self, lst: "Splits", data: pd.DataFrame, geoid: str, row: int):
+    def __init__(self, lst: "SplitList", data: pd.DataFrame, geoid: str, row: int):
         self._list = lst
         self._data = data
         self._geoid = geoid
@@ -128,41 +122,39 @@ class SplitGeography:
         return [f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, self.districts]
 
 
-class Splits(QObject):
+class SplitList(BaseModel):
     splitUpdating = pyqtSignal()
     splitUpdated = pyqtSignal()
 
-    def __init__(self, plan: "RedistrictingPlan", field: "Field", parent: Optional[QObject] = None):
+    field: str
+    data: pd.DataFrame
+
+    def __init__(self, field: str, data: Optional[pd.DataFrame] = None, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self.data = pd.DataFrame()
-        self.field = field
-        self.plan = plan
+        self._field = field
+        self._data = data or pd.DataFrame()
         self._splits = []
-        self._header = [self.field.caption, tr("Districts"), tr('Population')]
-        self._header.extend(f.caption for f in [*plan.popFields, *plan.dataFields])
+        if data is not None:
+            self.makeSplits()
 
-    @classmethod
-    def deserialize(cls, plan: "RedistrictingPlan", field: "Field", data: dict):
-        instance = cls(plan, field, plan.stats)
-        idx = pd.MultiIndex.from_tuples(
-            (tuple(i) for i in data['index']),
-            names=[field.fieldName, "district"]
-        )
-        df = pd.DataFrame(data['data'], index=idx, columns=data['columns'])
-        instance.setData(df)
-        return instance
+    @property
+    def field(self) -> str:
+        return self._field
 
-    def serialize(self):
-        return self.data.to_dict(orient="split")
+    @property
+    def data(self) -> pd.DataFrame:
+        return self._data
+
+    def makeSplits(self):
+        self._splits = [
+            SplitGeography(self, self._data, geoid, row)
+            for row, geoid in enumerate(self._data.index.get_level_values(0).unique())
+        ]
 
     def setData(self, data: pd.DataFrame):
         self.splitUpdating.emit()
-        self.data = data
-
-        self._header = [self.field.caption, tr("Districts"), tr('Population')]
-        self._header.extend(field.caption for field in [*self.plan.popFields, *self.plan.dataFields])
-        self._splits = [SplitGeography(self, data, geoid, row)
-                        for row, geoid in enumerate(data.index.get_level_values(0).unique())]
+        self._data = data
+        self.makeSplits()
         self.splitUpdated.emit()
 
     def __len__(self):
@@ -173,8 +165,4 @@ class Splits(QObject):
 
     @property
     def attrCount(self):
-        return len(self.data.columns) + 2 - int("__name" in self.data.columns)
-
-    @property
-    def header(self):
-        return self._header
+        return len(self._data.columns) + 2 - int("__name" in self._data.columns)

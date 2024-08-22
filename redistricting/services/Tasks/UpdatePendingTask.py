@@ -36,13 +36,13 @@ from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:
-    from ...models import RedistrictingPlan
+    from ...models import RdsPlan
 
 
 class AggregatePendingChangesTask(AggregateDataTask):
     def __init__(
         self,
-        plan: "RedistrictingPlan",
+        plan: "RdsPlan",
         popData: Optional[pd.DataFrame] = None,
         assignments: Optional[pd.DataFrame] = None
     ):

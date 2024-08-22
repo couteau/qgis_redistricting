@@ -37,17 +37,17 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
-    Field,
-    RedistrictingPlan
+    RdsField,
+    RdsPlan
 )
 from ..utils import tr
 
 
 class GeoFieldsModel(QAbstractListModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._data: list[Field] = list(plan.geoFields)
-        self._data.insert(0, Field(plan._assignLayer, plan.geoIdField, False, plan.geoIdCaption))
+        self._data: list[RdsField] = list(plan.geoFields)
+        self._data.insert(0, RdsField(plan.assignLayer, plan.geoIdField, False, plan.geoIdCaption))
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self._data)
@@ -68,10 +68,10 @@ class GeoFieldsModel(QAbstractListModel):
 
 
 class PopFieldsModel(QAbstractListModel):
-    def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = None):
+    def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._data: list[Field] = list(plan.popFields)
-        self._data.insert(0, Field(plan.popLayer, plan.popField, False, tr("Total Population")))
+        self._data: list[RdsField] = list(plan.popFields)
+        self._data.insert(0, RdsField(plan.popLayer, plan.popField, False, tr("Total Population")))
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self._data)

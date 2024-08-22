@@ -45,7 +45,7 @@ from qgis.PyQt.QtCore import (
 from .Tasks import AggregateDistrictDataTask
 
 if TYPE_CHECKING:
-    from ..models.Plan import RedistrictingPlan
+    from ..models.Plan import RdsPlan
 
 
 class DistrictUpdater(QObject):
@@ -55,19 +55,19 @@ class DistrictUpdater(QObject):
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._updateTasks: dict["RedistrictingPlan", AggregateDistrictDataTask] = {}
-        self._updateDistricts: dict["RedistrictingPlan", set[int]] = {}
+        self._updateTasks: dict["RdsPlan", AggregateDistrictDataTask] = {}
+        self._updateDistricts: dict["RdsPlan", set[int]] = {}
         self._beforeCommitSignals = QSignalMapper(self)
         self._beforeCommitSignals.mappedObject.connect(self.checkForChangedAssignments)
         self._afterCommitSignals = QSignalMapper(self)
         self._afterCommitSignals.mappedObject.connect(self.startUpdateDistricts)
 
-    def updateDistrictData(self, plan: "RedistrictingPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
+    def updateDistrictData(self, plan: "RdsPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
         for district, row in data.to_dict(orient="index").items():
             plan.districts[district].update(row)
 
-    def updateStats(self, plan: "RedistrictingPlan", splitsData: dict[str, pd.DataFrame], cutEdges: int):
-        plan.stats.setData(cutEdges, splitsData)
+    def updateStats(self, plan: "RdsPlan", totalPopulation: int, cutEdges: int, splitsData: dict[str, pd.DataFrame]):
+        plan.stats.updateStats(totalPopulation, cutEdges, splitsData)
 
     def updateTaskCompleted(self):
         updateTask: AggregateDistrictDataTask = self.sender()
@@ -75,10 +75,9 @@ class DistrictUpdater(QObject):
 
         if updateTask.data is not None:
             self.updateDistrictData(updateTask.plan, updateTask.data)
-        if updateTask.splits is not None or updateTask.cutEdges != 0:
-            self.updateStats(updateTask.plan, updateTask.splits, updateTask.cutEdges)
-        if updateTask.totalPopulation != 0:
-            updateTask.plan.updateTotalPopulation(updateTask.totalPopulation)
+        if updateTask.totalPopulation != 0 or updateTask.cutEdges != 0 or updateTask.splits is not None:
+            self.updateStats(updateTask.plan, updateTask.totalPopulation, updateTask.cutEdges, updateTask.splits)
+
         updated = list(updateTask.updateDistricts) if updateTask.updateDistricts else None
         self.updateComplete.emit(updateTask.plan, updated)
 
@@ -99,7 +98,7 @@ class DistrictUpdater(QObject):
 
     def updateDistricts(
             self,
-            plan: "RedistrictingPlan",
+            plan: "RdsPlan",
             districts: Optional[Iterable[int]] = None,
             needDemographics=False,
             needGeometry=False,
@@ -109,7 +108,7 @@ class DistrictUpdater(QObject):
         """ update aggregate district data from assignments, including geometry where requested
 
         :param plan: Plan to update
-        :type plan: RedistrictingPlan
+        :type plan: RdsPlan
 
         :param districts: Districts of plan to update if less than all districts
         :type districts: Iterable[int] | None
@@ -147,21 +146,21 @@ class DistrictUpdater(QObject):
             self._updateTasks[plan] = updateTask
             QgsApplication.taskManager().addTask(updateTask)
 
-    def watchPlan(self, plan: "RedistrictingPlan"):
+    def watchPlan(self, plan: "RdsPlan"):
         if plan.assignLayer:
             self._beforeCommitSignals.setMapping(plan.assignLayer, plan)
             self._afterCommitSignals.setMapping(plan.assignLayer, plan)
             plan.assignLayer.beforeCommitChanges.connect(self._beforeCommitSignals.map)
             plan.assignLayer.afterCommitChanges.connect(self._afterCommitSignals.map)
 
-    def unwatchPlan(self, plan: "RedistrictingPlan"):
+    def unwatchPlan(self, plan: "RdsPlan"):
         if plan.assignLayer:
             plan.assignLayer.beforeCommitChanges.disconnect(self._beforeCommitSignals.map)
             plan.assignLayer.afterCommitChanges.disconnect(self._afterCommitSignals.map)
             self._beforeCommitSignals.removeMappings(plan.assignLayer)
             self._afterCommitSignals.removeMappings(plan.assignLayer)
 
-    def checkForChangedAssignments(self, plan: "RedistrictingPlan"):
+    def checkForChangedAssignments(self, plan: "RdsPlan"):
         dindex = plan.assignLayer.fields().lookupField(plan.distField)
         if dindex == -1:
             return
@@ -178,7 +177,7 @@ class DistrictUpdater(QObject):
         }
         self._updateDistricts[plan] = set(new.values()) | old
 
-    def startUpdateDistricts(self, plan: "RedistrictingPlan"):
+    def startUpdateDistricts(self, plan: "RdsPlan"):
         if self._updateDistricts[plan]:
             self.updateDistricts(plan, self._updateDistricts[plan], True, True, True)
             del self._updateDistricts[plan]

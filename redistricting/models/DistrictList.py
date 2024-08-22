@@ -38,13 +38,14 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
+from .base import BaseModel
 from .District import (
-    District,
-    Unassigned
+    RdsDistrict,
+    RdsUnassigned
 )
 
 
-class DistrictList(QObject):
+class DistrictList(BaseModel):
     districtNameChanged = pyqtSignal(QObject)
     districtMembersChanged = pyqtSignal(QObject)
     districtDescriptionChanged = pyqtSignal(QObject)
@@ -58,7 +59,7 @@ class DistrictList(QObject):
             pass
 
         @overload
-        def __getitem__(self, index: int) -> District:
+        def __getitem__(self, index: int) -> RdsDistrict:
             pass
 
         def __getitem__(self, index):
@@ -86,7 +87,7 @@ class DistrictList(QObject):
             pass
 
         @overload
-        def __getitem__(self, index: str) -> District:
+        def __getitem__(self, index: str) -> RdsDistrict:
             pass
 
         def __getitem__(self, index):
@@ -109,8 +110,8 @@ class DistrictList(QObject):
 
             raise KeyError(tr("Invalid key passed to DistrictList.byname"))
 
-    def __init__(self, numDistricts=0, districts: Optional[Iterable[District]] = None):
-        super().__init__()
+    def __init__(self, numDistricts=0, districts: Optional[Iterable[RdsDistrict]] = None, parent: Optional[QObject] = None):
+        super().__init__(parent)
         self._nameSignalMapper = QSignalMapper(self)
         self._nameSignalMapper.mappedObject.connect(self.districtNameChanged)
         self._membersSignalMapper = QSignalMapper(self)
@@ -123,19 +124,16 @@ class DistrictList(QObject):
         self._numDistricts = numDistricts
 
         if districts is not None:
-            self._districts: dict[int, District] = OrderedDict()
+            self._districts: dict[int, RdsDistrict] = OrderedDict()
             for d in districts:
                 if d.district == 0:
                     self._districts[0] = d
                 else:
                     self.add(d)
         else:
-            self._districts: dict[int, District] = OrderedDict({0: Unassigned()})
+            self._districts: dict[int, RdsDistrict] = OrderedDict({0: RdsUnassigned()})
 
-    def __repr__(self):
-        return f"[{','.join(repr(d) for d in self._districts.values())}]"
-
-    def clone(self, districts: Optional[Iterable[District]] = None):
+    def clone(self, districts: Optional[Iterable[RdsDistrict]] = None):
         if districts is None:
             districts = self._districts.values()
 
@@ -143,7 +141,7 @@ class DistrictList(QObject):
         return instance
 
     @ overload
-    def __getitem__(self, index: int) -> District:
+    def __getitem__(self, index: int) -> RdsDistrict:
         ...
 
     @ overload
@@ -182,16 +180,16 @@ class DistrictList(QObject):
     def __len__(self):
         return len(self._districts)
 
-    @ overload
-    def __contains__(self, index: District) -> bool:
+    @overload
+    def __contains__(self, index: RdsDistrict) -> bool:
         ...
 
-    @ overload
+    @overload
     def __contains__(self, index: int) -> bool:
         ...
 
     def __contains__(self, index) -> bool:
-        if isinstance(index, District):
+        if isinstance(index, RdsDistrict):
             return index.district in self._districts
 
         return index in self._districts
@@ -208,13 +206,13 @@ class DistrictList(QObject):
     def items(self):
         return self._districts.items()
 
-    def index(self, district: District):
+    def index(self, district: RdsDistrict):
         return list(self._districts.values()).index(district)
 
     def clear(self):
         newdict = OrderedDict()
         if 0 in self._districts:
-            newdict[0] = Unassigned()
+            newdict[0] = RdsUnassigned()
             del self._districts[0]
 
         for d in self._districts.values():
@@ -227,7 +225,7 @@ class DistrictList(QObject):
 
         self._districts = newdict
 
-    def add(self, district: District):
+    def add(self, district: RdsDistrict):
         assert 0 < district.district <= self.numDistricts
         self._nameSignalMapper.setMapping(district, district)
         self._membersSignalMapper.setMapping(district, district)
@@ -239,7 +237,7 @@ class DistrictList(QObject):
         self._districts[district.district] = district
         self._districts = {key: self._districts[key] for key in sorted(self._districts.keys())}
 
-    def remove(self, district: Union[District, int]):
+    def remove(self, district: Union[RdsDistrict, int]):
         if isinstance(district, int):
             if district in self._districts:
                 district = self._districts[district]
@@ -259,19 +257,21 @@ class DistrictList(QObject):
         else:
             raise ValueError(tr("District {district} not found in District List").format(district=district.district))
 
-    @ property
+    numDistricts: int
+
+    @property
     def numDistricts(self) -> int:
         return self._numDistricts
 
-    @ numDistricts.setter
+    @numDistricts.setter
     def numDistricts(self, value: int):
         assert value > 1
         self._numDistricts = value
 
-    @ property
+    @property
     def byindex(self):
         return self._indexaccessor
 
-    @ property
+    @property
     def byname(self):
         return self._nameaccessor

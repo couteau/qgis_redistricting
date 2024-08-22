@@ -44,7 +44,7 @@ from ...utils import tr
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from ...models import Field
+    from ...models import RdsField
 
 
 class AddGeoFieldToAssignmentLayerTask(QgsTask):
@@ -53,7 +53,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
         geoPackagePath: str,
         assignLayer: QgsVectorLayer,
         srcLayer: QgsVectorLayer,
-        geoFields: List["Field"],
+        geoFields: List["RdsField"],
         srcIdField: str,
         geoIdField: str
     ):
@@ -67,8 +67,8 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
         self.exception = None
 
     def run(self):
-        def makeGetter(field: "Field"):
-            if not field.isExpression:
+        def makeGetter(field: "RdsField"):
+            if not field.expression:
                 findex = self.srcLayer.fields().lookupField(field.field)
                 if findex == -1:
                     raise RdsException(tr('Could not find {field} in {source} layer').format(

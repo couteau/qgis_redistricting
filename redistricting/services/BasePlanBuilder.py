@@ -27,10 +27,8 @@ from __future__ import annotations
 import pathlib
 from numbers import Number
 from typing import (
-    List,
     Optional,
-    TypeVar,
-    Union,
+    Self,
     overload
 )
 
@@ -38,10 +36,9 @@ from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
 from ..models import (
-    DataField,
-    Field,
-    FieldList,
-    RedistrictingPlan
+    RdsDataField,
+    RdsField,
+    RdsPlan
 )
 from ..utils import (
     matchField,
@@ -49,8 +46,6 @@ from ..utils import (
 )
 from . import defaults
 from .PlanValidate import PlanValidator
-
-Self = TypeVar("Self", bound="BasePlanBuilder")
 
 
 class BasePlanBuilder(PlanValidator):
@@ -62,7 +57,7 @@ class BasePlanBuilder(PlanValidator):
 
     # pylint: disable=protected-access
     @classmethod
-    def fromPlan(cls, plan: RedistrictingPlan, parent: Optional[QObject] = None, **kwargs):
+    def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
         instance = super().fromPlan(plan, parent, **kwargs)
         for f in instance._popFields:
             if instance._isVAP(f.field):
@@ -153,7 +148,7 @@ class BasePlanBuilder(PlanValidator):
             self.setPopLayer(value)
 
         for f in self._geoFields:
-            f.setLayer(self._geoLayer)
+            f.layer = self._geoLayer
 
         return self
 
@@ -177,10 +172,10 @@ class BasePlanBuilder(PlanValidator):
             self.setGeoLayer(value)
 
         for f in self._popFields:
-            f.setLayer(self._popLayer)
+            f.layer = self._popLayer
 
         for f in self._dataFields:
-            f.setLayer(self._popLayer)
+            f.layer = self._popLayer
 
         return self
 
@@ -198,23 +193,23 @@ class BasePlanBuilder(PlanValidator):
         self._popField = value
         return self
 
-    def _checkNotDuplicate(self, field: Field, fieldList: FieldList):
+    def _checkNotDuplicate(self, field: RdsField, fieldList: list[RdsField]):
         if any(f.field == field.field for f in fieldList):
             return False
 
         return True
 
-    def setPopFields(self, popFields: Union[List[Field], FieldList]):
-        l = FieldList()
+    def setPopFields(self, popFields: list[RdsField]):
+        l = []
         for f in popFields:
             if not self._checkNotDuplicate(f, l):
-                raise ValueError(tr('Field list contains duplicate fields'))
+                raise ValueError(tr('RdsField list contains duplicate fields'))
 
             if self._isVAP(f.field):
                 self._vap = f
             if self._isCVAP(f.field):
                 self._cvap = f
-            f.setLayer(self._popLayer)
+            f.layer = self._popLayer
             l.append(f)
         self._popFields = l
         return self
@@ -225,18 +220,18 @@ class BasePlanBuilder(PlanValidator):
     def _isCVAP(self, fieldName):
         return matchField(fieldName, self._popLayer, defaults.CVAP_TOTAL_FIELDS)
 
-    @overload
+    @ overload
     def appendPopField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
         ...
 
-    @overload
-    def appendPopField(self, field: Field) -> Self:
+    @ overload
+    def appendPopField(self, field: RdsField) -> Self:
         ...
 
-    def appendPopField(self, field, isExpression=False, caption=None) -> Self:
+    def appendPopField(self, field, caption=None) -> Self:
         if isinstance(field, str):
-            field = Field(self._popLayer, field, isExpression, caption)
-        elif not isinstance(field, Field):
+            field = RdsField(self._popLayer, field, caption)
+        elif not isinstance(field, RdsField):
             raise TypeError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name)
@@ -256,49 +251,51 @@ class BasePlanBuilder(PlanValidator):
 
         return self
 
-    @overload
-    def removePopField(self, field: Field) -> Self:
+    @ overload
+    def removePopField(self, field: RdsField) -> Self:
         ...
 
-    @overload
+    @ overload
     def removePopField(self, field: str) -> Self:
         ...
 
-    @overload
+    @ overload
     def removePopField(self, field: int) -> Self:
         ...
 
     def removePopField(self, field) -> Self:
-        if isinstance(field, Field):
+        if isinstance(field, RdsField):
             if not field in self._popFields:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field.field, plan=self._name)
                 )
         elif isinstance(field, str):
-            if field in self._popFields:
-                field = self._popFields[field]
+            for f in self._popFields:
+                if f.field == field:
+                    field = f
+                    break
             else:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field, plan=self._name)
                 )
         elif isinstance(field, int):
             if 0 <= field < len(self._popFields):
                 field = self._popFields[field]
             else:
-                raise ValueError(tr('Invalid index passed to RedistrictingPlan.removePopField'))
+                raise ValueError(tr('Invalid index passed to RdsPlan.removePopField'))
         else:
-            raise ValueError(tr('Invalid index passed to RedistrictingPlan.removePopField'))
+            raise ValueError(tr('Invalid index passed to RdsPlan.removePopField'))
 
         self._popFields.remove(field)
         return self
 
-    def setDataFields(self, dataFields: Union[List[DataField], FieldList]):
-        l = FieldList()
+    def setDataFields(self, dataFields: list[RdsDataField]):
+        l = []
         for f in dataFields:
             if not self._checkNotDuplicate(f, l):
-                raise ValueError(tr('Field list contains duplicate fields'))
+                raise ValueError(tr('RdsField list contains duplicate fields'))
 
             f.setLayer(self._popLayer)
             l.append(f)
@@ -309,7 +306,6 @@ class BasePlanBuilder(PlanValidator):
     def appendDataField(
         self,
         field: str,
-        isExpression: bool = False,
         caption: str = None,
         sumfield=None,
         pctbase=None
@@ -317,18 +313,18 @@ class BasePlanBuilder(PlanValidator):
         ...
 
     @overload
-    def appendDataField(self, field: DataField) -> Self:
+    def appendDataField(self, field: RdsDataField) -> Self:
         ...
 
-    def appendDataField(self, field, isExpression=False, caption=None, sumfield=None, pctbase=None) -> Self:
+    def appendDataField(self, field, caption=None, sumField=None, pctBase=None) -> Self:
         if isinstance(field, str):
-            if pctbase is None:
+            if pctBase is None:
                 if matchField(field, self._popLayer, defaults.VAP_FIELDS):
-                    pctbase = self._vap
+                    pctBase = self._vap
                 elif matchField(field, self._popLayer, defaults.CVAP_FIELDS):
-                    pctbase = self._cvap
-            field = DataField(self._popLayer, field, isExpression, caption, sumfield, pctbase)
-        elif not isinstance(field, DataField):
+                    pctBase = self._cvap
+            field = RdsDataField(self._popLayer, field, caption, sumField, pctBase)
+        elif not isinstance(field, RdsDataField):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name))
@@ -348,7 +344,7 @@ class BasePlanBuilder(PlanValidator):
         ...
 
     @overload
-    def removeDataField(self, field: DataField) -> Self:
+    def removeDataField(self, field: RdsDataField) -> Self:
         ...
 
     @overload
@@ -356,37 +352,38 @@ class BasePlanBuilder(PlanValidator):
         ...
 
     def removeDataField(self, field) -> Self:
-        if isinstance(field, DataField):
+        if isinstance(field, RdsDataField):
             if not field in self._dataFields:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field.field, plan=self._name)
                 )
         elif isinstance(field, str):
-            if field in self._dataFields:
-                field = self._dataFields[field]
+            for f in self._dataFields:
+                if f.field == field:
+                    field = f
+                    break
             else:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field, plan=self._name)
                 )
         elif isinstance(field, int):
             if 0 <= field < len(self._dataFields):
                 field = self._dataFields[field]
             else:
-                raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
+                raise ValueError(tr('Invalid index passed to RdsPlan.removeDataField'))
         else:
-            raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeDataField'))
+            raise ValueError(tr('Invalid index passed to RdsPlan.removeDataField'))
 
         self._dataFields.remove(field)
         return self
 
-    def setGeoFields(self, geoFields: Union[List[Field], FieldList]):
-
-        l = FieldList()
+    def setGeoFields(self, geoFields: list[RdsField]):
+        l = []
         for f in geoFields:
             if not self._checkNotDuplicate(f, l):
-                raise ValueError(tr('Field list contains duplicate fields'))
+                raise ValueError(tr('RdsField list contains duplicate fields'))
 
             f.setLayer(self._geoLayer)
             l.append(f)
@@ -395,17 +392,17 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def appendGeoField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
+    def appendGeoField(self, field: str, caption: str = None) -> Self:
         ...
 
     @overload
-    def appendGeoField(self, field: Field) -> Self:
+    def appendGeoField(self, field: RdsField) -> Self:
         ...
 
-    def appendGeoField(self, field, isExpression=False, caption=None) -> Self:
+    def appendGeoField(self, field, caption=None) -> Self:
         if isinstance(field, str):
-            field = Field(self._geoLayer, field, isExpression, caption)
-        elif not isinstance(field, Field):
+            field = RdsField(self._geoLayer, field, caption)
+        elif not isinstance(field, RdsField):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name)
@@ -422,7 +419,7 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def removeGeoField(self, field: Field) -> Self:
+    def removeGeoField(self, field: RdsField) -> Self:
         ...
 
     @overload
@@ -434,27 +431,29 @@ class BasePlanBuilder(PlanValidator):
         ...
 
     def removeGeoField(self, field) -> Self:
-        if isinstance(field, Field):
+        if isinstance(field, RdsField):
             if not field in self._geoFields:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field.field, plan=self._name)
                 )
         elif isinstance(field, str):
-            if field in self._geoFields:
-                field = self._geoFields[field]
+            for f in self._geoFields:
+                if f.field == field:
+                    field = f
+                    break
             else:
                 raise ValueError(
-                    tr('Could not remove field {field}. Field not found in plan {plan}.').
+                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
                     format(field=field, plan=self._name)
                 )
         elif isinstance(field, int):
             if 0 <= field < len(self._geoFields):
                 field = self._geoFields[field]
             else:
-                raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeGeoField'))
+                raise ValueError(tr('Invalid index passed to RdsPlan.removeGeoField'))
         else:
-            raise ValueError(tr('Invalid index passed to RedistrictingPlan.removeGeoField'))
+            raise ValueError(tr('Invalid index passed to RdsPlan.removeGeoField'))
 
         self._geoFields.remove(field)
         return self
