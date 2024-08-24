@@ -10,13 +10,13 @@ from redistricting.gui.DeltaListModel import DeltaListModel
 
 class TestDeltaModel:
     @pytest.fixture
-    def empty_model(self, mock_plan):
+    def empty_model(self, plan):
         model = DeltaListModel()
-        model.setPlan(mock_plan)
-        yield model
+        model.setPlan(plan)
+        return model
 
     @pytest.fixture
-    def delta_model(self, mock_plan):
+    def delta_model(self, plan, mocker):
         df = pd.DataFrame.from_records(
             [{
                 'district': 1,
@@ -39,13 +39,14 @@ class TestDeltaModel:
             index='district'
         )
         model = DeltaListModel()
-        model.setPlan(mock_plan)
+        model.setPlan(plan)
+        mocker.patch.object(model, "_delta")
         model._delta.__bool__.return_value = True
         model._delta._data = df
         yield model
 
     def test_create(self, empty_model: DeltaListModel):
-        assert empty_model.rowCount() == 4
+        assert empty_model.rowCount() == 15
 
     def test_model(self, delta_model, empty_model, qtmodeltester):
         qtmodeltester.check(delta_model)
