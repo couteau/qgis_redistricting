@@ -6,6 +6,16 @@ from redistricting.services import PlanBuilder
 
 
 class TestCreatePlan:
+
+    @pytest.fixture
+    def creator(self, block_layer):
+        return PlanBuilder() \
+            .setName('test') \
+            .setNumDistricts(5) \
+            .setGeoLayer(block_layer) \
+            .setGeoIdField('geoid') \
+            .setPopField('pop_total')
+
     def test_set_nonexistent_fields_no_validate(self, creator: PlanBuilder):
         assert creator._validatePopLayer()
         creator.setPopJoinField('not_a_field')
@@ -24,8 +34,7 @@ class TestCreatePlan:
 
     def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
         plan = creator.createPlan(createLayers=False)
-        assert hasattr(plan.districts[0], 'pop_total')
-        assert not plan._updater._needDemographicUpdate
+        assert hasattr(plan.districts[0], 'population')
 
         creator.appendPopField('vap_total')
         plan = creator.createPlan(createLayers=False)

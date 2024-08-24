@@ -27,12 +27,12 @@ class TestUpdatePendingChangesTask:
         t = AggregatePendingChangesTask(mock_plan)
         assert t.exception is None
 
-    def test_run(self, mock_plan: RedistrictingPlan):
-        mock_plan.assignLayer.startEditing()
-        f = next(mock_plan.assignLayer.getFeatures())
-        i = mock_plan.assignLayer.fields().lookupField(mock_plan.distField)
-        mock_plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
-        t = AggregatePendingChangesTask(mock_plan)
+    def test_run(self, plan: RedistrictingPlan):
+        plan.assignLayer.startEditing()
+        f = next(plan.assignLayer.getFeatures())
+        i = plan.assignLayer.fields().lookupField(plan.distField)
+        plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
+        t = AggregatePendingChangesTask(plan)
         t.run()
         assert t.data is not None
         assert len(t.data) == 2

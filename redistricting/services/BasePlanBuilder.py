@@ -29,7 +29,7 @@ from numbers import Number
 from typing import (
     List,
     Optional,
-    TypeVar,
+    Self,
     Union,
     overload
 )
@@ -49,8 +49,6 @@ from ..utils import (
 )
 from . import defaults
 from .PlanValidate import PlanValidator
-
-Self = TypeVar("Self", bound="BasePlanBuilder")
 
 
 class BasePlanBuilder(PlanValidator):

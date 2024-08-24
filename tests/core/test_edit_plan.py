@@ -61,22 +61,22 @@ class TestPlanEditor:
         qtbot: QtBot
     ):
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
-            editor.appendDataField('vap_apblack', False, 'APBVAP')
+            editor.appendDataField('vap_ap_black', False, 'APBVAP')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
         assert isinstance(valid_plan.dataFields[0], DataField)
         assert valid_plan.dataFields[0].layer == block_layer
-        assert valid_plan.dataFields[0].field == 'vap_apblack'
+        assert valid_plan.dataFields[0].field == 'vap_ap_black'
         assert not valid_plan.dataFields[0].isExpression
         assert valid_plan.dataFields[0].caption == 'APBVAP'
 
-        f1 = DataField(block_layer, 'pop_apblack', False, caption='APBPOP')
+        f1 = DataField(block_layer, 'pop_ap_black', False, caption='APBPOP')
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
             editor.appendDataField(f1)
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
         assert isinstance(valid_plan.dataFields[1], DataField)
-        assert valid_plan.dataFields[1].field == 'pop_apblack'
+        assert valid_plan.dataFields[1].field == 'pop_ap_black'
 
         editor.appendDataField('vap_nh_white')
         editor.updatePlan()
@@ -131,17 +131,17 @@ class TestPlanEditor:
             editor.removeDataField(3)
 
     def test_datafields_remove_field(self, editor: PlanEditor, valid_plan: RedistrictingPlan, qtbot: QtBot):
-        editor.appendDataField('pop_apblack')
-        editor.appendDataField('vap_apblack')
+        editor.appendDataField('pop_ap_black')
+        editor.appendDataField('vap_ap_black')
         editor.appendDataField('vap_nh_white')
         editor.updatePlan()
         f1 = valid_plan.dataFields[0]
 
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
-            editor.removeDataField('vap_apblack')
+            editor.removeDataField('vap_ap_black')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 2
-        assert valid_plan.dataFields[0].field == 'pop_apblack'
+        assert valid_plan.dataFields[0].field == 'pop_ap_black'
         assert valid_plan.dataFields[1].field == 'vap_nh_white'
 
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
@@ -157,11 +157,11 @@ class TestPlanEditor:
 
     @pytest.fixture
     def vtd_field_fld(self, block_layer):
-        return Field(block_layer, 'vtdid20', False)
+        return Field(block_layer, 'vtdid', False)
 
     @pytest.fixture
     def vtd_field_str(self):
-        return 'vtdid20'
+        return 'vtdid'
 
     def test_geofields_append_adds_field(
         self,
@@ -172,24 +172,24 @@ class TestPlanEditor:
         qtbot: QtBot
     ):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            editor.appendGeoField('vtdid20', False, 'VTD')
+            editor.appendGeoField('vtdid', False, 'VTD')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
         assert isinstance(valid_plan.geoFields[0], Field)
         assert valid_plan.geoFields[0].layer == block_layer
-        assert valid_plan.geoFields[0].field == 'vtdid20'
+        assert valid_plan.geoFields[0].field == 'vtdid'
         assert not valid_plan.geoFields[0].isExpression
         assert valid_plan.geoFields[0].caption == 'VTD'
 
-        f1 = Field(block_layer, 'statefp20 || countyfp20 || vtd', True, caption='VTD')
+        f1 = Field(block_layer, 'statefp || countyfp || vtd', True, caption='VTD')
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
-        assert valid_plan.geoFields[1].field == 'statefp20 || countyfp20 || vtd'
+        assert valid_plan.geoFields[1].field == 'statefp || countyfp || vtd'
         assert valid_plan.geoFields[1].isExpression
 
-        editor.appendGeoField('countyid20')
+        editor.appendGeoField('countyid')
         editor.updatePlan()
         assert len(valid_plan.geoFields) == 3
 
@@ -202,11 +202,11 @@ class TestPlanEditor:
         field,
         request
     ):
-        editor.appendGeoField('vtdid20', False, 'VTD')
+        editor.appendGeoField('vtdid', False, 'VTD')
         editor.updatePlan()
 
         editor.appendGeoField(request.getfixturevalue(field))
-        assert editor.error() == ('Attempt to add duplicate field vtdid20 to plan minimal', Qgis.Warning)
+        assert editor.error() == ('Attempt to add duplicate field vtdid to plan minimal', Qgis.Warning)
         editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
 
@@ -245,23 +245,23 @@ class TestPlanEditor:
     ):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(vtd_field_fld)
-            editor.appendGeoField('statefp20 || countyfp20 || vtd', True)
-            editor.appendGeoField('countyid20')
+            editor.appendGeoField('statefp || countyfp || vtd', True)
+            editor.appendGeoField('countyid')
             editor.updatePlan()
         f1 = valid_plan.geoFields[1]
 
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            editor.removeGeoField('vtdid20')
+            editor.removeGeoField('vtdid')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
-        assert valid_plan.geoFields[0].field == 'statefp20 || countyfp20 || vtd'
-        assert valid_plan.geoFields[1].field == 'countyid20'
+        assert valid_plan.geoFields[0].field == 'statefp || countyfp || vtd'
+        assert valid_plan.geoFields[1].field == 'countyid'
 
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.removeGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
-        assert valid_plan.geoFields[0].field == 'countyid20'
+        assert valid_plan.geoFields[0].field == 'countyid'
 
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.removeGeoField(0)

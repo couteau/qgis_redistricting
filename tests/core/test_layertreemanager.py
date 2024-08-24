@@ -17,6 +17,7 @@ class TestLayerTreeManager:
     @pytest.fixture
     def manager(self, mocker: MockerFixture):
         mocker.patch("redistricting.services.LayerTreeManager.QgsLayerTreeGroup")
+        mocker.patch("redistricting.services.LayerTreeManager.QgsProject")
         manager = LayerTreeManager()
         return manager
 

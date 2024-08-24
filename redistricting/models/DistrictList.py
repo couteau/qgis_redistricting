@@ -122,15 +122,12 @@ class DistrictList(QObject):
         self._nameaccessor = DistrictList._NameAccessor(self)
         self._numDistricts = numDistricts
 
+        self._districts: dict[int, District] = OrderedDict()
         if districts is not None:
-            self._districts: dict[int, District] = OrderedDict()
             for d in districts:
-                if d.district == 0:
-                    self._districts[0] = d
-                else:
-                    self.add(d)
+                self.add(d)
         else:
-            self._districts: dict[int, District] = OrderedDict({0: Unassigned()})
+            self.add(Unassigned())
 
     def __repr__(self):
         return f"[{','.join(repr(d) for d in self._districts.values())}]"
@@ -142,15 +139,15 @@ class DistrictList(QObject):
         instance = self.__class__(self._numDistricts, [d.clone() for d in districts])
         return instance
 
-    @ overload
+    @overload
     def __getitem__(self, index: int) -> District:
         ...
 
-    @ overload
+    @overload
     def __getitem__(self, index: slice) -> "DistrictList":
         ...
 
-    @ overload
+    @overload
     def __getitem__(self, index: tuple) -> Any:
         ...
 
@@ -182,11 +179,11 @@ class DistrictList(QObject):
     def __len__(self):
         return len(self._districts)
 
-    @ overload
+    @overload
     def __contains__(self, index: District) -> bool:
         ...
 
-    @ overload
+    @overload
     def __contains__(self, index: int) -> bool:
         ...
 
@@ -212,11 +209,6 @@ class DistrictList(QObject):
         return list(self._districts.values()).index(district)
 
     def clear(self):
-        newdict = OrderedDict()
-        if 0 in self._districts:
-            newdict[0] = Unassigned()
-            del self._districts[0]
-
         for d in self._districts.values():
             d.nameChanged.disconnect(self._nameSignalMapper.map)
             d.membersChanged.disconnect(self._membersSignalMapper.map)
@@ -225,10 +217,20 @@ class DistrictList(QObject):
             self._membersSignalMapper.removeMappings(d)
             self._descripSignalMapper.removeMappings(d)
 
-        self._districts = newdict
+        if 0 in self._districts:
+            addUnassigned = True
+
+        self._districts = OrderedDict()
+
+        if addUnassigned:
+            self.add(Unassigned())
 
     def add(self, district: District):
-        assert 0 < district.district <= self.numDistricts
+        assert 0 <= district.district <= self.numDistricts
+
+        if district.district == 0 and 0 in self._districts:
+            raise TypeError("Unassigned already exists in list")
+
         self._nameSignalMapper.setMapping(district, district)
         self._membersSignalMapper.setMapping(district, district)
         self._descripSignalMapper.setMapping(district, district)
@@ -259,19 +261,19 @@ class DistrictList(QObject):
         else:
             raise ValueError(tr("District {district} not found in District List").format(district=district.district))
 
-    @ property
+    @property
     def numDistricts(self) -> int:
         return self._numDistricts
 
-    @ numDistricts.setter
+    @numDistricts.setter
     def numDistricts(self, value: int):
         assert value > 1
         self._numDistricts = value
 
-    @ property
+    @property
     def byindex(self):
         return self._indexaccessor
 
-    @ property
+    @property
     def byname(self):
         return self._nameaccessor

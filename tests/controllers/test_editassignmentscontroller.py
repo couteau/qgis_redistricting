@@ -1,11 +1,16 @@
 import pytest
 from pytest_mock import MockerFixture
-from qgis.gui import QgsFieldComboBox
+from pytestqt.qtbot import QtBot
+from qgis.gui import (
+    QgsFieldComboBox,
+    QgsMapCanvas
+)
 from qgis.PyQt.QtWidgets import QAction
 
 from redistricting import (
     controllers,
     gui,
+    models,
     services
 )
 
@@ -60,6 +65,11 @@ class TestEditAssignmentsController:
         controller.load()
         return controller
 
+    @pytest.fixture
+    def controller_with_plan(self, controller: controllers.EditAssignmentsController, planmanager_with_active_plan):
+        controller.planManager = planmanager_with_active_plan
+        return controller
+
     def test_create_controller(self, qgis_iface, planmanager, mock_project, mock_toolbar, mock_assignment_editor, mocker: MockerFixture):
         mocker.patch('redistricting.controllers.BaseCtlr.ActionRegistry')
         controller = controllers.EditAssignmentsController(
@@ -107,3 +117,47 @@ class TestEditAssignmentsController:
     def test_connectplansignals(self, controller: controllers.EditAssignmentsController, mock_plan, mocker: MockerFixture):
         controller.connectPlanSignals(mock_plan)
         mock_plan.assignLayer.editingStarted.connect.assert_called_once()
+
+    def test_target_not_set_cannot_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+        controller_with_plan.setGeoField('geoid20')
+        assert controller_with_plan.geoField == 'geoid20'
+        assert controller_with_plan.targetDistrict is None
+        assert controller_with_plan.sourceDistrict is None
+        with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
+            controller_with_plan.activateMapTool(gui.PaintTool.PaintMode.PaintByGeography)
+
+    def test_geoid_not_set_cannot_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+        district = models.District(2)
+        controller_with_plan.targetDistrictChanged(district)
+        assert controller_with_plan.targetDistrict == district
+        assert controller_with_plan.sourceDistrict is None
+        assert controller_with_plan.geoField is None
+        with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
+            controller_with_plan.activateMapTool(gui.PaintTool.PaintMode.PaintByGeography)
+
+    def test_target_set_can_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+        district = models.District(2)
+        controller_with_plan.targetDistrictChanged(district)
+        controller_with_plan.setGeoField('geoid20')
+        assert controller_with_plan.targetDistrict == district
+        assert controller_with_plan.mapTool.targetDistrict() == 2
+        with qtbot.waitSignal(qgis_canvas.mapToolSet):
+            controller_with_plan.activateMapTool(gui.PaintTool.PaintMode.PaintByGeography)
+
+    def test_set_invalid_geofield_throws_exception(self, controller_with_plan: controllers.EditAssignmentsController, plan):
+        type(controller_with_plan.planManager).activePlan = plan
+        assert len(plan.geoFields) > 0
+        assert controller_with_plan.planManager.activePlan == plan
+        with pytest.raises(ValueError):
+            controller_with_plan.setGeoField('district')
+
+    def test_no_plan_geofields_can_set_any_geolayer_field(self, controller_with_plan: controllers.EditAssignmentsController, plan):
+        type(controller_with_plan.planManager).activePlan = plan
+        plan.geoFields.clear()
+        assert len(plan.geoFields) == 0
+        assert 'district' not in plan.geoFields
+        controller_with_plan.setGeoField('tractce')
+        assert controller_with_plan.geoField == 'tractce'
+
+        with pytest.raises(ValueError):
+            controller_with_plan.setGeoField('not_a_field')

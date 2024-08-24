@@ -156,14 +156,14 @@ class DistrictDataModel(QAbstractTableModel):
         if parent.isValid() or self._districts is None:
             return 0
 
-        return len(self._keys) - 1
+        return len(self._keys)
 
     def data(self, index, role=Qt.DisplayRole):
         value = None
         try:
             if role in (Qt.DisplayRole, Qt.EditRole):
                 row = index.row()
-                col = index.column() + 1
+                col = index.column()
                 district = self._districts.byindex[row]
 
                 key = self._keys[col]
@@ -237,8 +237,8 @@ class DistrictDataModel(QAbstractTableModel):
         return False
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section + 1 < len(self._headings):
-            return self._headings[section + 1]
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section < len(self._headings):
+            return self._headings[section]
 
         return None
 

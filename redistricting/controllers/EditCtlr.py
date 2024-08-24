@@ -22,6 +22,7 @@
  ***************************************************************************/
 """
 from typing import (
+    TYPE_CHECKING,
     Iterable,
     Optional
 )
@@ -38,10 +39,7 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import (
-    QAction,
-    QDialog
-)
+from qgis.PyQt.QtWidgets import QDialog
 
 from ..gui import (
     DlgNewDistrict,
@@ -56,6 +54,11 @@ from ..models import (
 from ..services import AssignmentsService
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class EditAssignmentsController(BaseController):
@@ -75,9 +78,9 @@ class EditAssignmentsController(BaseController):
         self.actionToggle: QAction = None
 
         self.mapTool = PaintDistrictsTool(self.canvas)
-        self.sourceDistrict: District = None
-        self.targetDistrict: District = None
-        self.geoField: str = None
+        self.sourceDistrict: Optional[District] = None
+        self.targetDistrict: Optional[District] = None
+        self.geoField: Optional[str] = None
 
         self.mapTool.paintingStarted.connect(self.startPaintingFeatures)
         self.mapTool.paintFatures.connect(self.paintFeatures)
@@ -318,10 +321,12 @@ class EditAssignmentsController(BaseController):
 
         dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
         dlg.setWindowTitle(tr("Edit District"))
+        dlg.sbxDistrictNo.setValue(district.district)
         dlg.sbxDistrictNo.setReadOnly(True)
         dlg.inpName.setText(district.name)
         dlg.sbxMembers.setValue(district.members)
         dlg.txtDescription.setPlainText(district.description)
+        dlg.buttonBox.button(dlg.buttonBox.Ok).setEnabled(True)
         if dlg.exec() == QDialog.Accepted:
             district.name = dlg.districtName
             district.members = dlg.members
@@ -353,9 +358,19 @@ class EditAssignmentsController(BaseController):
             self.canvas.setMapTool(self.mapTool)
 
     def setGeoField(self, value):
-        if value and self.planManager.activePlan is not None and \
-                value != self.planManager.activePlan.geoIdField and \
-                value not in self.planManager.activePlan.geoFields:
+        if self.planManager.activePlan is None:
+            return
+
+        if value is not None and value != self.planManager.activePlan.geoIdField and (
+            (
+                len(self.planManager.activePlan.geoFields) != 0 and
+                value not in self.planManager.activePlan.geoFields
+            ) or
+            (
+                len(self.planManager.activePlan.geoFields) == 0 and
+                value not in self.planManager.activePlan.geoLayer.fields().names()
+            )
+        ):
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
         self.geoField = value
 

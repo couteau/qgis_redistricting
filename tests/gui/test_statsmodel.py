@@ -12,14 +12,14 @@ from redistricting.services import PlanEditor
 
 class TestStatsModel:
     @pytest.fixture
-    def stats_model(self, mock_plan) -> StatsModel:
-        return StatsModel(mock_plan.stats)
+    def stats_model(self, plan) -> StatsModel:
+        return StatsModel(plan.stats)
 
     def test_model(self, stats_model, qtmodeltester):
         qtmodeltester.check(stats_model)
 
     def test_rowcount(self, stats_model):
-        assert stats_model.rowCount() == 7
+        assert stats_model.rowCount() == 9
 
     def test_headerdata(self, stats_model):
         assert stats_model.headerData(0, Qt.Vertical, Qt.DisplayRole) == 'Population'
@@ -29,10 +29,10 @@ class TestStatsModel:
         assert data == '227,036'
 
     # pylint: disable=unused-argument
-    def test_signals(self, stats_model: StatsModel, mock_plan: RedistrictingPlan, mock_taskmanager, qtbot: QtBot):
+    def test_signals(self, stats_model: StatsModel, plan: RedistrictingPlan, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignals([stats_model.modelAboutToBeReset, stats_model.modelReset]):
-            e = PlanEditor.fromPlan(mock_plan)
-            e.appendGeoField('countyid20')
+            e = PlanEditor.fromPlan(plan)
+            e.appendGeoField('countyid')
             e.updatePlan()
 
     def test_clear_stats(self, stats_model: StatsModel, qtbot: QtBot):

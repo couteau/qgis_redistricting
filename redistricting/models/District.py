@@ -208,6 +208,7 @@ class District(QObject):
 
     def update(self, data: Union["District", dict[str, Any]]):
         if isinstance(data, District):
+            self._fid = data.fid
             data = data[:]
 
         newkeys = [k for k in data.keys() if k not in District.BASE_COLUMNS + District.STATS_COLUMNS]

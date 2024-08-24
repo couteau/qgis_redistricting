@@ -59,21 +59,21 @@ class TestCreateLayersTask:
 
     @pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
-        (['vap_apblack', 'vap_hispanic', 'vap_nh_white'], []),
-        (['vap_apblack - vap_nh_black'], []),
-        ([], ['countyid20', 'vtdid20']),
-        ([], ['statefp20 || countyfp20']),
+        (['vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
+        (['vap_ap_black - vap_nh_black'], []),
+        ([], ['countyid', 'vtdid']),
+        ([], ['statefp || countyfp']),
     ])
     def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
         p = RedistrictingPlan('test_create_layers', 5)
         p._popLayer = block_layer
-        p._geoIdField = 'geoid20'
+        p._geoIdField = 'geoid'
         p._popField = 'pop_total'
 
         p._dataFields.extend([DataField(block_layer, f) for f in datafields])
         p._geoFields.extend([Field(block_layer, f) for f in geofields])
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
-        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid20')
+        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid')
         result = task.run()
         assert task.exception is None
         assert result

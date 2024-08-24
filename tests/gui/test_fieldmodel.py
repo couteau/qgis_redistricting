@@ -18,12 +18,12 @@ from redistricting.models import (
 class TestFieldTableView:
     @pytest.fixture
     def field_list(self, block_layer) -> FieldList:
-        f = Field(block_layer, 'vtdid20')
+        f = Field(block_layer, 'vtdid')
         return FieldList(fields=[f])
 
     @pytest.fixture
     def field_list_two(self, block_layer) -> FieldList:
-        l = [Field(block_layer, 'vtdid20'), Field(block_layer, 'countyid20')]
+        l = [Field(block_layer, 'vtdid'), Field(block_layer, 'countyid')]
         return FieldList(fields=l)
 
     @pytest.fixture
@@ -58,22 +58,22 @@ class TestFieldTableView:
 
     def test_add_field(self, block_layer, field_list_model: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model.rowsAboutToBeInserted, field_list_model.rowsInserted]):
-            field_list_model.appendField(block_layer, 'countyid20')
+            field_list_model.appendField(block_layer, 'countyid')
         assert field_list_model.rowCount() == 2
 
     def test_move_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model_two.rowsAboutToBeMoved, field_list_model_two.rowsMoved]):
             field_list_model_two.moveField(1, 0)
-        assert field_list_model_two.fields[0].field == 'countyid20'
+        assert field_list_model_two.fields[0].field == 'countyid'
 
     def test_delete_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model_two.rowsAboutToBeRemoved, field_list_model_two.rowsRemoved]):
             field_list_model_two.deleteField(0)
         assert field_list_model_two.rowCount() == 1
-        assert field_list_model_two.fields[0].field == 'countyid20'
+        assert field_list_model_two.fields[0].field == 'countyid'
 
     def test_disallow_add_duplicate(self, block_layer, field_list_model: FieldListModel):
-        field_list_model.appendField(block_layer, 'vtdid20')
+        field_list_model.appendField(block_layer, 'vtdid')
         assert field_list_model.rowCount() == 1
 
     def test_data(self, datafield_list_model: FieldListModel):

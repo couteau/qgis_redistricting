@@ -511,8 +511,8 @@ class RedistrictingPlan(QObject):
 
         self._geoFields.clear()
         self._geoFields.extend(value)
-        self._stats.splits.initSplits()
         self.geoFieldsChanged.emit()
+        self._stats.updateGeoFields()
 
     @property
     def districtColumns(self):

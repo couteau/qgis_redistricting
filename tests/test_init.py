@@ -3,6 +3,7 @@ import configparser
 import pathlib
 
 import pytest
+from pytest_lazy_fixtures import lf
 from pytest_mock.plugin import MockerFixture
 from pytestqt.plugin import QtBot
 from qgis.core import QgsProject
@@ -11,7 +12,6 @@ from redistricting import (
     classFactory,
     redistricting
 )
-from redistricting.models import RedistrictingPlan
 
 # pylint: disable=unused-argument
 
@@ -24,6 +24,7 @@ class TestPluginInit:
         settings_obj = settings.return_value
         settings_obj.value.return_value = 'en_US'
         qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
+        qgis_iface.removeCustomActionForLayerType = mocker.MagicMock()
         qgis_iface.addCustomActionForLayer = mocker.MagicMock()
         qgis_iface.vectorMenu = mocker.MagicMock()
         qgis_iface.addPluginToVectorMenu = mocker.MagicMock()
@@ -40,15 +41,15 @@ class TestPluginInit:
         plugin.unload()
 
     @pytest.fixture
-    def plugin_with_plan(self, plugin_with_gui, mock_plan):
-        plugin_with_gui.redistrictingPlans.append(mock_plan)
+    def plugin_with_plan(self, plugin_with_gui: redistricting.Redistricting, plan):
+        plugin_with_gui.planManager.appendPlan(plan)
         return plugin_with_gui
 
     @pytest.fixture
     def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, qgis_new_project):  # pylint: disable=unused-argument
         project = QgsProject.instance()
         with qtbot.waitSignal(project.readProject):
-            project.read(str((datadir / 'test_project.qgs').resolve()))
+            project.read(str((datadir / 'test_project.qgz').resolve()))
         yield plugin_with_gui
         project.clear()
 
@@ -91,45 +92,34 @@ class TestPluginInit:
         plugin.unload()
 
     @pytest.mark.parametrize('layer', [
-        pytest.lazy_fixture("block_layer"),
-        pytest.lazy_fixture("assign_layer"),
-        pytest.lazy_fixture("dist_layer")
+        lf("block_layer"),
+        lf("assign_layer"),
+        lf("dist_layer")
     ])
-    def test_remove_layer_removes_plan(self, plugin_with_plan, layer, qtbot: QtBot):
+    def test_remove_layer_removes_plan(self, plugin_with_plan: redistricting.Redistricting, layer, qtbot: QtBot):
         with qtbot.wait_signal(QgsProject.instance().layersRemoved):
             QgsProject.instance().removeMapLayer(layer.id())
-        assert not plugin_with_plan.redistrictingPlans
+        assert len(plugin_with_plan.planManager) == 0
 
-    def test_clear(self, plugin_with_plan):
-        plugin_with_plan.clear()
-        assert len(plugin_with_plan.redistrictingPlans) == 0
-        assert plugin_with_plan.activePlan is None
-        assert plugin_with_plan.actionNewPlan.isEnabled()
-
-    def test_clear_disables_action(self, plugin_with_gui, block_layer):
+    def test_clear_disables_action(self, plugin_with_gui: redistricting.Redistricting, block_layer):
         QgsProject.instance().removeMapLayer(block_layer.id())
         plugin_with_gui.clear()
-        assert not plugin_with_gui.actionNewPlan.isEnabled()
+        assert not plugin_with_gui.planController.actionNewPlan.isEnabled()
 
     def test_open_project(self, plugin_with_gui, datadir):
         project = QgsProject.instance()
-        project.read(str((datadir / 'test_project.qgs').resolve()))
-        assert len(project.mapLayers()) == 3
-        assert len(plugin_with_gui.redistrictingPlans) == 1
-        plan: RedistrictingPlan = plugin_with_gui.activePlan
-        assert plan.totalPopulation > 0 or plan.districts._needUpdate  # pylint: disable=protected-access
+        project.read(str((datadir / 'test_project.qgz').resolve()))
+        assert len(project.mapLayers()) == 9
+        assert len(plugin_with_gui.planManager) == 1
         project.clear()
 
     def test_close_project(self, plugin_with_project):
         QgsProject.instance().clear()
-        assert not plugin_with_project.redistrictingPlans
-        assert not plugin_with_project.actionNewPlan.isEnabled()
+        assert len(plugin_with_project.planManager) == 0
+        assert not plugin_with_project.planController.actionNewPlan.isEnabled()
 
-    def test_write_project(self, plugin_with_project: redistricting.Redistricting, mocker: MockerFixture):
+    def test_write_project_calls_storage(self, plugin_with_project: redistricting.Redistricting, mocker: MockerFixture):
         storage = mocker.patch('redistricting.redistricting.ProjectStorage')
-        plan = plugin_with_project.activePlan
-        plan._setDeviation(0.05)  # pylint: disable=protected-access
-        assert QgsProject.instance().isDirty()
         QgsProject.instance().write()
         storage.assert_called_once()
 

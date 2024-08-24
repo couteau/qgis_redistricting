@@ -41,30 +41,30 @@ def qgis_app_with_path(qgis_app: QgsApplication, datadir: pathlib.Path):
 
 @pytest.fixture
 def block_layer(datadir: pathlib.Path, qgis_new_project):
-    gpkg = (datadir / 'tuscaloosa_blocks.gpkg').resolve()
-    layer = QgsVectorLayer(f'{gpkg}|layername=plans', 'blocks', 'ogr')
+    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
+    layer = QgsVectorLayer(f'{gpkg}|layername=block20', 'blocks', 'ogr')
     layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
     QgsProject.instance().addMapLayer(layer)
     return layer
 
 
 @pytest.fixture
-def gpkg_path(datadir):
+def plan_gpkg_path(datadir):
     return (datadir / 'tuscaloosa_plan.gpkg').resolve()
 
 
 @pytest.fixture
-def assign_layer(gpkg_path, qgis_new_project):
+def assign_layer(plan_gpkg_path, qgis_new_project):
     layer = QgsVectorLayer(
-        f'{gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
+        f'{plan_gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
     QgsProject.instance().addMapLayer(layer, False)
     return layer
 
 
 @pytest.fixture
-def dist_layer(gpkg_path, qgis_new_project):
+def dist_layer(plan_gpkg_path, qgis_new_project):
     layer = QgsVectorLayer(
-        f'{gpkg_path}|layername=districts', 'test_districts', 'ogr')
+        f'{plan_gpkg_path}|layername=districts', 'test_districts', 'ogr')
     QgsProject.instance().addMapLayer(layer, False)
     return layer
 
@@ -77,13 +77,13 @@ def minimal_plan():
 
 
 @pytest.fixture
-def valid_plan(minimal_plan: RedistrictingPlan, block_layer, gpkg_path):
+def valid_plan(minimal_plan: RedistrictingPlan, block_layer, plan_gpkg_path):
     # pylint: disable=protected-access
     minimal_plan._setGeoLayer(block_layer)
-    minimal_plan._geoIdField = 'geoid20'
+    minimal_plan._geoIdField = 'geoid'
     minimal_plan._setPopField('pop_total')
     # pylint: enable=protected-access
-    minimal_plan.addLayersFromGeoPackage(gpkg_path)
+    minimal_plan.addLayersFromGeoPackage(plan_gpkg_path)
     QgsProject.instance().addMapLayers([minimal_plan.distLayer, minimal_plan.assignLayer], False)
     return minimal_plan
 
@@ -94,7 +94,7 @@ def plan(block_layer, assign_layer, dist_layer):
         'name': 'test',
         'deviation': 0.025,
         'geo-layer': block_layer.id(),
-        'geo-id-field': 'geoid20',
+        'geo-id-field': 'geoid',
         'dist-field': 'district',
         'pop-field': 'pop_total',
         'pop-fields': [
@@ -109,7 +109,7 @@ def plan(block_layer, assign_layer, dist_layer):
         'num-districts': 5,
         'data-fields': [
             {'layer': block_layer.id(),
-             'field': 'vap_apblack',
+             'field': 'vap_ap_black',
              'expression': False,
              'caption': 'APBVAP',
              'sum': True,
@@ -129,7 +129,7 @@ def plan(block_layer, assign_layer, dist_layer):
         ],
         'geo-fields': [
             {'layer': assign_layer.id(),
-             'field': 'vtdid20',
+             'field': 'vtdid',
              'expression': False,
              'caption': 'VTD'}
         ],
@@ -158,14 +158,14 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
         .setNumDistricts(5) \
         .setDeviation(0.025) \
         .setGeoLayer(block_layer) \
-        .setGeoIdField('geoid20') \
+        .setGeoIdField('geoid') \
         .setDistField('district') \
         .setPopField('pop_total') \
         .appendPopField('vap_total', caption='VAP') \
         .appendDataField('vap_nh_black', caption='BVAP') \
-        .appendDataField('vap_apblack', caption='APBVAP') \
+        .appendDataField('vap_ap_black', caption='APBVAP') \
         .appendDataField('vap_nh_white', caption='WVAP') \
-        .appendGeoField('vtdid20', caption='VTD') \
+        .appendGeoField('vtdid', caption='VTD') \
         .createPlan(createLayers=False)
     del b
 

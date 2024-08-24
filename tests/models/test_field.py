@@ -28,28 +28,28 @@ from redistricting.models import (
 class TestField:
     @pytest.fixture
     def field(self, block_layer) -> Field:
-        return Field(block_layer, 'vtdid20')
+        return Field(block_layer, 'vtdid')
 
     @pytest.fixture
     def expr(self, block_layer) -> Field:
-        return Field(block_layer, 'statefp20 || countyfp20 || tractce20')
+        return Field(block_layer, 'statefp || countyfp || tractce')
 
     def test_create(self, block_layer):
-        field = Field(block_layer, 'vtdid20')
-        assert field.field == 'vtdid20'
+        field = Field(block_layer, 'vtdid')
+        assert field.field == 'vtdid'
         assert not field.isExpression
-        assert field.caption == 'vtdid20'
+        assert field.caption == 'vtdid'
 
     def test_create_expr(self, block_layer):
-        field = Field(block_layer, 'statefp20 || countyfp20 || tractce20')
-        assert field.field == 'statefp20 || countyfp20 || tractce20'
+        field = Field(block_layer, 'statefp || countyfp || tractce')
+        assert field.field == 'statefp || countyfp || tractce'
         assert field.isExpression
-        assert field.caption == 'statefp20 || countyfp20 || tractce20'
-        assert field.fieldName == 'statefp20_countyfp20_tractce20'
+        assert field.caption == 'statefp || countyfp || tractce'
+        assert field.fieldName == 'statefp_countyfp_tractce'
 
     def test_create_withcaption(self, block_layer):
-        field = Field(block_layer, 'vtdid20', caption='VTD')
-        assert field.field == 'vtdid20'
+        field = Field(block_layer, 'vtdid', caption='VTD')
+        assert field.field == 'vtdid'
         assert not field.isExpression
         assert field.caption == 'VTD'
 
@@ -84,48 +84,48 @@ class TestField:
     def test_serialize(self, block_layer, field):
         data = field.serialize()
         assert data == {'layer': block_layer.id(),
-                        'field': 'vtdid20',
+                        'field': 'vtdid',
                         'expression': False,
-                        'caption': 'vtdid20'}
+                        'caption': 'vtdid'}
 
     def test_deserialize(self, block_layer):
-        data = {'layer': block_layer.id(), 'field': 'vtdid20', 'expression': False}
+        data = {'layer': block_layer.id(), 'field': 'vtdid', 'expression': False}
         field = Field.deserialize(data)
-        assert field.field == 'vtdid20'
+        assert field.field == 'vtdid'
         assert field.layer == block_layer
         assert not field.isExpression
-        assert field.caption == 'vtdid20'
+        assert field.caption == 'vtdid'
 
 
 class TestDataField:
     @pytest.fixture
     def data_field(self, block_layer) -> DataField:
-        return DataField(block_layer, 'vap_apblack', pctbase='vap_total')
+        return DataField(block_layer, 'vap_ap_black', pctbase='vap_total')
 
     @pytest.fixture
     def data_field_expr(self, block_layer) -> DataField:
         return DataField(
             block_layer,
-            'vap_nh_apblack + vap_nh_asian + vap_nh_amind_aknative + vap_hispanic',
+            'vap_nh_ap_black + vap_nh_asian + vap_nh_aiakn + vap_hispanic',
             caption='Dream Team',
             pctbase='vap_total'
         )
 
     def test_create(self, block_layer):
-        field = DataField(block_layer, 'vap_apblack', pctbase='vap_total')
-        assert field.field == 'vap_apblack' and field.sum and field.pctbase == 'vap_total'
+        field = DataField(block_layer, 'vap_ap_black', pctbase='vap_total')
+        assert field.field == 'vap_ap_black' and field.sum and field.pctbase == 'vap_total'
 
     def test_create_expr(self, block_layer):
-        field = DataField(block_layer, 'vap_nh_apblack + vap_hispanic', True)
-        assert field.field == 'vap_nh_apblack + vap_hispanic' and field.sum and field.pctbase is None
+        field = DataField(block_layer, 'vap_nh_ap_black + vap_hispanic', True)
+        assert field.field == 'vap_nh_ap_black + vap_hispanic' and field.sum and field.pctbase is None
 
     def test_serialize(self, block_layer, data_field):
         data = data_field.serialize()
         assert data == {
             'layer': block_layer.id(),
-            'field': 'vap_apblack',
+            'field': 'vap_ap_black',
             'expression': False,
-            'caption': 'vap_apblack',
+            'caption': 'vap_ap_black',
             'sum': True,
             'pctbase': 'vap_total'
         }
@@ -133,13 +133,13 @@ class TestDataField:
     def test_deserialize(self, block_layer):
         data = {
             'layer': block_layer.id(),
-            'field': 'vap_apblack',
+            'field': 'vap_ap_black',
             'expression': False,
             'caption': 'APBVAP',
             'pctbase': 'vap_total'
         }
         field = DataField.deserialize(data)
-        assert field.field == 'vap_apblack'
+        assert field.field == 'vap_ap_black'
         assert field.layer == block_layer
         assert not field.isExpression
         assert field.caption == 'APBVAP'

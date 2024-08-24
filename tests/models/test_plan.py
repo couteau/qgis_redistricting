@@ -88,9 +88,9 @@ class TestPlan:
         plan = RedistrictingPlan('test', 5)
         assert not plan.isValid()
 
-    def test_assign_name_updates_layer_names(self, gpkg_path, qtbot: QtBot):
+    def test_assign_name_updates_layer_names(self, plan_gpkg_path, qtbot: QtBot):
         plan = RedistrictingPlan('oldname', 45)
-        plan.addLayersFromGeoPackage(gpkg_path)
+        plan.addLayersFromGeoPackage(plan_gpkg_path)
         assert plan.distLayer.name() == 'oldname_districts'
         assert plan._assignLayer.name() == 'oldname_assignments'
         with qtbot.wait_signal(plan.nameChanged):
@@ -110,7 +110,7 @@ class TestPlan:
     # pylint: disable-next=unused-argument
     def test_geofields_assign(self, valid_plan: RedistrictingPlan, block_layer, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            valid_plan._setGeoFields([Field(block_layer, 'vtdid20', False)])  # pylint: disable=protected-access
+            valid_plan._setGeoFields([Field(block_layer, 'vtdid', False)])  # pylint: disable=protected-access
         assert len(valid_plan.geoFields) == 1
         assert len(valid_plan.stats.splits) == 1
 
@@ -126,6 +126,6 @@ class TestPlan:
         plan.addLayersFromGeoPackage(gpkg)
         assert plan._assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
-        assert plan.geoIdField == 'geoid20'
+        assert plan.geoIdField == 'geoid'
         plan._setAssignLayer(None)
         plan._setDistLayer(None)

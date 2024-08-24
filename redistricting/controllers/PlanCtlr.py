@@ -22,7 +22,10 @@
  ***************************************************************************/
 """
 import pathlib
-from typing import Optional
+from typing import (
+    TYPE_CHECKING,
+    Optional
+)
 
 from qgis.core import (
     QgsApplication,
@@ -36,8 +39,6 @@ from qgis.gui import (
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
-    QAction,
-    QActionGroup,
     QDialog,
     QMenu,
     QToolBar,
@@ -68,6 +69,17 @@ from ..services import (
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import (
+        QAction,
+        QActionGroup
+    )
+else:
+    from qgis.PyQt.QtWidgets import (
+        QAction,
+        QActionGroup
+    )
 
 
 class PlanController(BaseController):
@@ -287,7 +299,6 @@ class PlanController(BaseController):
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
     def planRemoved(self, plan: RedistrictingPlan):
-        self.planRemoved(plan)
         self.updateService.unwatchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
