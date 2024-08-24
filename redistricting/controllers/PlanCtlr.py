@@ -39,7 +39,6 @@ from qgis.gui import (
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
-    QActionGroup,
     QDialog,
     QMenu,
     QToolBar,
@@ -73,9 +72,15 @@ from .BaseCtlr import BaseController
 
 # annoyingly, Anaconda QGIS 3.36 converts QAction to a variable type reference instead of a type
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
+    from PyQt5.QtWidgets import (
+        QAction,
+        QActionGroup
+    )
 else:
-    from qgis.PyQt.QtWidgets import QAction
+    from qgis.PyQt.QtWidgets import (
+        QAction,
+        QActionGroup
+    )
 
 
 class PlanController(BaseController):

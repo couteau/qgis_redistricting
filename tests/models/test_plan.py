@@ -142,7 +142,7 @@ class TestPlan:
         plan.addLayersFromGeoPackage(gpkg)
         assert plan.assignLayer.name() == 'test_assignments'
         assert plan.distLayer.name() == 'test_districts'
-        assert plan.geoIdField == 'geoid20'
+        assert plan.geoIdField == 'geoid'
         plan._setAssignLayer(None)
         plan._setDistLayer(None)
 

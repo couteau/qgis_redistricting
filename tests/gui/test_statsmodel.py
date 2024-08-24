@@ -30,6 +30,9 @@ class TestStatsModel:
     # pylint: disable=unused-argument
     def test_signals(self, stats_model: StatsModel, plan: RdsPlan, qtbot: QtBot):
         with qtbot.waitSignals([stats_model.modelAboutToBeReset, stats_model.modelReset]):
+            e = PlanEditor.fromPlan(plan)
+            e.appendGeoField('countyid')
+            e.updatePlan()
             plan.stats.updateGeoFields(plan.geoFields)
 
     def test_clear_stats(self, stats_model: StatsModel, qtbot: QtBot):

@@ -72,22 +72,22 @@ def related_layers(block_layer, vtd_layer, county_layer):
 
 
 @pytest.fixture
-def gpkg_path(datadir):
+def plan_gpkg_path(datadir):
     return (datadir / 'tuscaloosa_plan.gpkg').resolve()
 
 
 @pytest.fixture
-def assign_layer(gpkg_path, qgis_new_project):
+def assign_layer(plan_gpkg_path, qgis_new_project):
     layer = QgsVectorLayer(
-        f'{gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
+        f'{plan_gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
     QgsProject.instance().addMapLayer(layer, False)
     return layer
 
 
 @pytest.fixture
-def dist_layer(gpkg_path, qgis_new_project):
+def dist_layer(plan_gpkg_path, qgis_new_project):
     layer = QgsVectorLayer(
-        f'{gpkg_path}|layername=districts', 'test_districts', 'ogr')
+        f'{plan_gpkg_path}|layername=districts', 'test_districts', 'ogr')
     QgsProject.instance().addMapLayer(layer, False)
     return layer
 
@@ -99,13 +99,13 @@ def minimal_plan():
 
 
 @pytest.fixture
-def valid_plan(minimal_plan: RdsPlan, block_layer, gpkg_path):
+def valid_plan(minimal_plan: RdsPlan, block_layer, plan_gpkg_path):
     # pylint: disable=protected-access
     minimal_plan.geoLayer = block_layer
     minimal_plan.geoIdField = 'geoid'
     minimal_plan.popField = 'pop_total'
     # pylint: enable=protected-access
-    minimal_plan.addLayersFromGeoPackage(gpkg_path)
+    minimal_plan.addLayersFromGeoPackage(plan_gpkg_path)
     QgsProject.instance().addMapLayers([minimal_plan.distLayer, minimal_plan.assignLayer], False)
     return minimal_plan
 

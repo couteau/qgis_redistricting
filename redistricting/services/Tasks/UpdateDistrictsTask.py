@@ -373,9 +373,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
             return
 
         with spatialite_connect(self.geoPackagePath) as db:
-            if self.distLayer.fields().lookupField("pieces") == -1:
-                db.execute("ALTER TABLE districts ADD COLUMN pieces INT")
-
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.data.columns)}
 
             # Account for districts with no assignments --

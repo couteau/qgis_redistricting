@@ -30,7 +30,7 @@ class TestDistrictDataModel:
         assert district_model.headerData(14, Qt.Horizontal, Qt.DisplayRole) == 'Convex Hull'
 
     def test_data(self, district_model: DistrictDataModel):
-        data = district_model.data(district_model.createIndex(0, 0), Qt.DisplayRole)
+        data = district_model.data(district_model.createIndex(0, 1), Qt.DisplayRole)
         assert data == 'Unassigned'
         data = district_model.data(district_model.createIndex(0, 0), Qt.BackgroundRole)
         assert isinstance(data, QBrush)

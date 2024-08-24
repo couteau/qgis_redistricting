@@ -57,6 +57,7 @@ class DistrictReader:
         return sorted(result, key=lambda s: s.district)
 
     def loadDistricts(self, plan: RdsPlan):
+        plan.districts.clear()
         for district in self.readFromLayer():
             if district.district == 0:
                 plan.districts[0].update(district)
@@ -94,6 +95,13 @@ class DistrictWriter:
 
     def writeToLayer(self, districts: Iterable[RdsDistrict]):
         def changeAttributes(dist: RdsDistrict, feature: QgsFeature):
+
+            # if all population is assigned, delete the Unassigned feature
+            if dist[self._distField] == 0 and not dist[DistrictColumns.POPULATION]:
+                if dist.fid != -1:
+                    self._layer.deleteFeature(dist.fid)
+                return
+
             for idx, field in self._field_map.items():
                 if field not in dist:
                     continue
@@ -102,11 +110,7 @@ class DistrictWriter:
                 if value != feature[idx]:
                     feature.setAttribute(idx, value)
 
-            # if all population is assigned, delete the Unassigned feature
-            if dist[self._distField] == 0 and not dist[DistrictColumns.POPULATION]:
-                if dist.fid != -1:
-                    self._layer.deleteFeature(dist.fid)
-            elif dist.fid == -1:
+            if dist.fid == -1:
                 self._layer.addFeature(feat)
             else:
                 self._layer.updateFeature(feat)

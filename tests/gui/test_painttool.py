@@ -30,6 +30,19 @@ class TestPaintTool:
             qgis_canvas.setMapTool(tool)
         return tool
 
+    @pytest.fixture
+    def active_tool_with_plan(
+        self,
+        qgis_canvas: QgsMapCanvas,
+        plan: RdsPlan,
+        qtbot: QtBot
+    ) -> PaintDistrictsTool:
+        t = PaintDistrictsTool(qgis_canvas)
+        t.plan = plan
+        with qtbot.wait_signal(t.activated):
+            qgis_canvas.setMapTool(t)
+        return t
+
     def test_create(self, tool: PaintDistrictsTool, qgis_canvas):
         assert tool.plan is None
         assert tool._layer is None
@@ -63,6 +76,7 @@ class TestPaintTool:
         assert tool.isActive()
 
     def test_deactivate(self, active_tool: PaintDistrictsTool, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+        assert active_tool.isActive()
         with qtbot.wait_signal(active_tool.deactivated):
             qgis_canvas.unsetMapTool(active_tool)
         assert not active_tool.isActive()
@@ -102,12 +116,12 @@ class TestPaintTool:
 
     @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_release(self,
-                           active_tool: PaintDistrictsTool,
+                           active_tool_with_plan: PaintDistrictsTool,
                            qgis_canvas: QgsMapCanvas,
                            qtbot: QtBot):
 
-        qgis_canvas.setDestinationCrs(active_tool._layer.crs())
-        qgis_canvas.setExtent(active_tool._layer.extent())
+        qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
+        qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
 
         with qtbot.assertNotEmitted(active_tool.paintingComplete):
             qtbot.mouseClick(qgis_canvas.viewport(), Qt.LeftButton)
@@ -124,7 +138,7 @@ class TestPaintTool:
 
     @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_release_select(self,
-                                  active_tool: PaintDistrictsTool,
+                                  active_tool_with_plan: PaintDistrictsTool,
                                   qgis_canvas: QgsMapCanvas,
                                   qtbot: QtBot):
 
@@ -132,6 +146,19 @@ class TestPaintTool:
         active_tool.paintMode = PaintMode.SelectByGeography
         with qtbot.wait_signal(active_tool.selectFeatures):
             qtbot.mouseClick(qgis_canvas.viewport(), Qt.LeftButton)
+
+    def test_mouse_move(
+        self,
+        active_tool_with_plan: PaintDistrictsTool,
+        qgis_canvas: QgsMapCanvas,
+        qtbot: QtBot,
+        mocker: MockerFixture
+    ):
+
+        paintFeatures = mocker.patch.object(active_tool_with_plan, "_paintFeatures")
+
+        qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
+        qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
 
     @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_move(self,
@@ -150,9 +177,9 @@ class TestPaintTool:
                         Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
         qgis_canvas.mouseMoveEvent(e)
         qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=QPoint(1020, 1020))
-        qtbot.assertNotEmitted(active_tool.paintingComplete)
+        paintFeatures.assert_not_called()
 
-        active_tool.setTargetDistrict(2)
+        active_tool_with_plan.setTargetDistrict(2)
         qtbot.mousePress(qgis_canvas.viewport(), Qt.RightButton, pos=QPoint(0, 0))
         e = QMouseEvent(QMouseEvent.MouseMove, QPoint(0, 0),
                         Qt.RightButton, Qt.RightButton, Qt.NoModifier)
@@ -161,7 +188,7 @@ class TestPaintTool:
                         Qt.RightButton, Qt.RightButton, Qt.NoModifier)
         qgis_canvas.mouseMoveEvent(e)
         qtbot.mouseRelease(qgis_canvas.viewport(), Qt.RightButton, pos=qgis_canvas.viewport().rect().center())
-        qtbot.assertNotEmitted(active_tool.paintingComplete)
+        paintFeatures.assert_not_called()
 
         with qtbot.waitSignal(active_tool.paintingStarted):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.LeftButton, pos=QPoint(0, 0))
@@ -173,25 +200,33 @@ class TestPaintTool:
         qgis_canvas.mouseMoveEvent(e)
         with qtbot.waitSignal(active_tool.paintingComplete):
             qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
+        qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
+        assert paintFeatures.call_count == 2
 
     @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_move_select(self,
-                               active_tool: PaintDistrictsTool,
+                               active_tool_with_plan: PaintDistrictsTool,
                                qgis_canvas: QgsMapCanvas,
                                qtbot: QtBot):
 
+        paintFeatures = mocker.patch.object(active_tool_with_plan, "_selectFeatures")
+        active_tool_with_plan.setTargetDistrict(2)
+        qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
+        qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
+        active_tool_with_plan.paintMode = PaintMode.SelectByGeography
         active_tool.setTargetDistrict(2)
         qgis_canvas.setDestinationCrs(active_tool._layer.crs())
         qgis_canvas.setExtent(active_tool._layer.extent())
         active_tool.paintMode = PaintMode.SelectByGeography
 
-        with qtbot.assertNotEmitted(active_tool.selectFeatures):
+        with qtbot.assertNotEmitted(active_tool_with_plan.selectFeatures):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.LeftButton, pos=QPoint(0, 0))
             e = QMouseEvent(QMouseEvent.MouseMove, qgis_canvas.viewport().rect().center(),
                             Qt.LeftButton, Qt.LeftButton, Qt.NoModifier)
             qgis_canvas.mouseMoveEvent(e)
-            assert active_tool._rubberBand is not None
+            assert active_tool_with_plan._rubberBand is not None
             qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
+        paintFeatures.assert_not_called()
 
         with qtbot.waitSignal(active_tool.selectFeatures):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.LeftButton, pos=QPoint(0, 0))

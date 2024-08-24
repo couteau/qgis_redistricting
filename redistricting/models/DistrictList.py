@@ -123,15 +123,12 @@ class DistrictList(BaseModel):
         self._nameaccessor = DistrictList._NameAccessor(self)
         self._numDistricts = numDistricts
 
+        self._districts: dict[int, RdsDistrict] = OrderedDict()
         if districts is not None:
-            self._districts: dict[int, RdsDistrict] = OrderedDict()
             for d in districts:
-                if d.district == 0:
-                    self._districts[0] = d
-                else:
-                    self.add(d)
+                self.add(d)
         else:
-            self._districts: dict[int, RdsDistrict] = OrderedDict({0: RdsUnassigned()})
+            self.add(RdsUnassigned())
 
     def clone(self, districts: Optional[Iterable[RdsDistrict]] = None):
         if districts is None:
@@ -140,15 +137,15 @@ class DistrictList(BaseModel):
         instance = self.__class__(self._numDistricts, [d.clone() for d in districts])
         return instance
 
-    @ overload
+    @overload
     def __getitem__(self, index: int) -> RdsDistrict:
         ...
 
-    @ overload
+    @overload
     def __getitem__(self, index: slice) -> "DistrictList":
         ...
 
-    @ overload
+    @overload
     def __getitem__(self, index: tuple) -> Any:
         ...
 
@@ -210,11 +207,6 @@ class DistrictList(BaseModel):
         return list(self._districts.values()).index(district)
 
     def clear(self):
-        newdict = OrderedDict()
-        if 0 in self._districts:
-            newdict[0] = RdsUnassigned()
-            del self._districts[0]
-
         for d in self._districts.values():
             d.nameChanged.disconnect(self._nameSignalMapper.map)
             d.membersChanged.disconnect(self._membersSignalMapper.map)
@@ -223,10 +215,20 @@ class DistrictList(BaseModel):
             self._membersSignalMapper.removeMappings(d)
             self._descripSignalMapper.removeMappings(d)
 
-        self._districts = newdict
+        if 0 in self._districts:
+            addUnassigned = True
+
+        self._districts = OrderedDict()
+
+        if addUnassigned:
+            self.add(RdsUnassigned())
 
     def add(self, district: RdsDistrict):
-        assert 0 < district.district <= self.numDistricts
+        assert 0 <= district.district <= self.numDistricts
+
+        if district.district == 0 and 0 in self._districts:
+            raise TypeError("Unassigned already exists in list")
+
         self._nameSignalMapper.setMapping(district, district)
         self._membersSignalMapper.setMapping(district, district)
         self._descripSignalMapper.setMapping(district, district)

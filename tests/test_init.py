@@ -49,7 +49,7 @@ class TestPluginInit:
     def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, qgis_new_project):  # pylint: disable=unused-argument
         project = QgsProject.instance()
         with qtbot.waitSignal(project.readProject):
-            project.read(str((datadir / 'test_project.qgs').resolve()))
+            project.read(str((datadir / 'test_project.qgz').resolve()))
         yield plugin_with_gui
         project.clear()
 
@@ -108,8 +108,8 @@ class TestPluginInit:
 
     def test_open_project(self, plugin_with_gui, datadir):
         project = QgsProject.instance()
-        project.read(str((datadir / 'test_project.qgs').resolve()))
-        assert len(project.mapLayers()) == 3
+        project.read(str((datadir / 'test_project.qgz').resolve()))
+        assert len(project.mapLayers()) == 9
         assert len(plugin_with_gui.planManager) == 1
         project.clear()
 

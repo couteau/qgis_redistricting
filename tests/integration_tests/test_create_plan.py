@@ -32,6 +32,9 @@ class TestCreatePlan:
         assert not creator._validatePopLayer()
 
     def test_set_pop_field_updates_districts(self, creator: PlanBuilder):
+        plan = creator.createPlan(createLayers=False)
+        assert hasattr(plan.districts[0], 'population')
+
         creator.appendPopField('vap_total')
         plan = creator.createPlan(createLayers=False)
         assert plan is not None

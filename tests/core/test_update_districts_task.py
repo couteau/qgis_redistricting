@@ -31,8 +31,8 @@ class TestUpdateDistrictsTask:
     def patch_task(self, class_mocker: MockerFixture):
         class_mocker.patch.object(AggregateDistrictDataTask, "setDependentLayers")
 
-    def test_create(self, mock_plan: RdsPlan):
-        t = AggregateDistrictDataTask(mock_plan)
+    def test_create(self, plan: RdsPlan):
+        t = AggregateDistrictDataTask(plan)
         assert t.exception is None
         assert not t.updateDistricts
 

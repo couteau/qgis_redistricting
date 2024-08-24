@@ -78,9 +78,9 @@ class EditAssignmentsController(BaseController):
         self.actionToggle: QAction = None
 
         self.mapTool = PaintDistrictsTool(self.canvas)
-        self.sourceDistrict: RdsDistrict = None
-        self.targetDistrict: RdsDistrict = None
-        self.geoField: str = None
+        self.sourceDistrict: Optional[RdsDistrict] = None
+        self.targetDistrict: Optional[RdsDistrict] = None
+        self.geoField: Optional[str] = None
 
         self.mapTool.paintingStarted.connect(self.startPaintingFeatures)
         self.mapTool.paintFeatures.connect(self.paintFeatures)
@@ -321,10 +321,12 @@ class EditAssignmentsController(BaseController):
 
         dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
         dlg.setWindowTitle(tr("Edit District"))
+        dlg.sbxDistrictNo.setValue(district.district)
         dlg.sbxDistrictNo.setReadOnly(True)
         dlg.inpName.setText(district.name)
         dlg.sbxMembers.setValue(district.members)
         dlg.txtDescription.setPlainText(district.description)
+        dlg.buttonBox.button(dlg.buttonBox.Ok).setEnabled(True)
         if dlg.exec() == QDialog.Accepted:
             district.name = dlg.districtName
             district.members = dlg.members
@@ -356,9 +358,19 @@ class EditAssignmentsController(BaseController):
             self.canvas.setMapTool(self.mapTool)
 
     def setGeoField(self, value):
-        if value and self.planManager.activePlan is not None and \
-                value != self.planManager.activePlan.geoIdField and \
-                value not in self.planManager.activePlan.geoFields:
+        if self.planManager.activePlan is None:
+            return
+
+        if value is not None and value != self.planManager.activePlan.geoIdField and (
+            (
+                len(self.planManager.activePlan.geoFields) != 0 and
+                value not in self.planManager.activePlan.geoFields
+            ) or
+            (
+                len(self.planManager.activePlan.geoFields) == 0 and
+                value not in self.planManager.activePlan.geoLayer.fields().names()
+            )
+        ):
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
         self.geoField = value
 
