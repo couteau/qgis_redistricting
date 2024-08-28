@@ -40,3 +40,13 @@ class TestCreatePlan:
         assert plan is not None
         assert plan.popFields[0].field == 'vap_total'
         assert hasattr(plan.districts[0], 'vap_total')
+
+    def test_append_nonexistent_data_field_no_validate(self, creator: PlanBuilder):
+        assert creator._validatePopLayer()
+        creator.appendDataField('not_a_field')
+        assert not creator._validatePopLayer()
+
+    def test_append_nonexistent_geo_field_no_validate(self, creator: PlanBuilder):
+        assert creator._validateGeoLayer()
+        creator.appendGeoField('not_a_field')
+        assert not creator._validateGeoLayer()

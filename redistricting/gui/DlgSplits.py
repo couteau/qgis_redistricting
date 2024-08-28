@@ -75,7 +75,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
         if self._plan:
             if self._field:
-                self._model = SplitsModel(self._plan.stats.splits[self._field], self)
+                self._model = SplitsModel(self._plan.metrics.splits[self._field], self)
             else:
                 self._model = None
             self.lblPlan.setText(self._plan.name)
@@ -100,7 +100,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
     def geoField(self, value: RdsGeoField):
         self._field = value
         if self._plan and self._field:
-            self._model = SplitsModel(self._plan.stats.splits[self._field], self)
+            self._model = SplitsModel(self._plan.metrics.splits[self._field], self)
         else:
             self._model = None
 

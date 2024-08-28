@@ -21,8 +21,7 @@ import pytest
 
 from redistricting.models import (
     Delta,
-    DeltaList,
-    RdsPlan
+    DeltaList
 )
 
 # pylint: disable=no-self-use
@@ -30,8 +29,8 @@ from redistricting.models import (
 
 class TestDeltaList:
     @pytest.fixture
-    def empty_delta_list(self, mock_plan: RdsPlan) -> DeltaList:
-        return DeltaList(mock_plan)
+    def empty_delta_list(self) -> DeltaList:
+        return DeltaList()
 
     @pytest.fixture
     def delta_list(self, empty_delta_list: DeltaList):
@@ -46,13 +45,13 @@ class TestDeltaList:
             }]
         )
         df.set_index('district', drop=False, inplace=True)
-        empty_delta_list._data = df  # pylint: disable=protected-access
+        empty_delta_list.setData(df)  # pylint: disable=protected-access
         return empty_delta_list
 
     def test_create(self, empty_delta_list: DeltaList):
         assert len(empty_delta_list) == 0
 
-    def test_clear(self, delta_list):
+    def test_clear(self, delta_list: DeltaList):
         delta_list.clear()
         assert len(delta_list) == 0
 

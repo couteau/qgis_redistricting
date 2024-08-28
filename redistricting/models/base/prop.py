@@ -50,7 +50,9 @@ def get_real_type(t: type):
 def type_name(t: type):
     if isinstance(t, _GenericAlias):
         if isinstance(t, _UnionGenericAlias):
-            return repr(t)
+            if t.__name__ == "Optional":
+                return f'{get_args(t)[0].__name__} or None'
+            return ' or '.join(a.__name__ for a in get_args(t))
         t = get_origin(t)
 
     return repr(t.__name__)

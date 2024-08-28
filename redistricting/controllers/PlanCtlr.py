@@ -28,7 +28,6 @@ from typing import (
 )
 
 from qgis.core import (
-    QgsApplication,
     QgsProject,
     QgsVectorLayer
 )
@@ -180,16 +179,6 @@ class PlanController(BaseController):
         )
         self.actionCopyPlan.setEnabled(False)
         self.menu.addAction(self.actionCopyPlan)
-
-        self.actionSaveAsNew = self.actions.createAction(
-            'actionSaveAsNew',
-            QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
-            tr('Save as new'),
-            tr('Save all unsaved districting changes to a new redistricting plan'),
-            callback=self.saveChangesAsNewPlan,
-            parent=self.iface.mainWindow()
-        )
-        self.actionSaveAsNew.setEnabled(False)
 
         self.actionImportAssignments = self.actions.createPlanAction(
             'actionImportAssignments',
@@ -406,23 +395,6 @@ class PlanController(BaseController):
                 dlgCopyPlan.geoPackagePath,
                 dlgCopyPlan.copyAssignments
             )
-
-    def saveChangesAsNewPlan(self):
-        if not self.checkActivePlan(self.tr('copy')):
-            return
-
-        dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
-        dlgCopyPlan.cbxCopyAssignments.hide()
-
-        if dlgCopyPlan.exec_() == QDialog.Accepted:
-            copier = PlanCopier(self.planManager.activePlan)
-            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
-                                   dlgCopyPlan.geoPackagePath, copyAssignments=True)
-
-            self.appendPlan(plan, False)
-            copier.copyBufferedAssignments(plan)
-            self.planManager.activePlan.assignLayer.rollBack(True)
-            self.planManager.setActivePlan(plan)
 
     def importPlan(self, plan=None):
         def importComplete():

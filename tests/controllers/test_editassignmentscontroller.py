@@ -119,15 +119,15 @@ class TestEditAssignmentsController:
         mock_plan.assignLayer.editingStarted.connect.assert_called_once()
 
     def test_target_not_set_cannot_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
-        controller_with_plan.setGeoField('geoid20')
-        assert controller_with_plan.geoField == 'geoid20'
+        controller_with_plan.setGeoField('geoid')
+        assert controller_with_plan.geoField == 'geoid'
         assert controller_with_plan.targetDistrict is None
         assert controller_with_plan.sourceDistrict is None
         with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
             controller_with_plan.activateMapTool(gui.PaintTool.PaintMode.PaintByGeography)
 
     def test_geoid_not_set_cannot_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
-        district = models.District(2)
+        district = models.RdsDistrict(2)
         controller_with_plan.targetDistrictChanged(district)
         assert controller_with_plan.targetDistrict == district
         assert controller_with_plan.sourceDistrict is None
@@ -136,9 +136,9 @@ class TestEditAssignmentsController:
             controller_with_plan.activateMapTool(gui.PaintTool.PaintMode.PaintByGeography)
 
     def test_target_set_can_activate(self, controller_with_plan: controllers.EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
-        district = models.District(2)
+        district = models.RdsDistrict(2)
         controller_with_plan.targetDistrictChanged(district)
-        controller_with_plan.setGeoField('geoid20')
+        controller_with_plan.setGeoField('geoid')
         assert controller_with_plan.targetDistrict == district
         assert controller_with_plan.mapTool.targetDistrict() == 2
         with qtbot.waitSignal(qgis_canvas.mapToolSet):

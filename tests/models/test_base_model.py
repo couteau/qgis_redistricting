@@ -15,16 +15,12 @@ from redistricting.models import (
 )
 from redistricting.models.base import (
     Factory,
-    RdsBaseModel
-)
-from redistricting.models.prop import (
+    RdsBaseModel,
+    deserialize_model,
     get_real_type,
     in_range,
     not_empty,
-    rds_property
-)
-from redistricting.models.serialize import (
-    deserialize_model,
+    rds_property,
     serialize_model
 )
 

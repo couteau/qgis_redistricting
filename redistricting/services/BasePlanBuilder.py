@@ -316,18 +316,19 @@ class BasePlanBuilder(PlanValidator):
     def appendDataField(self, field: RdsDataField) -> Self:
         ...
 
-    def appendDataField(self, field, caption=None, sumField=None, pctBase=None) -> Self:
+    def appendDataField(self, field, caption=None, sumField=True, pctBase=None) -> Self:
         if isinstance(field, str):
             if pctBase is None:
-                if matchField(field, self._popLayer, defaults.VAP_FIELDS):
-                    pctBase = self._vap
-                elif matchField(field, self._popLayer, defaults.CVAP_FIELDS):
-                    pctBase = self._cvap
+                if self._vap and matchField(field, self._popLayer, defaults.VAP_FIELDS):
+                    pctBase = self._vap.field
+                elif self._cvap and matchField(field, self._popLayer, defaults.CVAP_FIELDS):
+                    pctBase = self._cvap.field
             field = RdsDataField(self._popLayer, field, caption, sumField, pctBase)
         elif not isinstance(field, RdsDataField):
-            raise ValueError(
-                tr('Attempt to add invalid field {field!r} to plan {plan}').
-                format(field=field, plan=self._name))
+            raise TypeError(
+                tr('Field must by an RdsField or the name of a field').
+                format(field=field, plan=self._name)
+            )
 
         if self._checkNotDuplicate(field, self._dataFields):
             self._dataFields.append(field)

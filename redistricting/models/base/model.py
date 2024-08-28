@@ -142,7 +142,7 @@ class RdsBaseModel(QObject):
             return wrapped_init
 
         super().__init_subclass__()
-        setattr(cls, "__init__", wrap_init(RdsBaseModel.__init__))
+        setattr(cls, "__init__", wrap_init(getattr(cls, "__init__")))
 
     def __pre_init__(self):
         ...
@@ -152,6 +152,11 @@ class RdsBaseModel(QObject):
 
     def __init__(self, *args, **kwargs):
         sig = inspect.signature(type(self).__init__)
+
+        # remove any passed in missing params
+        args = (a for a in args if a is not MISSING)
+        kwargs = {k: v for k, v in kwargs.items() if v is not MISSING}
+
         bound_args = sig.bind(*args, **kwargs)
         parent = bound_args.arguments.pop("parent", None)
         extra = bound_args.arguments.pop("extra", {})

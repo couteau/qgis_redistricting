@@ -66,8 +66,8 @@ class DistrictUpdater(QObject):
         for district, row in data.to_dict(orient="index").items():
             plan.districts[district].update(row)
 
-    def updateStats(self, plan: "RdsPlan", totalPopulation: int, cutEdges: int, splitsData: dict[str, pd.DataFrame]):
-        plan.stats.updateStats(totalPopulation, cutEdges, splitsData)
+    def updateMetrics(self, plan: "RdsPlan", totalPopulation: int, cutEdges: int, splitsData: dict[str, pd.DataFrame]):
+        plan.updateMetrics(totalPopulation, cutEdges, splitsData)
 
     def updateTaskCompleted(self):
         updateTask: AggregateDistrictDataTask = self.sender()
@@ -76,7 +76,7 @@ class DistrictUpdater(QObject):
         if updateTask.data is not None:
             self.updateDistrictData(updateTask.plan, updateTask.data)
         if updateTask.totalPopulation != 0 or updateTask.cutEdges != 0 or updateTask.splits is not None:
-            self.updateStats(updateTask.plan, updateTask.totalPopulation, updateTask.cutEdges, updateTask.splits)
+            self.updateMetrics(updateTask.plan, updateTask.totalPopulation, updateTask.cutEdges, updateTask.splits)
 
         updated = list(updateTask.updateDistricts) if updateTask.updateDistricts else None
         self.updateComplete.emit(updateTask.plan, updated)

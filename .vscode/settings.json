@@ -38,8 +38,10 @@
     "editor.formatOnSave": true,
     "editor.formatOnType": true,
     "qtForPython.qmlls.enabled": false,
-    "python.testing.pytestArgs": [
-        "tests"
-    ],
     "python.testing.unittestEnabled": false,
+    "python.analysis.inlayHints.pytestParameters": true,
+    "python.testing.pytestArgs": [
+        "--cov=redistricting",
+        "--cov-report=xml"
+    ],
 }

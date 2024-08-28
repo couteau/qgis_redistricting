@@ -18,10 +18,8 @@ from typing import (
     overload
 )
 
-from .base import (
-    MISSING,
-    Factory
-)
+from .model import Factory
+from .prop import MISSING
 
 T = TypeVar("T")
 
@@ -46,7 +44,7 @@ class KeyedListView(Generic[T], Sized):
         return len(self._list)
 
 
-class KeyedListKeyView(KeyedListView):
+class KeyedListKeyView(KeyedListView[T]):
     __slots__ = ()
 
     def __iter__(self) -> Iterator[str]:
@@ -284,13 +282,13 @@ class KeyedList(Generic[T]):
         for k in self._keys:
             yield self._items[k]
 
-    def keys(self) -> KeyedListKeyView:
+    def keys(self) -> KeyedListKeyView[T]:
         return KeyedListKeyView(self)
 
-    def values(self) -> KeyedListValueView:
+    def values(self) -> KeyedListValueView[T]:
         return KeyedListValueView(self)
 
-    def items(self) -> KeyedListItemsView:
+    def items(self) -> KeyedListItemsView[T]:
         return KeyedListItemsView(self)
 
     def index(self, item: T, start=0, stop=sys.maxsize):

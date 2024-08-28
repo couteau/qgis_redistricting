@@ -141,8 +141,8 @@ class PlanValidator(ErrorListMixin, QObject):
                     result = False
 
             for f in self._geoFields:
-                if not f.validate(self._geoLayer):
-                    self.pushError(f.error())
+                if not f.validate():
+                    self.pushErrors(*f.errors())
                     result = False
 
         return result

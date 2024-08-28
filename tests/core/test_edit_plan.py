@@ -45,9 +45,7 @@ class TestPlanEditor:
         assert p.geoIdCaption == "Test Geog"
 
     def test_signals(self, editor: PlanEditor, valid_plan: RdsPlan, qtbot: QtBot):
-        with qtbot.waitSignal(valid_plan.nameChanged,
-                              check_params_cb=lambda p: p == 'new name'
-                              ):
+        with qtbot.waitSignal(valid_plan.nameChanged):
             editor.setName('new name')
             editor.updatePlan()
         assert valid_plan.name == 'new name'
@@ -61,16 +59,15 @@ class TestPlanEditor:
         qtbot: QtBot
     ):
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
-            editor.appendDataField('vap_ap_black', False, 'APBVAP')
+            editor.appendDataField('vap_ap_black', 'APBVAP')
             editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
         assert isinstance(valid_plan.dataFields[0], RdsDataField)
         assert valid_plan.dataFields[0].layer == block_layer
         assert valid_plan.dataFields[0].field == 'vap_ap_black'
-        assert not valid_plan.dataFields[0].expression
         assert valid_plan.dataFields[0].caption == 'APBVAP'
 
-        f1 = RdsDataField(block_layer, 'pop_ap_black', False, caption='APBPOP')
+        f1 = RdsDataField(block_layer, 'pop_ap_black', caption='APBPOP')
         with qtbot.waitSignal(valid_plan.dataFieldsChanged):
             editor.appendDataField(f1)
             editor.updatePlan()
@@ -84,7 +81,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def bvap_field_fld(self, block_layer):
-        return RdsDataField(block_layer, 'vap_nh_black', False)
+        return RdsDataField(block_layer, 'vap_nh_black')
 
     @pytest.fixture
     def bvap_field_str(self):
@@ -99,7 +96,7 @@ class TestPlanEditor:
         mock_taskmanager,  # pylint: disable=unused-argument
         request
     ):
-        editor.appendDataField('vap_nh_black', False, 'BVAP')
+        editor.appendDataField('vap_nh_black', 'BVAP')
         editor.updatePlan()
 
         editor.appendDataField(request.getfixturevalue(field))
@@ -109,12 +106,8 @@ class TestPlanEditor:
         assert len(valid_plan.dataFields) == 1
 
     def test_datafields_throw_exception_when_invalid_field_added(self, editor):
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             editor.appendDataField(1)
-
-    def test_datafields_throw_exception_when_bad_field_added(self, editor: PlanEditor):
-        with pytest.raises(ValueError):
-            editor.appendDataField('not_a_field')
 
     def test_datafields_throw_exception_when_non_existent_field_removed(
         self,
@@ -157,7 +150,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def vtd_field_fld(self, block_layer):
-        return RdsField(block_layer, 'vtdid', False)
+        return RdsField(block_layer, 'vtdid')
 
     @pytest.fixture
     def vtd_field_str(self):
@@ -172,23 +165,20 @@ class TestPlanEditor:
         qtbot: QtBot
     ):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            editor.appendGeoField('vtdid', False, 'VTD')
+            editor.appendGeoField('vtdid', 'VTD')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
         assert isinstance(valid_plan.geoFields[0], RdsField)
         assert valid_plan.geoFields[0].layer == block_layer
         assert valid_plan.geoFields[0].field == 'vtdid'
-        assert not valid_plan.geoFields[0].expression
         assert valid_plan.geoFields[0].caption == 'VTD'
 
-        f1 = RdsField(block_layer, 'statefp || countyfp || vtd', True, caption='VTD')
+        f1 = RdsField(block_layer, 'statefp || countyfp || vtd', 'VTD')
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(f1)
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 2
         assert valid_plan.geoFields[1].field == 'statefp || countyfp || vtd'
-        assert valid_plan.geoFields[1].expression
-
         editor.appendGeoField('countyid')
         editor.updatePlan()
         assert len(valid_plan.geoFields) == 3
@@ -202,7 +192,7 @@ class TestPlanEditor:
         field,
         request
     ):
-        editor.appendGeoField('vtdid', False, 'VTD')
+        editor.appendGeoField('vtdid', 'VTD')
         editor.updatePlan()
 
         editor.appendGeoField(request.getfixturevalue(field))
@@ -216,10 +206,6 @@ class TestPlanEditor:
     ):
         with pytest.raises(ValueError):
             editor.appendGeoField(1)
-
-    def test_geofields_throw_exception_when_bad_field_added(self, editor: PlanEditor):
-        with pytest.raises(ValueError):
-            editor.appendGeoField('not_a_field')
 
     def test_geofields_throw_exception_when_nonexistent_field_removed(
         self,
@@ -245,7 +231,7 @@ class TestPlanEditor:
     ):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(vtd_field_fld)
-            editor.appendGeoField('statefp || countyfp || vtd', True)
+            editor.appendGeoField('statefp || countyfp || vtd')
             editor.appendGeoField('countyid')
             editor.updatePlan()
         f1 = valid_plan.geoFields[1]

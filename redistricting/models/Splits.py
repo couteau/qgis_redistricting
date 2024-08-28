@@ -1,15 +1,19 @@
 from typing import (
     Any,
-    Sequence
+    Sequence,
+    Union
 )
 
 import pandas as pd
 from qgis.PyQt.QtCore import pyqtSignal
 
 from .base import (
+    MISSING,
     Factory,
-    RdsBaseModel
+    RdsBaseModel,
+    rds_property
 )
+from .Field import RdsGeoField
 
 
 class RdsSplitDistrict:
@@ -80,14 +84,29 @@ class RdsSplits(RdsBaseModel):
 
     field: str
     data: pd.DataFrame = Factory(pd.DataFrame, False)
+    geoField: RdsGeoField = rds_property(private=True, serialize=False, default=None)
+
+    def __init__(self, field: Union[str, RdsGeoField], data: pd.DataFrame = MISSING):
+        if isinstance(field, RdsGeoField):
+            super().__init__(field=field.field, data=data)
+            self.geoField = field
+        else:
+            super().__init__(field=field, data=data)
 
     def __post_init__(self, **kwargs):
-        if not self.data.empty:  # pylint: disable=no-member
+        if self.data is not None:
             self.makeSplits()
         else:
-            self.splits = {}
+            self.splits = []
+
+    def __key__(self):
+        return self.field
 
     def makeSplits(self):
+        if self.data is None:
+            self.splits = []
+            return
+
         self.splits = [
             RdsSplitGeography(self.data, geoid)
             for geoid in self.data.index.get_level_values(0).unique()

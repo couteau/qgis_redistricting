@@ -1,5 +1,6 @@
 from numbers import Number
 from typing import (
+    Any,
     Callable,
     Optional,
     TypedDict,
@@ -18,24 +19,148 @@ from ..utils import (
     tr
 )
 
-schemaVersion = version.parse('1.0.3')
+schemaVersion = version.parse('1.0.4')
 
 
-class fieldSchema(TypedDict):
+class fieldSchema1_0_0(TypedDict):
     layer: str
     field: str
     expression: bool
     caption: str
 
 
-class dataFieldSchema(fieldSchema):
+class dataFieldSchema1_0_0(fieldSchema1_0_0):
+    sum: bool
+    pctbase: int
+
+
+class baseDistSchema1_0_0(TypedDict):
+    district: int
+    name: str
+
+
+class distSchema1_0_0(baseDistSchema1_0_0, total=False):
+    description: str
+    members: int
+
+
+class splitSchema1_0_0(TypedDict):
+    districts: Union[str, dict[str, Number]]
+    splits: int
+
+
+statsSchema1_0_0 = TypedDict(
+    'statsSchema1_0_1',
+    {
+        'cut-edges': dict[int, int],
+        'splits': dict[str, list[splitSchema1_0_0]]
+    }
+)
+
+planSchema1_0_0 = TypedDict(
+    'planSchema1_0_0',
+    {
+        'id': str,
+        'name': str,
+        'description': str,
+        'total-population': Number,
+        'num-districts': int,
+        'num-seats': int,
+        'deviation': float,
+
+        'pop-layer': str,
+        'join-field': str,
+
+        'src-layer': str,
+        'src-id-field': str,
+
+        'assign-layer': str,
+        'geo-id-field': str,
+        'geo-id-display': str,
+        'geo-fields': list[fieldSchema1_0_0],
+        'dist-field': str,
+
+        'dist-layer': str,
+        'pop-field': str,
+        'vap-field': Optional[str],
+        'cvap-field': Optional[str],
+        'data-fields': list[dataFieldSchema1_0_0],
+
+        'districts': list[distSchema1_0_0],
+        'plan-stats': statsSchema1_0_0
+    }
+)
+
+
+class dataFieldSchema1_0_1(fieldSchema1_0_0):
     sum: bool
     pctbase: Optional[str]
 
 
-class dataFieldSchema1_0_0(fieldSchema):
-    sum: bool
-    pctbase: int
+planSchema1_0_1 = TypedDict(
+    'planSchema1_0_1',
+    {
+        'id': str,
+        'name': str,
+        'description': str,
+        'total-population': Number,
+        'num-districts': int,
+        'num-seats': int,
+        'deviation': float,
+
+        'pop-layer': str,
+        'pop-join-field': str,
+
+        'geo-layer': str,
+        'geo-join-field': str,
+
+        'assign-layer': str,
+        'geo-id-field': str,
+        'geo-id-caption': str,
+        'geo-fields': list[fieldSchema1_0_0],
+        'dist-field': str,
+
+        'dist-layer': str,
+        'pop-field': str,
+        'pop-fields': list[fieldSchema1_0_0],
+        'data-fields': list[dataFieldSchema1_0_1],
+
+        'districts': list[distSchema1_0_0],
+        'plan-stats': statsSchema1_0_0
+    }
+)
+
+planSchema1_0_2 = TypedDict(
+    'planSchema1_0_2',
+    {
+        'id': str,
+        'name': str,
+        'description': str,
+        'total-population': Number,
+        'num-districts': int,
+        'num-seats': int,
+        'deviation': float,
+
+        'pop-layer': str,
+        'pop-join-field': str,
+
+        'geo-layer': str,
+        'geo-join-field': str,
+
+        'assign-layer': str,
+        'geo-id-field': str,
+        'geo-id-caption': str,
+        'geo-fields': list[fieldSchema1_0_0],
+        'dist-field': str,
+
+        'dist-layer': str,
+        'pop-field': str,
+        'pop-fields': list[fieldSchema1_0_0],
+        'data-fields': list[dataFieldSchema1_0_1],
+
+        'plan-stats': statsSchema1_0_0
+    }
+)
 
 
 class splitSchema(TypedDict):
@@ -48,11 +173,27 @@ statsSchema = TypedDict(
     'statsSchema',
     {
         'cut-edges': int,
-        'plan-splits': dict[str, splitSchema],
+        'splits': dict[str, splitSchema],
     }
 )
 
 
+class fieldSchema(TypedDict):
+    layer: str
+    field: str
+    caption: str
+
+
+dataFieldSchema = TypedDict(
+    'dataFieldSchema',
+    {
+        'layer': str,
+        'field': str,
+        'caption': str,
+        'sum-field': bool,
+        'pct-base': Optional[str]
+    }
+)
 planSchema = TypedDict(
     'planSchema',
     {
@@ -82,97 +223,6 @@ planSchema = TypedDict(
         'data-fields': list[dataFieldSchema],
 
         'plan-stats': statsSchema
-    }
-)
-
-
-class baseDistSchema1_0_1(TypedDict):
-    district: int
-    name: str
-
-
-class distSchema1_0_1(baseDistSchema1_0_1, total=False):
-    description: str
-    members: int
-
-
-class splitSchema1_0_1(TypedDict):
-    districts: Union[str, dict[str, Number]]
-    splits: int
-
-
-statsSchema1_0_1 = TypedDict(
-    'statsSchema',
-    {
-        'cut-edges': dict[int, int],
-        'splits': dict[str, list[splitSchema1_0_1]]
-    }
-)
-
-planSchema1_0_1 = TypedDict(
-    'planSchema',
-    {
-        'id': str,
-        'name': str,
-        'description': str,
-        'total-population': Number,
-        'num-districts': int,
-        'num-seats': int,
-        'deviation': float,
-
-        'pop-layer': str,
-        'pop-join-field': str,
-
-        'geo-layer': str,
-        'geo-join-field': str,
-
-        'assign-layer': str,
-        'geo-id-field': str,
-        'geo-id-caption': str,
-        'geo-fields': list[fieldSchema],
-        'dist-field': str,
-
-        'dist-layer': str,
-        'pop-field': str,
-        'pop-fields': list[fieldSchema],
-        'data-fields': list[dataFieldSchema],
-
-        'districts': list[distSchema1_0_1],
-        'plan-stats': statsSchema1_0_1
-    }
-)
-
-planSchema1_0_0 = TypedDict(
-    'planSchema',
-    {
-        'id': str,
-        'name': str,
-        'description': str,
-        'total-population': Number,
-        'num-districts': int,
-        'num-seats': int,
-        'deviation': float,
-
-        'pop-layer': str,
-        'join-field': str,
-
-        'src-layer': str,
-        'src-id-field': str,
-
-        'assign-layer': str,
-        'geo-id-field': str,
-        'geo-id-display': str,
-        'geo-fields': list[fieldSchema],
-        'dist-field': str,
-
-        'dist-layer': str,
-        'pop-field': str,
-        'vap-field': Optional[str],
-        'cvap-field': Optional[str],
-        'data-fields': list[dataFieldSchema1_0_0],
-
-        'districts': list[distSchema1_0_1],
-        'plan-stats': statsSchema1_0_1
     }
 )
 
@@ -232,7 +282,7 @@ def migrateSchema1_0_0_to_1_0_1(data: dict):
     return data, version.parse('1.0.1')
 
 
-def _updateDistLayer(data: dict):
+def _updateDistLayer(data: dict[str, Any]):
     distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
     if distLayer is None:
         return
@@ -263,7 +313,7 @@ def _updateDistLayer(data: dict):
         distLayer.reload()
 
 
-def migrateSchema1_0_1_to_1_0_2(data: dict):
+def migrateSchema1_0_1_to_1_0_2(data: dict[str, Any]):
     _updateDistLayer(data)
 
     splits = data["plan-stats"]["splits"]
@@ -301,7 +351,7 @@ def migrateSchema1_0_1_to_1_0_2(data: dict):
     return data, version.parse('1.0.2')
 
 
-def migrateSchema1_0_2_to_1_0_3(data):
+def migrateSchema1_0_2_to_1_0_3(data: dict[str, Any]):
     distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
     if distLayer is None:
         return
@@ -317,16 +367,40 @@ def migrateSchema1_0_2_to_1_0_3(data):
     return data, version.parse('1.0.3')
 
 
+def migrateSchema1_0_3_to_1_0_4(data: dict[str, Any]):
+    if 'geo-layer' not in data and 'pop-layer' in data:
+        data['geo-layer'] = data['pop-layer']
+        del data['pop-layer']
+
+    for field in data.get('geo-fields', []):
+        if 'expression' in field:
+            del field['expression']
+
+    for field in data.get('pop-fields', []):
+        if 'expression' in field:
+            del field['expression']
+
+    for field in data.get('data-fields', []):
+        if 'expression' in field:
+            del field['expression']
+        _renameField(field, 'sum', 'sum-field')
+        _renameField(field, 'pctbase', 'pct-base')
+
+    return data, version.parse('1.0.4')
+
+
 migrations: dict[version.Version, Callable[[dict], tuple[dict, version.Version]]] = {
     version.parse('1.0.0'): migrateSchema1_0_0_to_1_0_1,
     version.parse('1.0.1'): migrateSchema1_0_1_to_1_0_2,
-    version.parse('1.0.2'): migrateSchema1_0_2_to_1_0_3
+    version.parse('1.0.2'): migrateSchema1_0_2_to_1_0_3,
+    version.parse('1.0.3'): migrateSchema1_0_3_to_1_0_4,
 }
 
 schemas = {
     version.parse('1.0.0'): planSchema1_0_0,
     version.parse('1.0.1'): planSchema1_0_1,
-    version.parse('1.0.2'): planSchema,
+    version.parse('1.0.2'): planSchema1_0_2,
+    version.parse('1.0.3'): planSchema1_0_2,
     schemaVersion: planSchema
 }
 

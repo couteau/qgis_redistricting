@@ -34,5 +34,6 @@ class TestUpdatePendingChangesTask:
         plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
         t = AggregatePendingChangesTask(plan)
         t.run()
+        assert t.exception is None
         assert t.data is not None
         assert len(t.data) == 2

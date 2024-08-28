@@ -1,9 +1,14 @@
 """QGIS Redistricting Plugin - unit tests for DeltaList class"""
 import pandas as pd
 import pytest
-from qgis.PyQt.QtCore import Qt
+from pytest_mock import MockerFixture
+from qgis.PyQt.QtCore import (
+    Qt,
+    pyqtBoundSignal
+)
 
 from redistricting.gui.DeltaListModel import DeltaListModel
+from redistricting.models import DeltaList
 
 # pylint: disable=unused-argument,protected-access
 
@@ -12,11 +17,11 @@ class TestDeltaModel:
     @pytest.fixture
     def empty_model(self, plan):
         model = DeltaListModel()
-        model.setPlan(plan)
+        model.setDelta(plan, None)
         return model
 
     @pytest.fixture
-    def delta_model(self, plan, mocker):
+    def mock_delta(self, mocker: MockerFixture):
         df = pd.DataFrame.from_records(
             [{
                 'district': 1,
@@ -38,11 +43,18 @@ class TestDeltaModel:
             }],
             index='district'
         )
+        delta = mocker.create_autospec(spec=DeltaList)
+        delta.__bool__.return_value = True
+        delta._data = df
+        type(delta).updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+        type(delta).updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        return delta
+
+    @pytest.fixture
+    def delta_model(self, plan, mock_delta):
         model = DeltaListModel()
-        model.setPlan(plan)
-        mocker.patch.object(model, "_delta")
-        model._delta.__bool__.return_value = True
-        model._delta._data = df
+        model.setDelta(plan, mock_delta)
+
         yield model
 
     def test_create(self, empty_model: DeltaListModel):
@@ -55,6 +67,6 @@ class TestDeltaModel:
     def test_heading(self, delta_model: DeltaListModel):
         assert delta_model.headerData(3, Qt.Vertical, Qt.DisplayRole) == '%Deviation'
 
-    def test_update_districts(self, delta_model):
-        delta_model._delta.__len__.return_value = 1
+    def test_update_districts(self, delta_model, mock_delta):
+        mock_delta.__len__.return_value = 1
         assert delta_model.columnCount() == 1

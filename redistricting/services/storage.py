@@ -39,7 +39,9 @@ from qgis.PyQt.QtXml import QDomDocument
 from ..models import (
     DistrictColumns,
     RdsPlan,
-    StatsColumns
+    StatsColumns,
+    deserialize_model,
+    serialize_model
 )
 from .DistrictIO import (
     DistrictReader,
@@ -93,11 +95,11 @@ class ProjectStorage:
         for f in plan.popFields:
             columns.append(f.fieldName)
         for f in plan.dataFields:
-            if f.sum:
+            if f.sumField:
                 columns.append(f.fieldName)
-            if f.pctbase:
+            if f.pctBase:
                 columns.append(f'pct_{f.fieldName}')
-        columns.extend([s.value for s in StatsColumns])
+        columns.extend(StatsColumns)
 
         districtReader = DistrictReader(plan.distLayer, plan.distField, plan.popField, columns)
         districtReader.loadDistricts(plan)
@@ -111,7 +113,7 @@ class ProjectStorage:
             columns.append(f.fieldName)
         for f in plan.dataFields:
             columns.append(f.fieldName)
-        columns.extend([s.value for s in StatsColumns])
+        columns.extend([s for s in StatsColumns])
         if plan.distLayer:
             writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
             writer.writeToLayer(plan.districts)
@@ -119,7 +121,7 @@ class ProjectStorage:
     def writeRedistrictingPlans(self, plans: Iterable[RdsPlan]):
         l: List[str] = []
         for p in plans:
-            data = p.serialize()
+            data = serialize_model(p)
             jsonPlan = json.dumps(data)
             l.append(jsonPlan)
             self.writeDistricts(p)
@@ -138,7 +140,7 @@ class ProjectStorage:
                     planJson['geo-layer'] = planJson['pop-layer']
                     del planJson['pop-layer']
 
-                plan = RdsPlan.deserialize(planJson, parent=self._project)
+                plan = deserialize_model(RdsPlan, planJson, parent=self._project)
                 self.readDistricts(plan)
                 if plan is not None:
                     plans.append(plan)

@@ -36,49 +36,42 @@ from qgis.PyQt.QtCore import (
 )
 
 if TYPE_CHECKING:
-    from .Plan import RedistrictingPlan
+    from .Plan import (
+        RdsDistrict,
+        RdsPlan
+    )
 
 
 class Delta:
-    def __init__(self, index: int, dlist: "DeltaList"):
-        self._list = dlist
-        self._index = index
+    def __init__(self, district: int, data: pd.DataFrame):
+        self._district = district
+        self._data = data
 
     def __getitem__(self, index):
-        if isinstance(index, int) and 0 <= index < len(self._list.data.columns):
-            return self._list.data.iloc[self._index, index]
+        if isinstance(index, int) and 0 <= index < len(self._data.columns):
+            i = self._data.index.get_loc(self._district)
+            return self._data.iloc[i, index]
 
-        if isinstance(index, str) and index in self._list.data.columns:
-            d = self._list.data.index[self._index]
-            return self._list.data.loc[d, index]
+        if isinstance(index, str) and index in self._data.columns:
+            return self._data.loc[self._district, index]
 
         raise IndexError("Bad delta index")
 
     def __len__(self):
-        return len(self._list.data.columns)
-
-    def __eq__(self, other: "Delta"):
-        return self._list == other._list and self._index == other._index
-
-    @property
-    def name(self):
-        d = int(self._list.data.index[self._index])
-        return self._list.districts[d].name
+        return len(self._data.columns)
 
     @property
     def district(self):
-        return int(self._list.data.index[self._index])
+        return self._district
 
 
 class DeltaList(QObject):
-    updateStarted = pyqtSignal('PyQt_PyObject')
-    updateComplete = pyqtSignal('PyQt_PyObject')
+    updateStarted = pyqtSignal()
+    updateComplete = pyqtSignal()
 
-    def __init__(self, plan: "RedistrictingPlan", parent: Optional[QObject] = None) -> None:
+    def __init__(self, parent: Optional[QObject] = None) -> None:
         super().__init__(parent)
-        self._plan = plan
-        self.districts = plan.districts
-        self._data: pd.DataFrame = None
+        self.setData(None)
 
     @overload
     def __getitem__(self, index: int) -> Delta:
@@ -89,10 +82,10 @@ class DeltaList(QObject):
         pass
 
     @overload
-    def __getitem__(self, index: tuple) -> Union[int, str, float]:
+    def __getitem__(self, index: tuple[int, int]) -> Union[int, str, float]:
         pass
 
-    def __getitem__(self, index) -> Union[int, str, float, pd.Series, Delta, None]:
+    def __getitem__(self, index: Union[str, int, tuple[int, int]]) -> Union[int, str, float, pd.Series, Delta, None]:
         if self._data is None:
             return None
 
@@ -105,15 +98,12 @@ class DeltaList(QObject):
             if index.isnumeric():
                 index = int(index)
                 if index in self._data.index:
-                    i = self._data.index.get_loc(index)
-                    return Delta(i, self)
-                if 0 <= index <= self._plan.numDistricts:
-                    return None
+                    return self._deltaDict[index]
             elif index in self._data.columns:
                 return list(self._data[index])
 
         elif isinstance(index, int):
-            return Delta(index, self)
+            return self._delta[index]
 
         raise IndexError()
 
@@ -121,33 +111,26 @@ class DeltaList(QObject):
         return len(self._data) if self._data is not None else 0
 
     def __iter__(self):
-        if self._data is not None:
-            for index in range(len(self._data)):
-                yield Delta(index, self)
+        return iter(self._delta)
 
     def __bool__(self):
         return self._data is not None and not self._data.empty
 
-    def changedDistricts(self) -> list[int]:
-        if self._data is not None:
-            return list(self._data.index)
-
-        return []
-
-    @property
-    def data(self):
-        return self._data
-
-    @property
-    def plan(self):
-        return self._plan
+    def setData(self, data: pd.DataFrame):
+        self._data = data
+        if data is not None:
+            self._delta = [Delta(d, data) for d in data.index]
+            self._deltaDict = {d.district: d for d in self._delta}
+        else:
+            self._delta: list[Delta] = []
+            self._deltaDict: dict[int, Delta] = {}
 
     def clear(self):
-        self.updateStarted.emit(self._plan)
-        self._data = None
-        self.updateComplete.emit(self._plan)
+        self.updateStarted.emit()
+        self.setData(None)
+        self.updateComplete.emit()
 
     def update(self, data: pd.DataFrame):
-        self.updateStarted.emit(self._plan)
-        self._data = data
-        self.updateComplete.emit(self._plan)
+        self.updateStarted.emit()
+        self.setData(data)
+        self.updateComplete.emit()

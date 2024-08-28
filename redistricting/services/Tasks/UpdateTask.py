@@ -34,7 +34,6 @@ import geopandas as gpd
 import pandas as pd
 from qgis.core import (
     Qgis,
-    QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsMessageLog,
@@ -70,7 +69,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.popFields: Sequence[RdsField] = plan.popFields
         self.dataFields: Sequence[RdsDataField] = plan.dataFields
         self.totalPopulation = plan.totalPopulation
-        self.ideal = plan.ideal
+        self.ideal = plan.idealPopulation
         self.districts = plan.districts
         self.count = 0
         self.total = 1
@@ -128,20 +127,12 @@ class AggregateDataTask(SqlAccess, QgsTask):
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
         for f in self.popFields:
-            if f.expression:
-                expr = QgsExpression(f.field)
-                expr.prepare(context)
-                cols += expr.referencedColumns()
-            else:
-                cols.append(f.field)
+            f.prepare(context)
+            cols += f.expression.referencedColumns()
 
         for f in self.dataFields:
-            if f.expression:
-                expr = QgsExpression(f.field)
-                expr.prepare(context)
-                cols += expr.referencedColumns()
-            else:
-                cols.append(f.field)
+            f.prepare(context)
+            cols += f.expression.referencedColumns()
 
         df = self.read_layer(
             self.popLayer,
@@ -151,10 +142,10 @@ class AggregateDataTask(SqlAccess, QgsTask):
         )
         df.rename(columns={self.popField: str(DistrictColumns.POPULATION)}, inplace=True)
         for f in self.popFields:
-            if f.expression:
+            if f.isExpression():
                 df.loc[:, f.fieldName] = df.query(f.field)
         for f in self.dataFields:
-            if f.expression:
+            if f.isExpression():
                 df.loc[:, f.fieldName] = df.query(f.field)
 
         return df

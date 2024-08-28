@@ -36,7 +36,10 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from ..models import RdsPlan
+from ..models import (
+    DeltaList,
+    RdsPlan
+)
 from .ErrorList import ErrorListMixin
 from .Tasks import AggregatePendingChangesTask
 
@@ -46,16 +49,21 @@ class DeltaUpdate:
     plan: RdsPlan
     assignments: pd.DataFrame = None
     popData: pd.DataFrame = None
+    delta: DeltaList = None
     task: AggregatePendingChangesTask = None
+
+    def __post_init__(self):
+        self.delta = DeltaList()
 
     def clear(self):
         self.assignments = None
         self.task = None
+        self.delta.clear()
 
 
 class DeltaUpdateService(ErrorListMixin, QObject):
     updateStarted = pyqtSignal("PyQt_PyObject")
-    updateCompleted = pyqtSignal("PyQt_PyObject")
+    updateCompleted = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")
     updateTerminated = pyqtSignal("PyQt_PyObject", bool, "PyQt_PyObject")
 
     def __init__(self, parent: Optional[QObject] = None):
@@ -96,18 +104,18 @@ class DeltaUpdateService(ErrorListMixin, QObject):
     def isUpdating(self, plan: RdsPlan):
         return plan in self._deltas \
             and self._deltas[plan].task is not None \
-            and self._deltas[plan].task.status() < self._pendingTask.TaskStatus.Complete
+            and self._deltas[plan].task.status() < QgsTask.TaskStatus.Complete
 
     def deltaTaskCompleted(self, plan: RdsPlan):
         delta = self._deltas[plan]
         task = delta.task
         self._completeSignals.removeMappings(task)
         self._terminatedSignals.removeMappings(task)
-        plan.delta.update(task.data)
         delta.assignments = task.assignments
         delta.popData = task.popData
+        delta.delta.setData(task.data)
         delta.task = None
-        self.updateCompleted.emit(plan)
+        self.updateCompleted.emit(plan, delta.delta)
 
     def deltaTaskTerminated(self, plan):
         task = self._deltas[plan].task
@@ -129,7 +137,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         if delta.plan.assignLayer is None \
                 or delta.plan.assignLayer.editBuffer() is None \
                 or delta.plan.assignLayer.undoStack().index() == 0:
-            plan.delta.clear()
+            delta.delta.clear()
             return None
 
         task = AggregatePendingChangesTask(plan, delta.popData, delta.assignments)
@@ -150,9 +158,11 @@ class DeltaUpdateService(ErrorListMixin, QObject):
     def commitChanges(self, plan: RdsPlan):
         if plan in self._deltas:
             self._deltas[plan].clear()
-        plan.delta.clear()
 
     def rollback(self, plan: RdsPlan):
         if plan in self._deltas:
             self._deltas[plan].clear()
-        plan.delta.clear()
+
+    def getDelta(self, plan: RdsPlan) -> DeltaList:
+        if plan in self._deltas:
+            return self._deltas[plan].delta

@@ -62,7 +62,7 @@ class DistrictReader:
             if district.district == 0:
                 plan.districts[0].update(district)
             else:
-                plan.districts.add(district)
+                plan.districts.append(district)
 
 
 class DistrictWriter:

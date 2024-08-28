@@ -36,18 +36,17 @@ from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
 from .base import (
+    MISSING,
     Factory,
-    RdsBaseModel
+    RdsBaseModel,
+    SortedKeyedList,
+    in_range,
+    not_empty,
+    rds_property
 )
 from .columns import (
     DistrictColumns,
     StatsColumns
-)
-from .prop import (
-    MISSING,
-    in_range,
-    not_empty,
-    rds_property
 )
 
 
@@ -236,3 +235,23 @@ class RdsUnassigned(RdsDistrict):
         self._data[DistrictColumns.PCT_DEVIATION] = None
 
         self._data.update(zip(RdsDistrict.STATS_COLUMNS, repeat(None)))
+
+
+class DistrictList(SortedKeyedList[RdsDistrict]):  # pylint: disable=abstract-method
+    def clear(self):
+        if '0' in self._keys:
+            addUnassigned = True
+
+        super().clear()
+
+        if addUnassigned:
+            self.append(RdsUnassigned())
+
+    def __contains__(self, item: Union[int, str, RdsDistrict]):
+        if isinstance(item, int):
+            item = str(item)
+
+        if isinstance(item, str):
+            return item in self._items
+
+        return item in self._items.values()

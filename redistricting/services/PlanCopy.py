@@ -105,9 +105,9 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             for f in plan.geoFields:
-                split = RdsSplits(plan, f, plan.stats)
-                split.setData(self._plan.stats.splits[f.fieldName].data.copy())
-                plan.stats.splits[f.fieldName] = split
+                split = RdsSplits(plan, f, plan.metrics)
+                split.setData(self._plan.metrics.splits[f.fieldName].data.copy())
+                plan.metrics.splits[f.fieldName] = split
 
             reader = DistrictReader(
                 plan.distLayer,

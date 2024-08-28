@@ -22,6 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
+from .base import (
+    deserialize_model,
+    serialize_model
+)
 from .columns import (
     DistrictColumns,
     StatsColumns
@@ -31,6 +35,7 @@ from .DeltaList import (
     DeltaList
 )
 from .District import (
+    DistrictList,
     RdsDistrict,
     RdsUnassigned
 )
@@ -41,11 +46,7 @@ from .Field import (
 )
 from .Plan import (
     RdsPlan,
-    RdsPlanStats
-)
-from .serialize import (
-    deserialize_model,
-    serialize_model
+    RdsPlanMetrics
 )
 from .Splits import (
     RdsSplitDistrict,
@@ -53,6 +54,6 @@ from .Splits import (
     RdsSplits
 )
 
-__all__ = ('StatsColumns', 'RdsDataField', 'Delta', 'DeltaList', 'RdsDistrict', 'DistrictColumns',
-           'RdsField', 'RdsGeoField', 'RdsPlanStats', 'RdsPlan',
+__all__ = ('StatsColumns', 'RdsDataField', 'Delta', 'DeltaList', 'RdsDistrict', 'DistrictColumns', 'DistrictList',
+           'RdsField', 'RdsGeoField', 'RdsPlanMetrics', 'RdsPlan',
            'RdsSplits', 'RdsSplitDistrict', 'RdsSplitGeography', 'RdsUnassigned', "serialize_model", "deserialize_model")

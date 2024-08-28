@@ -14,12 +14,12 @@ from qgis.PyQt.QtGui import (
     QFont
 )
 
-from ..models import RdsPlanStats
+from ..models import RdsPlanMetrics
 from ..utils import tr
 
 
-class StatsModel(QAbstractTableModel):
-    StatLabels = [
+class RdsPlanMetricsModel(QAbstractTableModel):
+    MetricLabels = [
         tr('Population'),
         tr('Continguous'),
         tr('Compactness'),
@@ -31,24 +31,24 @@ class StatsModel(QAbstractTableModel):
     ]
     SPLITS_OFFSET = 8
 
-    def __init__(self, stats: RdsPlanStats, parent: Optional[QObject] = None):
+    def __init__(self, stats: RdsPlanMetrics, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._stats = None
+        self._metrics = None
         self.setStats(stats)
 
-    def setStats(self, value: RdsPlanStats):
+    def setStats(self, value: RdsPlanMetrics):
         self.beginResetModel()
-        if self._stats:
-            self._stats.statsUpdating.disconnect(self.beginResetModel)
-            self._stats.statsUpdated.disconnect(self.endResetModel)
-            for s in self._stats.splits.values():
+        if self._metrics:
+            self._metrics.metricsAboutToChange.disconnect(self.beginResetModel)
+            self._metrics.metricsChanged.disconnect(self.endResetModel)
+            for s in self._metrics.splits.values():
                 s.splitUpdating.disconnect(self.beginResetModel)
                 s.splitUpdated.disconnect(self.endResetModel)
-        self._stats = value
-        if self._stats:
-            self._stats.statsUpdating.connect(self.beginResetModel)
-            self._stats.statsUpdated.connect(self.endResetModel)
-            for s in self._stats.splits.values():
+        self._metrics = value
+        if self._metrics:
+            self._metrics.metricsAboutToChange.connect(self.beginResetModel)
+            self._metrics.metricsChanged.connect(self.endResetModel)
+            for s in self._metrics.splits.values():
                 s.splitUpdating.connect(self.beginResetModel)
                 s.splitUpdated.connect(self.endResetModel)
         self.endResetModel()
@@ -57,9 +57,9 @@ class StatsModel(QAbstractTableModel):
         if parent.isValid():
             return 0
 
-        c = StatsModel.SPLITS_OFFSET - 1
-        if self._stats:
-            c += 1 + len(self._stats.splits)
+        c = RdsPlanMetricsModel.SPLITS_OFFSET - 1
+        if self._metrics:
+            c += 1 + len(self._metrics.splits)
         return c
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -67,37 +67,41 @@ class StatsModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
-            return StatsModel.StatLabels[section] \
-                if section < StatsModel.SPLITS_OFFSET \
-                else '   ' + self._stats.splits.headings[section-StatsModel.SPLITS_OFFSET]
+            if section >= RdsPlanMetricsModel.SPLITS_OFFSET:
+                split = self._metrics.splits[section-RdsPlanMetricsModel.SPLITS_OFFSET]
+                if split.geoField is None:
+                    return f'   {split.field}'
+                return f'   {split.geoField.caption}'
+
+            return RdsPlanMetricsModel.MetricLabels[section]
 
         return None
 
     def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
-        if self._stats is None or not index.isValid() or index.column() != 0:
+        if self._metrics is None or not index.isValid() or index.column() != 0:
             return None
 
         row = index.row()
         if role == Qt.DisplayRole:
             if row == 0:
-                result = f'{self._stats.totalPopulation:,}'
+                result = f'{self._metrics.totalPopulation:,}'
             elif row == 1:
-                result = tr('Yes') if self._stats.contiguous else tr('No')
+                result = tr('Yes') if self._metrics.contiguous else tr('No')
             elif row == 3:
-                avgPP = self._stats.avgPolsbyPopper
+                avgPP = self._metrics.polsbypopper
                 result = f'{avgPP:.3f}' if avgPP is not None else ''
             elif row == 4:
-                avgReock = self._stats.avgReock
+                avgReock = self._metrics.reock
                 result = f'{avgReock:.3f}' if avgReock is not None else ''
             elif row == 5:
-                avgCH = self._stats.avgConvexHull
+                avgCH = self._metrics.convexhull
                 result = f'{avgCH:.3f}' if avgCH is not None else ''
             elif row == 6:
-                result = f'{self._stats.cutEdges:,}' if self._stats.cutEdges else ''
-            elif row in (2, StatsModel.SPLITS_OFFSET - 1):
+                result = f'{self._metrics.cutEdges:,}' if self._metrics.cutEdges else ''
+            elif row in (2, RdsPlanMetricsModel.SPLITS_OFFSET - 1):
                 result = None
-            elif row <= StatsModel.SPLITS_OFFSET + len(self._stats.splits):
-                result = f'{len(self._stats.splits[row-StatsModel.SPLITS_OFFSET]):,}'
+            elif row <= RdsPlanMetricsModel.SPLITS_OFFSET + len(self._metrics.splits):
+                result = f'{len(self._metrics.splits[row-RdsPlanMetricsModel.SPLITS_OFFSET]):,}'
             else:
                 result = None
         elif role == Qt.FontRole:
@@ -105,7 +109,7 @@ class StatsModel(QAbstractTableModel):
             result.setBold(True)
         elif role == Qt.TextColorRole:
             if row == 1:
-                if not self._stats.contiguous:
+                if not self._metrics.contiguous:
                     result = QColor(Qt.red)
                 else:
                     result = QColor(Qt.green)

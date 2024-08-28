@@ -42,6 +42,7 @@ from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QDialog
 
 from ..gui import (
+    DlgCopyPlan,
     DlgNewDistrict,
     DockRedistrictingToolbox,
     PaintDistrictsTool,
@@ -51,7 +52,10 @@ from ..models import (
     RdsDistrict,
     RdsPlan
 )
-from ..services import AssignmentsService
+from ..services import (
+    AssignmentsService,
+    PlanCopier
+)
 from ..utils import tr
 from .BaseCtlr import BaseController
 
@@ -125,7 +129,15 @@ class EditAssignmentsController(BaseController):
         )
         self.actionCommitPlanChanges.setEnabled(False)
 
-        self.actionSaveAsNew = self.actions.actionSaveAsNew
+        self.actionSaveAsNew = self.actions.createAction(
+            'actionSaveAsNew',
+            QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
+            tr('Save as new'),
+            tr('Save all unsaved districting changes to a new redistricting plan'),
+            callback=self.saveChangesAsNewPlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionSaveAsNew.setEnabled(False)
 
         self.actionRollbackPlanChanges = self.actions.createAction(
             'actionRollbackPlanChanges',
@@ -338,6 +350,23 @@ class EditAssignmentsController(BaseController):
 
     def editTargetDistrict(self):
         self.editDistrict(self.mapTool.targetDistrict())
+
+    def saveChangesAsNewPlan(self):
+        if not self.checkActivePlan(self.tr('copy')):
+            return
+
+        dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
+        dlgCopyPlan.cbxCopyAssignments.hide()
+
+        if dlgCopyPlan.exec_() == QDialog.Accepted:
+            copier = PlanCopier(self.planManager.activePlan)
+            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
+                                   dlgCopyPlan.geoPackagePath, copyAssignments=True)
+
+            self.appendPlan(plan, False)
+            copier.copyBufferedAssignments(plan)
+            self.planManager.activePlan.assignLayer.rollBack(True)
+            self.planManager.setActivePlan(plan)
 
     # helper methods
 

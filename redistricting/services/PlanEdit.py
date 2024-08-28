@@ -154,7 +154,7 @@ class PlanEditor(BasePlanBuilder):
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-        self._plan._setPopFields(self._popFields)
+        self._plan.popFields = self._popFields
 
     def _updateDataFields(self):
         if self._plan.distLayer:
@@ -173,7 +173,7 @@ class PlanEditor(BasePlanBuilder):
                         provider.deleteAttributes([findex])
                 layer.updateFields()
 
-        self._plan._setDataFields(self._dataFields)
+        self._plan.dataFields = self._dataFields
 
     def _updateGeoFields(self):
         def removeFields():
@@ -236,7 +236,7 @@ class PlanEditor(BasePlanBuilder):
         else:
             removeFields()
 
-        self._plan._setGeoFields(self._geoFields)
+        self._plan.geoFields = self._geoFields
 
     def updatePlan(self):
         self.clearErrors()
@@ -246,15 +246,15 @@ class PlanEditor(BasePlanBuilder):
 
         self.startPlanUpdate()
         try:
-            self._plan._setName(self._name)
-            self._plan._setNumDistricts(self._numDistricts)
-            self._plan._setNumSeats(self._numSeats)
-            self._plan._setDescription(self._description)
-            self._plan._setDeviation(self._deviation)
+            self._plan.name = self._name
+            self._plan.numDistricts = self._numDistricts
+            self._plan.numSeats = self._numSeats
+            self._plan.description = self._description
+            self._plan.deviation = self._deviation
 
-            self._plan._setPopLayer(self._popLayer)
-            self._plan._setPopJoinField(self._popJoinField)
-            self._plan._setPopField(self._popField)
+            self._plan.popLayer = self._popLayer
+            self._plan.popJoinField = self._popJoinField
+            self._plan.popField = self._popField
 
             if self._popFields != self._plan.popFields:
                 self._updatePopFields()
@@ -262,7 +262,7 @@ class PlanEditor(BasePlanBuilder):
             if self._dataFields != self._plan.dataFields:
                 self._updateDataFields()
 
-            self._plan._setGeoIdCaption(self._geoIdCaption)
+            self._plan.geoIdCaption = self._geoIdCaption
 
             if self._geoFields != self._plan.geoFields:
                 self._updateGeoFields()

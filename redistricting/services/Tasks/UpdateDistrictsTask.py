@@ -117,7 +117,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
 
-        self.setDependentLayers([plan.distLayer, plan._assignLayer, plan.popLayer])
+        self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
 
         self.geoFields: Sequence['RdsGeoField'] = plan.geoFields
         self.numDistricts: int = plan.numDistricts
@@ -348,16 +348,16 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 deviation = self.data[DistrictColumns.POPULATION].sub(members * ideal)
                 pct_dev = deviation.div(members * ideal)
                 df = pd.DataFrame(
-                    {DistrictColumns.NAME.value: name,
-                     DistrictColumns.MEMBERS.value: members,
-                     DistrictColumns.DEVIATION.value: deviation,
-                     DistrictColumns.PCT_DEVIATION.value: pct_dev}
+                    {DistrictColumns.NAME: name,
+                     DistrictColumns.MEMBERS: members,
+                     DistrictColumns.DEVIATION: deviation,
+                     DistrictColumns.PCT_DEVIATION: pct_dev}
                 )
                 # for f in self.dataFields:
                 #     if f.pctbase and f.pctbase in self.data.columns:
                 #         self.data[f'pct_{f.fieldName}'] = (self.data[f.fieldName] / self.data[f.pctbase]).fillna(0)
             else:
-                df = pd.DataFrame({DistrictColumns.NAME.value: name, DistrictColumns.MEMBERS.value: members})
+                df = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
 
             self.data = self.data.join(df)
 

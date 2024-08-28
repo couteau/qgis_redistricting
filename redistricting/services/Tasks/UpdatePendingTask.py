@@ -129,7 +129,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                 data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
             for f in self.dataFields:
                 data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
-                pctbase = DistrictColumns.POPULATION if f.pctbase == self.popField else f.pctbase
+                pctbase = DistrictColumns.POPULATION if f.pctBase == self.popField else f.pctBase
                 if pctbase:
                     data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{pctbase}"]
 
@@ -142,7 +142,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
             for f in self.dataFields:
                 cols.append(f"new_{f.fieldName}")
                 cols.append(f.fieldName)
-                if f.pctbase:
+                if f.pctBase:
                     cols.append(f"pct_{f.fieldName}")
 
             self.data = data[cols]

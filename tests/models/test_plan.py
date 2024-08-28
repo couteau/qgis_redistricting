@@ -26,7 +26,7 @@ from redistricting.models import (
     RdsField,
     RdsPlan
 )
-from redistricting.models.serialize import serialize_model
+from redistricting.models.base.serialize import serialize_model
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -103,9 +103,9 @@ class TestPlan:
         plan = RdsPlan('test', 5)
         assert not plan.isValid()
 
-    def test_assign_name_updates_layer_names(self, gpkg_path, qtbot: QtBot):
+    def test_assign_name_updates_layer_names(self, plan_gpkg_path, qtbot: QtBot):
         plan = RdsPlan('oldname', 45)
-        plan.addLayersFromGeoPackage(gpkg_path)
+        plan.addLayersFromGeoPackage(plan_gpkg_path)
         try:
             assert plan.distLayer.name() == 'oldname_districts'
             assert plan.assignLayer.name() == 'oldname_assignments'
@@ -128,7 +128,7 @@ class TestPlan:
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             valid_plan.geoFields = [RdsField(block_layer, 'vtdid20')]
         assert len(valid_plan.geoFields) == 1
-        assert len(valid_plan.stats.splits) == 1
+        assert len(valid_plan.metrics.splits) == 1
 
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):
         plan = RdsPlan('test', 5)
@@ -156,9 +156,9 @@ class TestPlan:
             'num-seats': 5,
             'deviation': 0.025,
             'geo-layer': block_layer.id(),
-            'geo-join-field': 'geoid20',
+            'geo-join-field': 'geoid',
             'pop-layer': block_layer.id(),
-            'pop-join-field': 'geoid20',
+            'pop-join-field': 'geoid',
             'pop-field': 'pop_total',
             'pop-fields': {
                 'vap_total': {'layer': block_layer.id(),
@@ -166,8 +166,8 @@ class TestPlan:
                               'caption': 'VAP'}
             },
             'assign-layer': assign_layer.id(),
-            'geo-id-field': 'geoid20',
-            'geo-id-caption': 'geoid20',
+            'geo-id-field': 'geoid',
+            'geo-id-caption': 'geoid',
             'dist-layer': dist_layer.id(),
             'dist-field': 'district',
             'data-fields': {
@@ -188,9 +188,10 @@ class TestPlan:
                                  'pct-base': 'vap_total'},
             },
             'geo-fields': {
-                'vtdid20': {'layer': assign_layer.id(),
-                            'field': 'vtdid20',
-                            'caption': 'VTD'}
+                'vtdid': {'layer': assign_layer.id(),
+                          'field': 'vtdid',
+                          'caption': 'VTD'}
             },
-            'stats': {'total-population': 227036, 'splits': {'vtdid20': {'field': 'vtdid20', 'data': []}}}
+            'total-population': 227036,
+            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': []}}}
         }

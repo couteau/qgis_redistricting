@@ -109,8 +109,7 @@ class DistrictDataModel(QAbstractTableModel):
         self.beginResetModel()
 
         if self._plan is not None:
-            self._plan.districtNameChanged.disconnect(self.districtChanged)
-            self._plan.districtMembersChanged.disconnect(self.deviationChanged)
+            self._plan.districtDataChanged.disconnect(self.districtChanged)
             self._plan.dataFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.popFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.deviationChanged.disconnect(self.deviationChanged)
@@ -121,8 +120,7 @@ class DistrictDataModel(QAbstractTableModel):
         if self._plan:
             self._districts = self._plan.districts
             self.updatePlanFields()
-            self._plan.districtNameChanged.connect(self.districtChanged)
-            self._plan.districtMembersChanged.connect(self.deviationChanged)
+            self._plan.districtDataChanged.connect(self.districtChanged)
             self._plan.dataFieldsChanged.connect(self.updatePlanFields)
             self._plan.popFieldsChanged.connect(self.updatePlanFields)
             self._plan.deviationChanged.connect(self.deviationChanged)
@@ -163,7 +161,7 @@ class DistrictDataModel(QAbstractTableModel):
             if role in (Qt.DisplayRole, Qt.EditRole):
                 row = index.row()
                 col = index.column()
-                district = self._districts.byindex[row]
+                district = self._districts[row]
 
                 key = self._keys[col]
                 if key[:3] == 'pct' and key != 'pct_deviation':
@@ -197,7 +195,7 @@ class DistrictDataModel(QAbstractTableModel):
                 row = index.row()
                 col = index.column()
                 if col == 0:
-                    color = getColorForDistrict(self._plan, self._districts.byindex[row].district)
+                    color = getColorForDistrict(self._plan, self._districts[row].district)
                     value = QBrush(color)
 
             elif role == Qt.FontRole:

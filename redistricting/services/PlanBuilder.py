@@ -94,7 +94,7 @@ class PlanBuilder(BasePlanBuilder):
 
     def createLayers(self, plan: RdsPlan):
         def taskCompleted():
-            plan.stats.updateStats(self._createLayersTask.totalPop, 0, None)
+            plan.metrics.updateMetrics(self._createLayersTask.totalPop, 0, None)
             self._createLayersTask = None
 
             plan.addLayersFromGeoPackage(self._geoPackagePath)

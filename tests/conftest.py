@@ -13,8 +13,8 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import pyqtBoundSignal
 
+from redistricting.models.base.serialize import deserialize_model
 from redistricting.models.Plan import RdsPlan
-from redistricting.models.serialize import deserialize_model
 from redistricting.services.DistrictIO import DistrictReader
 from redistricting.services.PlanBuilder import PlanBuilder
 
@@ -149,10 +149,7 @@ def plan(block_layer, assign_layer, dist_layer):
              'field': 'vtdid',
              'caption': 'VTD'}
         ],
-        'stats': {
-            'total-population': 227036,
-        }
-
+        'total-population': 227036,
     }, None)
 
     r = DistrictReader(dist_layer, popField='pop_total')
@@ -162,9 +159,7 @@ def plan(block_layer, assign_layer, dist_layer):
         else:
             p.districts.append(d)
 
-    yield p
-
-    p.deleteLater()
+    return p
 
 
 @pytest.fixture
@@ -189,7 +184,7 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
     del b
 
     p.addLayersFromGeoPackage(dst)
-    p.stats.updateStats(227036, None, None)
+    p.metrics.updateMetrics(227036, None, None)
 
     yield p
 

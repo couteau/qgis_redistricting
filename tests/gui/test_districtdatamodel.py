@@ -23,11 +23,11 @@ class TestDistrictDataModel:
         assert district_model.rowCount() == 6
 
     def test_colcount(self, district_model):
-        assert district_model.columnCount() == 15
+        assert district_model.columnCount() == 16
 
     def test_headerdata(self, district_model):
         assert district_model.headerData(0, Qt.Horizontal, Qt.DisplayRole) == 'District'
-        assert district_model.headerData(14, Qt.Horizontal, Qt.DisplayRole) == 'Convex Hull'
+        assert district_model.headerData(15, Qt.Horizontal, Qt.DisplayRole) == 'Convex Hull'
 
     def test_data(self, district_model: DistrictDataModel):
         data = district_model.data(district_model.createIndex(0, 1), Qt.DisplayRole)

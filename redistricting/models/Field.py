@@ -35,6 +35,7 @@ from qgis.core import (
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import (
+    QMetaType,
     QVariant,
     pyqtSignal
 )
@@ -42,9 +43,9 @@ from qgis.PyQt.QtGui import QIcon
 
 from .base import (
     Factory,
-    RdsBaseModel
+    RdsBaseModel,
+    rds_property
 )
-from .prop import rds_property
 
 
 class RdsField(RdsBaseModel):
@@ -119,6 +120,9 @@ class RdsField(RdsBaseModel):
             self.validate()
         return not self._errors
 
+    def isExpression(self) -> bool:
+        return not self.expression.isField()
+
     def validate(self) -> bool:
         self._errors = []
         if not self.expression.isValid():
@@ -153,20 +157,22 @@ class RdsField(RdsBaseModel):
     def fieldIndex(self):
         return QgsExpression.expressionToLayerFieldIndex(self.field, self.layer)
 
-    def fieldType(self) -> QVariant.Type:
+    def fieldType(self) -> QMetaType.Type:
         index = self.fieldIndex()
         if index != -1:
             return self.layer.fields().field(index).type()
 
         if self._prepared or self.prepare():
-            if (f := self._context.feature()) is None:
+            f = self._context.feature()
+            if f is None or not f.isValid():
                 f = next(self.layer.getFeatures(), None)
 
             if f is not None:
                 v = self.getValue(f)
+                # TODO: change this type .typeId() when QGIS moves to Qt 6
                 return QVariant(v).type()
 
-        return QVariant.Invalid
+        return QMetaType.UnknownType
 
     def qgsField(self) -> QgsField:
         idx = self.fieldIndex()
@@ -181,7 +187,7 @@ class RdsField(RdsBaseModel):
 
         t = self.fieldType()
 
-        if t is QVariant.Invalid:
+        if t is QMetaType.UnknownType:
             return None
 
         return QgsField(name, t)

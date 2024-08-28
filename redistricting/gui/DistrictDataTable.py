@@ -73,7 +73,7 @@ from .DlgEditFields import DlgEditFields
 from .DlgNewDistrict import DlgNewDistrict
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
-from .StatsModel import StatsModel
+from .StatsModel import RdsPlanMetricsModel
 from .ui.DistrictDataTable import Ui_qdwDistrictData
 
 
@@ -97,7 +97,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._model = DistrictDataModel(None, self)
         self.tblDataTable.setModel(self._model)
 
-        self._statsModel = StatsModel(None, self)
+        self._statsModel = RdsPlanMetricsModel(None, self)
         self.tblPlanStats.setModel(self._statsModel)
         self.tblPlanStats.verticalHeader()
         self.tblPlanStats.doubleClicked.connect(self.statsDoubleClicked)
@@ -159,7 +159,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             self.btnAddFields.setEnabled(True)
             self.btnRecalculate.setEnabled(True)
             self.lblPlanName.setText(self._plan.name)
-            self._statsModel.setStats(self._plan.stats)
+            self._statsModel.setStats(self._plan.metrics)
 
     def planChanged(self, name):
         self.lblPlanName.setText(name)

@@ -21,19 +21,28 @@ from uuid import (
 
 import pandas as pd
 from qgis.core import QgsVectorLayer
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
 from ..utils import tr
 from .base import (
-    DictFactory,
+    MISSING,
     Factory,
-    RdsBaseModel
+    KeyedList,
+    KeyedListFactory,
+    RdsBaseModel,
+    in_range,
+    not_empty,
+    rds_property
 )
 from .columns import (
     DistrictColumns,
     StatsColumns
 )
 from .District import (
+    DistrictList,
     RdsDistrict,
     RdsUnassigned
 )
@@ -42,37 +51,56 @@ from .Field import (
     RdsField,
     RdsGeoField
 )
-from .lists import (
-    KeyedList,
-    KeyedListFactory,
-    SortedKeyedList
-)
-from .prop import (
-    in_range,
-    not_empty,
-    rds_property
-)
 from .Splits import RdsSplits
 
 
-class RdsPlanStats(RdsBaseModel):
-    statsUpdating = pyqtSignal()
-    statsUpdated = pyqtSignal()
+class RdsPlanMetrics(RdsBaseModel):
+    metricsAboutToChange = pyqtSignal()
+    metricsChanged = pyqtSignal()
 
-    totalPopulation: int = 0
-    cutEdges: int = None
-    splits: dict[str, RdsSplits] = DictFactory
+    cutEdges: Union[int, None] = None
+    splits: KeyedList[RdsSplits] = KeyedListFactory
+
+    @overload
+    def __init__(self, plan: 'RdsPlan'):
+        ...
+
+    @overload
+    def __init__(self, cutEdges: Union[int, None] = None, splits: KeyedList[RdsSplits] = None):
+        ...
+
+    def __init__(self, planOrCutEdges: Union[int, 'RdsPlan'] = None, splits: KeyedList[RdsSplits] = MISSING, parent: Optional[QObject] = None):
+        if isinstance(planOrCutEdges, RdsPlan):
+            super().__init__(parent=parent)
+            self.plan = planOrCutEdges
+            self.updateGeoFields(self.plan.geoFields)
+        else:
+            super().__init__(cutEdges=planOrCutEdges, splits=splits, parent=parent)
 
     def __pre_init__(self):
-        self.districts: SortedKeyedList[RdsDistrict] = SortedKeyedList()
+        self.plan: 'RdsPlan' = None
+
+    @property
+    def totalPopulation(self) -> int:
+        return self.plan.totalPopulation
 
     @property
     def contiguous(self):
-        return any(d['pieces'] > 1 for d in self.districts[1:])  # pylint: disable=not-an-iterable
+        if len(self.plan.districts) == 1:
+            return True
+
+        return not any(d['pieces'] > 1 for d in self.plan.districts[1:])  # pylint: disable=not-an-iterable
+
+    @property
+    def complete(self):
+        fiter = self.plan.assignLayer.getFeatures(f"{self.plan.distField} IS NULL OR {self.plan.distField} = 0")
+        _, hasUnassigned = fiter.nextFeature()
+        return not hasUnassigned
 
     # stats
+
     def _avgScore(self, score: str) -> Union[float, None]:
-        values = self.districts[1:, score]
+        values = self.plan.districts[1:, score]
         try:
             return mean(v for v in values if v is not None)  # pylint: disable=not-an-iterable
         except StatisticsError:
@@ -85,20 +113,18 @@ class RdsPlanStats(RdsBaseModel):
         return super().__getattr__(name)
 
     def updateGeoFields(self, geoFields: list[RdsGeoField]):
-        self.statsUpdating.emit()
-        splits: dict[str, RdsSplits] = {}
+        self.metricsAboutToChange.emit()
+        splits: KeyedList[RdsSplits] = KeyedList()
         for f in geoFields:
-            splits[f.field] = RdsSplits(f.field)
+            split = RdsSplits(f)
             if f.field in self.splits:
-                splits[f.field].setData(self.splits[f.field].data)
+                split.setData(self.splits[f.field].data)
+            splits.append(split)
         self.splits = splits
-        self.statsUpdated.emit()
+        self.metricsChanged.emit()
 
-    def updateStats(self, totalPopulation, cutEdges, splits: dict[str, pd.DataFrame]):
-        self.statsUpdating.emit()
-        if totalPopulation is not None:
-            self.totalPopulation = totalPopulation
-
+    def updateMetrics(self, cutEdges: int, splits: dict[str, pd.DataFrame]):
+        self.metricsAboutToChange.emit()
         if cutEdges is not None:
             self.cutEdges = cutEdges
 
@@ -108,7 +134,8 @@ class RdsPlanStats(RdsBaseModel):
                     self.splits[f] = RdsSplits(f, split)
                 else:
                     self.splits[f].setData(split)
-        self.statsUpdated.emit()
+
+        self.metricsChanged.emit()
 
 
 class RdsPlan(RdsBaseModel):
@@ -125,7 +152,7 @@ class RdsPlan(RdsBaseModel):
     districtAdded = pyqtSignal("PyQt_PyObject")  # district
     districtRemoved = pyqtSignal("PyQt_PyObject")  # district
     districtDataChanged = pyqtSignal("PyQt_PyObject")  # district
-    statisticsChanged = pyqtSignal()
+    metricsChanged = pyqtSignal()
     validChanged = pyqtSignal()
 
     def _validLayer(self, layer: Optional[QgsVectorLayer]):
@@ -143,10 +170,11 @@ class RdsPlan(RdsBaseModel):
         private=True, strict=True, default=0.0, notify=deviationChanged
     )
 
-    districts: SortedKeyedList[RdsDistrict] = rds_property(
-        private=True, fset=rds_property.set_list, serialize=False, factory=SortedKeyedList
+    districts: DistrictList = rds_property(
+        private=True, fset=rds_property.set_list, serialize=False, factory=DistrictList
     )
-    stats: RdsPlanStats = Factory[RdsPlanStats](RdsPlanStats, False)
+    metrics: RdsPlanMetrics = Factory[RdsPlanMetrics](RdsPlanMetrics)
+    totalPopulation: int = 0
 
     geoLayer: QgsVectorLayer = rds_property(private=True, fvalid=_validLayer, default=None)
     geoJoinField: str = None
@@ -181,11 +209,13 @@ class RdsPlan(RdsBaseModel):
         self._geoFields: KeyedList[RdsGeoField] = KeyedList()
 
     def __post_init__(self, **kwargs):
-        self.stats.districts = self.districts
-        self.stats.statsUpdated.connect(self.statisticsChanged)  # pylint: disable=no-member
-        self.blockSignals(True)
-        self.districts.append(self.createDistrict(0, unassigned=True))
-        self.blockSignals(False)
+        self.districts.append(self.createDistrict(0))
+
+        if self.metrics.plan is None:
+            self.metrics.plan = self
+            self.metrics.updateGeoFields(self.geoFields)  # pylint: disable=no-member
+
+        self.metrics.metricsChanged.connect(self.metricsChanged)  # pylint: disable=no-member
 
     @name.setter
     def name(self, value: str):
@@ -242,7 +272,7 @@ class RdsPlan(RdsBaseModel):
     def geoFields(self, geoFields: Iterable[RdsGeoField]):
         self._geoFields.clear()
         self._geoFields.extend(geoFields)
-        self.stats.updateGeoFields(self._geoFields)  # pylint: disable=no-member
+        self.metrics.updateGeoFields(self._geoFields)  # pylint: disable=no-member
 
     @rds_property(fvalid=_validLayer)
     def popLayer(self) -> QgsVectorLayer:
@@ -303,12 +333,8 @@ class RdsPlan(RdsBaseModel):
             self._geoIdCaption = value
 
     @property
-    def totalPopulation(self):
-        return self.stats.totalPopulation  # pylint: disable=no-member
-
-    @property
     def idealPopulation(self):
-        return round(self.stats.totalPopulation / self.numSeats)  # pylint: disable=no-member
+        return round(self.totalPopulation / self.numSeats)  # pylint: disable=no-member
 
     @property
     def allocatedDistricts(self):
@@ -336,11 +362,11 @@ class RdsPlan(RdsBaseModel):
         cols.extend(list(StatsColumns))
         return cols
 
-    def createDistrict(self, district: int, name: str = '', members: int = 1, description: str = '', unassigned: bool = False):
+    def createDistrict(self, district: int, name: str = '', members: int = 1, description: str = ''):
         cols = dict(zip(self.districtColumns, repeat(0)))
         cols['description'] = description
 
-        if unassigned:
+        if district == 0:
             del cols[DistrictColumns.DISTRICT]
             del cols[DistrictColumns.NAME]
             del cols[DistrictColumns.MEMBERS]
@@ -386,6 +412,11 @@ class RdsPlan(RdsBaseModel):
             district.membersChanged.disconnect(self.districtUpdated)
             self.districts.remove(district)  # pylint: disable=no-member
             self.districtRemoved.emit(district)
+
+    def updateMetrics(self, totalPopulation, cutEdges, splitsData):
+        if totalPopulation is not None:
+            self.totalPopulation = totalPopulation
+        self.metrics.updateMetrics(cutEdges, splitsData)  # pylint: disable=no-member
 
     def isValid(self):
         """Test whether plan meets minimum specifications for use"""

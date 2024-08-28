@@ -27,9 +27,8 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QObject
 
-from redistricting.models.prop import rds_property
-
-from .base import RdsBaseModel
+from .model import RdsBaseModel
+from .prop import rds_property
 
 serializers = {
     UUID: str,

@@ -26,7 +26,10 @@ from __future__ import annotations
 
 import csv
 from contextlib import closing
-from typing import TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Union
+)
 
 from qgis.core import (
     QgsExpression,
@@ -43,7 +46,7 @@ from qgis.core import (
     QgsVectorLayer,
     QgsWkbTypes
 )
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QMetaType
 from qgis.utils import spatialite_connect
 
 from redistricting.models.columns import DistrictColumns
@@ -54,6 +57,7 @@ from ._debug import debug_thread
 
 if TYPE_CHECKING:
     from ...models import (
+        RdsDataField,
         RdsField,
         RdsPlan
     )
@@ -118,9 +122,9 @@ class ExportRedistrictingPlanTask(QgsTask):
             'name': 'name',
             'members': 'members'
         }
-        fields.append(QgsField(fieldNames[self.distField], QVariant.Int))
-        fields.append(QgsField('name', QVariant.String, 'String', 127))
-        fields.append(QgsField("members", QVariant.Int))
+        fields.append(QgsField(fieldNames[self.distField], QMetaType.Int))
+        fields.append(QgsField('name', QMetaType.QString, 'QString', 127))
+        fields.append(QgsField("members", QMetaType.Int))
 
         if self.includeDemographics:
             fieldNames |= {
@@ -128,47 +132,49 @@ class ExportRedistrictingPlanTask(QgsTask):
                 'deviation': 'deviation',
                 'pct_deviation': 'pct_dev'
             }
-            fields.append(QgsField('population', QVariant.LongLong, 'Integer64', 18, 0))
-            fields.append(QgsField('deviation', QVariant.Double))
-            fields.append(QgsField('pct_dev', QVariant.Double))
+            fields.append(QgsField('population', QMetaType.LongLong, 'Integer64', 18, 0))
+            fields.append(QgsField('deviation', QMetaType.Double))
+            fields.append(QgsField('pct_dev', QMetaType.Double))
 
             for f in self.popFields:
+                f.prepare(context)
                 fn = f.fieldName
                 fieldNames[fn] = makeDbfFieldName(fn, fields)
-                field = f.makeQgsField(context, name=fieldNames[fn])
-                if field.type() in (QVariant.LongLong, QVariant.ULongLong):
+                field = f.makeQgsField(fieldNames[fn])
+                if field.type() in (QMetaType.LongLong, QMetaType.ULongLong, QMetaType.Long):
                     field.setTypeName('Integer64')
                     field.setLength(20)
                     field.setPrecision(0)
                 fields.append(field)
 
             for f in self.dataFields:
+                f.prepare(context)
                 fn = f.fieldName
                 fieldNames[fn] = makeDbfFieldName(fn, fields)
-                field = f.makeQgsField(context, name=fieldNames[fn])
-                if field.type() in (QVariant.LongLong, QVariant.ULongLong):
+                field = f.makeQgsField(fieldNames[fn])
+                if field.type() in (QMetaType.LongLong, QMetaType.ULongLong, QMetaType.Long):
                     field.setTypeName('Integer64')
                     field.setLength(20)
                     field.setPrecision(0)
                 fields.append(field)
-                if f.pctbase:
+                if f.pctBase:
                     fn = f'pct_{f.fieldName}'
                     fieldNames[fn] = makeDbfFieldName(f'p_{f.fieldName}', fields)
-                    fields.append(QgsField(fieldNames[fn], QVariant.Double))
+                    fields.append(QgsField(fieldNames[fn], QMetaType.Double))
 
         if self.includeMetrics:
-            fields.append(QgsField('polsbypop', QVariant.Double))
-            fields.append(QgsField('reock', QVariant.Double))
-            fields.append(QgsField('convexhull', QVariant.Double))
             fieldNames |= {
                 'polsbypopper': 'polsbypop',
                 'reock': 'reock',
                 'convexhull': 'convexhull'
             }
+            fields.append(QgsField('polsbypop', QMetaType.Double))
+            fields.append(QgsField('reock', QMetaType.Double))
+            fields.append(QgsField('convexhull', QMetaType.Double))
         return fields, fieldNames
 
     def _createDistrictsMemoryLayer(self):
-        def fieldByName(fieldName, fieldList: list[RdsField]):
+        def fieldByName(fieldName, fieldList: list[RdsField]) -> Union[RdsField, RdsDataField]:
             for f in fieldList:
                 if f.field == fieldName:
                     return f
@@ -207,7 +213,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 for srcFld in fieldNames:
                     if srcFld[:3] == "pct" and srcFld != DistrictColumns.PCT_DEVIATION:
                         basefld = srcFld[4:]
-                        pctbase = fieldByName(basefld, self.dataFields)
+                        pctbase = fieldByName(basefld, self.dataFields).pctBase
                         if pctbase == self.popField:
                             pctbase = DistrictColumns.POPULATION
                         if dist[basefld] is None or not dist[pctbase]:

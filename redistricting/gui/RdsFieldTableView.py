@@ -79,9 +79,9 @@ class FieldListModel(QAbstractTableModel):
     def __init__(self, fields: list[RdsField] = None, popFields: list[RdsField] = None, parent=None):
         super().__init__(parent)
         if fields is None:
-            self._data: list[RdsField] = []
+            self._data: list[Union[RdsField, RdsDataField]] = []
         else:
-            self._data: list[RdsField] = fields[:]
+            self._data: list[Union[RdsField, RdsDataField]] = fields[:]
 
         self.popFields = popFields
         self._colCount = 3
@@ -118,15 +118,15 @@ class FieldListModel(QAbstractTableModel):
         self.setColCount(5 if self._fieldType == RdsDataField else 3)
 
     @property
-    def popFields(self) -> list[RdsField]:
+    def popFields(self) -> dict[str, RdsField]:
         return self._popFields
 
     @popFields.setter
     def popFields(self, value: list[RdsField]):
         if value is None:
-            self._popFields: list[RdsField] = []
+            self._popFields: dict[str, RdsField] = []
         else:
-            self._popFields = value
+            self._popFields = {fld.field: fld for fld in value}
 
     def setColCount(self, value):
         if value != self._colCount:
@@ -159,9 +159,9 @@ class FieldListModel(QAbstractTableModel):
             elif col == 1:
                 value = self._data[row].caption
             elif col == 3:
-                pctbase = self._data[row].pctbase
+                pctbase = self._data[row].pctBase
                 if pctbase and pctbase in self.popFields:
-                    value = self.popFields[self._data[row].pctbase].caption
+                    value = self.popFields[self._data[row].pctBase].caption
                 else:
                     value = QVariant()
             else:
@@ -178,7 +178,7 @@ class FieldListModel(QAbstractTableModel):
             if col == self._colCount - 1:
                 value = QVariant()
             elif col == 2:
-                value = Qt.Checked if field.sum else Qt.Unchecked
+                value = Qt.Checked if field.sumField else Qt.Unchecked
             else:
                 value = QVariant()
         elif role == Qt.TextAlignmentRole:
@@ -193,11 +193,11 @@ class FieldListModel(QAbstractTableModel):
                     'Redistricting', 'Click to delete field {field}').format(field=field.fieldName)
             elif col == 2:
                 value = QCoreApplication.translate('Redistricting', 'Display sum for field {field} is {checkstate}'). \
-                    format(field=field.fieldName, checkstate='checked' if field.sum else 'unchecked')
+                    format(field=field.fieldName, checkstate='checked' if field.sumField else 'unchecked')
             elif col == 3:
-                pctbase = self._data[row].pctbase
+                pctbase = self._data[row].pctBase
                 if pctbase and pctbase in self.popFields:
-                    basefield = self.popFields[self._data[row].pctbase].caption
+                    basefield = self.popFields[self._data[row].pctBase].caption
                 else:
                     basefield = None
                 if basefield is None:
@@ -245,12 +245,12 @@ class FieldListModel(QAbstractTableModel):
 
             if index.column() == 3:
                 if 0 <= value < len(self._popFields):
-                    field.pctbase = self._popFields[value].fieldName
+                    field.pctBase = self._popFields[value].fieldName
                     return True
 
         if role == Qt.CheckStateRole:
             if index.column() == 2:
-                field.sum = bool(value)
+                field.sumField = bool(value)
                 return True
 
         return False
@@ -276,13 +276,13 @@ class FieldListModel(QAbstractTableModel):
 
         return f
 
-    def appendField(self, layer, field, isExpression=False, caption=None) -> Union[RdsField, RdsDataField, None]:
+    def appendField(self, layer, field, caption=None) -> Union[RdsField, RdsDataField, None]:
         for f in self._data:
             if f.field == field:
                 return None
 
         try:
-            fld = self._fieldType(layer, field, isExpression, caption)
+            fld = self._fieldType(layer, field, caption)
         except RdsException as e:
             iface.messageBar().pushMessage(tr('Error'), str(e), level=Qgis.Critical)
             return None

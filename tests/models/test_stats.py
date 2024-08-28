@@ -20,7 +20,7 @@ from pytest_mock import MockerFixture
 
 from redistricting.models.columns import StatsColumns
 from redistricting.models.Field import RdsGeoField
-from redistricting.models.Plan import RdsPlanStats
+from redistricting.models.Plan import RdsPlanMetrics
 
 # pylint: disable=protected-access
 
@@ -32,9 +32,7 @@ class TestPlanStats:
         districts.__getitem__.return_value = [0.5]
         geofields = type(mock_plan).geoFields
         geofields.__iter__.return_value = [mocker.create_autospec(spec=RdsGeoField, instance=True)]
-        stats = RdsPlanStats()
-        stats.districts = mock_plan.districts
-        stats.updateGeoFields(geofields)
+        stats = RdsPlanMetrics(mock_plan)
         assert stats.cutEdges is None
         for f in StatsColumns.CompactnessScores():
             assert getattr(stats, f) == 0.5

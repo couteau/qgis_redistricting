@@ -33,6 +33,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
+    DeltaList,
     DistrictColumns,
     RdsDataField,
     RdsField,
@@ -46,29 +47,33 @@ class DeltaListModel(QAbstractTableModel):
         super().__init__(parent)
         self._plan = None
         self._fields = []
-        self._delta = None
+        self._delta: DeltaList = None
 
-    def setPlan(self, plan: RdsPlan):
+    def setDelta(self, plan: RdsPlan, delta: DeltaList):
         if plan != self._plan:
             self.beginResetModel()
-            if self._plan:
+            if self._plan is not None:
                 self._plan.popFieldChanged.disconnect(self.updateFields)
                 self._plan.popFieldsChanged.disconnect(self.updateFields)
                 self._plan.dataFieldsChanged.disconnect(self.updateFields)
+            if self._delta is not None:
                 self._delta.updateStarted.disconnect(self.startUpdate)
                 self._delta.updateComplete.disconnect(self.endUpdate)
+
             self._plan = plan
-            if self._plan:
+            self._delta = delta
+
+            if self._plan is not None:
                 self._plan.popFieldChanged.connect(self.updateFields)
                 self._plan.popFieldsChanged.connect(self.updateFields)
                 self._plan.dataFieldsChanged.connect(self.updateFields)
-                self._delta = self._plan.delta
                 self.updateFields()
+            else:
+                self._fields = []
+
+            if self._delta is not None:
                 self._delta.updateStarted.connect(self.startUpdate)
                 self._delta.updateComplete.connect(self.endUpdate)
-            else:
-                self._delta = None
-                self._fields = []
 
             self.endResetModel()
 
@@ -137,7 +142,7 @@ class DeltaListModel(QAbstractTableModel):
                 })
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._delta) if self._delta and not parent.isValid() else 0
+        return len(self._delta) if self._delta is not None and not parent.isValid() else 0
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._fields) if not parent.isValid() else 0
@@ -165,10 +170,8 @@ class DeltaListModel(QAbstractTableModel):
 
         return QVariant()
 
-    def startUpdate(self, plan):
-        if plan == self._plan:
-            self.beginResetModel()
+    def startUpdate(self):
+        self.beginResetModel()
 
-    def endUpdate(self, plan):
-        if plan == self._plan:
-            self.endResetModel()
+    def endUpdate(self):
+        self.endResetModel()
