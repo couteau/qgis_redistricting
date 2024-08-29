@@ -13,7 +13,7 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import pyqtBoundSignal
 
-from redistricting.models.base.serialize import deserialize_model
+from redistricting.models.base.serialize import deserialize
 from redistricting.models.Plan import RdsPlan
 from redistricting.services.DistrictIO import DistrictReader
 from redistricting.services.PlanBuilder import PlanBuilder
@@ -100,19 +100,17 @@ def minimal_plan():
 
 @pytest.fixture
 def valid_plan(minimal_plan: RdsPlan, block_layer, plan_gpkg_path):
-    # pylint: disable=protected-access
     minimal_plan.geoLayer = block_layer
     minimal_plan.geoIdField = 'geoid'
     minimal_plan.popField = 'pop_total'
-    # pylint: enable=protected-access
     minimal_plan.addLayersFromGeoPackage(plan_gpkg_path)
     QgsProject.instance().addMapLayers([minimal_plan.distLayer, minimal_plan.assignLayer], False)
     return minimal_plan
 
 
 @pytest.fixture
-def plan(block_layer, assign_layer, dist_layer):
-    p: RdsPlan = deserialize_model(RdsPlan, {
+def plan(qgis_parent, block_layer, assign_layer, dist_layer):
+    p: RdsPlan = deserialize(RdsPlan, {
         'name': 'test',
         'deviation': 0.025,
         'geo-layer': block_layer.id(),
@@ -150,7 +148,7 @@ def plan(block_layer, assign_layer, dist_layer):
              'caption': 'VTD'}
         ],
         'total-population': 227036,
-    }, None)
+    }, parent=qgis_parent)
 
     r = DistrictReader(dist_layer, popField='pop_total')
     for d in r.readFromLayer():
@@ -163,7 +161,7 @@ def plan(block_layer, assign_layer, dist_layer):
 
 
 @pytest.fixture
-def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
+def new_plan(block_layer: QgsVectorLayer, datadir: pathlib.Path, mocker: MockerFixture):
     dst = datadir / 'tuscaloosa_new_plan.gpkg'
 
     b = PlanBuilder()
@@ -184,7 +182,8 @@ def new_plan(block_layer, datadir: pathlib.Path, mocker: MockerFixture):
     del b
 
     p.addLayersFromGeoPackage(dst)
-    p.metrics.updateMetrics(227036, None, None)
+    QgsProject.instance().addMapLayers([p.distLayer, p.assignLayer], False)
+    p.updateMetrics(227036, None, None)
 
     yield p
 

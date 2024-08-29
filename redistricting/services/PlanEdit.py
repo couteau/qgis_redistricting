@@ -47,8 +47,8 @@ from ..models import (
     RdsDataField,
     RdsField,
     RdsGeoField,
-    deserialize_model,
-    serialize_model
+    deserialize,
+    serialize
 )
 from ..utils import tr
 from .BasePlanBuilder import BasePlanBuilder
@@ -275,10 +275,10 @@ class PlanEditor(BasePlanBuilder):
         return self._plan
 
     def startPlanUpdate(self):
-        self._oldvalues = serialize_model(self._plan)
+        self._oldvalues = serialize(self._plan)
 
     def endPlanUpdate(self):
-        newvalues = serialize_model(self._plan)
+        newvalues = serialize(self._plan)
         modifiedFields = {
             k for k in newvalues if k not in self._oldvalues or newvalues[k] != self._oldvalues[k]
         }
@@ -329,19 +329,19 @@ class PlanEditor(BasePlanBuilder):
 
         self._plan.popFields.clear()
         for field in self._oldvalues.get('pop-fields', []):
-            f = deserialize_model(RdsField, field)
+            f = deserialize(RdsField, field)
             if f:
                 self._plan.popFields.append(f)
 
         self._plan.dataFields.clear()
         for field in self._oldvalues.get('data-fields', []):
-            f = deserialize_model(RdsDataField, field)
+            f = deserialize(RdsDataField, field)
             if f:
                 self._plan.dataFields.append(f)
 
         self._plan._geoFields.clear()
         for field in self._oldvalues.get('geo-fields', []):
-            f = deserialize_model(RdsGeoField, field)
+            f = deserialize(RdsGeoField, field)
             if f:
                 self._plan.geoFields.append(f)
 

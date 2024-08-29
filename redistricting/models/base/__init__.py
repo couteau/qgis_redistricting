@@ -17,6 +17,6 @@ from .prop import (
     rds_property
 )
 from .serialize import (
-    deserialize_model,
-    serialize_model
+    deserialize,
+    serialize
 )

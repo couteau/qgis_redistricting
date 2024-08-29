@@ -9,6 +9,7 @@ from typing import (
 
 from packaging import version
 from qgis.core import (
+    QgsExpression,
     QgsProject,
     QgsVectorLayer
 )
@@ -368,6 +369,24 @@ def migrateSchema1_0_2_to_1_0_3(data: dict[str, Any]):
 
 
 def migrateSchema1_0_3_to_1_0_4(data: dict[str, Any]):
+    def addKeyField(fld: dict[str, Any]):
+        l: QgsVectorLayer = QgsProject.instance().mapLayer(fld.get('layer'))
+        if l is None:
+            return
+
+        index = QgsExpression.expressionToLayerFieldIndex(fld.get('field'), l)
+        if index == -1:
+            return
+
+        relations = l.referencingRelations(index)
+        if not relations:
+            return
+        rel = relations[0]
+        refi = rel.referencedFields()
+        if len(refi) != 1:
+            return
+        fld['name-field']['key-field'] = l.fields().field(refi[0]).name()
+
     if 'geo-layer' not in data and 'pop-layer' in data:
         data['geo-layer'] = data['pop-layer']
         del data['pop-layer']
@@ -375,6 +394,8 @@ def migrateSchema1_0_3_to_1_0_4(data: dict[str, Any]):
     for field in data.get('geo-fields', []):
         if 'expression' in field:
             del field['expression']
+        if 'name-field' in field and 'key-field' not in field['name-field']:
+            addKeyField(field)
 
     for field in data.get('pop-fields', []):
         if 'expression' in field:

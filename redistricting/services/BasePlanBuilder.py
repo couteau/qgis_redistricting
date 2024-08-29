@@ -297,7 +297,7 @@ class BasePlanBuilder(PlanValidator):
             if not self._checkNotDuplicate(f, l):
                 raise ValueError(tr('RdsField list contains duplicate fields'))
 
-            f.setLayer(self._popLayer)
+            f.layer = self._popLayer
             l.append(f)
         self._dataFields = l
         return self
@@ -386,7 +386,7 @@ class BasePlanBuilder(PlanValidator):
             if not self._checkNotDuplicate(f, l):
                 raise ValueError(tr('RdsField list contains duplicate fields'))
 
-            f.setLayer(self._geoLayer)
+            f.layer = self._geoLayer
             l.append(f)
 
         self._geoFields = l

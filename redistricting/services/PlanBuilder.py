@@ -42,8 +42,8 @@ from qgis.PyQt.QtCore import (
 
 from ..models import (
     RdsPlan,
-    deserialize_model,
-    serialize_model
+    deserialize,
+    serialize
 )
 from ..utils import tr
 from .BasePlanBuilder import BasePlanBuilder
@@ -197,11 +197,11 @@ class PlanBuilder(BasePlanBuilder):
             'pop-field': self._popField,
             'geo-layer': self._geoLayer.id(),
             'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
-            'pop-fields': [serialize_model(field) for field in self._popFields],
-            'data-fields': [serialize_model(field) for field in self._dataFields],
-            'geo-fields': [serialize_model(field) for field in self._geoFields],
+            'pop-fields': [serialize(field) for field in self._popFields],
+            'data-fields': [serialize(field) for field in self._dataFields],
+            'geo-fields': [serialize(field) for field in self._geoFields],
         }
-        plan = deserialize_model(RdsPlan, {k: v for k, v in data.items() if v is not None}, planParent)
+        plan = deserialize(RdsPlan, {k: v for k, v in data.items() if v is not None}, parent=planParent)
 
         self.createAttributeIndices()
 

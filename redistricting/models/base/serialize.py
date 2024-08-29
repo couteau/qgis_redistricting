@@ -64,30 +64,13 @@ def kebab_dict(kw: Iterable[tuple[str, Any]]):
     return {to_kebabcase(k): v for k, v in kw}
 
 
-_SEEN = object()
+_memo = object()
 
 
-def serialize_model(obj, seen=None, exclude_none=True):
-    """Right now we just ignore already seen objects to avoid recursion.
+def serialize_model(obj, memo=None, exclude_none=True):
+    """Right now we just ignore already memo objects to avoid recursion.
     TODO: come up with a way to cross-reference
     """
-    def serialize_value(value, seen: list[Any]):
-        if not id(value) in seen:
-            if isinstance(value, RdsBaseModel):
-                seen[id(value)] = serialize_model(value, seen, exclude_none)
-            elif isinstance(value, Mapping):
-                seen[id(value)] = {k: serialize_value(v, seen) for k, v in value.items()}
-            elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
-                seen[id(value)] = [serialize_value(v, seen) for v in value]
-            elif type(value) in serializers:
-                seen[id(value)] = serializers[type(value)](value)
-            else:
-                seen[id(value)] = value
-
-        return seen[id(value)]
-
-    if seen is None:
-        seen = {id(obj): obj}
 
     d = {}
     fields = get_type_hints(type(obj))
@@ -97,39 +80,39 @@ def serialize_model(obj, seen=None, exclude_none=True):
                 continue
 
             if callable(prop.serialize):
-                value = prop.serialize(value)
-                if value in seen:
-                    value = _SEEN
-                else:
-                    seen[id] = value
+                value = prop.serialize(value, memo)
             else:
-                value = serialize_value(getattr(obj, f), seen)
+                value = serialize_value(getattr(obj, f), memo)
         else:
-            value = serialize_value(getattr(obj, f), seen)
+            value = serialize_value(getattr(obj, f), memo)
 
-        if value is not _SEEN and (value is not None or not exclude_none):
+        if value is not _memo and (value is not None or not exclude_none):
             d[f] = value
 
     return kebab_dict(d.items())
 
 
-def deserialize_value(t: type, value: Any, *args):
-    if value is None:
-        return None
-
-    if issubclass(t, RdsBaseModel):
-        if issubclass(t, Generic) and args:
-            value = deserialize_model(t[args], value)
+def serialize_value(value, memo: dict[int, Any], exclude_none=True):
+    if not id(value) in memo:
+        if isinstance(value, RdsBaseModel):
+            memo[id(value)] = serialize_model(value, memo, exclude_none)
+        elif isinstance(value, Mapping):
+            memo[id(value)] = {k: serialize_value(v, memo) for k, v in value.items()}
+        elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+            memo[id(value)] = [serialize_value(v, memo) for v in value]
+        elif type(value) in serializers:
+            memo[id(value)] = serializers[type(value)](value)
         else:
-            value = deserialize_model(t, value)
-    elif issubclass(t, Mapping):
-        value = t(deserialize_iterable(value, *args))
-    elif issubclass(t, Iterable) and t not in (str, bytes):
-        value = t(deserialize_iterable(value, *args))
-    elif t in deserializers:
-        value = deserializers[t](value)
+            memo[id(value)] = value
 
-    return value
+    return memo[id(value)]
+
+
+def serialize(obj: Any, memo: dict[int, Any] = None, exclude_none=True):
+    if memo is None:
+        memo = {}
+
+    return serialize_value(obj, memo, exclude_none)
 
 
 def deserialize_iterable(value: Iterable, *args):
@@ -170,12 +153,6 @@ _ModelType = TypeVar("_ModelType", bound=RdsBaseModel)
 
 def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
     kw = {}
-    if isinstance(cls, (_GenericAlias, GenericAlias)):
-        cls_args = get_args(cls)
-        cls = get_origin(cls)  # pylint: disable=self-cls-assignment
-        cls_anns = dict(zip(cls.__parameters__, cls_args))
-    else:
-        cls_anns = {}
 
     fields = get_type_hints(cls)
 
@@ -187,23 +164,51 @@ def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optio
             continue
 
         if t is not None:
-            if isinstance(t, (_GenericAlias, GenericAlias)):
-                if isinstance(t, _UnionGenericAlias):
-                    # type is Optional or Union
-                    t = get_args(t)[0]
-                    args = ()
-                else:
-                    args = get_args(t)
-                    t = get_origin(t)
-                    if t is Annotated:
-                        t = args[0]
-                        args = ()
-                    else:
-                        args = tuple(cls_anns[a] if a in cls_anns else a for a in args)
-            else:
-                args = ()
-            v = deserialize_value(t, v, *args)
+            v = deserialize_value(t, v)
 
         kw[f] = v
 
     return cls(**kw, parent=parent)
+
+
+def deserialize_value(t: type, value: Any, **kw):
+    if value is None:
+        return None
+
+    if isinstance(t, (_GenericAlias, GenericAlias)):
+        if isinstance(t, _UnionGenericAlias):
+            # type is Optional or Union
+            t = get_args(t)[0]
+            args = ()
+        else:
+            args = get_args(t)
+            t = get_origin(t)
+            if t is Annotated:
+                t = args[0]
+                args = ()
+    else:
+        args = ()
+        cls_anns = {}
+
+    if issubclass(t, RdsBaseModel):
+        if issubclass(t, Generic) and args:
+            cls_anns = dict(zip(t.__parameters__, args))
+            args = tuple(cls_anns[a] if a in cls_anns else a for a in args)
+            value = deserialize_model(t[args], value, **kw)
+        else:
+            value = deserialize_model(t, value, **kw)
+    elif issubclass(t, Mapping):
+        value = t(deserialize_iterable(value, *args))
+    elif issubclass(t, Iterable) and t not in (str, bytes):
+        value = t(deserialize_iterable(value, *args))
+    elif t in deserializers:
+        value = deserializers[t](value)
+
+    return value
+
+
+T = TypeVar("T")
+
+
+def deserialize(t: type[T], value: Any, **kw) -> T:
+    return deserialize_value(t, value, **kw)

@@ -109,7 +109,7 @@ class rds_property(property):
         factory: Callable[[Any], Any] = MISSING,
         strict: bool = False,
         init: bool = True,
-        serialize: bool = True
+        serialize: Union[bool, Callable[[Any, dict], Any]] = True
     ):
         if fset is rds_property.set_list:
             fset = self.set_list

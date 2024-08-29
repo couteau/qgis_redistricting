@@ -16,12 +16,12 @@ from redistricting.models import (
 from redistricting.models.base import (
     Factory,
     RdsBaseModel,
-    deserialize_model,
+    deserialize,
     get_real_type,
     in_range,
     not_empty,
     rds_property,
-    serialize_model
+    serialize
 )
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
@@ -43,14 +43,22 @@ class TestBaseModel:
 
     def test_serialize(self):
         inst = TestBaseModel.ModelTest()
-        data = serialize_model(inst)
+        data = serialize(inst)
         assert data == {"prop1": "default", "prop2": 1}
 
     def test_deserialize(self):
         data = {"prop1": "string", "prop2": -1}
-        inst = deserialize_model(TestBaseModel.ModelTest, data)
+        inst = deserialize(TestBaseModel.ModelTest, data)
         assert inst.prop1 == "string"
         assert inst.prop2 == -1
+
+    def test_deserialize_with_parent(self):
+        parent = QObject()
+        data = {"prop1": "string", "prop2": -1}
+        inst = deserialize(TestBaseModel.ModelTest, data, parent=parent)
+        assert inst.prop1 == "string"
+        assert inst.prop2 == -1
+        assert inst.parent() == parent
 
     def test_init_with_init(self):
         class ModelTest2(RdsBaseModel):
@@ -66,7 +74,7 @@ class TestBaseModel:
             prop1: str = "default"
             prop2: int = 1
 
-        inst = deserialize_model(ModelTest3, {"prop1": "string", "prop2": -1}, None)
+        inst = deserialize(ModelTest3, {"prop1": "string", "prop2": -1})
         assert inst.prop1 == "string"
         assert inst.prop2 == -1
 
@@ -75,7 +83,7 @@ class TestBaseModel:
             prop1: str
             prop2: int = -1
 
-        inst = deserialize_model(ModelTest4, {"prop1": "value"}, None)
+        inst = deserialize(ModelTest4, {"prop1": "value"})
         assert inst.prop1 == "value"
         assert inst.prop2 == -1
 
@@ -85,7 +93,7 @@ class TestBaseModel:
             prop2: list[int] = [1]
 
         inst = ModelTest5()
-        data = serialize_model(inst)
+        data = serialize(inst)
         assert data == {"prop1": "default", "prop2": [1]}
 
     def test_deserialize_with_list(self):
@@ -93,7 +101,7 @@ class TestBaseModel:
             prop1: str = "default"
             prop2: list[int] = [1]
 
-        inst = deserialize_model(ModelTest6, {"prop1": "string", "prop2": [-1]}, None)
+        inst = deserialize(ModelTest6, {"prop1": "string", "prop2": [-1]})
         assert inst.prop1 == "string"
         assert inst.prop2 == [-1]
 

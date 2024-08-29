@@ -23,7 +23,10 @@
  ***************************************************************************/
 """
 import re
-from typing import Union
+from typing import (
+    Union,
+    overload
+)
 
 from qgis.core import (
     QgsApplication,
@@ -31,6 +34,7 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
+    QgsFeatureRequest,
     QgsField,
     QgsVectorLayer
 )
@@ -193,26 +197,50 @@ class RdsField(RdsBaseModel):
         return QgsField(name, t)
 
 
-class RdsGeoField(RdsField):
-    def _createNameField(self):
-        l = self.getRelatedLayer()
-        if l is None:
+class RdsRelatedField(RdsField):
+    keyField: str = None
+
+    def getRelatedValue(self, key):
+        if self.keyField is None:
             return None
 
+        if not self._prepared:
+            self.prepare()
+
+        req = QgsFeatureRequest(QgsExpression(f'{self.keyField} = {key!r}'), self._context)
+        f = next(self.layer.getFeatures(req), None)
+
+        if f is None:
+            return None
+
+        return self.getValue(f)
+
+
+class RdsGeoField(RdsField):
+    def _createNameField(self):
+        rel = self.getRelation()
+        if not rel:
+            return None
+        l = rel.referencedLayer()
+        k = rel.referencedFields()
+        if len(k) > 1:
+            return None
+        keyField = l.fields().field(k[0]).name()
+
         if l.fields().lookupField("name") != -1:
-            nameField = RdsField(l, "name")
-        elif self.layer.fields().lookupField(l, "name30") != -1:
-            nameField = RdsField(l, "name30")
-        elif self.layer.fields().lookupField("name20") != -1:
-            nameField = RdsField(l, "name20")
+            nameField = RdsRelatedField(l, "name", keyField=keyField)
+        elif self.layer.fields().lookupField(l, "name30", keyField=keyField) != -1:
+            nameField = RdsRelatedField(l, "name30", keyField=keyField)
+        elif self.layer.fields().lookupField("name20", keyField=keyField) != -1:
+            nameField = RdsRelatedField(l, "name20", keyField=keyField)
         elif self.layer.fields().lookupField("name10") != -1:
-            nameField = RdsField(l, "name10")
+            nameField = RdsRelatedField(l, "name10", keyField=keyField)
         else:
             nameField = None
 
         return nameField
 
-    nameField: RdsField = rds_property(private=True, factory=Factory(_createNameField))
+    nameField: RdsRelatedField = rds_property(private=True, factory=Factory(_createNameField))
 
     def getRelation(self):
         index = QgsExpression.expressionToLayerFieldIndex(self._field, self._layer)
@@ -230,11 +258,23 @@ class RdsGeoField(RdsField):
 
         return None
 
-    def getName(self, feature) -> str:
-        rel = self.getRelation()
-        f = rel.getReferencedFeature(feature)
-        if f is not None:
-            return self._nameField.getValue(f)
+    @overload
+    def getName(self, feature: QgsFeature) -> str:
+        ...
+
+    @overload
+    def getName(self, key: Union[str]) -> str:
+        ...
+
+    def getName(self, feature_or_key: Union[QgsFeature, str]) -> str:
+        if isinstance(feature_or_key, QgsFeature):
+            rel = self.getRelation()
+            if rel:
+                f = rel.getReferencedFeature(feature_or_key)
+                if f is not None:
+                    return self._nameField.getValue(f)
+        else:
+            return self._nameField.getRelatedValue(feature_or_key)
 
         return None
 

@@ -40,8 +40,8 @@ from ..models import (
     DistrictColumns,
     RdsPlan,
     StatsColumns,
-    deserialize_model,
-    serialize_model
+    deserialize,
+    serialize
 )
 from .DistrictIO import (
     DistrictReader,
@@ -121,7 +121,7 @@ class ProjectStorage:
     def writeRedistrictingPlans(self, plans: Iterable[RdsPlan]):
         l: List[str] = []
         for p in plans:
-            data = serialize_model(p)
+            data = serialize(p)
             jsonPlan = json.dumps(data)
             l.append(jsonPlan)
             self.writeDistricts(p)
@@ -140,7 +140,7 @@ class ProjectStorage:
                     planJson['geo-layer'] = planJson['pop-layer']
                     del planJson['pop-layer']
 
-                plan = deserialize_model(RdsPlan, planJson, parent=self._project)
+                plan = deserialize(RdsPlan, planJson, parent=self._project)
                 self.readDistricts(plan)
                 if plan is not None:
                     plans.append(plan)

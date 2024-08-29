@@ -26,7 +26,7 @@ from redistricting.models import (
     RdsField,
     RdsPlan
 )
-from redistricting.models.base.serialize import serialize_model
+from redistricting.models.base.serialize import serialize
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -147,7 +147,7 @@ class TestPlan:
         plan._setDistLayer(None)
 
     def test_serialize(self, plan: RdsPlan, block_layer, assign_layer, dist_layer):
-        data = serialize_model(plan)
+        data = serialize(plan)
         assert data == {
             'id': str(plan.id),
             'name': 'test',

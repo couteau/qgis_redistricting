@@ -248,7 +248,7 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
     def statsDoubleClicked(self, index: QModelIndex):
         row = index.row()
         if row >= 6:
-            field = self._plan.geoFields[row-6]
+            field = self._plan.geoFields[row-self._statsModel.SPLITS_OFFSET]
             if self._dlgSplits:
                 self._dlgSplits.geoField = field
             else:

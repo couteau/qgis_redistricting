@@ -3,7 +3,7 @@ from qgis.core import QgsProject
 
 from redistricting.models import (
     RdsPlan,
-    deserialize_model
+    deserialize
 )
 from redistricting.services import LayerTreeManager
 from redistricting.services.DistrictIO import DistrictReader
@@ -19,7 +19,7 @@ class TestLayerTreeManager:
 
     @pytest.fixture
     def plan2(self, block_layer, assign_layer, dist_layer):
-        p: RdsPlan = deserialize_model(RdsPlan, {
+        p: RdsPlan = deserialize(RdsPlan, {
             'name': 'test2',
             'deviation': 0.025,
             'geo-layer': block_layer.id(),
@@ -60,7 +60,7 @@ class TestLayerTreeManager:
                 'total-population': 227036,
             }
 
-        }, None)
+        })
 
         r = DistrictReader(dist_layer, popField='pop_total')
         for d in r.readFromLayer():

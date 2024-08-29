@@ -25,8 +25,8 @@ from redistricting.models import (
     RdsField
 )
 from redistricting.models.base.serialize import (
-    deserialize_model,
-    serialize_model
+    deserialize,
+    serialize
 )
 
 # pylint: disable=comparison-with-callable
@@ -87,14 +87,14 @@ class TestField:
         assert qf.type() == QVariant.String
 
     def test_serialize(self, block_layer, field: RdsField):
-        data = serialize_model(field)
+        data = serialize(field)
         assert data == {'layer': block_layer.id(),
                         'field': 'vtdid',
                         'caption': 'vtdid'}
 
     def test_deserialize(self, block_layer):
         data = {'layer': block_layer.id(), 'field': 'vtdid'}
-        field = deserialize_model(RdsField, data)
+        field = deserialize(RdsField, data)
         assert field.field == 'vtdid'
         assert field.layer == block_layer
         assert field.caption == 'vtdid'
@@ -123,7 +123,7 @@ class TestDataField:
         assert field.field == 'vap_nh_ap_black + vap_hispanic' and field.sumField and field.pctBase is None
 
     def test_serialize(self, block_layer, data_field):
-        data = serialize_model(data_field)
+        data = serialize(data_field)
         assert data == {
             'layer': block_layer.id(),
             'field': 'vap_ap_black',
@@ -139,7 +139,7 @@ class TestDataField:
             'caption': 'APBVAP',
             'pct-base': 'vap_total'
         }
-        field = deserialize_model(RdsDataField, data)
+        field = deserialize(RdsDataField, data)
         assert field.field == 'vap_ap_black'
         assert field.layer == block_layer
         assert field.caption == 'APBVAP'

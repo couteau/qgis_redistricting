@@ -85,13 +85,6 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
         self.tvSplits.setModel(self._model)
 
-    def planNameChanged(self):
-        self.lblPlan.setText(self._plan.name)
-
-    def updateGeography(self):
-        self.cmbGeography.clear()
-        self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])
-
     @property
     def geoField(self) -> RdsGeoField:
         return self._field
@@ -100,7 +93,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
     def geoField(self, value: RdsGeoField):
         self._field = value
         if self._plan and self._field:
-            self._model = SplitsModel(self._plan.metrics.splits[self._field], self)
+            self._model = SplitsModel(self._plan.metrics.splits[self._field.field], self)
         else:
             self._model = None
 
@@ -108,6 +101,14 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
         if self._field:
             self.setWindowTitle(f"{self._field.caption} {tr('Splits')}")
+            self.cmbGeography.setCurrentText(self._field.caption)
 
     def geographyChanged(self, index):
         self.geoField = self.plan.geoFields[index]
+
+    def planNameChanged(self):
+        self.lblPlan.setText(self._plan.name)
+
+    def updateGeography(self):
+        self.cmbGeography.clear()
+        self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])

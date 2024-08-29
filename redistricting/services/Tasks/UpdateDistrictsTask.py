@@ -156,21 +156,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
             return None
 
     def getSplitNames(self, field: 'RdsGeoField', geoids: Iterable[str]):
-        ref = field.layer.referencingRelations(field.index)[0]
-        name_layer = ref.referencedLayer()
-        name_join_field = ref.resolveReferencedField(field.field)
-
-        ctx = QgsExpressionContext()
-        ctx.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(name_layer))
-
-        expr = QgsExpression(f"""{name_join_field} in ({','.join(f"'{i}'" for i in geoids)})""")
-
-        request = QgsFeatureRequest(expr, ctx)
-        request.setSubsetOfAttributes([name_layer.fields().lookupField(name_join_field), field.nameField.index])
-        request.setInvalidGeometryCheck(QgsFeatureRequest.InvalidGeometryCheck.GeometryNoCheck)
-
-        name_map = {feat[name_join_field]: feat[field.nameField.index] for feat in name_layer.getFeatures(request)}
-
+        name_map = {g: field.getName(g) for g in geoids}
         return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
 
     def calcFracks(self, field: 'RdsGeoField', splitpop: pd.DataFrame):
@@ -212,7 +198,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 .groupby([field.fieldName, self.distField]) \
                 .sum()
 
-            if field.nameField and field.index and field.layer.referencingRelations(field.index):
+            if field.nameField and field.getRelation() is not None:
                 names = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
                 splitpop = splitpop \
                     .reset_index(level=1) \

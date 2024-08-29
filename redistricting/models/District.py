@@ -28,6 +28,7 @@ from typing import (
     Any,
     Iterable,
     Literal,
+    Optional,
     Union,
     overload
 )
@@ -215,6 +216,9 @@ class RdsUnassigned(RdsDistrict):
         init=False, readonly=True, default=0, fget=RdsDistrict.district.fget, fset=RdsDistrict.district.fset)
     name: str = rds_property(init=False, readonly=True, default=tr("Unassigned"),
                              fget=RdsDistrict.name.fget, fset=RdsDistrict.name.fset)
+    members: Optional[int] = None
+    deviation: Optional[int] = None
+    pct_deviation: Optional[float] = None
 
     def __pre_init__(self):
         super().__pre_init__()

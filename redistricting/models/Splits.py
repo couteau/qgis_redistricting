@@ -53,7 +53,7 @@ class RdsSplitGeography:
             RdsSplitDistrict(data, (geoid, d)) for d in self._districts
         ]
         self.attributes = [
-            f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, ", ".join(self._districts)]
+            f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, ", ".join(self._districts.astype(str))]
 
     def __len__(self):
         return len(self._districts)
@@ -101,6 +101,13 @@ class RdsSplits(RdsBaseModel):
 
     def __key__(self):
         return self.field
+
+    def __len__(self):
+        return len(self.splits)
+
+    @property
+    def attrCount(self):
+        return len(self.data.columns) - int("__name" in self.data.columns)
 
     def makeSplits(self):
         if self.data is None:

@@ -66,7 +66,7 @@ class TestPlanCreator:
     ):
         mock = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
         mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
         task_class = mocker.patch('redistricting.services.PlanBuilder.CreatePlanLayersTask', spec=CreatePlanLayersTask)
         task_class.return_value = mocker.create_autospec(spec=CreatePlanLayersTask, instance=True)
@@ -92,7 +92,7 @@ class TestPlanCreator:
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
         mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         builder = PlanBuilder() \
@@ -115,7 +115,7 @@ class TestPlanCreator:
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
         mocker.patch('redistricting.services.PlanBuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize_model')
+        deserialize = mocker.patch('redistricting.services.PlanBuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         # no name
