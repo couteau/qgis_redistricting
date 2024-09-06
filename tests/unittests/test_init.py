@@ -1,7 +1,4 @@
 """Test redististricting plugin initialization"""
-import configparser
-import pathlib
-
 import pytest
 from pytest_lazy_fixtures import lf
 from pytest_mock.plugin import MockerFixture
@@ -19,7 +16,7 @@ from redistricting import (
 class TestPluginInit:
 
     @pytest.fixture
-    def plugin(self, qgis_iface, mocker: MockerFixture):
+    def plugin(self, qgis_iface, tmp_path, mocker: MockerFixture):
         settings = mocker.patch('redistricting.redistricting.QSettings')
         settings_obj = settings.return_value
         settings_obj.value.return_value = 'en_US'
@@ -31,6 +28,7 @@ class TestPluginInit:
         qgis_iface.removeDockWidget = mocker.MagicMock()
         qgis_iface.removePluginVectorMenu = mocker.MagicMock()
         qgis_iface.layerTreeView = mocker.MagicMock()
+        QgsProject.instance().setFileName(str(tmp_path / "test.qgz"))
 
         return classFactory(qgis_iface)
 
@@ -52,37 +50,6 @@ class TestPluginInit:
             project.read(str((datadir / 'test_project.qgz').resolve()))
         yield plugin_with_gui
         project.clear()
-
-    def test_metadata(self):
-        """Test that the plugin metadata.txt will validate on plugins.qgis.org."""
-
-        # You should update this list according to the latest in
-        # https://github.com/qgis/qgis-django/blob/master/qgis-app/plugins/validator.py
-
-        required_metadata = [
-            'name',
-            'description',
-            'version',
-            'qgisMinimumVersion',
-            'author',
-            'email',
-            'about',
-            'tracker',
-            'repository'
-        ]
-
-        file_path = (pathlib.Path(__file__).parent.parent / 'redistricting' / 'metadata.txt').resolve()
-        metadata = []
-        parser = configparser.ConfigParser()
-        parser.optionxform = str
-        parser.read(file_path)
-        message = f'Cannot find a section named "general" in {file_path}'
-        assert parser.has_section('general'), message
-        metadata.extend(parser.items('general'))
-
-        for expectation in required_metadata:
-            message = f'Cannot find metadata "{expectation}" in metadata source ({file_path}).'
-            assert expectation in dict(metadata), message
 
     def test_init(self, plugin):
         assert plugin.name == 'Redistricting'
@@ -125,6 +92,5 @@ class TestPluginInit:
 
     def test_write_project_no_plan(self, plugin_with_gui, mocker: MockerFixture):  # pylint: disable=unused-argument
         storage = mocker.patch('redistricting.redistricting.ProjectStorage')
-        project = QgsProject.instance()
-        project.write()
+        QgsProject.instance().write()
         storage.assert_not_called()

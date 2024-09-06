@@ -159,10 +159,18 @@ class EditAssignmentsController(BaseController):
         )
         self.actionCreateDistrict.setEnabled(False)
 
+        self.actionEditDistrict = self.actions.createAction(
+            'actionEditDistrict',
+            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
+            tr('Edit district'),
+            callback=self.editDistrict,
+            parent=self.iface.mainWindow()
+        )
+
         self.actionEditTargetDistrict = self.actions.createAction(
             'actionEditTargetDistrict',
             QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
-            tr('Edit district'),
+            tr('Edit target district'),
             callback=self.editDistrict,
             parent=self.iface.mainWindow()
         )
@@ -171,7 +179,7 @@ class EditAssignmentsController(BaseController):
         self.actionEditSourceDistrict = self.actions.createAction(
             'actionEditSourceDistrict',
             QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
-            tr('Edit district'),
+            tr('Edit source district'),
             callback=self.editDistrict,
             parent=self.iface.mainWindow()
         )
@@ -320,11 +328,13 @@ class EditAssignmentsController(BaseController):
         return dist.district
 
     def editDistrict(self, district: RdsDistrict = None):
-        if not district:
+        if not isinstance(district, RdsDistrict):
             if self.sender() == self.actionEditTargetDistrict:
                 district = self.targetDistrict
             elif self.sender() == self.actionEditSourceDistrict:
                 district = self.sourceDistrict
+            elif self.sender() == self.actionEditDistrict and self.actionEditDistrict.data() is not None:
+                district = self.actionEditDistrict.data()
             else:
                 return
 
@@ -346,24 +356,32 @@ class EditAssignmentsController(BaseController):
             self.project.setDirty()
 
     def editSourceDistrict(self):
-        self.editDistrict(self.mapTool.sourceDistrict())
+        self.editDistrict(self.sourceDistrict)
 
     def editTargetDistrict(self):
-        self.editDistrict(self.mapTool.targetDistrict())
+        self.editDistrict(self.targetDistrict)
 
     def saveChangesAsNewPlan(self):
-        if not self.checkActivePlan(self.tr('copy')):
+        if not self.checkActivePlan(self.tr('save changes to new plan')):
+            return
+
+        if not self.planManager.activePlan.assignLayer.isEditable():
+            self.iface.messageBar().pushMessage(
+                self.tr("Oops!"),
+                self.tr("Cannot save changes to no plan: active plan has no unsaved changes."),
+                Qgis.Warning
+            )
             return
 
         dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
         dlgCopyPlan.cbxCopyAssignments.hide()
 
-        if dlgCopyPlan.exec_() == QDialog.Accepted:
+        if dlgCopyPlan.exec() == QDialog.Accepted:
             copier = PlanCopier(self.planManager.activePlan)
             plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                                    dlgCopyPlan.geoPackagePath, copyAssignments=True)
 
-            self.appendPlan(plan, False)
+            self.planManager.appendPlan(plan, False)
             copier.copyBufferedAssignments(plan)
             self.planManager.activePlan.assignLayer.rollBack(True)
             self.planManager.setActivePlan(plan)
@@ -414,7 +432,7 @@ class EditAssignmentsController(BaseController):
     def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: int, endEdit: bool):
         editor = self.assignmentsService.getEditor(self.planManager.activePlan)
         if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
-            values = {str(feature.attribute(self.geoField)) for feature in features}
+            values = {feature.attribute(self.geoField) for feature in features}
             features = editor.getDistFeatures(
                 self.geoField, values, target, source)
 

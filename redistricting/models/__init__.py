@@ -42,18 +42,38 @@ from .District import (
 from .Field import (
     RdsDataField,
     RdsField,
-    RdsGeoField
+    RdsGeoField,
+    RdsRelatedField
 )
 from .Plan import (
     RdsPlan,
     RdsPlanMetrics
 )
 from .Splits import (
+    RdsSplitBase,
     RdsSplitDistrict,
     RdsSplitGeography,
     RdsSplits
 )
 
-__all__ = ('StatsColumns', 'RdsDataField', 'Delta', 'DeltaList', 'RdsDistrict', 'DistrictColumns', 'DistrictList',
-           'RdsField', 'RdsGeoField', 'RdsPlanMetrics', 'RdsPlan',
-           'RdsSplits', 'RdsSplitDistrict', 'RdsSplitGeography', 'RdsUnassigned', "serialize", "deserialize")
+__all__ = (
+    'DistrictColumns',
+    'StatsColumns',
+    'RdsField',
+    'RdsGeoField',
+    'RdsRelatedField',
+    'RdsDataField',
+    'Delta',
+    'DeltaList',
+    'RdsDistrict',
+    'RdsUnassigned',
+    'DistrictList',
+    'RdsPlanMetrics',
+    'RdsSplits',
+    'RdsSplitBase',
+    'RdsSplitDistrict',
+    'RdsSplitGeography',
+    'RdsPlan',
+    "serialize",
+    "deserialize"
+)

@@ -23,6 +23,7 @@ from pytestqt.plugin import QtBot
 
 from redistricting.models import (
     RdsDataField,
+    RdsDistrict,
     RdsField,
     RdsPlan
 )
@@ -52,9 +53,14 @@ class TestPlan:
                                  {'name': 'test', 'numDistricts': 2001},
                              ]
                              )
-    def test_create_plan_throws_typeerror_with_invalid_params(self, params):
+    def test_create_plan_throws_valueerror_with_invalid_params(self, params):
         with pytest.raises(ValueError):
             plan = RdsPlan(**params)  # pylint: disable=unused-variable
+
+    def test_set_invalid_numdistricts_raises_value_error(self):
+        p = RdsPlan("test", 5)
+        with pytest.raises(ValueError):
+            p.numDistricts = 1
 
     @pytest.mark.parametrize('params,expected',
                              [
@@ -195,3 +201,57 @@ class TestPlan:
             'total-population': 227036,
             'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': []}}}
         }
+
+    def test_validate_district(self, plan: RdsPlan, mocker):
+        plan.totalPopulation = 500
+        plan.deviation = 0.05
+
+        district = mocker.create_autospec(spec=RdsDistrict)
+        district.members = 1
+
+        district.population = 100
+        assert plan.isDistrictValid(district)
+
+        district.population = 105
+        assert plan.isDistrictValid(district)
+
+        district.population = 95
+        assert plan.isDistrictValid(district)
+
+        district.population = 106
+        assert not plan.isDistrictValid(district)
+
+        district.population = 94
+        assert not plan.isDistrictValid(district)
+
+        plan.deviation = 0
+        district.population = 100
+        assert plan.isDistrictValid(district)
+
+    def test_validate_district_multi_member(self, plan: RdsPlan, mocker):
+        plan.totalPopulation = 500
+        plan.numDistricts = 5
+        plan.numSeats = 5
+        plan.deviation = 0.05
+
+        district = mocker.create_autospec(spec=RdsDistrict)
+        district.members = 2
+
+        district.population = 200
+        assert plan.isDistrictValid(district)
+
+        district.population = 210
+        assert plan.isDistrictValid(district)
+
+        district.population = 190
+        assert plan.isDistrictValid(district)
+
+        district.population = 211
+        assert not plan.isDistrictValid(district)
+
+        district.population = 189
+        assert not plan.isDistrictValid(district)
+
+        plan.deviation = 0
+        district.population = 200
+        assert plan.isDistrictValid(district)

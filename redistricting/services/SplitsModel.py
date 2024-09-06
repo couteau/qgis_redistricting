@@ -39,19 +39,35 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
+    RdsPlan,
+    RdsSplitBase,
     RdsSplitDistrict,
     RdsSplitGeography,
     RdsSplits
 )
+from ..utils import tr
 
 
-class SplitsModel(QAbstractItemModel):
-    def __init__(self, splits: RdsSplits, parent: Optional[QObject] = None):
+class RdsSplitsModel(QAbstractItemModel):
+    def __init__(self, plan: RdsPlan, splits: RdsSplits, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._splits = splits
         self._splits.splitUpdating.connect(self.beginResetModel)
         self._splits.splitUpdated.connect(self.endResetModel)
         self._data: pd.DataFrame = splits.data
+        self._header = [self._splits.geoField.caption, tr("Districts"), tr('Population')]
+        self._header.extend(f.caption for f in [*plan.popFields, *plan.dataFields])
+        self._expandedGeogs: set[RdsSplitGeography] = set()
+
+    def setExpanded(self, index: QModelIndex):
+        item: RdsSplitBase = index.internalPointer()
+        if isinstance(item, RdsSplitGeography):
+            self._expandedGeogs.add(item)
+
+    def setCollapsed(self, index: QModelIndex):
+        item: RdsSplitBase = index.internalPointer()
+        if isinstance(item, RdsSplitGeography) and item in self._expandedGeogs:
+            self._expandedGeogs.remove(item)
 
     def rowCount(self, parent: QModelIndex = ...) -> int:
         if not parent.isValid():  # it's the root node
@@ -60,7 +76,7 @@ class SplitsModel(QAbstractItemModel):
         if parent.column() > 0:
             return 0
 
-        split: Union[RdsSplitGeography, RdsSplitDistrict] = parent.internalPointer()
+        split: RdsSplitBase = parent.internalPointer()
         if isinstance(split, RdsSplitGeography):
             return len(split)
 
@@ -86,10 +102,10 @@ class SplitsModel(QAbstractItemModel):
         if not index.isValid():
             return QVariant()
 
-        item: Union[RdsSplitGeography, RdsSplits] = index.internalPointer()
+        item: RdsSplitBase = index.internalPointer()
         col = index.column()
         if isinstance(item, RdsSplitGeography):
-            if col >= 2:
+            if (col == 1 and item in self._expandedGeogs) or col >= 2:
                 return QVariant()
         else:
             if col == 0:
@@ -109,7 +125,7 @@ class SplitsModel(QAbstractItemModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
         if orientation == Qt.Horizontal:
             if role == Qt.DisplayRole:
-                return self._splits.header[section]
+                return self._header[section]
 
         return QVariant()
 
@@ -120,7 +136,7 @@ class SplitsModel(QAbstractItemModel):
         if not parent.isValid():
             return self.createIndex(row, column, self._splits[row])
 
-        parentItem: Union[RdsSplitGeography, RdsSplitDistrict] = parent.internalPointer()
+        parentItem: RdsSplitBase = parent.internalPointer()
         if isinstance(parentItem, RdsSplitDistrict):  # shouldn't happen
             return QModelIndex()
 
@@ -130,8 +146,8 @@ class SplitsModel(QAbstractItemModel):
         if not index.isValid():
             return QModelIndex()
 
-        split: Union[RdsSplitGeography, RdsSplitDistrict] = index.internalPointer()
+        split: RdsSplitBase = index.internalPointer()
         if isinstance(split, RdsSplitDistrict):
-            return self.createIndex(split.parent.row, 0, split.parent)
+            return self.createIndex(self._splits.index(split.parent), 0, split.parent)
 
         return QModelIndex()

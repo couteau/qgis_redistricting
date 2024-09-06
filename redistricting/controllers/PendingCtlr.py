@@ -23,7 +23,8 @@
 """
 from typing import (
     TYPE_CHECKING,
-    Optional
+    Optional,
+    Union
 )
 
 from qgis.PyQt.QtCore import (
@@ -33,8 +34,12 @@ from qgis.PyQt.QtCore import (
 from qgis.PyQt.QtGui import QIcon
 
 from ..gui import DockPendingChanges
-from ..models import RdsPlan
+from ..models import (
+    DeltaList,
+    RdsPlan
+)
 from ..services import (
+    DeltaListModel,
     DeltaUpdateService,
     PlanManager
 )
@@ -60,8 +65,10 @@ class PendingChangesController(BaseController):
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.deltaService = deltaService
+        self.deltaService.updateCompleted.connect(self.updateDelta)
         self.dockwidget: DockPendingChanges = None
         self.actionToggle: QAction = None
+        self.model: DeltaListModel = DeltaListModel(self.iface)
 
     def load(self):
         self.setupPendingChangesWidget()
@@ -77,6 +84,7 @@ class PendingChangesController(BaseController):
         """Create the dockwidget with displays the impact of pending
         changes on affected districts."""
         dockwidget = DockPendingChanges(self.deltaService)
+        dockwidget.tblPending.setModel(self.model)
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, dockwidget)
 
         self.actionToggle = dockwidget.toggleViewAction()
@@ -88,5 +96,13 @@ class PendingChangesController(BaseController):
         self.dockwidget = dockwidget
         return self.dockwidget
 
-    def activePlanChanged(self, plan: RdsPlan):
+    def activePlanChanged(self, plan: Union[RdsPlan, None]):
         self.dockwidget.plan = plan
+        if plan is None:
+            self.model.setDelta(None, None)
+        else:
+            self.model.setDelta(plan, self.deltaService.getDelta(plan))
+
+    def updateDelta(self, plan, delta: DeltaList):
+        if plan == self.planManager.activePlan:
+            self.model.setDelta(plan, delta)

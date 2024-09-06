@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from typing import (
     TYPE_CHECKING,
+    Any,
     Iterable,
     Optional,
     Union
@@ -115,7 +116,7 @@ class PlanAssignmentEditor(QObject):
         for f in self._assignLayer.getFeatures(request):
             self._assignLayer.changeAttributeValue(f.id(), findex, newDistrict, district)
 
-    def getDistFeatures(self, field, value: Union[Iterable[str], str], targetDistrict=None, sourceDistrict=None):
+    def getDistFeatures(self, field, value: Union[Iterable[Any], Any], targetDistrict=None, sourceDistrict=None):
         self._clearError()
 
         if not self._assignLayer:
@@ -133,9 +134,7 @@ class PlanAssignmentEditor(QObject):
             value = [value]
 
         if f.type() == QVariant.String:
-            flt = ' and '.join(f"{field} = '{v}'" for v in value)
-        else:
-            flt = ' and '.join(f'{field} = {v}' for v in value)
+            flt = ' and '.join(f'{field} = {v!r}' for v in value)
 
         if sourceDistrict is not None:
             if sourceDistrict == 0:

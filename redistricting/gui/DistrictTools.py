@@ -53,13 +53,13 @@ from ..models import (
 )
 from ..services import (
     ActionRegistry,
+    GeoFieldsModel,
     getColorForDistrict
 )
 from ..utils import (
     showHelp,
     tr
 )
-from .FieldListModels import GeoFieldsModel
 from .ui.DistrictTools import Ui_qdwDistrictTools
 
 

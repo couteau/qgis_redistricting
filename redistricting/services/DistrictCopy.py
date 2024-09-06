@@ -23,7 +23,6 @@ from ..utils import (
     LayerReader,
     tr
 )
-from .actions import ActionRegistry
 from .PlanAssignments import AssignmentsService
 from .PlanManager import PlanManager
 
@@ -39,42 +38,6 @@ class DistrictCopier(QObject):
         self.canvas = iface.mapCanvas()
         self.planManager = planManager
         self.assignmentsService = assignmentsService
-
-        actions = ActionRegistry()
-
-        self.actionCopyDistrict = actions.createAction(
-            name='actionCopyDistrict',
-            icon=':/plugins/redistricting/copydistrict.svg',
-            text=str('Copy District'),
-            tooltip=tr('Copy district to clipboard'),
-            callback=self.copyDistrict,
-            parent=iface.mainWindow()
-        )
-
-        self.actionPasteDistrict = actions.createAction(
-            name='actionPasteDistrict',
-            icon=QgsApplication.getThemeIcon('/mActionDuplicateFeature.svg'),
-            text=tr('Paste District'),
-            tooltip=tr('Paste district from clipboard'),
-            callback=self.pasteDistrict,
-            parent=iface.mainWindow()
-        )
-
-        self.actionZoomToDistrict = actions.createAction(
-            name="actionZoomToDistrict",
-            icon=':/plugins/redistricting/zoomdistrict.svg',
-            text=tr("Zoom to district"),
-            callback=self.zoomToDistrict,
-            parent=iface.mainWindow()
-        )
-
-        self.actionFlashDistrict = actions.createAction(
-            name='actionFlashDistrict',
-            icon=':/plugins/redistricting/flashdistrict.svg',
-            text=self.tr("Flash district"),
-            callback=self.flashDistrict,
-            parent=iface.mainWindow()
-        )
 
     def canCopyAssignments(self, action: QAction, event: QgsMapMouseEvent):
         i = QgsMapToolIdentify(self.canvas)
@@ -148,36 +111,3 @@ class DistrictCopier(QObject):
 
             assign.changeAssignments(groups)
             assign.endEditCommand()
-
-    def zoomToDistrict(self, district: Optional[int]):
-        if self.planManager.activePlan is None:
-            return
-
-        if district is None:
-            action = self.sender()
-            if isinstance(action, QAction):
-                district = action.data()
-
-        if not (isinstance(district, int) and 1 <= district <= self.planManager.activePlan.numDistricts):
-            return
-
-        fid = self.planManager.activePlan.districts[district].fid
-        if fid is not None:
-            self.canvas.zoomToFeatureIds(self.planManager.activePlan.distLayer, [fid])
-            self.canvas.refresh()
-
-    def flashDistrict(self, district: Optional[int]):
-        if self.planManager.activePlan is None:
-            return
-
-        if district is None:
-            action = self.sender()
-            if isinstance(action, QAction):
-                district = action.data()
-
-        if not (isinstance(district, int) and 1 <= district <= self.planManager.activePlan.numDistricts):
-            return
-
-        fid = self.planManager.activePlan.districts[district].fid
-        if fid is not None:
-            self.canvas.flashFeatureIds(self.planManager.activePlan.distLayer, [fid])

@@ -8,6 +8,7 @@ from qgis.core import (
     QgsVectorLayer
 )
 from qgis.gui import Qgis
+from qgis.PyQt.QtCore import pyqtBoundSignal
 from qgis.PyQt.QtWidgets import (
     QAction,
     QDialog
@@ -100,28 +101,84 @@ class TestPlanController:
         return dlg_class
 
     @pytest.fixture
-    def controller(self, qgis_iface, planmanager, mock_project, mock_toolbar, mocker: MockerFixture):
-        layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
-        styler = mocker.create_autospec(spec=services.PlanStylerService)
+    def mock_update_service(self, mocker: MockerFixture) -> services.DistrictUpdater:
         updater = mocker.create_autospec(spec=services.DistrictUpdater)
-        controller = controllers.PlanController(
-            qgis_iface, mock_project, planmanager,
-            mock_toolbar, layerTreeManager, styler, updater
-        )
-        controller.load()
-        return controller
+        updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        return updater
 
     @pytest.fixture
-    def controller_with_active_plan(self, qgis_iface, planmanager_with_active_plan, mock_project, mock_toolbar, mocker: MockerFixture):
-        layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
+    def mock_styler(self, mocker: MockerFixture) -> services.PlanStylerService:
         styler = mocker.create_autospec(spec=services.PlanStylerService)
-        updater = mocker.create_autospec(spec=services.DistrictUpdater)
+        return styler
+
+    @pytest.fixture
+    def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_styler, mocker: MockerFixture):
+        layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
         controller = controllers.PlanController(
-            qgis_iface, mock_project, planmanager_with_active_plan,
-            mock_toolbar, layerTreeManager, styler, updater
+            qgis_iface, mock_project, mock_planmanager,
+            mock_toolbar, layerTreeManager, mock_styler, mock_update_service
         )
+        mocker.patch.object(controller, "startProgress")
+
         controller.load()
-        return controller
+        yield controller
+        controller.unload()
+
+    @pytest.fixture
+    def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_styler, mocker: MockerFixture):
+        layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
+        controller = controllers.PlanController(
+            qgis_iface, mock_project, mock_planmanager_with_active_plan,
+            mock_toolbar, layerTreeManager, mock_styler, mock_update_service
+        )
+        mocker.patch.object(controller, "startProgress")
+        controller.load()
+        controller.addPlanToMenu(mock_planmanager_with_active_plan.activePlan)
+        yield controller
+        controller.unload()
+
+    def test_add_plan_to_menu(self, controller: controllers.PlanController, mock_plan):
+        assert len(controller.planMenu.actions()) == 0
+        controller.addPlanToMenu(mock_plan)
+        assert len(controller.planMenu.actions()) == 1
+
+    def test_plan_added(self, controller: controllers.PlanController, mock_plan, mock_update_service: services.DistrictUpdater, mock_planmanager):
+        assert len(controller.planMenu.actions()) == 0
+        assert not controller.actionSelectPlan.isEnabled()
+        mock_planmanager.__len__.return_value = 1
+        controller.planAdded(mock_plan)
+        assert len(controller.planMenu.actions()) == 1
+        mock_update_service.watchPlan.assert_called_once_with(mock_plan)
+        assert controller.actionSelectPlan.isEnabled()
+
+    def test_append_plan(self, controller: controllers.PlanController, mock_plan, mock_planmanager, mock_project):
+        controller.appendPlan(mock_plan, True)
+        mock_planmanager.appendPlan.assert_called_once_with(mock_plan, True)
+        mock_project.setDirty.assert_called_once()
+
+    def test_activate_plan(self, controller: controllers.PlanController, mock_plan, mock_planmanager):
+        controller.addPlanToMenu(mock_plan)
+        controller.planActions.actions()[0].setChecked(True)
+        controller.activatePlan(True)
+        mock_planmanager.setActivePlan.assert_called_once()
+
+    def test_remove_plan(self, controller_with_active_plan: controllers.PlanController, mock_plan):
+        assert len(controller_with_active_plan.planMenu.actions()) == 1
+        controller_with_active_plan.removePlanFromMenu(mock_plan)
+        assert len(controller_with_active_plan.planMenu.actions()) == 0
+
+    def test_plan_removed(self, controller_with_active_plan: controllers.PlanController, mock_plan, mock_update_service: services.DistrictUpdater):
+        assert len(controller_with_active_plan.planMenu.actions()) == 1
+        controller_with_active_plan.planRemoved(mock_plan)
+        assert len(controller_with_active_plan.planMenu.actions()) == 0
+        mock_update_service.unwatchPlan.assert_called_once_with(mock_plan)
+        assert not controller_with_active_plan.actionSelectPlan.isEnabled()
+
+    def test_clear_plan_menu(self, controller_with_active_plan: controllers.PlanController):
+        assert len(controller_with_active_plan.planMenu.actions()) == 1
+        controller_with_active_plan.clearPlanMenu()
+        assert len(controller_with_active_plan.planMenu.actions()) == 0
+        assert not controller_with_active_plan.actionSelectPlan.isEnabled()
 
     def test_enable_active_plan_actions(self, controller: controllers.PlanController, mock_plan):
         controller.addPlanToMenu(mock_plan)
@@ -236,6 +293,29 @@ class TestPlanController:
         mock_editor.fromPlan.assert_called_once()
         builder.setName.assert_called_once_with('mocked')
         builder.updatePlan.assert_called_once()
+        controller.styler.stylePlan.assert_not_called()
+
+    def test_edit_plan_with_no_active_plan_and_no_param_returns(
+        self,
+        controller: controllers.PlanController,
+        mock_edit_dlg: MagicMock,
+    ):
+        controller.editPlan()
+        mock_edit_dlg.assert_not_called()
+
+    def test_edit_plan_with_changed_num_districts_calls_styler(
+        self,
+        controller_with_active_plan: controllers.PlanController,
+        mock_edit_dlg: MagicMock,
+        mock_editor: MagicMock,
+        mock_plan: RdsPlan
+    ):
+        builder = mock_editor.fromPlan.return_value
+        builder.modifiedFields = ['num-districts']
+        controller_with_active_plan.editPlan()
+        mock_edit_dlg.assert_called_once_with(mock_plan, controller_with_active_plan.iface.mainWindow())
+        mock_editor.fromPlan.assert_called_once()
+        controller_with_active_plan.styler.stylePlan.assert_called_once_with(mock_plan)
 
     def test_create_plan(
         self,
@@ -289,9 +369,11 @@ class TestPlanController:
         assert "Oops!:Cannot copy: no active redistricting plan. Try creating a new plan." \
             in qgis_iface.messageBar().get_messages(Qgis.Warning)
 
+    @pytest.mark.parametrize('copy_assignments', [True, False])
     def test_copy_plan_active_plan_executes_copy(
         self,
         controller_with_active_plan: controllers.PlanController,
+        copy_assignments,
         datadir,
         mocker: MockerFixture
     ):
@@ -299,7 +381,7 @@ class TestPlanController:
         dlg.return_value.planName = 'copied'
         dlg.return_value.description = 'copy of plan'
         dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
-        dlg.return_value.copyAssignments = False
+        dlg.return_value.copyAssignments = copy_assignments
         dlg.return_value.exec.return_value = QDialog.Accepted
 
         cpy = mocker.patch('redistricting.controllers.PlanCtlr.PlanCopier', spec=services.PlanCopier)
@@ -309,7 +391,7 @@ class TestPlanController:
         cpy.assert_called_once()
         dlg.return_value.exec.assert_called_once()
         cpy.return_value.copyPlan.assert_called_once_with(
-            'copied', 'copy of plan', str(datadir / 'test_plan.gpkg'), False)
+            'copied', 'copy of plan', str(datadir / 'test_plan.gpkg'), copy_assignments)
 
     def test_import_plan_no_active_plan_warns(
         self,
@@ -383,3 +465,46 @@ class TestPlanController:
         dlg_class.assert_called_once()
         importer_class.assert_called_once()
         dlgImportPlan.exec.assert_called_once()
+
+    def test_export_plan_no_active_plan_warns(
+        self,
+        controller: controllers.PlanController,
+        mocker: MockerFixture,
+        qgis_iface
+    ):
+        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan', spec=gui.DlgExportPlan)
+
+        controller.exportPlan()
+        dlg_class.assert_not_called()
+        assert "Oops!:Cannot export: no active redistricting plan. Try creating a new plan." \
+            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+
+    def test_export_plan_with_active_plan_executes_export(
+        self,
+        controller_with_active_plan: controllers.PlanController,
+        datadir,
+        mocker: MockerFixture
+    ):
+        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan', spec=gui.DlgExportPlan)
+        dlgExportPlan = dlg_class.return_value
+        dlgExportPlan.exportEquivalency = True
+        dlgExportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
+        dlgExportPlan.equivalencyGeography = controller_with_active_plan.planManager.activePlan.geoFields[0]
+        dlgExportPlan.exportShapefile = True
+        dlgExportPlan.shapefileFileName = str(datadir / 'tuscaloosa.shp')
+        dlgExportPlan.includeUnassigned = False
+        dlgExportPlan.includeDemographics = True
+        dlgExportPlan.includeMetrics = True
+        dlgExportPlan.exec.return_value = QDialog.Accepted
+
+        exporter_class = mocker.patch('redistricting.controllers.PlanCtlr.PlanExporter',
+                                      spec=services.PlanExporter)
+
+        controller_with_active_plan.exportPlan()
+        dlg_class.assert_called_once()
+        exporter_class.assert_called_once()
+        dlgExportPlan.exec.assert_called_once()
+
+    def test_trigger_update(self, controller_with_active_plan: controllers.PlanController, mock_update_service, mock_plan):
+        controller_with_active_plan.triggerUpdate(mock_plan)
+        mock_update_service.updateDistricts.assert_called_once()

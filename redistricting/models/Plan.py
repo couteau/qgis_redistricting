@@ -2,6 +2,10 @@
 import pathlib
 from contextlib import contextmanager
 from itertools import repeat
+from math import (
+    ceil,
+    floor
+)
 from statistics import (
     StatisticsError,
     mean
@@ -429,6 +433,12 @@ class RdsPlan(RdsBaseModel):
                 self._geoIdField and
                 self._distField
             ) and 2 <= self.numDistricts <= 2000
+
+    def isDistrictValid(self, district: RdsDistrict):
+        maxDeviation = district.members * int(self.totalPopulation * self.deviation / self.numDistricts)
+        idealUpper = ceil(district.members * self.totalPopulation / self.numSeats) + maxDeviation
+        idealLower = floor(district.members * self.totalPopulation / self.numSeats) - maxDeviation
+        return idealLower <= district.population <= idealUpper
 
     @contextmanager
     def checkValid(self):

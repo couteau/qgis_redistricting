@@ -94,6 +94,7 @@ class ActionRegistry:
         icon: Union[str, QIcon],
         text: str,
         tooltip: Optional[str] = None,
+        statustip: Optional[str] = None,
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         parent: Optional[QObject] = None,
@@ -107,6 +108,8 @@ class ActionRegistry:
             action.setToolTip(tooltip)
         if shortcut is not None:
             action.setShortcut(shortcut)
+        if statustip is not None:
+            action.setStatusTip(statustip)
 
         action.setCheckable(checkable)
 
@@ -120,12 +123,13 @@ class ActionRegistry:
         icon: Union[str, QIcon],
         text: str,
         tooltip: Optional[str] = None,
+        statustip: Optional[str] = None,
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         callback: Optional[Callable[[], None]] = None,
         parent: Optional[QObject] = None
     ) -> QAction:
-        action = self._createAction(name, icon, text, tooltip, shortcut, checkable, parent)
+        action = self._createAction(name, icon, text, tooltip, statustip, shortcut, checkable, parent)
         if callback is not None:
             action.triggered.connect(callback)
         return action
@@ -136,13 +140,14 @@ class ActionRegistry:
         icon: Union[str, QIcon],
         text: str,
         tooltip: Optional[str] = None,
+        statustip: Optional[str] = None,
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         callback: Optional[Callable[[], None]] = None,
         parent: Optional[QObject] = None
     ) -> QAction:
         action: PlanAction = self._createAction(
-            name, icon, text, tooltip, shortcut, checkable, parent, actionCls=PlanAction
+            name, icon, text, tooltip, statustip, shortcut, checkable, parent, actionCls=PlanAction
         )
         if callback is not None:
             action.triggeredForPlan.connect(callback)

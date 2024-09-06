@@ -24,14 +24,8 @@
 """
 from qgis.PyQt.QtWidgets import QDockWidget
 
-from redistricting.models import DeltaList
-
-from ..models import (
-    DeltaList,
-    RdsPlan
-)
+from ..models import RdsPlan
 from ..services import DeltaUpdateService
-from .DeltaListModel import DeltaListModel
 from .RdsOverlayWidget import OverlayWidget
 from .ui.PendingChanges import Ui_qdwPendingChanges
 
@@ -44,11 +38,10 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
         self.lblWaiting.setVisible(False)
 
         self._plan: RdsPlan = None
-        self._model: DeltaListModel = DeltaListModel(self)
 
         self.deltaService = deltaService
         self.deltaService.updateStarted.connect(self.showOverlay)
-        self.deltaService.updateCompleted.connect(self.updateModel)
+        self.deltaService.updateCompleted.connect(self.hideOverlay)
         self.deltaService.updateTerminated.connect(self.hideOverlay)
 
     @property
@@ -61,7 +54,6 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
             if self.lblWaiting.isVisible():
                 self.lblWaiting.stop()
             self._plan = value
-            self._model.setDelta(value, self.deltaService.getDelta(value))
             if self.deltaService.isUpdating(self._plan):
                 self.lblWaiting.start()
 
@@ -69,11 +61,6 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
         if plan == self._plan:
             self.lblWaiting.start()
 
-    def hideOverlay(self, plan):
+    def hideOverlay(self, plan: RdsPlan):
         if plan == self._plan:
             self.lblWaiting.stop()
-
-    def updateModel(self, plan, delta: DeltaList):
-        self.hideOverlay(plan)
-        if plan == self.plan:
-            self._model.setDelta(plan, delta)

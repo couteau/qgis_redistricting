@@ -67,7 +67,12 @@ class Ui_qdwDistrictData(object):
         self.splitter.setSizePolicy(sizePolicy)
         self.splitter.setOrientation(QtCore.Qt.Horizontal)
         self.splitter.setObjectName("splitter")
-        self.tblDataTable = RdsTableView(self.splitter)
+        self.gbxDistrictDemographics = QtWidgets.QGroupBox(self.splitter)
+        self.gbxDistrictDemographics.setObjectName("gbxDistrictDemographics")
+        self.gloDistrictDemographics = QtWidgets.QGridLayout(self.gbxDistrictDemographics)
+        self.gloDistrictDemographics.setContentsMargins(0, 0, 0, 0)
+        self.gloDistrictDemographics.setObjectName("gloDistrictDemographics")
+        self.tblDataTable = RdsTableView(self.gbxDistrictDemographics)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(1)
         sizePolicy.setVerticalStretch(0)
@@ -75,33 +80,33 @@ class Ui_qdwDistrictData(object):
         self.tblDataTable.setSizePolicy(sizePolicy)
         self.tblDataTable.setMinimumSize(QtCore.QSize(20, 0))
         self.tblDataTable.setObjectName("tblDataTable")
-        self.gbxPlanStats = QtWidgets.QGroupBox(self.splitter)
+        self.gloDistrictDemographics.addWidget(self.tblDataTable, 0, 0, 1, 1)
+        self.gbxPlanMetrics = QtWidgets.QGroupBox(self.splitter)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.gbxPlanStats.sizePolicy().hasHeightForWidth())
-        self.gbxPlanStats.setSizePolicy(sizePolicy)
-        self.gbxPlanStats.setFlat(False)
-        self.gbxPlanStats.setObjectName("gbxPlanStats")
-        self.gloStatistics = QtWidgets.QGridLayout(self.gbxPlanStats)
-        self.gloStatistics.setContentsMargins(0, 0, 0, 0)
-        self.gloStatistics.setObjectName("gloStatistics")
-        self.tblPlanStats = QtWidgets.QTableView(self.gbxPlanStats)
-        self.tblPlanStats.setStyleSheet("QHeaderView {\n"
-"     border: none;\n"
-"     padding-left: 5px\n"
-"}\n"
-"QHeaderView::section {\n"
-"    border: none;\n"
-"}")
-        self.tblPlanStats.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.tblPlanStats.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.tblPlanStats.setShowGrid(False)
-        self.tblPlanStats.setGridStyle(QtCore.Qt.NoPen)
-        self.tblPlanStats.setObjectName("tblPlanStats")
-        self.tblPlanStats.horizontalHeader().setVisible(False)
-        self.tblPlanStats.verticalHeader().setDefaultSectionSize(24)
-        self.gloStatistics.addWidget(self.tblPlanStats, 5, 0, 1, 1)
+        sizePolicy.setHeightForWidth(self.gbxPlanMetrics.sizePolicy().hasHeightForWidth())
+        self.gbxPlanMetrics.setSizePolicy(sizePolicy)
+        self.gbxPlanMetrics.setObjectName("gbxPlanMetrics")
+        self.gloMetrics = QtWidgets.QGridLayout(self.gbxPlanMetrics)
+        self.gloMetrics.setContentsMargins(0, 0, 0, 0)
+        self.gloMetrics.setObjectName("gloMetrics")
+        self.tblPlanMetrics = QtWidgets.QTableView(self.gbxPlanMetrics)
+        self.tblPlanMetrics.setStyleSheet("QHeaderView {\n"
+"                                                                        border: none;\n"
+"                                                                        padding-left: 5px\n"
+"                                                                        }\n"
+"                                                                        QHeaderView::section {\n"
+"                                                                        border: none;\n"
+"                                                                        }")
+        self.tblPlanMetrics.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.tblPlanMetrics.setFrameShadow(QtWidgets.QFrame.Plain)
+        self.tblPlanMetrics.setShowGrid(False)
+        self.tblPlanMetrics.setGridStyle(QtCore.Qt.NoPen)
+        self.tblPlanMetrics.setObjectName("tblPlanMetrics")
+        self.tblPlanMetrics.horizontalHeader().setVisible(False)
+        self.tblPlanMetrics.verticalHeader().setDefaultSectionSize(24)
+        self.gloMetrics.addWidget(self.tblPlanMetrics, 5, 0, 1, 1)
         self.verticalLayout.addWidget(self.splitter)
         qdwDistrictData.setWidget(self.dockWidgetContents)
 
@@ -113,13 +118,17 @@ class Ui_qdwDistrictData(object):
         qdwDistrictData.setWindowTitle(_translate("qdwDistrictData", "QGIS Redistricting - Plan Analysis"))
         self.label.setText(_translate("qdwDistrictData", "Redistricting Plan"))
         self.lblPlanName.setText(_translate("qdwDistrictData", "No plan selected"))
-        self.btnCopy.setToolTip(_translate("qdwDistrictData", "Copy entire table to clipboard"))
+        self.btnCopy.setToolTip(_translate("qdwDistrictData", "Copy entire table to\n"
+"                                                                              clipboard"))
         self.btnCopy.setText(_translate("qdwDistrictData", "..."))
         self.btnRecalculate.setToolTip(_translate("qdwDistrictData", "Recalculate"))
-        self.btnRecalculate.setStatusTip(_translate("qdwDistrictData", "Reaggregate all demographics"))
+        self.btnRecalculate.setStatusTip(_translate("qdwDistrictData", "Reaggregate all\n"
+"                                                                              demographics"))
         self.btnRecalculate.setText(_translate("qdwDistrictData", "..."))
-        self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data fields"))
+        self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data\n"
+"                                                                              fields"))
         self.btnAddFields.setText(_translate("qdwDistrictData", "..."))
         self.btnHelp.setText(_translate("qdwDistrictData", "..."))
-        self.gbxPlanStats.setTitle(_translate("qdwDistrictData", "Plan Statistics"))
+        self.gbxDistrictDemographics.setTitle(_translate("qdwDistrictData", "District Demographics"))
+        self.gbxPlanMetrics.setTitle(_translate("qdwDistrictData", "Plan Metrics"))
 from .RedistrictingWidgets import RdsTableView

@@ -120,7 +120,8 @@ class BaseController(QObject):
             progress.canceled.disconnect(self.progressCanceled)
             progress.close()
 
-        self.dlg = None
+        if self.dlg == progress:
+            self.dlg = None
 
     def pushErrors(self, errors: Iterable[tuple[str, int]], title: str = None, level: int = None):
         if not errors:

@@ -1,10 +1,14 @@
 import pandas as pd
 import pytest
 
-from redistricting.gui.DeltaListModel import DeltaListModel
-from redistricting.models import RdsPlan
-from redistricting.models.DeltaList import DeltaList
-from redistricting.services import PlanEditor
+from redistricting.models import (
+    DeltaList,
+    RdsPlan
+)
+from redistricting.services import (
+    DeltaListModel,
+    PlanEditor
+)
 
 # pylint: disable=unused-argument,protected-access
 

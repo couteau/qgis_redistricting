@@ -42,6 +42,8 @@
     "python.analysis.inlayHints.pytestParameters": true,
     "python.testing.pytestArgs": [
         "--cov=redistricting",
-        "--cov-report=xml"
+        "--cov-report=xml",
+        "-p",
+        "pytest_qgis"
     ],
 }

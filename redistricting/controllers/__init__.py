@@ -24,10 +24,11 @@
 from .CtxMenuCtlr import ContextMenuController
 from .DistrictCtlr import DistrictController
 from .EditCtlr import EditAssignmentsController
+from .MetricsCtlr import MetricsController
 from .PendingCtlr import PendingChangesController
 from .PlanCtlr import PlanController
 
 __all__ = (
     'ContextMenuController', 'DistrictController', 'EditAssignmentsController',
-    'PendingChangesController', 'PlanController'
+    'MetricsController', 'PendingChangesController', 'PlanController'
 )

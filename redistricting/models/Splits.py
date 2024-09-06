@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import (
     Any,
     Sequence,
@@ -16,10 +17,38 @@ from .base import (
 from .Field import RdsGeoField
 
 
-class RdsSplitDistrict:
-    def __init__(self, data: pd.DataFrame, idx: tuple[str, int]):
+class RdsSplitBase:
+    def __init__(self, parent: Union['RdsSplitBase', 'RdsSplits'], data: pd.DataFrame, idx: Union[str, tuple[str, int]]):
+        self._parent = parent
         self._data = data
         self._idx = idx
+
+    @property
+    @abstractmethod
+    def attributes(self) -> Sequence[Any]:
+        return NotImplemented
+
+    @property
+    def parent(self):
+        return self._parent
+
+
+class RdsSplitDistrict(RdsSplitBase):
+    def __len__(self) -> int:
+        return len(self._data.columns) + 1 - int("__name" in self._data.columns)
+
+    def __getitem__(self, index: int):
+        if index == 0:
+            return self.district
+
+        if 0 < index < len(self._data.columns):
+            col = self._data.columns[index-1]
+            return self._data.loc[self._idx, col]
+
+        raise IndexError()
+
+    def __contains__(self, item):
+        return item in self._data[self._idx]
 
     @property
     def geoid(self) -> str:
@@ -33,37 +62,28 @@ class RdsSplitDistrict:
     def attributes(self) -> Sequence[Any]:
         return self
 
-    def __len__(self) -> int:
-        return len(self._data.columns) + 1 - int("__name" in self._data.columns)
 
-    def __getitem__(self, index: str):
-        if index == 0:
-            return self.district
-        else:
-            col = self._data.columns[index-1]
-            return self._data.loc[self._idx, col]
-
-
-class RdsSplitGeography:
-    def __init__(self, data: pd.DataFrame, geoid: str):
-        self._data = data
-        self._geoid = geoid
-        self._districts = data.loc[geoid].index
+class RdsSplitGeography(RdsSplitBase):
+    def __init__(self, parent: 'RdsSplits', data: pd.DataFrame, idx: str):
+        super().__init__(parent, data, idx)
+        self._districts = list(data.loc[idx].index)
         self._splits = [
-            RdsSplitDistrict(data, (geoid, d)) for d in self._districts
+            RdsSplitDistrict(self, data, (idx, d)) for d in self._districts
         ]
-        self.attributes = [
-            f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid, ", ".join(self._districts.astype(str))]
+        self._attributes = [
+            f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid,
+            ", ".join(data.loc[idx].index.astype(str))
+        ]
 
     def __len__(self):
-        return len(self._districts)
+        return len(self._splits)
 
     def __getitem__(self, index) -> RdsSplitDistrict:
-        return self._districts[index]
+        return self._splits[index]
 
     @property
     def geoid(self):
-        return self._geoid
+        return self._idx
 
     @property
     def districts(self):
@@ -73,9 +93,13 @@ class RdsSplitGeography:
     def name(self):
         if "__name" in self._data.columns:
             i = self._data.columns.get_loc("__name",)
-            return self._data.loc[self._geoid].iat[0, i]
+            return self._data.loc[self._idx].iat[0, i]
 
         return ""
+
+    @property
+    def attributes(self):
+        return self._attributes
 
 
 class RdsSplits(RdsBaseModel):
@@ -99,15 +123,24 @@ class RdsSplits(RdsBaseModel):
         else:
             self.splits = []
 
-    def __key__(self):
-        return self.field
-
     def __len__(self):
         return len(self.splits)
 
-    @property
+    def __getitem__(self, index: int) -> RdsSplitGeography:
+        return self.splits[index]
+
+    def __key__(self):
+        return self.field
+
+    def index(self, item: RdsSplitGeography):
+        if not item.geoid in self.data.index.get_level_values(0):
+            raise IndexError(f"No split for {self.geoField.caption} {item.geoid!r}")
+
+        return self.data.index.get_level_values(0).unique().get_loc(item.geoid)
+
+    @ property
     def attrCount(self):
-        return len(self.data.columns) - int("__name" in self.data.columns)
+        return len(self.data.columns) + 2 - int("__name" in self.data.columns)
 
     def makeSplits(self):
         if self.data is None:
@@ -115,7 +148,7 @@ class RdsSplits(RdsBaseModel):
             return
 
         self.splits = [
-            RdsSplitGeography(self.data, geoid)
+            RdsSplitGeography(self, self.data, geoid)
             for geoid in self.data.index.get_level_values(0).unique()
         ]
 

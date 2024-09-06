@@ -7,8 +7,8 @@ from qgis.PyQt.QtCore import (
     pyqtBoundSignal
 )
 
-from redistricting.gui.DeltaListModel import DeltaListModel
 from redistricting.models import DeltaList
+from redistricting.services import DeltaListModel
 
 # pylint: disable=unused-argument,protected-access
 

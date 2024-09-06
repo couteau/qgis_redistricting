@@ -1,3 +1,4 @@
+import textwrap
 from typing import (
     Any,
     Optional
@@ -31,12 +32,12 @@ class RdsPlanMetricsModel(QAbstractTableModel):
     ]
     SPLITS_OFFSET = 8
 
-    def __init__(self, stats: RdsPlanMetrics, parent: Optional[QObject] = None):
+    def __init__(self, metrics: RdsPlanMetrics, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._metrics = None
-        self.setStats(stats)
+        self.setMetrics(metrics)
 
-    def setStats(self, value: RdsPlanMetrics):
+    def setMetrics(self, value: RdsPlanMetrics):
         self.beginResetModel()
         if self._metrics:
             self._metrics.metricsAboutToChange.disconnect(self.beginResetModel)
@@ -70,8 +71,10 @@ class RdsPlanMetricsModel(QAbstractTableModel):
             if section >= RdsPlanMetricsModel.SPLITS_OFFSET:
                 split = self._metrics.splits[section-RdsPlanMetricsModel.SPLITS_OFFSET]
                 if split.geoField is None:
-                    return f'   {split.field}'
-                return f'   {split.geoField.caption}'
+                    header = split.field
+                else:
+                    header = split.geoField.caption
+                return f'   {textwrap.shorten(header, 20, placeholder="...")}'
 
             return RdsPlanMetricsModel.MetricLabels[section]
 

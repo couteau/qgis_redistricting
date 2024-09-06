@@ -22,8 +22,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-from .DeltaListModel import DeltaListModel
-from .DistrictDataModel import DistrictDataModel
 from .DistrictDataTable import DockDistrictDataTable
 from .DistrictTools import DockRedistrictingToolbox
 from .DlgConfirmDelete import DlgConfirmDelete
@@ -35,23 +33,18 @@ from .DlgImportPlan import DlgImportPlan
 from .DlgImportShape import DlgImportShape
 from .DlgNewDistrict import DlgNewDistrict
 from .DlgSelectPlan import DlgSelectPlan
-from .FieldListModels import (
-    GeoFieldsModel,
-    PopFieldsModel
-)
+from .DlgSplits import DlgSplitDetail
 from .PaintTool import (
     PaintDistrictsTool,
     PaintMode
 )
 from .PendingChanges import DockPendingChanges
-from .PlanSplitsModel import SplitsModel
 
 __all__ = [
-    'DeltaListModel',
-    'DistrictDataModel',
     'DlgEditPlan',
     'DlgCopyPlan',
     'DlgSelectPlan',
+    'DlgSplitDetail',
     'DlgExportPlan',
     'DlgImportPlan',
     'DlgImportShape',
@@ -60,9 +53,6 @@ __all__ = [
     'DockRedistrictingToolbox',
     'DockDistrictDataTable',
     'DockPendingChanges',
-    'GeoFieldsModel',
     'PaintDistrictsTool',
     'PaintMode',
-    'PopFieldsModel',
-    'SplitsModel'
 ]

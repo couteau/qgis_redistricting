@@ -48,14 +48,11 @@ from ..models import (
     RdsDistrict,
     RdsPlan
 )
-from ..services import (
-    DistrictValidator,
-    getColorForDistrict
-)
 from ..utils import tr
+from .PlanColors import getColorForDistrict
 
 
-class DistrictDataModel(QAbstractTableModel):
+class RdsDistrictDataModel(QAbstractTableModel):
     _plan: RdsPlan = None
 
     def __init__(self, plan: RdsPlan = None, parent: QObject = None):
@@ -64,7 +61,6 @@ class DistrictDataModel(QAbstractTableModel):
         self._headings = []
         self._plan = None
         self._districts: Sequence[RdsDistrict] = []
-        self._validator = DistrictValidator()
         self.plan = plan
 
     @property
@@ -246,7 +242,10 @@ class DistrictDataModel(QAbstractTableModel):
 
         return f
 
-    def districtsUpdated(self, districts: Union[Iterable[int], None]):
+    def districtsUpdated(self, plan: RdsPlan, districts: Union[Iterable[int], None]):
+        if plan != self._plan:
+            return
+
         if districts:
             for d in districts:
                 self.dataChanged.emit(

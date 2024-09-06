@@ -32,9 +32,9 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QBrush
 
-from ..gui import DistrictDataModel
 from ..models import RdsPlan
 from ..utils import tr
+from .DistrictDataModel import RdsDistrictDataModel
 
 
 class DistrictClipboardAccess:
@@ -70,10 +70,10 @@ class DistrictClipboardAccess:
             r = 0 if row == tr("Unassigned") else int(row)
             clr: QBrush = model.data(model.index(r, 0), Qt.BackgroundColorRole)
             return f'background-color: #{clr.color().rgb() & 0xFFFFFF:x};'
-        model = DistrictDataModel(plan)
+        model = RdsDistrictDataModel(plan)
         df = self.getSelectionData(model, selection)
         return df.style.map_index(colorRowHeader).to_html(doctype_html=True)
 
     def getAsCsv(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
-        model = DistrictDataModel(plan)
+        model = RdsDistrictDataModel(plan)
         return self.getSelectionData(model, selection).to_csv()

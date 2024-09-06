@@ -115,14 +115,16 @@ class TestPaintTool:
         qtbot.mousePress(qgis_canvas.viewport(), Qt.LeftButton)
         assert active_tool._selectRect.topLeft() == qgis_canvas.viewport().rect().center()
 
-    @pytest.mark.qgis_show_map(timeout=1)
+    # @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_release(self,
                            active_tool_with_plan: PaintDistrictsTool,
                            qgis_canvas: QgsMapCanvas,
+                           qgis_parent,
                            qtbot: QtBot):
 
         qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
         qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
+        qgis_parent.show()
 
         with qtbot.assertNotEmitted(active_tool_with_plan.paintingComplete):
             qtbot.mouseClick(qgis_canvas.viewport(), Qt.LeftButton)
@@ -137,22 +139,28 @@ class TestPaintTool:
         with qtbot.waitSignals([active_tool_with_plan.paintingStarted, active_tool_with_plan.paintingComplete, active_tool_with_plan.paintFeatures]):
             qtbot.mouseClick(qgis_canvas.viewport(), Qt.LeftButton)
 
-    @pytest.mark.qgis_show_map(timeout=1)
+        qgis_parent.hide()
+
+    # @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_release_select(self,
                                   active_tool_with_plan: PaintDistrictsTool,
                                   qgis_canvas: QgsMapCanvas,
+                                  qgis_parent,
                                   qtbot: QtBot):
 
+        qgis_parent.show()
         active_tool_with_plan.setTargetDistrict(2)
         active_tool_with_plan.paintMode = PaintMode.SelectByGeography
         with qtbot.wait_signal(active_tool_with_plan.selectFeatures):
             qtbot.mouseClick(qgis_canvas.viewport(), Qt.LeftButton)
+        qgis_parent.hide()
 
-    @pytest.mark.qgis_show_map(timeout=1)
+    # @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_move(
         self,
         active_tool_with_plan: PaintDistrictsTool,
         qgis_canvas: QgsMapCanvas,
+        qgis_parent,
         qtbot: QtBot,
         mocker: MockerFixture
     ):
@@ -161,6 +169,7 @@ class TestPaintTool:
 
         qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
         qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
+        qgis_parent.show()
 
         qtbot.mousePress(qgis_canvas.viewport(), Qt.LeftButton, pos=QPoint(1000, 1000))
         e = QMouseEvent(QMouseEvent.MouseMove, QPoint(1000, 1000),
@@ -196,15 +205,19 @@ class TestPaintTool:
         qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
         assert paintFeatures.call_count == 2
 
-    @pytest.mark.qgis_show_map(timeout=1)
+        qgis_parent.hide()
+
+    # @pytest.mark.qgis_show_map(timeout=1)
     def test_mouse_move_select(self,
                                active_tool_with_plan: PaintDistrictsTool,
                                qgis_canvas: QgsMapCanvas,
+                               qgis_parent,
                                qtbot: QtBot):
 
         active_tool_with_plan.setTargetDistrict(2)
         qgis_canvas.setDestinationCrs(active_tool_with_plan._layer.crs())
         qgis_canvas.setExtent(active_tool_with_plan._layer.extent())
+        qgis_parent.show()
         active_tool_with_plan.paintMode = PaintMode.SelectByGeography
 
         with qtbot.assertNotEmitted(active_tool_with_plan.selectFeatures):
@@ -225,3 +238,4 @@ class TestPaintTool:
             qgis_canvas.mouseMoveEvent(e)
             assert active_tool_with_plan._rubberBand is not None
             qtbot.mouseRelease(qgis_canvas.viewport(), Qt.LeftButton, pos=qgis_canvas.viewport().rect().center())
+            qgis_parent.hide()

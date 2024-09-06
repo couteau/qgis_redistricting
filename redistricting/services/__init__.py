@@ -23,12 +23,20 @@
  ***************************************************************************/
 """
 from .actions import ActionRegistry
+from .clipboard import DistrictClipboardAccess
+from .DeltaListModel import DeltaListModel
 from .DeltaUpdate import DeltaUpdateService
 from .DistrictCopy import DistrictCopier
+from .DistrictDataModel import RdsDistrictDataModel
 from .DistrictUpdate import DistrictUpdater
 from .DistrictValid import DistrictValidator
 from .ErrorList import ErrorListMixin
+from .FieldListModels import (
+    GeoFieldsModel,
+    PopFieldsModel
+)
 from .LayerTreeManager import LayerTreeManager
+from .MetricsModel import RdsPlanMetricsModel
 from .PlanAssignments import (
     AssignmentsService,
     PlanAssignmentEditor
@@ -45,13 +53,15 @@ from .PlanImport import (
 )
 from .PlanManager import PlanManager
 from .PlanStyle import PlanStylerService
+from .SplitsModel import RdsSplitsModel
 from .storage import ProjectStorage
 
 __all__ = (
-    'ActionRegistry', 'PlanManager', 'LayerTreeManager',
-    'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService', 'getColorForDistrict',
+    'ActionRegistry', 'PlanManager', 'LayerTreeManager', 'DistrictClipboardAccess',
+    'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
     'DistrictUpdater', 'DeltaUpdateService', 'DistrictValidator',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
-    'ProjectStorage', 'ErrorListMixin'
+    'ProjectStorage', 'ErrorListMixin', 'getColorForDistrict',
+    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'DeltaListModel', 'RdsSplitsModel'
 )

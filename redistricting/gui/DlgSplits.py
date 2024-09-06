@@ -37,8 +37,8 @@ from ..models import (
     RdsGeoField,
     RdsPlan
 )
+from ..services import RdsSplitsModel
 from ..utils import tr
-from .PlanSplitsModel import SplitsModel
 from .ui.DlgSplits import Ui_dlgSplits
 
 
@@ -70,12 +70,17 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         if self._plan:
             self.plan.nameChanged.disconnect(self.planNameChanged)
             self.plan.geoFieldsChanged.disconnect(self.updateGeography)
+            if self._model:
+                self.tvSplits.expanded.disconnect(self._model.setExpanded)
+                self.tvSplits.collapsed.disconnect(self._model.setCollapsed)
 
         self._plan = value
 
         if self._plan:
             if self._field:
-                self._model = SplitsModel(self._plan.metrics.splits[self._field], self)
+                self._model = RdsSplitsModel(self._plan, self._plan.metrics.splits[self._field], self)
+                self.tvSplits.expanded.connect(self._model.setExpanded)
+                self.tvSplits.collapsed.connect(self._model.setCollapsed)
             else:
                 self._model = None
             self.lblPlan.setText(self._plan.name)
@@ -92,8 +97,14 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
     @geoField.setter
     def geoField(self, value: RdsGeoField):
         self._field = value
+        if self._model:
+            self.tvSplits.expanded.disconnect(self._model.setExpanded)
+            self.tvSplits.collapsed.disconnect(self._model.setCollapsed)
+
         if self._plan and self._field:
-            self._model = SplitsModel(self._plan.metrics.splits[self._field.field], self)
+            self._model = RdsSplitsModel(self._plan, self._plan.metrics.splits[self._field.field], self)
+            self.tvSplits.expanded.connect(self._model.setExpanded)
+            self.tvSplits.collapsed.connect(self._model.setCollapsed)
         else:
             self._model = None
 

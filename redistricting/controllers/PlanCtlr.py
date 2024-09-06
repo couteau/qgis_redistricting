@@ -24,6 +24,7 @@
 import pathlib
 from typing import (
     TYPE_CHECKING,
+    Iterable,
     Optional
 )
 
@@ -125,6 +126,7 @@ class PlanController(BaseController):
         self.project.layersAdded.connect(self.enableNewPlan)
         self.project.layersRemoved.connect(self.enableNewPlan)
         self.project.cleared.connect(self.clearPlanMenu)
+        self.updateService.updateComplete.connect(self.planDistrictsUpdated)
 
         m: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
         m.addMenu(self.menuButton.menu())
@@ -232,7 +234,11 @@ class PlanController(BaseController):
             parent=self.iface.mainWindow()
         )
         self.actionSelectPlan.setEnabled(False)
+
     # slots
+
+    def planDistrictsUpdated(self, plan: RdsPlan, districts: Iterable[int]):  # pylint: disable=unused-argument
+        self.project.setDirty()
 
     def enableActivePlanActions(self, plan: RdsPlan):
         self.actionEditPlan.setEnabled(plan is not None)
@@ -277,7 +283,7 @@ class PlanController(BaseController):
         self.planMenu.addAction(action)
 
     def removePlanFromMenu(self, plan: RdsPlan):
-        action = self.planActions.findChild(QAction, plan.name)
+        action: QAction = self.planActions.findChild(QAction, plan.name)
         if action:
             action.triggered.disconnect(self.activatePlan)
             self.planMenu.removeAction(action)
@@ -348,6 +354,7 @@ class PlanController(BaseController):
         """Open redistricting plan in the edit dialog"""
         if not isinstance(plan, RdsPlan):
             plan = self.planManager.activePlan
+
         if not plan:
             return
 
@@ -459,7 +466,7 @@ class PlanController(BaseController):
                 return
 
         dlgExportPlan = DlgExportPlan(self.planManager.activePlan, self.iface.mainWindow())
-        if dlgExportPlan.exec_() == QDialog.Accepted:
+        if dlgExportPlan.exec() == QDialog.Accepted:
             plan = self.planManager.activePlan
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
                 export = PlanExporter(
@@ -479,10 +486,13 @@ class PlanController(BaseController):
                 export.exportTerminated.connect(exportError)
                 export.export()
 
-    def selectPlan(self, plan):
+    def selectPlan(self, plan: RdsPlan):
         """Make the selected plan the active plan"""
         self.planManager.setActivePlan(plan)
         self.project.setDirty()
+        action: QAction = self.planActions.findChild(QAction, plan.name)
+        if action is not None:
+            action.setChecked(True)
 
     def deletePlan(self, plan: RdsPlan):
         if plan in self.planManager:
@@ -507,8 +517,7 @@ class PlanController(BaseController):
             action: QAction = self.planActions.checkedAction()
             plan = action.data()
             if plan != self.planManager.activePlan:
-                self.planManager.setActivePlan(plan)
-                self.project.setDirty()
+                self.selectPlan(plan)
 
     # helper methods
 

@@ -21,9 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
+import csv
+import io
 from typing import (
     TYPE_CHECKING,
-    Optional
+    Optional,
+    Union
 )
 
 from qgis.core import (
@@ -35,8 +38,16 @@ from qgis.gui import (
     QgsMapMouseEvent
 )
 from qgis.PyQt.QtCore import (
+    QEvent,
+    QMimeData,
+    QModelIndex,
     QObject,
+    QPoint,
     Qt
+)
+from qgis.PyQt.QtGui import (
+    QContextMenuEvent,
+    QKeySequence
 )
 from qgis.PyQt.QtWidgets import (
     QMenu,
@@ -44,12 +55,16 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..gui import DockDistrictDataTable
+from ..models import RdsPlan
 from ..services import (
     ActionRegistry,
     AssignmentsService,
+    DistrictClipboardAccess,
     DistrictCopier,
     DistrictUpdater,
-    PlanManager
+    PlanManager,
+    RdsDistrictDataModel,
+    RdsPlanMetricsModel
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
@@ -78,17 +93,69 @@ class DistrictController(BaseController):
         self.districtCopier = districtCopier
         self.updateService = updateService
         self.actionToggle: QAction = None
+        self.model: RdsDistrictDataModel = None
+        self.metricsModel: RdsPlanMetricsModel = None
         self.dockwidget: DockDistrictDataTable = None
         self.actions = ActionRegistry()
 
-        self.actionCopyDistrict = self.actions.actionCopyDistrict
-        self.actionPasteDistrict = self.actions.actionPasteDistrict
-        self.actionZoomToDistrict = self.actions.actionZoomToDistrict
-        self.actionFlashDistrict = self.actions.actionFlashDistrict
+        self.actionCopyDistrict = self.actions.createAction(
+            name='actionCopyDistrict',
+            icon=':/plugins/redistricting/copydistrict.svg',
+            text=str('Copy District'),
+            tooltip=tr('Copy district to clipboard'),
+            callback=self.districtCopier.copyDistrict,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionPasteDistrict = self.actions.createAction(
+            name='actionPasteDistrict',
+            icon=QgsApplication.getThemeIcon('/mActionDuplicateFeature.svg'),
+            text=tr('Paste District'),
+            tooltip=tr('Paste district from clipboard'),
+            callback=self.districtCopier.pasteDistrict,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionZoomToDistrict = self.actions.createAction(
+            name="actionZoomToDistrict",
+            icon=':/plugins/redistricting/zoomdistrict.svg',
+            text=tr("Zoom to district"),
+            callback=self.zoomToDistrict,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionFlashDistrict = self.actions.createAction(
+            name='actionFlashDistrict',
+            icon=':/plugins/redistricting/flashdistrict.svg',
+            text=self.tr("Flash district"),
+            callback=self.flashDistrict,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionCopyDistrictData = self.actions.createAction(
+            name="actionCopyDistrictsData",
+            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            text=self.tr("Copy data"),
+            tooltip=self.tr("Copy selected demographic data to clipboard"),
+            callback=self.copySelection,
+            shortcut=QKeySequence.Copy,
+            parent=self.iface.mainWindow()
+        )
+
+        self.actionRecalculate = self.actions.createAction(
+            name="actionRecalculate",
+            icon=QgsApplication.getThemeIcon('/mActionRefresh.svg'),
+            text=self.tr("Recalculate"),
+            tooltip=self.tr("Recalculate"),
+            statustip=self.tr("Reaggregate all demographics"),
+            callback=self.recalculate
+        )
 
     def load(self):
         self.createDataTableDockWidget()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
+        self.planManager.planAdded.connect(self.planAdded)
+        self.planManager.planRemoved.connect(self.planRemoved)
         self.canvas.contextMenuAboutToShow.connect(self.addCanvasContextMenuItems)
 
     def unload(self):
@@ -99,8 +166,22 @@ class DistrictController(BaseController):
         self.dockwidget = None
 
     def createDataTableDockWidget(self):
-        """Create the dockwidget that displays district statistics."""
-        dockwidget = DockDistrictDataTable(self.updateService, self.districtCopier)
+        """Create the dockwidget that displays district statistics and wire up the interface."""
+        self.model = RdsDistrictDataModel(None, self)
+        self.updateService.updateComplete.connect(self.model.districtsUpdated)
+
+        self.metricsModel = RdsPlanMetricsModel(None, self)
+
+        dockwidget = DockDistrictDataTable(self.updateService, self.iface.mainWindow())
+        dockwidget.installEventFilter(self)
+        dockwidget.tblDataTable.doubleClicked.connect(self.editDistrict)
+        dockwidget.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
+        dockwidget.tblDataTable.customContextMenuRequested.connect(self.createDataTableContextMenu)
+        dockwidget.tblDataTable.setModel(self.model)
+        dockwidget.tblPlanMetrics.setModel(self.metricsModel)
+        dockwidget.tblPlanMetrics.doubleClicked.connect(self.showSplitsDialog)
+        dockwidget.btnCopy.setDefaultAction(self.actionCopyDistrictData)
+        dockwidget.btnRecalculate.setDefaultAction(self.actionRecalculate)
         self.iface.addDockWidget(Qt.BottomDockWidgetArea, dockwidget)
 
         self.actionToggle = dockwidget.toggleViewAction()
@@ -113,8 +194,26 @@ class DistrictController(BaseController):
         self.dockwidget = dockwidget
         return self.dockwidget
 
-    def activePlanChanged(self, plan):
+    def activePlanChanged(self, plan: Union[RdsPlan, None]):
+        self.model.plan = plan
+        if plan is not None:
+            self.metricsModel.setMetrics(plan.metrics)
+        else:
+            self.metricsModel.setMetrics(None)
         self.dockwidget.plan = plan
+        self.actionRecalculate.setEnabled(plan is not None)
+        self.actionCopyDistrictData.setEnabled(plan is not None)
+
+    def planAdded(self, plan: RdsPlan):
+        plan.metricsChanged.connect(self.updateMetrics)
+
+    def planRemoved(self, plan: RdsPlan):
+        plan.metricsChanged.disconnect(self.updateMetrics)
+
+    def updateMetrics(self):
+        plan: RdsPlan = self.sender()
+        if plan == self.planManager.activePlan:
+            self.metricsModel.setMetrics(plan.metrics)
 
     def addCanvasContextMenuItems(self, menu: QMenu, event: QgsMapMouseEvent):
         if self.planManager.activePlan is None:
@@ -125,3 +224,122 @@ class DistrictController(BaseController):
 
         menu.addAction(self.actionPasteDistrict)
         self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
+
+    def eventFilter(self, obj: QObject, event: QContextMenuEvent):  # pylint: disable=unused-argument
+        if event.type() != QEvent.ContextMenu:
+            return False
+
+        menu = QMenu()
+        menu.addActions([self.actionCopyDistrict, self.actionPasteDistrict,
+                        self.actionZoomToDistrict, self.actionFlashDistrict])
+        menu.exec(event.globalPos())
+
+        return True
+
+    def createDataTableContextMenu(self, pos: QPoint):
+        menu = QMenu()
+        menu.addAction(self.actionCopyDistrictData)
+
+        idx = self.dockwidget.tblDataTable.indexAt(pos)
+        district = self.planManager.activePlan.districts[idx.row()]
+
+        menu.addAction(self.actionCopyDistrict)
+        self.actionCopyDistrict.setData(district.district)
+        self.actionCopyDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.actionPasteDistrict)
+        self.actionPasteDistrict.setData(district.district)
+        self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
+        menu.addAction(self.actionZoomToDistrict)
+        self.actionZoomToDistrict.setData(district.district)
+        menu.addAction(self.actionFlashDistrict)
+        self.actionFlashDistrict.setData(district.district)
+        self.actionFlashDistrict.setEnabled(district.district != 0)
+        menu.exec(self.dockwidget.tblDataTable.mapToGlobal(pos))
+
+    def districtAction(self, district, method, refresh):
+        if self.planManager.activePlan is None:
+            return
+
+        if isinstance(district, bool):
+            district = None
+
+        if district is None:
+            action = self.sender()
+            if isinstance(action, QAction):
+                district = action.data()
+
+        if not isinstance(district, int):
+            raise TypeError()
+
+        if district < 1 or district > self.planManager.activePlan.numDistricts:
+            raise ValueError()
+
+        fid = self.planManager.activePlan.districts[district].fid
+        if fid is not None:
+            method(self.planManager.activePlan.distLayer, [fid])
+            if refresh:
+                self.canvas.refresh()
+
+    def zoomToDistrict(self, district: Optional[int]):
+        self.districtAction(district, self.canvas.zoomToFeatureIds, True)
+
+    def flashDistrict(self, district: Optional[int]):
+        self.districtAction(district, self.canvas.flashFeatureIds, False)
+
+    def copyMimeDataToClipboard(self, selection: Optional[list[QModelIndex]] = None):
+        """Copy district data to clipboard in html table format"""
+        if selection:
+            selection = ((s.row(), s.column()) for s in selection)
+
+        clipboard = DistrictClipboardAccess()
+        html = clipboard.getAsHtml(self.planManager.activePlan, selection)
+        text = clipboard.getAsCsv(self.planManager.activePlan, selection)
+        mime = QMimeData()
+        mime.setHtml(html)
+        mime.setData("application/csv", text.encode())
+        QgsApplication.instance().clipboard().setMimeData(mime)
+
+    def copyToClipboard(self):
+        self.copyMimeDataToClipboard()
+
+    def copySelection(self):
+        table = None
+        if self.dockwidget.tblPlanStats.hasFocus():
+            selection = self.dockwidget.tblPlanStats.selectedIndexes()
+            if selection:
+                selection.sort(key=lambda idx: idx.row())
+                table = []
+                for idx in selection:
+                    table.append([self.metricsModel.headerData(
+                        idx.row(), Qt.Vertical, Qt.DisplayRole), idx.data()])
+                stream = io.StringIO()
+                csv.writer(stream, delimiter='\t').writerows(table)
+                QgsApplication.instance().clipboard().setText(stream.getvalue())
+        else:
+            selection = self.dockwidget.tblDataTable.selectedIndexes()
+            if selection:
+                self.copyMimeDataToClipboard(selection)
+
+    def recalculate(self):
+        self.updateService.updateDistricts(self.planManager.activePlan, needDemographics=True, needSplits=True)
+
+    def editDistrict(self, index: QModelIndex):
+        if not self.actions.actionEditDistrict.isEnabled():
+            return
+
+        if index.row() == 0:
+            return
+
+        district = self.planManager.activePlan.districts[index.row()]
+        self.actions.actionEditDistrict.setData(district)
+        self.actions.actionEditDistrict.trigger()
+
+    def showSplitsDialog(self, index: QModelIndex):
+        if not self.actions.actionShowSplitsDialog.isEnabled():
+            return
+
+        row = index.row()
+        if row >= self.metricsModel.SPLITS_OFFSET:
+            field = self.planManager.activePlan.geoFields[row-self.metricsModel.SPLITS_OFFSET]
+            self.actions.actionShowSplitsDialog.setData(field)
+            self.actions.actionShowSplitsDialog.trigger()

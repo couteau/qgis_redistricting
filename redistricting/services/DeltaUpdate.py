@@ -164,5 +164,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             self._deltas[plan].clear()
 
     def getDelta(self, plan: RdsPlan) -> DeltaList:
-        if plan in self._deltas:
-            return self._deltas[plan].delta
+        if plan not in self._deltas:
+            return None
+
+        return self._deltas[plan].delta

@@ -35,7 +35,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import RdsPlan
-from .FieldListModels import GeoFieldsModel
+from ..services import GeoFieldsModel
 from .ui.DlgExportPlan import Ui_dlgExportPlan
 
 

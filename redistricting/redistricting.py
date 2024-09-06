@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# pylint: disable=too-many-lines
 """QGIS Redistricting Plugin
 
         QGIS plugin for building political districts from geographic units
@@ -59,6 +58,7 @@ from .controllers import (
     ContextMenuController,
     DistrictController,
     EditAssignmentsController,
+    MetricsController,
     PendingChangesController,
     PlanController
 )
@@ -138,6 +138,14 @@ class Redistricting:
             iface
         )
 
+        self.metricsController = MetricsController(
+            iface,
+            self.project,
+            self.planManager,
+            self.toolbar,
+            iface
+        )
+
         self.districtController = DistrictController(
             iface,
             self.project,
@@ -199,6 +207,7 @@ class Redistricting:
 
         self.planController.load()
         self.editController.load()
+        self.metricsController.load()
         self.districtController.load()
         self.pendingController.load()
         self.contextConroller.load()
@@ -226,6 +235,7 @@ class Redistricting:
         self.contextConroller.unload()
         self.pendingController.unload()
         self.districtController.unload()
+        self.metricsController.unload()
         self.editController.unload()
         self.planController.unload()
 

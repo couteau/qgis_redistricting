@@ -26,6 +26,7 @@ from typing import Optional
 
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import (
+    QAbstractListModel,
     QModelIndex,
     QObject,
     Qt
@@ -47,7 +48,6 @@ from ..utils import (
     matchField,
     tr
 )
-from .RdsFieldTableView import FieldListModel
 from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
 
 
@@ -74,7 +74,7 @@ class PopFieldDelegate(QStyledItemDelegate):
         else:
             super().setEditorData(editor, index)
 
-    def setModelData(self, editor: QComboBox, model: FieldListModel, index: QModelIndex):
+    def setModelData(self, editor: QComboBox, model: QAbstractListModel, index: QModelIndex):
         if index.column() == 3:
             idx = editor.currentIndex()
             model.setData(index, idx, Qt.EditRole)
@@ -110,7 +110,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
     def initializePage(self):
         super().initializePage()
         popLayer = self.field("popLayer") or self.field("sourceLayer")
-        popField = RdsField(popLayer, self.field("popField"), False, tr("Total Population"))
+        popField = RdsField(popLayer, self.field("popField"), tr("Total Population"))
         popFields: list[RdsField] = [popField, *self.field("popFields")]
         self.fieldsModel.popFields = popFields
 
