@@ -1,6 +1,8 @@
 Getting Started with Redistricting
 ==================================
 
+The QGIS Redistricting plugin allows you to create redistricting plans for legislative and other governmental bodies. You specify the number of districts and the geographic units from which plans will be built, as well as other plan parameters, such as what layer and attributes to use for population demographics, the allowable population deviation, and additional geographies to use for drawing districts. Plan parameters are stored as part of the QGIS project, while assignments of geographies to districts and district geometry and metrics are stored as vector layers in a GeoPackage file.
+
 Plugin Toolbar
 --------------
 
