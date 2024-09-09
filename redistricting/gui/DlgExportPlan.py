@@ -34,13 +34,11 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RdsPlan
-from ..services import GeoFieldsModel
 from .ui.DlgExportPlan import Ui_dlgExportPlan
 
 
 class DlgExportPlan(Ui_dlgExportPlan, QDialog):
-    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
@@ -52,8 +50,6 @@ class DlgExportPlan(Ui_dlgExportPlan, QDialog):
         self.fwEquivalency.fileChanged.connect(self.updateButton)
         self.cbxExportShape.toggled.connect(self.updateButton)
         self.fwShape.fileChanged.connect(self.updateButton)
-
-        self.cmbGeography.setModel(GeoFieldsModel(plan, self))
 
     def updateButton(self):
         self.cbxExportEquivalency.setChecked(

@@ -22,6 +22,8 @@
  *                                                                         *
  ***************************************************************************/
 """
+from typing import Optional
+
 from qgis.core import (
     QgsProject,
     QgsVectorLayer
@@ -32,15 +34,13 @@ from qgis.PyQt.QtWidgets import QWizard
 from qgis.utils import iface
 
 from ..models import RdsPlan
-from ..utils import (
-    showHelp,
-    tr
-)
+from ..utils import tr
 from ._dlgEditPlanDetailsPage import dlgEditPlanDetailsPage
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
 from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
 from ._dlgEditPlanPopPage import dlgEditPlanPopPage
+from .help import showHelp
 from .RdsFieldComboBox import RdsFieldComboBox
 from .RdsFieldTableView import RdsFieldTableView
 from .RdsMapLayerComboBox import RdsMapLayerComboBox
@@ -51,7 +51,7 @@ iface: QgisInterface
 class DlgEditPlan(QWizard):
     plan: RdsPlan = None
 
-    def __init__(self, plan: RdsPlan = None, parent=None, ):
+    def __init__(self, plan: Optional[RdsPlan] = None, parent=None):
         super().__init__(parent)
         self.new = plan is None
         self.setWindowTitle(

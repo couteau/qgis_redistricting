@@ -46,14 +46,14 @@
       </widget>
      </item>
      <item row="2" column="5">
-      <widget class="QPushButton" name="btnCancel">
+      <widget class="QPushButton" name="btnClose">
        <property name="text">
         <string>Close</string>
        </property>
       </widget>
      </item>
      <item row="2" column="0">
-      <widget class="QPushButton" name="btnOpen">
+      <widget class="QPushButton" name="btnSelect">
        <property name="enabled">
         <bool>false</bool>
        </property>

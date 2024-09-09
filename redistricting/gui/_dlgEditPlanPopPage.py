@@ -33,8 +33,10 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import RdsField
-from ..services import defaults
-from ..utils import getDefaultField
+from ..utils import (
+    defaults,
+    getDefaultField
+)
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
 

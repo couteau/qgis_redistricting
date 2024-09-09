@@ -58,7 +58,7 @@ class DlgImportPlan(QDialog):
         self.setLayout(layout)
 
         self.page.initializePage()
-        self.page.cmbJoinField.setLayer(plan._assignLayer)
+        self.page.cmbJoinField.setLayer(plan.assignLayer)
         self.page.cmbJoinField.setField(plan.geoIdField)
 
     def updateButton(self):

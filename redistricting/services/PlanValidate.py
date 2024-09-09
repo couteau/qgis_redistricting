@@ -37,8 +37,10 @@ from ..models import (
     RdsGeoField,
     RdsPlan
 )
-from ..utils import tr
-from .defaults import MAX_DISTRICTS
+from ..utils import (
+    defaults,
+    tr
+)
 from .ErrorList import ErrorListMixin
 
 
@@ -329,7 +331,7 @@ class PlanValidator(ErrorListMixin, QObject):
             and self._numDistricts > 1 \
             and self._numSeats >= self._numDistricts
 
-        if self._numDistricts < 2 or self._numDistricts > MAX_DISTRICTS:
+        if self._numDistricts < 2 or self._numDistricts > defaults.MAX_DISTRICTS:
             self.pushError(tr('Invalid number of districts for plan: {value}').format(
                 value=self._numDistricts), Qgis.Critical)
 

@@ -39,22 +39,16 @@ from ..models import (
     RdsField,
     RdsPlan
 )
-from ..services import DistrictUpdater
-from ..utils import showHelp
 from .DlgEditFields import DlgEditFields
+from .help import showHelp
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
 
 
 class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
-    def __init__(self, updateService: DistrictUpdater, parent: Optional[QObject] = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self.setupUi(self)
-
-        self.updateService = updateService
-        self.updateService.updateStarted.connect(self.updateStarted)
-        self.updateService.updateComplete.connect(self.updateComplete)
-        self.updateService.updateTerminated.connect(self.updateTerminated)
 
         self.fieldStats: dict[RdsField, QWidget] = {}
 
@@ -83,9 +77,6 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         if self._plan is not None:
             self._plan.nameChanged.disconnect(self.planNameChanged)
 
-        if self.lblWaiting.isVisible():
-            self.lblWaiting.stop()
-
         self.gbxPlanMetrics.setContentsMargins(0, 20, 0, 0)
         self._plan = value
 
@@ -96,23 +87,9 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             self._plan.nameChanged.connect(self.planNameChanged)
             self.btnAddFields.setEnabled(True)
             self.lblPlanName.setText(self._plan.name)
-            if self.updateService.planIsUpdating(self._plan):
-                self.lblWaiting.start()
 
     def planNameChanged(self, name):
         self.lblPlanName.setText(name)
-
-    def updateStarted(self, plan: RdsPlan):
-        if plan == self._plan:
-            self.lblWaiting.start()
-
-    def updateComplete(self, plan: RdsPlan, districts: Optional[set[int]] = None):  # pylint: disable=unused-argument
-        if plan == self._plan:
-            self.lblWaiting.stop()
-
-    def updateTerminated(self, plan: RdsPlan):
-        if plan == self._plan:
-            self.lblWaiting.stop()
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)
@@ -120,3 +97,9 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
     def btnHelpClicked(self):
         showHelp('usage/data_table.html')
+
+    def setWaiting(self, on: bool = True):
+        if on and not self.lblWaiting.isVisible():
+            self.lblWaiting.start()
+        elif self.lblWaiting.isVisible():
+            self.lblWaiting.stop()

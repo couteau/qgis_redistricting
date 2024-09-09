@@ -58,15 +58,18 @@ from ..models import RdsPlan
 from ..services import (
     AssignmentImporter,
     DistrictUpdater,
+    GeoFieldsModel,
     LayerTreeManager,
     PlanBuilder,
     PlanCopier,
     PlanEditor,
     PlanExporter,
+    PlanListModel,
     PlanManager,
     PlanStylerService,
     ShapefileImporter
 )
+from ..services.actions import PlanAction
 from ..utils import tr
 from .BaseCtlr import BaseController
 
@@ -103,19 +106,23 @@ class PlanController(BaseController):
         self.icon = QIcon(':/plugins/redistricting/icon.png')
         self.menuName = tr('&Redistricting')
 
-        self.menu = QMenu(self.menuName, self.iface.mainWindow())
+        self.menu = QMenu(self.menuName)
         self.menu.setIcon(self.icon)
 
-        self.menuButton = QToolButton(self.iface.mainWindow())
+        self.menuButton = QToolButton()
         self.menuButton.setMenu(self.menu)
         self.menuButton.setPopupMode(QToolButton.MenuButtonPopup)
         self.menuButton.setIcon(self.icon)
         self.menuButton.setToolTip(tr('Redistricting Utilities'))
 
-        self.toolBtnAction = self.toolbar.addWidget(self.menuButton)
+        self.toolBtnAction: QAction = None
 
-        self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
-        self.planActions = QActionGroup(self.iface.mainWindow())
+        self.planMenu: QMenu = None
+        self.planActions: QActionGroup = None
+        self.vectorSubMenu: QMenu = None
+
+        self.planManagerDlg: DlgSelectPlan = None
+        self.planModel: PlanListModel = None
 
         self.createActions()
 
@@ -128,13 +135,39 @@ class PlanController(BaseController):
         self.project.cleared.connect(self.clearPlanMenu)
         self.updateService.updateComplete.connect(self.planDistrictsUpdated)
 
-        m: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
-        m.addMenu(self.menuButton.menu())
+        self.planModel = PlanListModel(self.planManager)
+        self.planManager.aboutToChangeActivePlan.connect(self.planModel.updatePlan)
+        self.planManager.activePlanChanged.connect(self.planModel.updatePlan)
+        self.planManager.planAdded.connect(self.planModel.planListUpdated)
+        self.planManager.planRemoved.connect(self.planModel.planListUpdated)
+        self.planManager.cleared.connect(self.planModel.planListUpdated)
+
+        self.toolBtnAction: QAction = self.toolbar.addWidget(self.menuButton)
+
+        self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
+        self.planActions = QActionGroup(self.iface.mainWindow())
+
+        self.vectorSubMenu: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
+        self.vectorSubMenu.addMenu(self.menuButton.menu())
 
     def unload(self):
+        self.toolbar.removeAction(self.toolBtnAction)
+        self.iface.vectorMenu().removeAction(self.vectorSubMenu.menuAction())
+        if self.planManagerDlg is not None:
+            self.planManagerDlg.close()
+            self.planManagerDlg.deleteLater()
+            self.planManagerDlg = None
+
         self.planManager.activePlanChanged.disconnect(self.enableActivePlanActions)
         self.planManager.planAdded.disconnect(self.planAdded)
         self.planManager.planRemoved.disconnect(self.planRemoved)
+
+        self.planManager.aboutToChangeActivePlan.disconnect(self.planModel.updatePlan)
+        self.planManager.activePlanChanged.disconnect(self.planModel.updatePlan)
+        self.planManager.planAdded.disconnect(self.planModel.planListUpdated)
+        self.planManager.planRemoved.disconnect(self.planModel.planListUpdated)
+        self.planManager.cleared.disconnect(self.planModel.planListUpdated)
+
         self.project.layersAdded.disconnect(self.enableNewPlan)
         self.project.layersRemoved.disconnect(self.enableNewPlan)
         self.project.cleared.disconnect(self.clearPlanMenu)
@@ -153,7 +186,7 @@ class PlanController(BaseController):
         self.actionNewPlan = self.actions.createAction(
             'actionNewPlan',
             QIcon(':/plugins/redistricting/addplan.svg'),
-            tr('New Redistricting Plan'),
+            tr('New Plan'),
             tooltip=tr('Create a new redistricting plan'),
             callback=self.newPlan,
             parent=self.iface.mainWindow()
@@ -161,20 +194,20 @@ class PlanController(BaseController):
         self.actionNewPlan.setEnabled(False)
         self.menu.addAction(self.actionNewPlan)
 
-        self.actionEditPlan = self.actions.createPlanAction(
-            'actionEditPlan',
+        self.actionEditActivePlan = self.actions.createPlanAction(
+            'actionEditActivePlan',
             QIcon(':/plugins/redistricting/icon.png'),
-            tr('Edit Plan'),
+            tr('Edit Active Plan'),
             callback=self.editPlan,
             parent=self.iface.mainWindow()
         )
-        self.actionEditPlan.setEnabled(False)
-        self.menu.addAction(self.actionEditPlan)
+        self.actionEditActivePlan.setEnabled(False)
+        self.menu.addAction(self.actionEditActivePlan)
 
         self.actionCopyPlan = self.actions.createPlanAction(
             'actionCopyPlan',
             QIcon(':/plugins/redistricting/copyplan.svg'),
-            tr('Copy Plan'),
+            tr('Copy Active Plan'),
             tooltip=tr('Copy the active plan to a new redistricting plan'),
             callback=self.copyPlan,
             parent=self.iface.mainWindow()
@@ -186,7 +219,7 @@ class PlanController(BaseController):
             'actionImportAssignments',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Equivalency File'),
-            tooltip=tr('Import equivalency file to district field'),
+            tooltip=tr('Import assignments to active plan from equivalency file'),
             callback=self.importPlan,
             parent=self.iface.mainWindow()
         )
@@ -197,7 +230,7 @@ class PlanController(BaseController):
             'actionImportShapefile',
             QIcon(':/plugins/redistricting/importplan.svg'),
             tr('Import Shapefile'),
-            tooltip=tr('Import assignments from sahpefile'),
+            tooltip=tr('Import assignments to active plan from shapefile'),
             callback=self.importShapefile,
             parent=self.iface.mainWindow()
         )
@@ -207,13 +240,32 @@ class PlanController(BaseController):
         self.actionExportPlan = self.actions.createPlanAction(
             'actionExportPlan',
             QIcon(':/plugins/redistricting/exportplan.svg'),
-            tr('Export Plan'),
+            tr('Export Active Plan'),
             tooltip=tr('Export plan as equivalency and/or shapefile'),
             callback=self.exportPlan,
             parent=self.iface.mainWindow()
         )
         self.actionExportPlan.setEnabled(False)
         self.menu.addAction(self.actionExportPlan)
+
+        self.actionSelectPlan = self.actions.createPlanAction(
+            'actionSelectPlan',
+            QIcon(':/plugins/redistricting/selectplan.svg'),
+            tr('Select Plan'),
+            tooltip=tr('Make the selected plan the active plan'),
+            callback=self.selectPlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionSelectPlan.setEnabled(False)
+
+        self.actionEditPlan = self.actions.createPlanAction(
+            'actionEditPlan',
+            QIcon(':/plugins/redistricting/icon.png'),
+            tr('Edit Plan'),
+            callback=self.editPlan,
+            parent=self.iface.mainWindow()
+        )
+        self.actionEditPlan.setEnabled(False)
 
         self.actionDeletePlan = self.actions.createPlanAction(
             'actionDeletePlan',
@@ -225,29 +277,24 @@ class PlanController(BaseController):
         )
         self.actionDeletePlan.setEnabled(False)
 
-        self.actionSelectPlan = self.actions.createPlanAction(
-            'actionSelectPlan',
-            QIcon(':/plugins/redistricting/selectplan.svg'),
-            tr('Delete Plan'),
-            tooltip=tr('Make the selected plan the active plan'),
-            callback=self.selectPlan,
-            parent=self.iface.mainWindow()
-        )
-        self.actionSelectPlan.setEnabled(False)
-
     # slots
 
     def planDistrictsUpdated(self, plan: RdsPlan, districts: Iterable[int]):  # pylint: disable=unused-argument
         self.project.setDirty()
 
-    def enableActivePlanActions(self, plan: RdsPlan):
-        self.actionEditPlan.setEnabled(plan is not None)
+    def enableActivePlanActions(self, plan: Optional[RdsPlan]):
+        self.actionEditActivePlan.setEnabled(plan is not None)
+        self.actionEditActivePlan.setTarget(plan)
         self.actionCopyPlan.setEnabled(plan is not None and plan.isValid())
+        self.actionCopyPlan.setTarget(plan)
         self.actionImportAssignments.setEnabled(plan is not None and plan.isValid())
+        self.actionImportAssignments.setTarget(plan)
         self.actionImportShapefile.setEnabled(plan is not None and plan.isValid())
+        self.actionImportShapefile.setTarget(plan)
         self.actionExportPlan.setEnabled(
             plan is not None and plan.assignLayer is not None and plan.distLayer is not None
         )
+        self.actionExportPlan.setTarget(plan)
 
         if plan is not None:
             action = self.planActions.findChild(QAction, plan.name)
@@ -262,6 +309,13 @@ class PlanController(BaseController):
         self.actionNewPlan.setEnabled(
             any(isinstance(layer, QgsVectorLayer)for layer in self.project.mapLayers(True).values())
         )
+
+    def updatePlanManagerActions(self, index: int):
+        plan = self.planManager[index]
+        self.actionEditPlan.setTarget(plan)
+        self.actionSelectPlan.setTarget(plan)
+        self.actionSelectPlan.setEnabled(plan != self.activePlan and plan.isValid())
+        self.actionDeletePlan.setTarget(plan)
 
     def clearPlanMenu(self):
         self.planMenu.clear()
@@ -303,8 +357,23 @@ class PlanController(BaseController):
 
     def showPlanManager(self):
         """Display the plan manager window"""
-        dlg = DlgSelectPlan(self.planManager, self.iface.mainWindow())
-        dlg.exec()
+        if self.planManagerDlg is None:
+            self.planManagerDlg = DlgSelectPlan(self.iface.mainWindow())
+            self.planManagerDlg.setModel(self.planModel)
+            # self.planManagerDlg.lvwPlans.resizeColumnsToContents()
+            # self.planManagerDlg.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            # self.planManagerDlg.lvwPlans.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+            # self.planManagerDlg.lvwPlans.activated.connect(self.updatePlanManagerActions)
+            self.planManagerDlg.currentIndexChanged.connect(self.updatePlanManagerActions)
+            if self.activePlan is not None:
+                self.planManagerDlg.setCurrentIndex(self.planManager.index(self.activePlan))
+
+            self.planManagerDlg.setNewAction(self.actionNewPlan)
+            self.planManagerDlg.setEditAction(self.actionEditPlan)
+            self.planManagerDlg.setSelectAction(self.actionSelectPlan)
+            self.planManagerDlg.setDeleteAction(self.actionDeletePlan)
+
+        self.planManagerDlg.show()
 
     def newPlan(self):
         """Display new redistricting plan dialog and create new plan"""
@@ -465,7 +534,9 @@ class PlanController(BaseController):
             if not self.checkActivePlan(tr('export')):
                 return
 
-        dlgExportPlan = DlgExportPlan(self.planManager.activePlan, self.iface.mainWindow())
+        dlgExportPlan = DlgExportPlan(self.iface.mainWindow())
+        dlgExportPlan.cmbGeography.setModel(GeoFieldsModel(plan, self))
+
         if dlgExportPlan.exec() == QDialog.Accepted:
             plan = self.planManager.activePlan
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
@@ -486,8 +557,16 @@ class PlanController(BaseController):
                 export.exportTerminated.connect(exportError)
                 export.export()
 
-    def selectPlan(self, plan: RdsPlan):
+    def selectPlan(self, plan: Optional[RdsPlan] = None):
         """Make the selected plan the active plan"""
+        if plan is None:
+            action = self.sender()
+            if isinstance(action, PlanAction):
+                plan = action.target()
+
+        if not isinstance(plan, RdsPlan):
+            return
+
         self.planManager.setActivePlan(plan)
         self.project.setDirty()
         action: QAction = self.planActions.findChild(QAction, plan.name)

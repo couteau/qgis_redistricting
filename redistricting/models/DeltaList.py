@@ -64,6 +64,10 @@ class Delta:
     def district(self):
         return self._district
 
+    @property
+    def name(self):
+        return str(self._district)
+
 
 class DeltaList(QObject):
     updateStarted = pyqtSignal()
@@ -116,7 +120,16 @@ class DeltaList(QObject):
     def __bool__(self):
         return self._data is not None and not self._data.empty
 
-    def setData(self, data: pd.DataFrame):
+    def __eq__(self, other: 'DeltaList'):
+        if other is None:
+            return False
+
+        if not isinstance(other, DeltaList):
+            return NotImplemented
+
+        return self._data.equals(other._data)
+
+    def setData(self, data: Optional[pd.DataFrame]):
         self._data = data
         if data is not None:
             self._delta = [Delta(d, data) for d in data.index]

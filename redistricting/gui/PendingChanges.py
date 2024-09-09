@@ -25,24 +25,18 @@
 from qgis.PyQt.QtWidgets import QDockWidget
 
 from ..models import RdsPlan
-from ..services import DeltaUpdateService
 from .RdsOverlayWidget import OverlayWidget
 from .ui.PendingChanges import Ui_qdwPendingChanges
 
 
 class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
-    def __init__(self, deltaService: DeltaUpdateService, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
         self.lblWaiting = OverlayWidget(self.tblPending)
         self.lblWaiting.setVisible(False)
 
         self._plan: RdsPlan = None
-
-        self.deltaService = deltaService
-        self.deltaService.updateStarted.connect(self.showOverlay)
-        self.deltaService.updateCompleted.connect(self.hideOverlay)
-        self.deltaService.updateTerminated.connect(self.hideOverlay)
 
     @property
     def plan(self) -> RdsPlan:
@@ -51,16 +45,10 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
     @plan.setter
     def plan(self, value: RdsPlan):
         if self._plan != value:
-            if self.lblWaiting.isVisible():
-                self.lblWaiting.stop()
             self._plan = value
-            if self.deltaService.isUpdating(self._plan):
-                self.lblWaiting.start()
 
-    def showOverlay(self, plan: RdsPlan):
-        if plan == self._plan:
+    def setWaiting(self, on: bool = True):
+        if on and not self.lblWaiting.isVisible():
             self.lblWaiting.start()
-
-    def hideOverlay(self, plan: RdsPlan):
-        if plan == self._plan:
+        elif self.lblWaiting.isVisible():
             self.lblWaiting.stop()

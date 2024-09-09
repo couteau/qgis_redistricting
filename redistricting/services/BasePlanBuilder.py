@@ -41,10 +41,10 @@ from ..models import (
     RdsPlan
 )
 from ..utils import (
+    defaults,
     matchField,
     tr
 )
-from . import defaults
 from .PlanValidate import PlanValidator
 
 

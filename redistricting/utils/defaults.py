@@ -24,7 +24,7 @@
 """
 import re
 
-from ..utils import tr
+from . import tr
 
 MAX_DISTRICTS = 1000
 

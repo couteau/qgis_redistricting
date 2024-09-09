@@ -43,8 +43,8 @@ from ..models import (
     RdsDataField,
     RdsField
 )
-from ..services import defaults
 from ..utils import (
+    defaults,
     matchField,
     tr
 )

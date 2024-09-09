@@ -156,23 +156,30 @@ class DistrictController(BaseController):
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.planManager.planAdded.connect(self.planAdded)
         self.planManager.planRemoved.connect(self.planRemoved)
+        self.updateService.updateStarted.connect(self.showOverlay)
+        self.updateService.updateComplete.connect(self.hideOverlay)
+        self.updateService.updateTerminated.connect(self.hideOverlay)
         self.canvas.contextMenuAboutToShow.connect(self.addCanvasContextMenuItems)
 
     def unload(self):
         self.canvas.contextMenuAboutToShow.disconnect(self.addCanvasContextMenuItems)
+        self.updateService.updateStarted.disconnect(self.showOverlay)
+        self.updateService.updateComplete.disconnect(self.hideOverlay)
+        self.updateService.updateTerminated.disconnect(self.hideOverlay)
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         self.iface.removeDockWidget(self.dockwidget)
         self.dockwidget.destroy()
         self.dockwidget = None
+        self.metricsModel = None
 
     def createDataTableDockWidget(self):
         """Create the dockwidget that displays district statistics and wire up the interface."""
-        self.model = RdsDistrictDataModel(None, self)
+        self.model = RdsDistrictDataModel()
         self.updateService.updateComplete.connect(self.model.districtsUpdated)
 
-        self.metricsModel = RdsPlanMetricsModel(None, self)
+        self.metricsModel = RdsPlanMetricsModel(None)
 
-        dockwidget = DockDistrictDataTable(self.updateService, self.iface.mainWindow())
+        dockwidget = DockDistrictDataTable(self.updateService)
         dockwidget.installEventFilter(self)
         dockwidget.tblDataTable.doubleClicked.connect(self.editDistrict)
         dockwidget.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -195,6 +202,7 @@ class DistrictController(BaseController):
         return self.dockwidget
 
     def activePlanChanged(self, plan: Union[RdsPlan, None]):
+        self.dockwidget.setWaiting(False)
         self.model.plan = plan
         if plan is not None:
             self.metricsModel.setMetrics(plan.metrics)
@@ -203,6 +211,8 @@ class DistrictController(BaseController):
         self.dockwidget.plan = plan
         self.actionRecalculate.setEnabled(plan is not None)
         self.actionCopyDistrictData.setEnabled(plan is not None)
+        if self.updateService.planIsUpdating(plan):
+            self.dockwidget.setWaiting(True)
 
     def planAdded(self, plan: RdsPlan):
         plan.metricsChanged.connect(self.updateMetrics)
@@ -343,3 +353,11 @@ class DistrictController(BaseController):
             field = self.planManager.activePlan.geoFields[row-self.metricsModel.SPLITS_OFFSET]
             self.actions.actionShowSplitsDialog.setData(field)
             self.actions.actionShowSplitsDialog.trigger()
+
+    def showOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(True)
+
+    def hideOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(False)

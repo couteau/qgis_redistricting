@@ -33,11 +33,19 @@ from typing import (
 from osgeo import gdal
 from processing.algs.gdal.GdalUtils import GdalUtils
 from qgis.core import (
+    Qgis,
     QgsDataSourceUri,
     QgsMessageLog,
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import QCoreApplication
+
+
+def getConnectionStringFromLayer(layer: QgsVectorLayer) -> str:
+    if Qgis.versionInt() < 33801:
+        return GdalUtils.ogrConnectionStringAndFormatFromLayer(layer)[0]  # pylint: disable=no-member
+    else:
+        return GdalUtils.gdal_connection_details_from_layer(layer).connection_string  # pylint: disable=no-member
 
 
 def getOgrCompatibleSource(input_layer: QgsVectorLayer):
@@ -46,18 +54,15 @@ def getOgrCompatibleSource(input_layer: QgsVectorLayer):
     if input_layer is None or input_layer.dataProvider().name() == 'memory':
         pass
     elif input_layer.dataProvider().name() == 'ogr':
-        ogr_data_path = \
-            GdalUtils.ogrConnectionStringAndFormatFromLayer(input_layer)[0]
+        ogr_data_path = getConnectionStringFromLayer(input_layer)
     elif input_layer.dataProvider().name() == 'delimitedtext':
-        ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
-            input_layer)[7:]
+        ogr_data_path = getConnectionStringFromLayer(input_layer)[7:]
     elif input_layer.dataProvider().name().lower() == 'wfs':
         uri = QgsDataSourceUri(input_layer.source())
         baseUrl = uri.param('url').split('?')[0]
         ogr_data_path = f"WFS:{baseUrl}"
     else:
-        ogr_data_path = GdalUtils.ogrConnectionStringFromLayer(
-            input_layer)
+        ogr_data_path = getConnectionStringFromLayer(input_layer)
 
     return ogr_data_path
 

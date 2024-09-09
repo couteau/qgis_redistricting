@@ -160,3 +160,7 @@ class BaseController(QObject):
             return False
 
         return True
+
+    @property
+    def activePlan(self):
+        return self.planManager.activePlan

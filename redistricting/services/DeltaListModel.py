@@ -50,30 +50,34 @@ class DeltaListModel(QAbstractTableModel):
         self._delta: DeltaList = None
 
     def setDelta(self, plan: RdsPlan, delta: DeltaList):
-        if plan != self._plan:
+        if plan != self._plan or delta != self._delta:
             self.beginResetModel()
-            if self._plan is not None:
-                self._plan.popFieldChanged.disconnect(self.updateFields)
-                self._plan.popFieldsChanged.disconnect(self.updateFields)
-                self._plan.dataFieldsChanged.disconnect(self.updateFields)
-            if self._delta is not None:
-                self._delta.updateStarted.disconnect(self.startUpdate)
-                self._delta.updateComplete.disconnect(self.endUpdate)
+            if plan != self._plan:
+                if self._plan is not None:
+                    self._plan.popFieldChanged.disconnect(self.updateFields)
+                    self._plan.popFieldsChanged.disconnect(self.updateFields)
+                    self._plan.dataFieldsChanged.disconnect(self.updateFields)
 
-            self._plan = plan
-            self._delta = delta
+                self._plan = plan
 
-            if self._plan is not None:
-                self._plan.popFieldChanged.connect(self.updateFields)
-                self._plan.popFieldsChanged.connect(self.updateFields)
-                self._plan.dataFieldsChanged.connect(self.updateFields)
-                self.updateFields()
-            else:
-                self._fields = []
+                if self._plan is not None:
+                    self._plan.popFieldChanged.connect(self.updateFields)
+                    self._plan.popFieldsChanged.connect(self.updateFields)
+                    self._plan.dataFieldsChanged.connect(self.updateFields)
+                    self.updateFields()
+                else:
+                    self._fields = []
 
-            if self._delta is not None:
-                self._delta.updateStarted.connect(self.startUpdate)
-                self._delta.updateComplete.connect(self.endUpdate)
+            if delta != self._delta:
+                if self._delta is not None:
+                    self._delta.updateStarted.disconnect(self.startUpdate)
+                    self._delta.updateComplete.disconnect(self.endUpdate)
+
+                self._delta = delta
+
+                if self._delta is not None:
+                    self._delta.updateStarted.connect(self.startUpdate)
+                    self._delta.updateComplete.connect(self.endUpdate)
 
             self.endResetModel()
 

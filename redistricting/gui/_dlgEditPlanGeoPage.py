@@ -41,8 +41,10 @@ from qgis.PyQt.QtWidgets import (
     QWizardPage
 )
 
-from ..services import defaults
-from ..utils import getDefaultField
+from ..utils import (
+    defaults,
+    getDefaultField
+)
 from .RdsFieldTableView import FieldListModel
 from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 

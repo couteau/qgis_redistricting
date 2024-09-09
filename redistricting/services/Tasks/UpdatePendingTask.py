@@ -135,6 +135,8 @@ class AggregatePendingChangesTask(AggregateDataTask):
 
             checkCanceled()
 
+            data["__name"] = pd.Series([self.plan.districts[str(i)].name for i in data.index], data.index)
+
             cols = [f"new_{DistrictColumns.POPULATION}", DistrictColumns.POPULATION, "deviation", "pct_deviation"]
             for f in self.popFields:
                 cols.append(f"new_{f.fieldName}")
@@ -145,7 +147,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
                 if f.pctBase:
                     cols.append(f"pct_{f.fieldName}")
 
-            self.data = data[cols]
+            self.data = data.set_index("__name")[cols]
             checkCanceled()
         except CanceledError:
             self.data = None

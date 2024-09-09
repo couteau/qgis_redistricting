@@ -64,8 +64,8 @@ class PlanAssignmentEditor(QObject):
             raise ValueError()
 
         self._plan = plan
-        self._assignLayer = plan._assignLayer
-        self._distField = plan._distField
+        self._assignLayer = plan.assignLayer
+        self._distField = plan.distField
         self._undoStack = self._assignLayer.undoStack()
         self._error = None
         self._errorLevel: Qgis.MessageLevel = 0

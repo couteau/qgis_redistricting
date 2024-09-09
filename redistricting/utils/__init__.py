@@ -29,7 +29,6 @@ from .gpkg import (
     getTableName,
     spatialite_connect
 )
-from .help import showHelp
 from .intl import tr
 from .layer import LayerReader
 from .misc import (
@@ -47,7 +46,6 @@ __all__ = (
     'LayerReader',
     'matchField',
     'random_id',
-    'showHelp',
     'spatialite_connect',
     'SqlAccess',
     'tr',

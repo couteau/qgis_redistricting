@@ -22,9 +22,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+import sys
 from typing import (
     Iterable,
     Optional,
+    SupportsIndex,
     Union
 )
 from uuid import UUID
@@ -46,6 +48,7 @@ class PlanManager(QObject):
     activePlanChanged = pyqtSignal("PyQt_PyObject")
     planAdded = pyqtSignal("PyQt_PyObject")
     planRemoved = pyqtSignal("PyQt_PyObject")
+    cleared = pyqtSignal()
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -106,7 +109,7 @@ class PlanManager(QObject):
             return
 
         if self._activePlan != plan:
-            self.aboutToChangeActivePlan.emit(plan, self._activePlan)
+            self.aboutToChangeActivePlan.emit(self._activePlan, plan)
             self._activePlan = plan
             self.activePlanChanged.emit(plan)
 
@@ -131,6 +134,7 @@ class PlanManager(QObject):
         self.setActivePlan(None)
         self._plansById = {}
         self._plans = []
+        self.cleared.emit()
 
     def extend(self, plans: Iterable[RdsPlan]):
         for plan in plans:
@@ -138,3 +142,6 @@ class PlanManager(QObject):
 
     def get(self, key: UUID) -> Union[RdsPlan, None]:
         return self._plansById.get(key)
+
+    def index(self, plan, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
+        return self._plans.index(plan, start, stop)

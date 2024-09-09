@@ -82,27 +82,16 @@ class TestEditAssignmentsController:
         return assignmentService
 
     @pytest.fixture
-    def mock_district(self, mocker: MockerFixture):
-        district = mocker.create_autospec(spec=RdsDistrict, instance=True)
-        type(district).district = mocker.PropertyMock(return_value=1, )
-        type(district).name = mocker.PropertyMock(return_value="District Name")
-        type(district).description = mocker.PropertyMock(return_value="District description")
-        return district
-
-    @pytest.fixture
     def patch_districttools_dockwidget(self, mocker: MockerFixture):
-        mocker.patch('redistricting.gui.DistrictTools.QgsFieldModel')
+        mocker.patch('redistricting.controllers.EditCtlr.QgsFieldModel')
 
         registry = mocker.patch('redistricting.controllers.BaseCtlr.ActionRegistry')
         mocker.patch.object(registry.return_value, 'createAction', new=lambda *args, **kwargs: QAction())
         # registry.return_value.createAction.return_value = QAction()
         registry.return_value.actionSaveAsNew = QAction()
-
-        registry = mocker.patch('redistricting.gui.DistrictTools.ActionRegistry')
         registry.return_value.actionCreateDistrict = QAction()
         registry.return_value.actionEditTargetDistrict = QAction()
         registry.return_value.actionEditSourceDistrict = QAction()
-        mocker.patch.object(registry.return_value, 'createAction', new=lambda *args, **kwargs: QAction())
 
         return registry
 
@@ -143,12 +132,15 @@ class TestEditAssignmentsController:
         controller.unload()
         assert controller.dockwidget is None
 
-    def test_activeplanchanged(self, controller: EditAssignmentsController, mock_plan, mocker: MockerFixture):
-        controller.dockwidget.cmbGeoSelect = mocker.create_autospec(QgsFieldComboBox, instance=True)
-        controller.activePlanChanged(mock_plan)
-        assert controller.actionStartPaintDistricts.isEnabled()
-        assert not controller.actionCreateDistrict.isEnabled()
-        assert not controller.actionCommitPlanChanges.isEnabled()
+    def test_activeplanchanged(self, controller_with_plan: EditAssignmentsController, mock_plan, mocker: MockerFixture):
+        controller_with_plan.dockwidget.cmbGeoSelect = mocker.create_autospec(QgsFieldComboBox, instance=True)
+        assert controller_with_plan.geoField is None
+        assert not controller_with_plan.actionStartPaintDistricts.isEnabled()
+        controller_with_plan.activePlanChanged(mock_plan)
+        assert controller_with_plan.geoField == mock_plan.geoIdField
+        assert controller_with_plan.actionStartPaintDistricts.isEnabled()
+        assert not controller_with_plan.actionCreateDistrict.isEnabled()
+        assert not controller_with_plan.actionCommitPlanChanges.isEnabled()
 
     def test_activeplanchanged_editablelayer_enables_commit(self, controller: EditAssignmentsController, mock_plan, mocker: MockerFixture):
         mock_plan.assignLayer.isEditable.return_value = True
@@ -164,20 +156,24 @@ class TestEditAssignmentsController:
         controller.activePlanChanged(None)
         assert not controller.actionStartPaintDistricts.isEnabled()
 
-    def test_connectplansignals(self, controller: EditAssignmentsController, mock_plan, mocker: MockerFixture):
+    def test_connectplansignals(self, controller: EditAssignmentsController, mock_plan):
         controller.connectPlanSignals(mock_plan)
         mock_plan.assignLayer.editingStarted.connect.assert_called_once()
 
-    def test_target_district_changed(self, controller_with_plan: EditAssignmentsController, mock_district):
+    def test_target_district_changed(self, controller_with_plan: EditAssignmentsController, mock_plan, mock_district, mocker: MockerFixture):
+        mocker.patch.object(controller_with_plan, 'dockwidget', autospec=controller_with_plan.dockwidget)
+        controller_with_plan.activePlanChanged(mock_plan)
         assert controller_with_plan.targetDistrict is None
-        controller_with_plan.targetDistrictChanged(mock_district)
+        controller_with_plan.targetDistrictChanged(1)
         assert controller_with_plan.targetDistrict == mock_district
         controller_with_plan.targetDistrictChanged(None)
         assert controller_with_plan.targetDistrict is None
 
-    def test_source_district_changed(self, controller_with_plan: EditAssignmentsController, mock_district):
+    def test_source_district_changed(self, controller_with_plan: EditAssignmentsController, mock_plan, mock_district, mocker: MockerFixture):
+        mocker.patch.object(controller_with_plan, 'dockwidget', autospec=controller_with_plan.dockwidget)
+        controller_with_plan.activePlanChanged(mock_plan)
         assert controller_with_plan.sourceDistrict is None
-        controller_with_plan.sourceDistrictChanged(mock_district)
+        controller_with_plan.sourceDistrictChanged(1)
         assert controller_with_plan.sourceDistrict == mock_district
         controller_with_plan.sourceDistrictChanged(None)
         assert controller_with_plan.sourceDistrict is None
@@ -200,21 +196,20 @@ class TestEditAssignmentsController:
         with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
             controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
 
-    def test_geoid_not_set_cannot_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+    def test_geoid_not_set_geoid_not_set_cannot_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
         district = RdsDistrict(2)
-        controller_with_plan.targetDistrictChanged(district)
-        assert controller_with_plan.targetDistrict == district
+        controller_with_plan.targetDistrict = district
         assert controller_with_plan.sourceDistrict is None
         assert controller_with_plan.geoField is None
         with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
             controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
 
-    def test_target_set_can_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
+    def test_target_set_geoid_set_can_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
         district = RdsDistrict(2)
-        controller_with_plan.targetDistrictChanged(district)
+        controller_with_plan.targetDistrict = district
         controller_with_plan.setGeoField('geoid')
-        assert controller_with_plan.targetDistrict == district
-        assert controller_with_plan.mapTool.targetDistrict() == 2
+        assert controller_with_plan.sourceDistrict is None
+        assert controller_with_plan.geoField == 'geoid'
         with qtbot.waitSignal(qgis_canvas.mapToolSet):
             controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
 
@@ -244,6 +239,7 @@ class TestEditAssignmentsController:
 
     def test_create_district(self, controller_with_plan: EditAssignmentsController, mock_project, mock_plan, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
+        controller_with_plan.activePlanChanged(mock_plan)
         type(mock_plan).allocatedDistricts = mocker.PropertyMock(return_value=0)
         type(mock_plan).allocatedSeats = mocker.PropertyMock(return_value=0)
         mock_plan.districts.__len__.return_value = 1

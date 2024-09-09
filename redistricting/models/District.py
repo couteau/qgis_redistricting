@@ -129,6 +129,12 @@ class RdsDistrict(RdsBaseModel):
         self._data[key] = value
 
     def __eq__(self, __value: "RdsDistrict"):
+        if __value is None:
+            return False
+
+        if not isinstance(__value, RdsDistrict):
+            return NotImplemented
+
         return self._data == __value._data
 
     def __getattr__(self, name):

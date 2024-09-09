@@ -28,6 +28,11 @@ from .DeltaListModel import DeltaListModel
 from .DeltaUpdate import DeltaUpdateService
 from .DistrictCopy import DistrictCopier
 from .DistrictDataModel import RdsDistrictDataModel
+from .DistrictModels import (
+    DistrictSelectModel,
+    SourceDistrictModel,
+    TargetDistrictModel
+)
 from .DistrictUpdate import DistrictUpdater
 from .DistrictValid import DistrictValidator
 from .ErrorList import ErrorListMixin
@@ -51,6 +56,7 @@ from .PlanImport import (
     PlanImportService,
     ShapefileImporter
 )
+from .PlanListModel import PlanListModel
 from .PlanManager import PlanManager
 from .PlanStyle import PlanStylerService
 from .SplitsModel import RdsSplitsModel
@@ -63,5 +69,6 @@ __all__ = (
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
     'ProjectStorage', 'ErrorListMixin', 'getColorForDistrict',
-    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'DeltaListModel', 'RdsSplitsModel'
+    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'DeltaListModel', 'RdsSplitsModel',
+    'DistrictSelectModel', 'TargetDistrictModel', 'SourceDistrictModel', 'PlanListModel'
 )

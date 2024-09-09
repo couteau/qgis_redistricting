@@ -53,7 +53,6 @@ else:
 
 
 class PendingChangesController(BaseController):
-
     def __init__(
         self,
         iface,
@@ -73,8 +72,14 @@ class PendingChangesController(BaseController):
     def load(self):
         self.setupPendingChangesWidget()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
+        self.deltaService.updateStarted.connect(self.showOverlay)
+        self.deltaService.updateCompleted.connect(self.hideOverlay)
+        self.deltaService.updateTerminated.connect(self.hideOverlay)
 
     def unload(self):
+        self.deltaService.updateStarted.disconnect(self.showOverlay)
+        self.deltaService.updateCompleted.disconnect(self.hideOverlay)
+        self.deltaService.updateTerminated.disconnect(self.hideOverlay)
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         self.iface.removeDockWidget(self.dockwidget)
         self.dockwidget.destroy()
@@ -83,8 +88,9 @@ class PendingChangesController(BaseController):
     def setupPendingChangesWidget(self):
         """Create the dockwidget with displays the impact of pending
         changes on affected districts."""
-        dockwidget = DockPendingChanges(self.deltaService)
+        dockwidget = DockPendingChanges()
         dockwidget.tblPending.setModel(self.model)
+
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, dockwidget)
 
         self.actionToggle = dockwidget.toggleViewAction()
@@ -97,12 +103,23 @@ class PendingChangesController(BaseController):
         return self.dockwidget
 
     def activePlanChanged(self, plan: Union[RdsPlan, None]):
+        self.dockwidget.setWaiting(False)
         self.dockwidget.plan = plan
         if plan is None:
             self.model.setDelta(None, None)
         else:
             self.model.setDelta(plan, self.deltaService.getDelta(plan))
+            if self.deltaService.isUpdating(plan):
+                self.dockwidget.setWaiting(True)
 
     def updateDelta(self, plan, delta: DeltaList):
-        if plan == self.planManager.activePlan:
+        if plan == self.activePlan:
             self.model.setDelta(plan, delta)
+
+    def showOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(True)
+
+    def hideOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(False)

@@ -65,6 +65,9 @@ class PlanAction(QAction):
         self._plan = None
         self.triggered.connect(self.triggerForPlan)
 
+    def target(self):
+        return self._plan
+
     def setTarget(self, plan: "RdsPlan"):
         self._plan = plan
 
@@ -145,7 +148,7 @@ class ActionRegistry:
         checkable: bool = False,
         callback: Optional[Callable[[], None]] = None,
         parent: Optional[QObject] = None
-    ) -> QAction:
+    ) -> PlanAction:
         action: PlanAction = self._createAction(
             name, icon, text, tooltip, statustip, shortcut, checkable, parent, actionCls=PlanAction
         )

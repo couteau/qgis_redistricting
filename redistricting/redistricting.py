@@ -44,7 +44,10 @@ from qgis.PyQt.QtCore import (
     QSettings,
     QTranslator
 )
-from qgis.PyQt.QtWidgets import QToolBar
+from qgis.PyQt.QtWidgets import (
+    QMenu,
+    QToolBar
+)
 from qgis.PyQt.QtXml import QDomDocument
 
 from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
@@ -105,74 +108,70 @@ class Redistricting:
             self.translator.load(str(localePath))
             QCoreApplication.installTranslator(self.translator)
 
-        self.toolbar: QToolBar = self.iface.addToolBar(self.name)
+        # set up services
+        self.planManager = PlanManager()
+        self.layerTreeManger = LayerTreeManager()
+        self.planStyler = PlanStylerService(self.planManager)
+        self.deltaService = DeltaUpdateService()
+        self.updaterService = DistrictUpdater()
+        self.importService = PlanImportService(self.updaterService)
+        self.assignmentsService = AssignmentsService(self.deltaService)
+        self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService)
+
+        # create toolbar
+        self.toolbar: QToolBar = QToolBar(self.name)
         self.toolbar.setObjectName(self.name)
 
-        # set up services
-        self.planManager = PlanManager(iface)
-        self.layerTreeManger = LayerTreeManager(iface)
-        self.planStyler = PlanStylerService(self.planManager, iface)
-        self.deltaService = DeltaUpdateService(iface)
-        self.updaterService = DistrictUpdater(iface)
-        self.importService = PlanImportService(self.updaterService, iface)
-        self.assignmentsService = AssignmentsService(self.deltaService, iface)
-        self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService, iface)
-
+        # create controllers
         self.planController = PlanController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
             self.toolbar,
             self.layerTreeManger,
             self.planStyler,
-            self.updaterService,
-            iface
+            self.updaterService
         )
 
         self.editController = EditAssignmentsController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
             self.toolbar,
-            self.assignmentsService,
-            iface
+            self.assignmentsService
         )
 
         self.metricsController = MetricsController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
-            self.toolbar,
-            iface
+            self.toolbar
         )
 
         self.districtController = DistrictController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
             self.toolbar,
             self.assignmentsService,
             self.districtCopier,
-            self.updaterService,
-            iface
+            self.updaterService
         )
 
         self.pendingController = PendingChangesController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
             self.toolbar,
-            self.deltaService,
-            iface
+            self.deltaService
         )
 
         self.contextConroller = ContextMenuController(
-            iface,
+            self.iface,
             self.project,
             self.planManager,
             self.toolbar,
-            self.planController,
-            iface
+            self.planController
         )
 
     @staticmethod
@@ -204,6 +203,8 @@ class Redistricting:
         self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
 
         self.iface.layerTreeView().clicked.connect(self.layerChanged)
+
+        self.iface.addToolBar(self.toolbar)
 
         self.planController.load()
         self.editController.load()
@@ -238,6 +239,11 @@ class Redistricting:
         self.metricsController.unload()
         self.editController.unload()
         self.planController.unload()
+
+        self.iface.mainWindow().findChild(QMenu, 'mToolbarMenu').removeAction(self.toolbar.toggleViewAction())
+        self.iface.mainWindow().removeToolBar(self.toolbar)
+        self.toolbar.hide()
+        self.toolbar.setParent(None)
 
     # --------------------------------------------------------------------------
 

@@ -24,12 +24,14 @@
 from typing import (
     TYPE_CHECKING,
     Iterable,
-    Optional
+    Optional,
+    Union
 )
 
 from qgis.core import (
     QgsApplication,
     QgsFeature,
+    QgsFieldModel,
     QgsVectorLayer
 )
 from qgis.gui import Qgis
@@ -54,7 +56,10 @@ from ..models import (
 )
 from ..services import (
     AssignmentsService,
-    PlanCopier
+    DistrictSelectModel,
+    GeoFieldsModel,
+    PlanCopier,
+    TargetDistrictModel
 )
 from ..utils import tr
 from .BaseCtlr import BaseController
@@ -80,6 +85,10 @@ class EditAssignmentsController(BaseController):
         self.canvas = self.iface.mapCanvas()
         self.dockwidget: DockRedistrictingToolbox = None
         self.actionToggle: QAction = None
+
+        self.sourceModel: DistrictSelectModel = None
+        self.targetModel: TargetDistrictModel = None
+        self.geoFieldsModel: Union[GeoFieldsModel, QgsFieldModel] = None
 
         self.mapTool = PaintDistrictsTool(self.canvas)
         self.sourceDistrict: Optional[RdsDistrict] = None
@@ -189,19 +198,21 @@ class EditAssignmentsController(BaseController):
         self.createPlanToolsDockWidget()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.planManager.planAdded.connect(self.connectPlanSignals)
+        self.planManager.planRemoved.connect(self.disconnectPlanSignals)
 
     def unload(self):
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         self.planManager.planAdded.disconnect(self.connectPlanSignals)
+        self.planManager.planRemoved.disconnect(self.disconnectPlanSignals)
         self.iface.removeDockWidget(self.dockwidget)
         self.dockwidget.destroy()
         self.dockwidget = None
 
     def createPlanToolsDockWidget(self):
-        """Create the dockwidget with tools for painting districts."""
+        """Create the dockwidget with tools for painting districts and wire up the actions."""
         dockwidget = DockRedistrictingToolbox(None)
 
-        dockwidget.geoFieldChanged.connect(self.setGeoField)
+        dockwidget.geoFieldChanged.connect(self.setGeoFieldFromIndex)
         dockwidget.sourceChanged.connect(self.sourceDistrictChanged)
         dockwidget.targetChanged.connect(self.targetDistrictChanged)
         dockwidget.btnAssign.setDefaultAction(self.actionStartPaintDistricts)
@@ -210,6 +221,9 @@ class EditAssignmentsController(BaseController):
         dockwidget.btnCommitUpdate.setDefaultAction(self.actionCommitPlanChanges)
         dockwidget.btnSaveAsNew.setDefaultAction(self.actionSaveAsNew)
         dockwidget.btnRollbackUpdate.setDefaultAction(self.actionRollbackPlanChanges)
+        dockwidget.btnAddDistrict.setDefaultAction(self.actionCreateDistrict)
+        dockwidget.btnEditTargetDistrict.setDefaultAction(self.actionEditTargetDistrict)
+        dockwidget.btnEditSourceDistrict.setDefaultAction(self.actionEditSourceDistrict)
 
         self.iface.addDockWidget(Qt.RightDockWidgetArea, dockwidget)
 
@@ -224,7 +238,7 @@ class EditAssignmentsController(BaseController):
 
     # slots
 
-    def activePlanChanged(self, plan: RdsPlan):
+    def activePlanChanged(self, plan: Union[RdsPlan, None]):
         if not sip.isdeleted(self.canvas):
             self.canvas.unsetMapTool(self.mapTool)
 
@@ -235,6 +249,41 @@ class EditAssignmentsController(BaseController):
             self.actionCommitPlanChanges.setEnabled(plan.assignLayer.isEditable())
             self.actionSaveAsNew.setEnabled(plan.assignLayer.isEditable())
             self.actionRollbackPlanChanges.setEnabled(plan.assignLayer.isEditable())
+            if len(plan.geoFields) > 0:
+                self.geoFieldsModel = GeoFieldsModel(plan)
+                i = 0
+            else:
+                self.geoFieldsModel = QgsFieldModel()
+                self.geoFieldsModel.setLayer(plan.assignLayer)
+                i = self.geoFieldsModel.indexFromName(plan.geoIdField).row()
+            self.dockwidget.cmbGeoSelect.setModel(self.geoFieldsModel)
+            self.dockwidget.cmbGeoSelect.setCurrentIndex(i)
+            self.setGeoField(plan.geoIdField)
+
+            self.dockwidget.cmbSource.blockSignals(True)
+            self.sourceModel = DistrictSelectModel(plan)
+            self.dockwidget.cmbSource.setModel(self.sourceModel)
+            self.dockwidget.cmbSource.setCurrentIndex(0)
+            self.dockwidget.cmbSource.blockSignals(False)
+
+            self.dockwidget.cmbTarget.blockSignals(True)
+            self.targetModel = TargetDistrictModel(plan)
+            self.dockwidget.cmbTarget.setModel(self.targetModel)
+            self.dockwidget.cmbTarget.setCurrentIndex(0)
+            self.dockwidget.cmbTarget.blockSignals(False)
+
+            plan.nameChanged.connect(self.dockwidget.planNameChanged)
+            plan.assignLayer.undoStack().canUndoChanged.connect(self.dockwidget.btnUndo.setEnabled)
+            plan.assignLayer.undoStack().canRedoChanged.connect(self.dockwidget.btnRedo.setEnabled)
+            plan.assignLayer.undoStack().undoTextChanged.connect(self.dockwidget.btnUndo.setToolTip)
+            plan.assignLayer.undoStack().redoTextChanged.connect(self.dockwidget.btnRedo.setToolTip)
+        else:
+            self.dockwidget.cmbGeoSelect.setModel(None)
+            self.geoFieldsModel = None
+            self.dockwidget.cmbSource.setModel(None)
+            self.sourceModel = None
+            self.dockwidget.cmbTarget.setModel(None)
+            self.targetModel = None
 
         self.actionStartPaintDistricts.setEnabled(plan is not None)
         self.actionPaintRectangle.setEnabled(plan is not None)
@@ -251,6 +300,17 @@ class EditAssignmentsController(BaseController):
             plan.assignLayer.editingStopped.connect(self.editingStopped)
         plan.districtAdded.connect(self.updateCreateDistrictActionEnabled)
         plan.districtRemoved.connect(self.updateCreateDistrictActionEnabled)
+        plan.geoFieldsChanged.connect(self.updateGeographies)
+        plan.geoIdCaptionChanged.connect(self.updateGeographies)
+
+    def disconnectPlanSignals(self, plan: RdsPlan):
+        if plan.assignLayer:
+            plan.assignLayer.editingStarted.disconnect(self.editingStarted)
+            plan.assignLayer.editingStopped.disconnect(self.editingStopped)
+        plan.districtAdded.disconnect(self.updateCreateDistrictActionEnabled)
+        plan.districtRemoved.disconnect(self.updateCreateDistrictActionEnabled)
+        plan.geoFieldsChanged.disconnect(self.updateGeographies)
+        plan.geoIdCaptionChanged.disconnect(self.updateGeographies)
 
     def editingStarted(self):
         if self.sender() == self.planManager.activePlan.assignLayer:
@@ -270,29 +330,50 @@ class EditAssignmentsController(BaseController):
                 self.planManager.activePlan.allocatedDistricts < self.planManager.activePlan.numDistricts
             )
 
+    def updateGeographies(self):
+        plan: RdsPlan = self.sender()
+        if plan is self.activePlan:
+            index = self.dockwidget.cmbGeoSelect.currentIndex()
+            if plan.geoFields:
+                self.geoFieldsModel = GeoFieldsModel(plan)
+            else:
+                self.geoFieldsModel = QgsFieldModel()
+                self.geoFieldsModel.setLayer(plan.assignLayer)
+
+            self.dockwidget.cmbGeoSelect.setModel(self.geoFieldsModel)
+            self.dockwidget.cmbGeoSelect.setCurrentIndex(index)
+            self.setGeoFieldFromIndex(index)
+
     # action slots
 
     def startPaintDistricts(self):
-        if self.planManager.activePlan:
+        if self.activePlan:
             self.activateMapTool(PaintMode.PaintByGeography)
 
     def startPaintRectangle(self):
-        if self.planManager.activePlan:
+        if self.activePlan:
             self.activateMapTool(PaintMode.PaintRectangle)
 
     def selectByGeography(self):
-        if self.planManager.activePlan:
+        if self.activePlan:
             self.activateMapTool(PaintMode.SelectByGeography)
 
     def onCommitChanges(self):
-        self.planManager.activePlan.assignLayer.commitChanges(True)
-        self.planManager.activePlan.assignLayer.triggerRepaint()
+        self.activePlan.assignLayer.commitChanges(True)
+        self.activePlan.assignLayer.triggerRepaint()
 
     def onRollbackChanges(self):
-        self.planManager.activePlan.assignLayer.rollBack(True)
-        self.planManager.activePlan.assignLayer.triggerRepaint()
+        self.activePlan.assignLayer.rollBack(True)
+        self.activePlan.assignLayer.triggerRepaint()
 
-    def sourceDistrictChanged(self, district: RdsDistrict):
+    def sourceDistrictChanged(self, index: int):
+        if index is None or index == -1:
+            district = None
+        elif self.sourceModel is not None:
+            district = self.sourceModel.districtFromIndex(index)
+        else:
+            district = None
+
         if district is None:
             self.mapTool.setSourceDistrict(None)
         else:
@@ -300,7 +381,14 @@ class EditAssignmentsController(BaseController):
         self.actionEditSourceDistrict.setEnabled(district is not None and district.district != 0)
         self.sourceDistrict = district
 
-    def targetDistrictChanged(self, district: RdsDistrict):
+    def targetDistrictChanged(self, index: Union[int, None]):
+        if index is None or index == -1:
+            district = None
+        elif self.targetModel is not None:
+            district = self.targetModel.districtFromIndex(index)
+        else:
+            district = None
+
         if district is None:
             self.mapTool.setTargetDistrict(None)
         else:
@@ -312,22 +400,24 @@ class EditAssignmentsController(BaseController):
         if not self.checkActivePlan('create district'):
             return None
 
-        if self.planManager.activePlan.allocatedDistricts == self.planManager.activePlan.numDistricts:
+        if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
             self.iface.messageBar().pushMessage(
                 self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.Warning)
             return None
 
-        dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
+        dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
         if dlg.exec() == QDialog.Rejected:
             return None
 
-        dist = self.planManager.activePlan.addDistrict(
-            dlg.districtNumber, dlg.districtName, dlg.members, dlg.description)
+        dist = self.activePlan.addDistrict(
+            dlg.districtNumber, dlg.districtName, dlg.members, dlg.description
+        )
         self.project.setDirty()
-        self.dockwidget.setTargetDistrict(dist)
+        i = self.targetModel.indexFromDistrict(dist)
+        self.dockwidget.cmbTarget.setCurrentIndex(i)
         return dist.district
 
-    def editDistrict(self, district: RdsDistrict = None):
+    def editDistrict(self, district: Optional[RdsDistrict] = None):
         if not isinstance(district, RdsDistrict):
             if self.sender() == self.actionEditTargetDistrict:
                 district = self.targetDistrict
@@ -341,7 +431,7 @@ class EditAssignmentsController(BaseController):
         if district is None or district.district == 0:
             return
 
-        dlg = DlgNewDistrict(self.planManager.activePlan, self.iface.mainWindow())
+        dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
         dlg.setWindowTitle(tr("Edit District"))
         dlg.sbxDistrictNo.setValue(district.district)
         dlg.sbxDistrictNo.setReadOnly(True)
@@ -365,7 +455,7 @@ class EditAssignmentsController(BaseController):
         if not self.checkActivePlan(self.tr('save changes to new plan')):
             return
 
-        if not self.planManager.activePlan.assignLayer.isEditable():
+        if not self.activePlan.assignLayer.isEditable():
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"),
                 self.tr("Cannot save changes to no plan: active plan has no unsaved changes."),
@@ -373,7 +463,7 @@ class EditAssignmentsController(BaseController):
             )
             return
 
-        dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
+        dlgCopyPlan = DlgCopyPlan(self.activePlan, self.iface.mainWindow())
         dlgCopyPlan.cbxCopyAssignments.hide()
 
         if dlgCopyPlan.exec() == QDialog.Accepted:
@@ -401,28 +491,34 @@ class EditAssignmentsController(BaseController):
             return
 
         self.mapTool.paintMode = mode
-        if self.planManager.activePlan is not None and self.targetDistrict is not None and self.geoField:
+        if self.activePlan is not None and self.targetDistrict is not None and self.geoField:
             self.canvas.setMapTool(self.mapTool)
 
-    def setGeoField(self, value):
-        if self.planManager.activePlan is None:
+    def setGeoFieldFromIndex(self, index: int):
+        if index == -1:
+            self.setGeoField(self.activePlan.geoIdField if self.activePlan else None)
             return
 
-        if value is not None and value != self.planManager.activePlan.geoIdField and (
-            (
-                len(self.planManager.activePlan.geoFields) != 0 and
-                value not in self.planManager.activePlan.geoFields
-            ) or
-            (
-                len(self.planManager.activePlan.geoFields) == 0 and
-                value not in self.planManager.activePlan.geoLayer.fields().names()
-            )
+        if isinstance(self.geoFieldsModel, QgsFieldModel):
+            field = self.geoFieldsModel.fields().field(index).name()
+        else:
+            field = self.geoFieldsModel.fields[index].fieldName
+        self.setGeoField(field)
+
+    def setGeoField(self, value):
+        if self.activePlan is None:
+            return
+
+        if value is not None and value != self.activePlan.geoIdField and (
+            (len(self.activePlan.geoFields) != 0 and value not in self.activePlan.geoFields) or
+            (len(self.activePlan.geoFields) == 0 and value not in self.activePlan.geoLayer.fields().names())
         ):
             raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
+
         self.geoField = value
 
     def startPaintingFeatures(self, target, source):
-        editor = self.assignmentsService.getEditor(self.planManager.activePlan)
+        editor = self.assignmentsService.getEditor(self.activePlan)
         if source is not None:
             msg = tr('Assign features to district %d from %d') % (target, source)
         else:

@@ -23,18 +23,17 @@
  ***************************************************************************/
 """
 from typing import (
+    TYPE_CHECKING,
     Optional,
     Union
 )
 
 from qgis.PyQt.QtCore import (
-    QAbstractTableModel,
+    QAbstractItemModel,
     QModelIndex,
-    Qt
-)
-from qgis.PyQt.QtGui import (
-    QColor,
-    QFont
+    QSize,
+    Qt,
+    pyqtSignal
 )
 from qgis.PyQt.QtWidgets import (
     QDialog,
@@ -42,131 +41,112 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RdsPlan
-from ..services import (
-    ActionRegistry,
-    PlanManager
-)
-from ..utils import tr
 from .ui.DlgSelectPlan import Ui_dlgSelectPlan
 
-
-class PlanListModel(QAbstractTableModel):
-    def __init__(self, planList: PlanManager, parent=None):
-        super().__init__(parent)
-        self.planList = planList
-        self.activePlan = planList.activePlan
-        self.planList.activePlanChanged.connect(self.planListUpdate)
-        self.planList.planAdded.connect(self.planListUpdate)
-        self.planList.planRemoved.connect(self.planListUpdate)
-
-        self.header = [
-            tr('Plan'),
-            tr('Districts'),
-            tr('Description')
-        ]
-
-    def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
-        return len(self.planList)
-
-    def columnCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument,no-self-use
-        return 3
-
-    def headerData(self, section, orientation: Qt.Orientation, role):
-        if (role == Qt.DisplayRole and orientation == Qt.Horizontal):
-            return self.header[section]
-        return None
-
-    def data(self, index, role):
-        if role == Qt.DisplayRole:
-            plan = self.planList[index.row()]
-            if index.column() == 0:
-                return plan.name
-            elif index.column() == 1:
-                return str(plan.numDistricts)
-            elif index.column() == 2:
-                return plan.description
-        elif role == Qt.TextAlignmentRole and index.column() == 1:
-            return int(Qt.AlignRight | Qt.AlignCenter)
-        elif role == Qt.FontRole:
-            if index.row() == self.activePlanIndex().row():
-                f = QFont()
-                f.setBold(True)
-                return f
-        elif role == Qt.TextColorRole:
-            if index.row() == self.activePlanIndex().row():
-                return QColor(Qt.blue)
-
-    def activePlanIndex(self):
-        if self.activePlan is not None:
-            try:
-                row = self.planList.index(self.activePlan)
-                return self.createIndex(row, 0)
-            except:  # pylint: disable=bare-except
-                pass
-
-        return QModelIndex()
-
-    def plan(self, index):
-        if 0 <= index.row() < len(self.planList):
-            return self.planList[index.row()]
-        return None
-
-    def planListUpdate(self):
-        self.beginResetModel()
-        self.endResetModel()
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
-    def __init__(self, planList: PlanManager, parent: Optional[QWidget] = None,
+    currentIndexChanged = pyqtSignal(int)
+
+    def __init__(self, parent: Optional[QWidget] = None,
                  flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
-        self.registry = ActionRegistry()
-        self.model = PlanListModel(
-            planList,
-            self
-        )
+        self._newAction: QAction = None
+        self._selectAction: QAction = None
+        self._editAction: QAction = None
+        self._deleteAction: QAction = None
+        self.btnClose.clicked.connect(self.close)
 
-        self.lvwPlans.setModel(self.model)
-        self.lvwPlans.resizeColumnsToContents()
-        self.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.lvwPlans.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.lvwPlans.clicked.connect(self.updateButtons)
-        self.lvwPlans.doubleClicked.connect(self.selectPlan)
-        self.btnNew.clicked.connect(self.newPlanClicked)
-        self.btnEdit.clicked.connect(self.editPlan)
-        self.btnOpen.clicked.connect(self.selectPlan)
-        self.btnDelete.clicked.connect(self.deletePlan)
-        self.btnCancel.clicked.connect(self.reject)
+    def model(self):
+        return self.lvwPlans.model(0)
 
-        self.lvwPlans.setCurrentIndex(self.model.activePlanIndex())
-        self.updateButtons(self.lvwPlans.currentIndex())
+    def setModel(self, model: QAbstractItemModel):
+        if self.lvwPlans.model() is not None:
+            self.lvwPlans.selectionModel().currentRowChanged.disconnect(self.viewCurrentRowChanged)
 
-    def updateButtons(self, current: QModelIndex):
-        self.btnOpen.setEnabled(
-            self.plan(current) is not None and self.plan(current).isValid())
-        self.btnEdit.setEnabled(self.plan(current) is not None)
+        self.lvwPlans.setModel(model)
+        if model is None:
+            return
 
-    def plan(self, index) -> RdsPlan:
-        return self.model.plan(index)
+        for i in range(model.columnCount()):
+            sizeHint = model.headerData(i, Qt.Horizontal, Qt.SizeHintRole)
+            if isinstance(sizeHint, QSize):
+                self.lvwPlans.setColumnWidth(i, sizeHint.width())
+        # self.lvwPlans.resizeColumnsToContents()
+        # self.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.lvwPlans.horizontalHeader().setSectionResizeMode(model.columnCount() - 1, QHeaderView.Stretch)
+        self.lvwPlans.selectionModel().currentRowChanged.connect(self.viewCurrentRowChanged)
 
-    @property
-    def currentPlan(self) -> RdsPlan:
-        index = self.lvwPlans.currentIndex()
-        return self.model.plan(index)
+    def currentIndex(self):
+        return self.lvwPlans.currentIndex().row()
 
-    def newPlanClicked(self):
-        self.registry.actionNewPlan.trigger()
+    def setCurrentIndex(self, index: int):
+        self.lvwPlans.setCurrentIndex(self.lvwPlans.model().createIndex(index, 0))
 
-    def editPlan(self):
-        self.registry.actionEditPlan.triggerForPlan(self.currentPlan)
-        self.model.planListUpdate()
+    def viewCurrentRowChanged(self, index: QModelIndex, oldIndex: QModelIndex):  # pylint: disable=unused-argument
+        self.currentIndexChanged.emit(index.row())
 
-    def selectPlan(self):
-        if self.currentPlan and self.currentPlan.isValid():
-            self.registry.actionSelectPlan.triggerForPlan(self.currentPlan)
-            self.accept()
+    def setNewAction(self, action: QAction):
+        if self._newAction is not None:
+            self.btnNew.clicked.disconnect(self._newAction.trigger)
+            self._newAction.changed.disconnect(self.newChanged)
 
-    def deletePlan(self):
-        self.registry.actionDeletePlan.triggerForPlan(self.currentPlan)
+        self._newAction = action
+
+        if self._newAction is not None:
+            self.btnNew.setToolTip(self._newAction.toolTip())
+            self.btnNew.clicked.connect(self._newAction.trigger)
+            self._newAction.changed.connect(self.newChanged)
+
+    def setSelectAction(self, action: QAction):
+        if self._selectAction is not None:
+            self.btnSelect.clicked.disconnect(self._selectAction.trigger)
+            self._selectAction.changed.disconnect(self.selectChanged)
+
+        self._selectAction = action
+
+        if self._selectAction is not None:
+            self.btnSelect.setToolTip(self._selectAction.toolTip())
+            self.btnSelect.clicked.connect(self._selectAction.trigger)
+            self._selectAction.changed.connect(self.selectChanged)
+
+    def setEditAction(self, action: QAction):
+        if self._editAction is not None:
+            self.btnEdit.clicked.disconnect(self._editAction.trigger)
+            self._editAction.changed.disconnect(self.editChanged)
+
+        self._editAction = action
+
+        if self._editAction is not None:
+            self.btnEdit.setToolTip(self._editAction.toolTip())
+            self.btnEdit.clicked.connect(self._editAction.trigger)
+            self._editAction.changed.connect(self.editChanged)
+
+    def setDeleteAction(self, action: QAction):
+        if self._deleteAction is not None:
+            self.btnDelete.clicked.disconnect(self._deleteAction.trigger)
+            self._deleteAction.changed.disconnect(self.deleteChanged)
+
+        self._deleteAction = action
+
+        if self._deleteAction is not None:
+            self.btnDelete.setToolTip(self._deleteAction.toolTip())
+            self.btnDelete.clicked.connect(self._deleteAction.trigger)
+            self._deleteAction.changed.connect(self.deleteChanged)
+
+    def newChanged(self):
+        self.btnNew.setEnabled(self._newAction.isEnabled())
+
+    def selectChanged(self):
+        self.btnSelect.setEnabled(self._selectAction.isEnabled())
+
+    def editChanged(self):
+        self.btnEdit.setEnabled(self._editAction.isEnabled())
+
+    def deleteChanged(self):
+        self.btnDelete.setEnabled(self._deleteAction.isEnabled())
