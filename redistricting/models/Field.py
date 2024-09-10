@@ -174,7 +174,7 @@ class RdsField(RdsBaseModel):
             if f is not None:
                 v = self.getValue(f)
                 # TODO: change this type .typeId() when QGIS moves to Qt 6
-                return QVariant(v).type()
+                return QMetaType.Type(QVariant(v).type())
 
         return QMetaType.UnknownType
 

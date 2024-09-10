@@ -42,7 +42,7 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
     sourceChanged = pyqtSignal(int)
     targetChanged = pyqtSignal(int)
 
-    def __init__(self, plan, parent=None):
+    def __init__(self, plan=None, parent=None):
         super(DockRedistrictingToolbox, self).__init__(parent)
         self.setupUi(self)
 
@@ -79,6 +79,7 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             self.undoStack = self._plan.assignLayer.undoStack()
         else:
             self.lblPlanName.setText(tr('No plan selected'))
+            self.undoStack = None
 
         self.cmbSource.setEnabled(self._plan is not None)
         self.cmbTarget.setEnabled(self._plan is not None)

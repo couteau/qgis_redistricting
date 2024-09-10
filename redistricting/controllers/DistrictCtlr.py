@@ -179,7 +179,7 @@ class DistrictController(BaseController):
 
         self.metricsModel = RdsPlanMetricsModel(None)
 
-        dockwidget = DockDistrictDataTable(self.updateService)
+        dockwidget = DockDistrictDataTable()
         dockwidget.installEventFilter(self)
         dockwidget.tblDataTable.doubleClicked.connect(self.editDistrict)
         dockwidget.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)

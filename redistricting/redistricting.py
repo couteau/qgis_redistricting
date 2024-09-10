@@ -240,7 +240,11 @@ class Redistricting:
         self.editController.unload()
         self.planController.unload()
 
-        self.iface.mainWindow().findChild(QMenu, 'mToolbarMenu').removeAction(self.toolbar.toggleViewAction())
+        # iface.addToolBar adds the toolbar to the View|Toolbars menu,
+        # but iface has no removeToolBar method, so we need another way
+        toolbarMenu = self.iface.mainWindow().findChild(QMenu, 'mToolbarMenu')
+        if toolbarMenu is not None:
+            toolbarMenu.removeAction(self.toolbar.toggleViewAction())
         self.iface.mainWindow().removeToolBar(self.toolbar)
         self.toolbar.hide()
         self.toolbar.setParent(None)

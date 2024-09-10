@@ -251,7 +251,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 feedback.canceled.connect(self.cancel)
             saveOptions.feedback = feedback
 
-            error, msg = QgsVectorFileWriter.writeAsVectorFormatV2(
+            error, msg, _fn, _ln = QgsVectorFileWriter.writeAsVectorFormatV3(
                 layer,
                 self.shapeFileName,
                 QgsProject.instance().transformContext(),

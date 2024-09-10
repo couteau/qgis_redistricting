@@ -533,12 +533,12 @@ class PlanController(BaseController):
         if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(tr('export')):
                 return
+            plan = self.activePlan
 
         dlgExportPlan = DlgExportPlan(self.iface.mainWindow())
         dlgExportPlan.cmbGeography.setModel(GeoFieldsModel(plan, self))
 
         if dlgExportPlan.exec() == QDialog.Accepted:
-            plan = self.planManager.activePlan
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
                 export = PlanExporter(
                     plan,
