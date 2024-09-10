@@ -183,7 +183,7 @@ class TestPlanController:
     def test_enable_active_plan_actions(self, controller: controllers.PlanController, mock_plan):
         controller.addPlanToMenu(mock_plan)
         controller.enableActivePlanActions(mock_plan)
-        assert controller.actionEditPlan.isEnabled()
+        assert controller.actionEditActivePlan.isEnabled()
         assert controller.actionImportAssignments.isEnabled()
         assert controller.actionImportShapefile.isEnabled()
         assert controller.actionExportPlan.isEnabled()
@@ -194,13 +194,13 @@ class TestPlanController:
     def test_set_active_plan_none(self, controller: controllers.PlanController, mock_plan):
         controller.addPlanToMenu(mock_plan)
         controller.enableActivePlanActions(mock_plan)
-        assert controller.actionEditPlan.isEnabled()
+        assert controller.actionEditActivePlan.isEnabled()
         assert controller.actionImportAssignments.isEnabled()
         assert controller.actionImportShapefile.isEnabled()
         assert controller.actionExportPlan.isEnabled()
         assert controller.actionCopyPlan.isEnabled()
         controller.enableActivePlanActions(None)
-        assert not controller.actionEditPlan.isEnabled()
+        assert not controller.actionEditActivePlan.isEnabled()
         assert not controller.actionImportAssignments.isEnabled()
         assert not controller.actionImportShapefile.isEnabled()
         assert not controller.actionExportPlan.isEnabled()
@@ -485,8 +485,10 @@ class TestPlanController:
         datadir,
         mocker: MockerFixture
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan', spec=gui.DlgExportPlan)
+        mocker.patch('redistricting.controllers.PlanCtlr.GeoFieldsModel')
+        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan')
         dlgExportPlan = dlg_class.return_value
+
         dlgExportPlan.exportEquivalency = True
         dlgExportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
         dlgExportPlan.equivalencyGeography = controller_with_active_plan.planManager.activePlan.geoFields[0]

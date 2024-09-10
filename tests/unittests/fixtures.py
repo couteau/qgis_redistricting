@@ -4,6 +4,7 @@ from unittest.mock import PropertyMock
 import pytest
 from pytest_mock import MockerFixture
 from qgis.core import QgsProject
+from qgis.PyQt.QtCore import pyqtBoundSignal
 from qgis.PyQt.QtWidgets import QToolBar
 
 from redistricting import services
@@ -34,9 +35,11 @@ class Fixtures:
         qgis_iface.layerTreeView = mocker.MagicMock()
 
         planManager = mocker.create_autospec(spec=services.PlanManager, instance=True)
-        planManager.activePlanChanged = mocker.MagicMock()
-        planManager.planAdded = mocker.MagicMock()
-        planManager.planRemoved = mocker.MagicMock()
+        planManager.aboutToChangeActivePlan = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.activePlanChanged = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.planAdded = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.planRemoved = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.cleared = mocker.create_autospec(spec=pyqtBoundSignal)
         type(planManager).activePlan = active_plan
         return planManager
 
@@ -51,9 +54,11 @@ class Fixtures:
         qgis_iface.layerTreeView = mocker.MagicMock()
 
         planManager = mocker.create_autospec(spec=services.PlanManager, instance=True)
-        planManager.activePlanChanged = mocker.MagicMock()
-        planManager.planAdded = mocker.MagicMock()
-        planManager.planRemoved = mocker.MagicMock()
+        planManager.aboutToChangeActivePlan = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.activePlanChanged = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.planAdded = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.planRemoved = mocker.create_autospec(spec=pyqtBoundSignal)
+        planManager.cleared = mocker.create_autospec(spec=pyqtBoundSignal)
         active_plan.return_value = mock_plan
         mock_plan.districts.__getitem__.return_value = mock_district
         type(planManager).activePlan = active_plan

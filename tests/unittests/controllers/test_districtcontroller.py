@@ -40,7 +40,9 @@ class TestDistrictController:
     @pytest.fixture
     def mock_updater(self, mocker: MockerFixture) -> DistrictUpdater:
         updater = mocker.create_autospec(spec=DistrictUpdater, instance=True)
+        updater.updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
         updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        updater.updateTerminated = mocker.create_autospec(spec=pyqtBoundSignal)
         return updater
 
     @pytest.fixture

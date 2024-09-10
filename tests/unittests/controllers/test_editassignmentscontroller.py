@@ -133,6 +133,7 @@ class TestEditAssignmentsController:
         assert controller.dockwidget is None
 
     def test_activeplanchanged(self, controller_with_plan: EditAssignmentsController, mock_plan, mocker: MockerFixture):
+        mocker.patch.object(controller_with_plan, "dockwidget", autospec=controller_with_plan.dockwidget)
         controller_with_plan.dockwidget.cmbGeoSelect = mocker.create_autospec(QgsFieldComboBox, instance=True)
         assert controller_with_plan.geoField is None
         assert not controller_with_plan.actionStartPaintDistricts.isEnabled()
@@ -143,12 +144,14 @@ class TestEditAssignmentsController:
         assert not controller_with_plan.actionCommitPlanChanges.isEnabled()
 
     def test_activeplanchanged_editablelayer_enables_commit(self, controller: EditAssignmentsController, mock_plan, mocker: MockerFixture):
+        mocker.patch.object(controller, "dockwidget", autospec=controller.dockwidget)
         mock_plan.assignLayer.isEditable.return_value = True
         controller.dockwidget.cmbGeoSelect = mocker.create_autospec(QgsFieldComboBox, instance=True)
         controller.activePlanChanged(mock_plan)
         assert controller.actionCommitPlanChanges.isEnabled()
 
     def test_activeplanchanged_none(self, controller: EditAssignmentsController, mock_plan, mocker: MockerFixture):
+        mocker.patch.object(controller, "dockwidget", autospec=controller.dockwidget)
         controller.dockwidget.cmbGeoSelect = mocker.create_autospec(QgsFieldComboBox, instance=True)
         controller.activePlanChanged(mock_plan)
         assert controller.actionStartPaintDistricts.isEnabled()
