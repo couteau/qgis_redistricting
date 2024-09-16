@@ -1,12 +1,16 @@
 from abc import abstractmethod
 from typing import (
     Any,
+    Optional,
     Sequence,
     Union
 )
 
 import pandas as pd
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
 from .base import (
     MISSING,
@@ -110,12 +114,12 @@ class RdsSplits(RdsBaseModel):
     data: pd.DataFrame = Factory(pd.DataFrame, False)
     geoField: RdsGeoField = rds_property(private=True, serialize=False, default=None)
 
-    def __init__(self, field: Union[str, RdsGeoField], data: pd.DataFrame = MISSING):
+    def __init__(self, field: Union[str, RdsGeoField], data: pd.DataFrame = MISSING, parent: Optional[QObject] = None):
         if isinstance(field, RdsGeoField):
-            super().__init__(field=field.field, data=data)
+            super().__init__(field=field.field, data=data, parent=parent)
             self.geoField = field
         else:
-            super().__init__(field=field, data=data)
+            super().__init__(field=field, data=data, parent=parent)
 
     def __post_init__(self, **kwargs):
         if self.data is not None:
@@ -138,7 +142,7 @@ class RdsSplits(RdsBaseModel):
 
         return self.data.index.get_level_values(0).unique().get_loc(item.geoid)
 
-    @ property
+    @property
     def attrCount(self):
         return len(self.data.columns) + 2 - int("__name" in self.data.columns)
 
