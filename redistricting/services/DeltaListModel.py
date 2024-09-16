@@ -145,10 +145,10 @@ class DeltaListModel(QAbstractTableModel):
                     'format': '{:.2%}'
                 })
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._delta) if self._delta is not None and not parent.isValid() else 0
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._fields) if not parent.isValid() else 0
 
     def data(self, index: QModelIndex, role: int = ...):
@@ -157,15 +157,15 @@ class DeltaListModel(QAbstractTableModel):
             col = index.column()
 
             if role in {Qt.DisplayRole, Qt.EditRole}:
-                value = self._delta[col, row]
-                return self._fields[row]['format'].format(value) if value is not None else None
+                value = self._delta[row, col]
+                return self._fields[col]['format'].format(value) if value is not None else None
 
         return QVariant()
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
         if self._delta:
             if role == Qt.DisplayRole:
-                if orientation == Qt.Horizontal:
+                if orientation == Qt.Vertical:
                     return self._delta[section].name
                 else:
                     return self._fields[section]['caption']
