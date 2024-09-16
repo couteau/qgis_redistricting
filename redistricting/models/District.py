@@ -90,7 +90,7 @@ class RdsDistrict(RdsBaseModel):
         return str(self.district).rjust(4, "0")
 
     def clone(self):
-        return self.__class__(fid=self._fid, description=self.description, **self._data)
+        return self.__class__(fid=self.fid, description=self.description, **self._data)
 
     def __contains__(self, index: str):
         return index in self._data
@@ -210,7 +210,7 @@ class RdsDistrict(RdsBaseModel):
 
     def update(self, data: Union["RdsDistrict", dict[str, Any]]):
         if isinstance(data, RdsDistrict):
-            self._fid = data.fid
+            self.fid = data.fid
             data = data[:]
 
         newkeys = [k for k in data.keys() if k not in RdsDistrict.BASE_COLUMNS + RdsDistrict.STATS_COLUMNS]

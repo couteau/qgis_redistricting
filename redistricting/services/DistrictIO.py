@@ -99,13 +99,13 @@ class DistrictWriter:
 
     def writeToLayer(self, districts: Iterable[RdsDistrict]):
         def changeAttributes(dist: RdsDistrict, feature: QgsFeature):
-
             # if all population is assigned, delete the Unassigned feature
             if dist[self._distField] == 0 and not dist[DistrictColumns.POPULATION]:
                 if dist.fid != -1:
                     self._layer.deleteFeature(dist.fid)
                 return
 
+            dirty = False
             for idx, field in self._field_map.items():
                 if field not in dist:
                     continue
@@ -113,11 +113,13 @@ class DistrictWriter:
                 value = dist[field]
                 if value != feature[idx]:
                     feature.setAttribute(idx, value)
+                    dirty = True
 
-            if dist.fid == -1:
-                self._layer.addFeature(feat)
-            else:
-                self._layer.updateFeature(feat)
+            if dirty:
+                if dist.fid == -1:
+                    self._layer.addFeature(feat)
+                else:
+                    self._layer.updateFeature(feat)
 
         self._layer.startEditing()
         for d in districts:
