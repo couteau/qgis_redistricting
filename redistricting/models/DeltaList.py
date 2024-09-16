@@ -127,6 +127,9 @@ class DeltaList(QObject):
         if not isinstance(other, DeltaList):
             return NotImplemented
 
+        if self._data is None:
+            return False
+
         return self._data.equals(other._data)
 
     def setData(self, data: Optional[pd.DataFrame]):

@@ -525,14 +525,14 @@ class EditAssignmentsController(BaseController):
             msg = tr('Assign features to district %d') % target
         editor.startEditCommand(msg)
 
-    def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: int, endEdit: bool):
+    def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: Union[int, None], endEdit: bool):
         editor = self.assignmentsService.getEditor(self.planManager.activePlan)
         if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
             values = {feature.attribute(self.geoField) for feature in features}
             features = editor.getDistFeatures(
                 self.geoField, values, target, source)
 
-        editor.assignFeaturesToDistrict(features, target, source, self.planManager.activePlan.assignLayer.isEditable())
+        editor.assignFeaturesToDistrict(features, target)
         if endEdit:
             editor.endEditCommand()
 

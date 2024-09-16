@@ -49,6 +49,10 @@ class DistrictReader:
                 data[DistrictColumns.POPULATION] = data[self._popField]
                 del data[self._popField]
 
+            data[DistrictColumns.POPULATION] = data[DistrictColumns.POPULATION] or 0
+            if data.get('description', '') is None:
+                data['description'] = ''
+
             if f[self._distField] == 0:
                 result.append(RdsUnassigned(fid=f.id(), **data))
             else:

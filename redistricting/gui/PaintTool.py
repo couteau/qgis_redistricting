@@ -63,7 +63,7 @@ class PaintMode(IntEnum):
 
 class PaintDistrictsTool(QgsMapToolIdentify):
     paintingStarted = pyqtSignal(int, int)
-    paintFeatures = pyqtSignal("PyQt_PyObject", int, int, bool)
+    paintFeatures = pyqtSignal("PyQt_PyObject", int, object, bool)  # features, target, source (int|none), endEdit
     paintingComplete = pyqtSignal()
     paintingCanceled = pyqtSignal()
     selectFeatures = pyqtSignal("PyQt_PyObject", int, int, "PyQt_PyObject")

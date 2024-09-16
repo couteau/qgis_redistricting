@@ -400,8 +400,7 @@ class TestEditAssignmentsController:
         controller_with_plan.paintFeatures(features, 1, None, False)
         mock_assignments_service.getEditor.assert_called_once()
         mock_assignments_editor.getDistFeatures.assert_not_called()
-        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(
-            features, 1, None, False)
+        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(features, 1)
         mock_assignments_editor.endEditCommand.assert_not_called()
 
     def test_paint_features_end_edit(self, controller_with_plan: EditAssignmentsController, mock_plan, mock_assignments_editor: PlanAssignmentEditor, mock_assignments_service: AssignmentsService, mocker: MockerFixture):
@@ -410,8 +409,7 @@ class TestEditAssignmentsController:
         controller_with_plan.paintFeatures(features, 1, None, True)
         mock_assignments_service.getEditor.assert_called_once()
         mock_assignments_editor.getDistFeatures.assert_not_called()
-        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(
-            features, 1, None, False)
+        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(features, 1)
         mock_assignments_editor.endEditCommand.assert_called_once()
 
     def test_paint_features_with_geo_field(self, controller_with_plan: EditAssignmentsController, mock_assignments_editor: PlanAssignmentEditor, mock_assignments_service: AssignmentsService, mocker: MockerFixture):
@@ -424,7 +422,7 @@ class TestEditAssignmentsController:
         mock_assignments_service.getEditor.assert_called_once()
         mock_assignments_editor.getDistFeatures.assert_called_once_with(
             'vtdid', {'011271001'}, 1, None)
-        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(matching_features, 1, None, False)
+        mock_assignments_editor.assignFeaturesToDistrict.assert_called_once_with(matching_features, 1)
 
     def test_end_paint_features(self, controller_with_plan: EditAssignmentsController, mock_assignments_editor: PlanAssignmentEditor, mock_assignments_service: AssignmentsService):
         controller_with_plan.endPaintingFeatures()

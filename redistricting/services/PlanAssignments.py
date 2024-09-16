@@ -24,32 +24,34 @@
 """
 from __future__ import annotations
 
+import itertools
 from typing import (
     TYPE_CHECKING,
     Any,
     Iterable,
+    Iterator,
     Optional,
-    Union
+    Sequence,
+    Union,
+    overload
 )
 
-import pandas as pd
 from qgis.core import (
-    Qgis,
+    QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
     QgsFeatureRequest,
-    QgsMessageLog
+    QgsVectorLayerEditPassthrough,
+    QgsVectorLayerFeatureIterator
 )
 from qgis.PyQt.QtCore import (
     QObject,
     QSignalMapper,
-    QVariant,
     pyqtSignal
 )
 
 from ..utils import tr
-from .DeltaUpdate import DeltaUpdateService
 
 if TYPE_CHECKING:
     from ..models import RdsPlan
@@ -66,24 +68,15 @@ class PlanAssignmentEditor(QObject):
         self._plan = plan
         self._assignLayer = plan.assignLayer
         self._distField = plan.distField
+        self._fieldIndex = self._assignLayer.fields().indexOf(self._distField)
+        if self._fieldIndex == -1:
+            raise RuntimeError(
+                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.')
+                .format(plan=self._plan.name, field=self._distField)
+            )
+
         self._undoStack = self._assignLayer.undoStack()
-        self._error = None
-        self._errorLevel: Qgis.MessageLevel = 0
-        self._assignments: pd.DataFrame = None
-        self._popData: pd.DataFrame = None
-
         self._undoStack.indexChanged.connect(self.undoChanged)
-
-    def error(self):
-        return (self._error, self._errorLevel)
-
-    def _setError(self, error, level=Qgis.Warning):
-        self._error = error
-        self._errorLevel = level
-        QgsMessageLog.logMessage(error, 'Redistricting', level)
-
-    def _clearError(self):
-        self._error = None
 
     def startEditCommand(self, msg: str = None):
         if not self._assignLayer.isEditable():
@@ -103,38 +96,23 @@ class PlanAssignmentEditor(QObject):
 
     def reassignDistrict(self, district: int, newDistrict: int = 0):
         context = QgsExpressionContext()
-        context.appendScopes(
-            QgsExpressionContextUtils.globalProjectLayerScopes(self._assignLayer))
+        context.appendScope(QgsExpressionContextUtils.layerScope(self._assignLayer))
         request = QgsFeatureRequest()
         request.setExpressionContext(context)
         request.setFilterExpression(f"{self._distField} = {district}")
         request.setFlags(QgsFeatureRequest.NoGeometry)
-        request.setSubsetOfAttributes([self._distField], self._assignLayer.fields())
-        findex = self._assignLayer.fields().indexFromName(self._distField)
-
-        f: QgsFeature
+        request.setSubsetOfAttributes([])
         for f in self._assignLayer.getFeatures(request):
-            self._assignLayer.changeAttributeValue(f.id(), findex, newDistrict, district)
+            self._assignLayer.changeAttributeValue(f.id(), self._fieldIndex, newDistrict, district)
 
-    def getDistFeatures(self, field, value: Union[Iterable[Any], Any], targetDistrict=None, sourceDistrict=None):
-        self._clearError()
-
+    def getDistFeatures(self, field: str, value: Union[Iterable[Any], Any], targetDistrict=None, sourceDistrict=None):
         if not self._assignLayer:
             return None
 
-        f = self._assignLayer.fields().field(field)
-        if not f:
-            return None
-
-        context = QgsExpressionContext()
-        context.appendScopes(
-            QgsExpressionContextUtils.globalProjectLayerScopes(self._assignLayer))
-        request = QgsFeatureRequest()
-        if isinstance(value, str):
+        if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             value = [value]
 
-        if f.type() == QVariant.String:
-            flt = ' and '.join(f'{field} = {v!r}' for v in value)
+        flt = ' and '.join(f'{field} = {v!r}' for v in value)
 
         if sourceDistrict is not None:
             if sourceDistrict == 0:
@@ -147,48 +125,85 @@ class PlanAssignmentEditor(QObject):
             else:
                 flt += f' and {self._distField} != {targetDistrict}'
 
-        request.setExpressionContext(context)
-        request.setFilterExpression(flt)
+        expression = QgsExpression(flt)
+        if expression.hasParserError():
+            return None
+
+        context = QgsExpressionContext()
+        context.appendScope(QgsExpressionContextUtils.layerScope(self._assignLayer))
+        if not expression.prepare(context):
+            return None
+
+        request = QgsFeatureRequest(expression, context)
         request.setFlags(QgsFeatureRequest.NoGeometry)
 
         return self._assignLayer.getFeatures(request)
 
+    @overload
     def assignFeaturesToDistrict(
         self,
         features: Iterable[QgsFeature],
-        district,
-        oldDistrict=None,
-        inTransaction=None
+        district
     ):
-        self._clearError()
+        ...
 
-        fieldIndex = self._assignLayer.fields().indexOf(self._distField)
-        if fieldIndex == -1:
-            self._setError(
-                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.')
-                .format(plan=self._plan.name, field=self._distField)
-            )
-            return
+    @overload
+    def assignFeaturesToDistrict(
+        self,
+        featureIds: Iterable[int],
+        district: int
+    ):
+        ...
 
-        if inTransaction is None:
-            inTransaction = self._assignLayer.isEditable()
+    def assignFeaturesToDistrict(
+        self,
+        features: Union[Iterable[QgsFeature], Iterable[int]],
+        district
+    ):
+        # determine type of iterable elements
+        if isinstance(features, Sequence):
+            if len(features) > 0:
+                if isinstance(features[0], int):
+                    features = self._assignLayer.getFeatures(features)
+        elif not isinstance(features, QgsVectorLayerFeatureIterator):
+            if not isinstance(features, Iterator):
+                features = iter(features)
+
+            f = next(features, None)
+            if f is None:
+                return
+
+            if isinstance(f, int):
+                # int-iterator convert to feature iterator (so we can get the old value for undo purposes)
+                features = self._assignLayer.getFeatures([f, *features])
+            else:
+                # push the peeked value back on the iterator
+                features = itertools.chain([f], features)
 
         try:
+            inTransaction = self._assignLayer.isEditable()
+            if not inTransaction:
+                self._assignLayer.startEditing()
+
             for f in features:
                 self._assignLayer.changeAttributeValue(
-                    f.id(), fieldIndex, district, oldDistrict)
+                    f.id(), self._fieldIndex, district, f[self._fieldIndex])
+
+            if not inTransaction:
+                self._assignLayer.commitChanges(True)
         except:
             # only delete the buffer on error if we were not already in a transaction --
             # otherwise we may discard prior, successful updates
             self._assignLayer.rollBack(not inTransaction)
             raise
 
-    def changeAssignments(self, assignments: dict[int, Iterable[int]]):
-        for dist, fids in assignments.items():
-            self.assignFeaturesToDistrict(self._assignLayer.getFeatures(list(fids)), dist)
-
     def undoChanged(self, index):  # pylint: disable=unused-argument
         self.assignmentsChanged.emit(self._plan)
+
+    def runQuery(self, query: str):
+        buffer = self._assignLayer.editBuffer()
+        if isinstance(buffer, QgsVectorLayerEditPassthrough):
+            buffer.update(query)
 
 
 class AssignmentsService(QObject):
@@ -196,10 +211,9 @@ class AssignmentsService(QObject):
     editingStopped = pyqtSignal("PyQt_PyObject")
     assignmentsChanged = pyqtSignal("PyQt_PyObject")
 
-    def __init__(self, updateService: DeltaUpdateService, parent: Optional[QObject] = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._editors: dict[RdsPlan, PlanAssignmentEditor] = {}
-        self._updateService = updateService
         self._endEditSignals = QSignalMapper(self)
         self._endEditSignals.mappedObject.connect(self.endEditing)
 
@@ -213,7 +227,6 @@ class AssignmentsService(QObject):
         if plan not in self._editors:
             self._editors[plan] = PlanAssignmentEditor(plan)
             self._editors[plan].assignmentsChanged.connect(self.assignmentsChanged)
-            self._updateService.watchPlan(plan)
             self._endEditSignals.setMapping(plan.assignLayer, plan)
             plan.assignLayer.afterCommitChanges.connect(self._endEditSignals.map)
             plan.assignLayer.afterRollBack.connect(self._endEditSignals.map)
@@ -225,8 +238,8 @@ class AssignmentsService(QObject):
     def endEditing(self, plan: RdsPlan):
         if plan in self._editors:
             del self._editors[plan]
-            self._updateService.unwatchPlan(plan)
             plan.assignLayer.afterCommitChanges.disconnect(self._endEditSignals.map)
             plan.assignLayer.afterRollBack.disconnect(self._endEditSignals.map)
             self._endEditSignals.removeMappings(plan.assignLayer)
+
             self.editingStopped.emit(plan)

@@ -47,13 +47,13 @@ from .base import (
 )
 from .columns import (
     DistrictColumns,
-    StatsColumns
+    MetricsColumns
 )
 
 
 class RdsDistrict(RdsBaseModel):
     BASE_COLUMNS = list(DistrictColumns)
-    STATS_COLUMNS = list(StatsColumns)
+    STATS_COLUMNS = list(MetricsColumns)
     WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
                            DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
 
@@ -87,7 +87,7 @@ class RdsDistrict(RdsBaseModel):
         self.update(data)
 
     def __key__(self):
-        return str(self.district)
+        return str(self.district).rjust(4, "0")
 
     def clone(self):
         return self.__class__(fid=self._fid, description=self.description, **self._data)
@@ -249,8 +249,7 @@ class RdsUnassigned(RdsDistrict):
 
 class DistrictList(SortedKeyedList[RdsDistrict]):  # pylint: disable=abstract-method
     def clear(self):
-        if '0' in self._keys:
-            addUnassigned = True
+        addUnassigned = '0000' in self._keys
 
         super().clear()
 

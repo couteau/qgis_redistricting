@@ -31,4 +31,4 @@ class Ui_qdwPendingChanges(object):
 
     def retranslateUi(self, qdwPendingChanges):
         _translate = QtCore.QCoreApplication.translate
-        qdwPendingChanges.setWindowTitle(_translate("qdwPendingChanges", "QGIS Redistricting - Pending Changes"))
+        qdwPendingChanges.setWindowTitle(_translate("qdwPendingChanges", "Redistricting - Pending Changes"))

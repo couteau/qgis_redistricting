@@ -28,6 +28,7 @@ class MetricsController(BaseController):
             text=self.tr("Split detail"),
             callback=self.showSplits
         )
+        self.actionShowSplitsDialog.setEnabled(False)
 
     def load(self):
         self.planManager.activePlanChanged.connect(self.planChanged)

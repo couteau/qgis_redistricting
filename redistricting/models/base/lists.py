@@ -5,6 +5,7 @@ from copy import copy
 from types import GenericAlias
 from typing import (
     Any,
+    Callable,
     Generic,
     Iterable,
     Iterator,
@@ -24,7 +25,7 @@ from .prop import MISSING
 T = TypeVar("T")
 
 
-def key(item: T, default=MISSING) -> str:
+def _key(item: T, default=MISSING) -> str:
     if hasattr(item, "__key__"):
         return item.__key__()
 
@@ -97,19 +98,28 @@ class KeyedList(Generic[T]):
     """Sequence-Mapping hybrid, indexible by string or integer"""
 
     @overload
-    def __init__(self):
+    def __init__(self, key: Callable[[T], str] = None):
         ...
 
     @overload
-    def __init__(self, iterable: Union[Iterable[T], Mapping[str, T]]):
+    def __init__(self, iterable: Union[Iterable[T], Mapping[str, T]], key: Callable[[T], str] = None):
         ...
 
-    def __init__(self, iterable=None):
+    def __init__(self, iterable=None, key=None):
+        if callable(iterable) and key is None:
+            key = iterable
+            iterable = None
+
+        if key is not None:
+            self._key = lambda i, default=MISSING: key(i)
+        else:
+            self._key = _key
+
         if iterable is not None:
             if isinstance(iterable, Mapping):
-                self._items = {k: v for k, v in iterable.items()}
+                self._items = dict(iterable.items())
             elif isinstance(iterable, Iterable) and not isinstance(iterable, (str, bytes)):
-                self._items = {key(v): v for v in iterable}
+                self._items = {self._key(v): v for v in iterable}
             else:
                 raise TypeError(f"Cannot create KeyedList from {iterable}")
             self._keys = list(self._items.keys())
@@ -186,11 +196,11 @@ class KeyedList(Generic[T]):
         if isinstance(index, slice):
             oldkeys = self._keys[index]
             if isinstance(value, Mapping):
-                if any(key(v, k) != k for k, v in value.items()):
+                if any(self._key(v, k) != k for k, v in value.items()):
                     raise ValueError("Item key doesn't match index")
             elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
                 value = {
-                    key(item, oldkeys[i] if i < len(oldkeys) else MISSING): item
+                    self._key(item, oldkeys[i] if i < len(oldkeys) else MISSING): item
                     for i, item in enumerate(value)
                 }
             else:  # value is a scalar
@@ -198,7 +208,7 @@ class KeyedList(Generic[T]):
                 # pylint: disable-next=invalid-sequence-index
                 default = MISSING if len(r) == 0 else self._keys[r.start]
                 value = {
-                    key(value, default): value
+                    self._key(value, default): value
                 }
 
             for k in value.keys():
@@ -210,7 +220,7 @@ class KeyedList(Generic[T]):
         else:
             if isinstance(index, str):
                 item_key = index
-                if item_key != key(value, item_key):
+                if item_key != self._key(value, item_key):
                     raise ValueError("Item key doesn't match index")
 
                 if item_key not in self._items:
@@ -220,7 +230,7 @@ class KeyedList(Generic[T]):
 
                 index = self._keys.index(index)
             else:
-                item_key = key(value, self._keys[index])
+                item_key = self._key(value, self._keys[index])
                 if item_key in self._items and item_key != self._keys[index]:
                     raise KeyError("Key already in list")
 
@@ -292,7 +302,7 @@ class KeyedList(Generic[T]):
         return KeyedListItemsView(self)
 
     def index(self, item: T, start=0, stop=sys.maxsize):
-        item_key = key(item, None)
+        item_key = self._key(item, None)
         if item_key is None:
             for k, v in self._items.items():
                 if v == item:
@@ -325,7 +335,7 @@ class KeyedList(Generic[T]):
 
     def __or__(self, other: Union[Iterable[T], Mapping[str, T]]) -> Self:
         if not isinstance(other, Mapping):
-            other = {key(v): v for v in other}
+            other = {self._key(v): v for v in other}
 
         newlist = type(self)(self)
         newlist._keys.extend(other.keys() - self._items.keys())
@@ -334,7 +344,7 @@ class KeyedList(Generic[T]):
 
     def __ior__(self, other: Union[Iterable[T], Mapping[str, T]]):
         if not isinstance(other, Mapping):
-            other = {key(v): v for v in other}
+            other = {self._key(v): v for v in other}
 
         self._keys.extend(other.keys() - self._items.keys())
         self._items.update(other)
@@ -344,7 +354,7 @@ class KeyedList(Generic[T]):
         return self
 
     def append(self, item: T):
-        item_key = key(item)
+        item_key = self._key(item)
         if item_key in self._items:
             raise KeyError(f"Key {item_key!r} already exists in list")
 
@@ -353,7 +363,7 @@ class KeyedList(Generic[T]):
 
     def extend(self, values: Union[Iterable[T], Mapping[str, T]]):
         if not isinstance(values, Mapping):
-            values = {key(v): v for v in values}
+            values = {self._key(v): v for v in values}
 
         dups = self._items.keys() & values.keys()
         if dups:
@@ -363,7 +373,7 @@ class KeyedList(Generic[T]):
         self._setitems(index, values)
 
     def insert(self, index: int, item: T):
-        item_key = key(item)
+        item_key = self._key(item)
         if item_key in self._items:
             raise KeyError(f"Keys {item_key} already exists in list")
 
@@ -371,7 +381,7 @@ class KeyedList(Generic[T]):
         self._setitems(index, {item_key: item})
 
     def remove(self, item: T):
-        item_key = key(item, None)
+        item_key = self._key(item, None)
         if item_key is None:
             for item_key, v in self._items.items():
                 if v == item:
@@ -416,12 +426,12 @@ MutableMapping.register(KeyedList)
 
 
 class SortedKeyedList(KeyedList[T]):
-    def __init__(self, iterable=None):
-        super().__init__(iterable)
+    def __init__(self, iterable=None, key=None):
+        super().__init__(iterable, key)
         self._keys = sorted(self._items.keys())
 
     def append(self, item: T):
-        item_key = key(item)
+        item_key = self._key(item)
         if item_key in self._items:
             raise KeyError(f"Key {item_key!r} already exists in list")
 
@@ -430,7 +440,7 @@ class SortedKeyedList(KeyedList[T]):
 
     def extend(self, values: Union[Iterable[T], Mapping[str, T]]):
         if not isinstance(values, Mapping):
-            values = {key(v): v for v in values}
+            values = {self._key(v): v for v in values}
 
         dups = self._items.keys() & values.keys()
         if dups:

@@ -53,6 +53,7 @@ from .PlanEdit import PlanEditor
 from .PlanExport import PlanExporter
 from .PlanImport import (
     AssignmentImporter,
+    PlanImporter,
     PlanImportService,
     ShapefileImporter
 )
@@ -67,7 +68,7 @@ __all__ = (
     'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
     'DistrictUpdater', 'DeltaUpdateService', 'DistrictValidator',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
-    'PlanExporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
+    'PlanExporter', 'PlanImporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
     'ProjectStorage', 'ErrorListMixin', 'getColorForDistrict',
     'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'DeltaListModel', 'RdsSplitsModel',
     'DistrictSelectModel', 'TargetDistrictModel', 'SourceDistrictModel', 'PlanListModel'

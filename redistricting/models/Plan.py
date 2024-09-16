@@ -43,7 +43,7 @@ from .base import (
 )
 from .columns import (
     DistrictColumns,
-    StatsColumns
+    MetricsColumns
 )
 from .District import (
     DistrictList,
@@ -93,7 +93,7 @@ class RdsPlanMetrics(RdsBaseModel):
         if len(self.plan.districts) == 1:
             return True
 
-        return not any(d['pieces'] > 1 for d in self.plan.districts[1:])  # pylint: disable=not-an-iterable
+        return not any(d['pieces'] > 1 for d in self.plan.districts[1:] if d['pieces'] is not None)  # pylint: disable=not-an-iterable
 
     @property
     def complete(self):
@@ -111,7 +111,7 @@ class RdsPlanMetrics(RdsBaseModel):
             return 0
 
     def __getattr__(self, name: str) -> Any:
-        if name in StatsColumns.CompactnessScores():
+        if name in MetricsColumns.CompactnessScores():
             return self._avgScore(name)
 
         return super().__getattr__(name)
@@ -363,7 +363,7 @@ class RdsPlan(RdsBaseModel):
             cols.append(f.fieldName)
         for f in self.dataFields:  # pylint: disable=not-an-iterable
             cols.append(f.fieldName)
-        cols.extend(list(StatsColumns))
+        cols.extend(list(MetricsColumns))
         return cols
 
     def createDistrict(self, district: int, name: str = '', members: int = 1, description: str = ''):

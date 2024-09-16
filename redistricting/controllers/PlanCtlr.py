@@ -55,8 +55,7 @@ from ..gui import (
     DlgSelectPlan
 )
 from ..models import RdsPlan
-from ..services import (
-    AssignmentImporter,
+from ..services import (  # ShapefileImporter
     DistrictUpdater,
     GeoFieldsModel,
     LayerTreeManager,
@@ -64,10 +63,11 @@ from ..services import (
     PlanCopier,
     PlanEditor,
     PlanExporter,
+    PlanImporter,
+    PlanImportService,
     PlanListModel,
     PlanManager,
-    PlanStylerService,
-    ShapefileImporter
+    PlanStylerService
 )
 from ..services.actions import PlanAction
 from ..utils import tr
@@ -96,12 +96,14 @@ class PlanController(BaseController):
         layerTreeManager: LayerTreeManager,
         planStyler: PlanStylerService,
         updateService: DistrictUpdater,
+        importService: PlanImportService,
         parent: Optional[QObject] = None
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.layerTreeManager = layerTreeManager
         self.styler = planStyler
         self.updateService = updateService
+        self.importService = importService
 
         self.icon = QIcon(':/plugins/redistricting/icon.png')
         self.menuName = tr('&Redistricting')
@@ -134,6 +136,7 @@ class PlanController(BaseController):
         self.project.layersRemoved.connect(self.enableNewPlan)
         self.project.cleared.connect(self.clearPlanMenu)
         self.updateService.updateComplete.connect(self.planDistrictsUpdated)
+        self.importService.importComplete.connect(self.importComplete)
 
         self.planModel = PlanListModel(self.planManager)
         self.planManager.aboutToChangeActivePlan.connect(self.planModel.updatePlan)
@@ -360,10 +363,6 @@ class PlanController(BaseController):
         if self.planManagerDlg is None:
             self.planManagerDlg = DlgSelectPlan(self.iface.mainWindow())
             self.planManagerDlg.setModel(self.planModel)
-            # self.planManagerDlg.lvwPlans.resizeColumnsToContents()
-            # self.planManagerDlg.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-            # self.planManagerDlg.lvwPlans.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-            # self.planManagerDlg.lvwPlans.activated.connect(self.updatePlanManagerActions)
             self.planManagerDlg.currentIndexChanged.connect(self.updatePlanManagerActions)
             if self.activePlan is not None:
                 self.planManagerDlg.setCurrentIndex(self.planManager.index(self.activePlan))
@@ -406,14 +405,17 @@ class PlanController(BaseController):
                 .setGeoPackagePath(dlgNewPlan.gpkgPath())
 
             if dlgNewPlan.importPlan():
-                importer = AssignmentImporter(self.iface) \
-                    .setSourceFile(dlgNewPlan.importPath()) \
-                    .setJoinField(dlgNewPlan.importField()) \
-                    .setHeaderRow(dlgNewPlan.importHeaderRow()) \
-                    .setDelimiter(dlgNewPlan.importDelim()) \
-                    .setQuoteChar(dlgNewPlan.importQuote()) \
-                    .setGeoColumn(dlgNewPlan.importGeoCol()) \
-                    .setDistColumn(dlgNewPlan.importDistCol())
+                importer = self.importService.importEquivalencyFile(
+                    None,
+                    dlgNewPlan.importPath(),
+                    dlgNewPlan.importField(),
+                    dlgNewPlan.importHeaderRow(),
+                    dlgNewPlan.importDelim(),
+                    dlgNewPlan.importQuote(),
+                    dlgNewPlan.importGeoCol(),
+                    dlgNewPlan.importDistCol(),
+                    startTask=False
+                )
             else:
                 importer = None
 
@@ -472,33 +474,48 @@ class PlanController(BaseController):
                 dlgCopyPlan.copyAssignments
             )
 
-    def importPlan(self, plan=None):
-        def importComplete():
-            self.updateService.updateDistricts(
-                self.planManager.activePlan, needDemographics=True, needGeometry=True, needSplits=True
-            )
-            self.planManager.activePlan.assignLayer.triggerRepaint()
+    def importComplete(self, plan):
+        if plan != self.activePlan:
+            return
 
+        # self.updateService.updateDistricts(
+        #     self.activePlan, needDemographics=True, needGeometry=True, needSplits=True
+        # )
+        self.activePlan.assignLayer.triggerRepaint()
+
+    def importPlan(self, plan=None):
         if not isinstance(plan, RdsPlan):
             if not self.checkActivePlan(tr('import')):
                 return
 
-        dlgImportPlan = DlgImportPlan(self.planManager.activePlan, self.iface.mainWindow())
+        dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
-            importer = AssignmentImporter(self.iface) \
-                .setSourceFile(dlgImportPlan.equivalencyFileName) \
-                .setJoinField(dlgImportPlan.joinField) \
-                .setHeaderRow(dlgImportPlan.headerRow) \
-                .setGeoColumn(dlgImportPlan.geoColumn) \
-                .setDistColumn(dlgImportPlan.distColumn) \
-                .setDelimiter(dlgImportPlan.delimiter) \
-                .setQuoteChar(dlgImportPlan.quotechar)
+            # importer = AssignmentImporter(self.iface) \
+            #     .setSourceFile(dlgImportPlan.equivalencyFileName) \
+            #     .setJoinField(dlgImportPlan.joinField) \
+            #     .setHeaderRow(dlgImportPlan.headerRow) \
+            #     .setGeoColumn(dlgImportPlan.geoColumn) \
+            #     .setDistColumn(dlgImportPlan.distColumn) \
+            #     .setDelimiter(dlgImportPlan.delimiter) \
+            #     .setQuoteChar(dlgImportPlan.quotechar)
 
             progress = self.startProgress(tr('Importing assignments...'))
-            importer.progressChanged.connect(progress.setValue)
-            progress.canceled.connect(importer.cancel)
-            importer.importComplete.connect(importComplete)
-            if not importer.importPlan(self.planManager.activePlan):
+            importer = self.importService.importEquivalencyFile(
+                self.activePlan,
+                dlgImportPlan.equivalencyFileName,
+                dlgImportPlan.joinField,
+                dlgImportPlan.headerRow,
+                dlgImportPlan.geoColumn,
+                dlgImportPlan.distColumn,
+                dlgImportPlan.delimiter,
+                dlgImportPlan.quotechar,
+                progress,
+            )
+            # importer.progressChanged.connect(progress.setValue)
+            # progress.canceled.connect(importer.cancel)
+            # importer.importComplete.connect(importComplete)
+            # if not importer.importPlan(self.activePlan):
+            if importer is None or not importer.isValid():
                 self.endProgress(progress)
 
     def importShapefile(self, plan=None):
@@ -508,17 +525,27 @@ class PlanController(BaseController):
 
         dlgImportPlan = DlgImportShape(self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
-            importer = ShapefileImporter(self.iface) \
-                .setSourceFile(dlgImportPlan.shapefileFileName) \
-                .setDistField(dlgImportPlan.distField) \
-                .setNameField(dlgImportPlan.nameField) \
-                .setMembersField(dlgImportPlan.membersField)
+            # importer = ShapefileImporter(self.iface) \
+            #     .setSourceFile(dlgImportPlan.shapefileFileName) \
+            #     .setDistField(dlgImportPlan.distField) \
+            #     .setNameField(dlgImportPlan.nameField) \
+            #     .setMembersField(dlgImportPlan.membersField)
 
             progress = self.startProgress(self.tr('Importing shapefile...'))
-            progress.canceled.connect(importer.cancel)
-            importer.progressChanged.connect(progress.setValue)
-            importer.importComplete.connect(self.triggerUpdate)
-            if not importer.importPlan(self.planManager.activePlan):
+            importer = self.importService.importShapeFile(
+                self.activePlan,
+                dlgImportPlan.shapefileFileName,
+                dlgImportPlan.distField,
+                dlgImportPlan.nameField,
+                dlgImportPlan.membersField,
+                progress
+            )
+
+            # progress.canceled.connect(importer.cancel)
+            # importer.progressChanged.connect(progress.setValue)
+            # importer.importComplete.connect(self.triggerUpdate)
+            # if not importer.importPlan(self.planManager.activePlan):
+            if importer is None or not importer.isValid():
                 self.endProgress(progress)
 
     def exportPlan(self, plan=None):
@@ -606,7 +633,7 @@ class PlanController(BaseController):
         self.planManager.appendPlan(plan, makeActive)
         self.project.setDirty()
 
-    def buildPlan(self, builder: PlanBuilder, importer: Optional[AssignmentImporter] = None):
+    def buildPlan(self, builder: PlanBuilder, importer: Optional[PlanImporter] = None):
         def layersCreated(plan: RdsPlan):
             nonlocal progress
             self.appendPlan(plan)
@@ -614,11 +641,10 @@ class PlanController(BaseController):
 
             if importer is not None:
                 progress = self.startProgress(tr('Importing assignments...'))
-                progress.canceled.connect(importer.cancel)
-                importer.progressChanged.connect(progress.setValue)
                 importer.importComplete.connect(self.triggerUpdate)
                 importer.importTerminated.connect(self.endProgress)
-                importer.importPlan(plan)
+                self.importService.startImport(plan, importer)
+                # importer.importPlan(plan)
 
         def buildError(builder: PlanBuilder):
             if not builder.isCancelled():

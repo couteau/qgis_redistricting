@@ -28,7 +28,7 @@ from .base import (
 )
 from .columns import (
     DistrictColumns,
-    StatsColumns
+    MetricsColumns
 )
 from .DeltaList import (
     Delta,
@@ -58,7 +58,7 @@ from .Splits import (
 
 __all__ = (
     'DistrictColumns',
-    'StatsColumns',
+    'MetricsColumns',
     'RdsField',
     'RdsGeoField',
     'RdsRelatedField',

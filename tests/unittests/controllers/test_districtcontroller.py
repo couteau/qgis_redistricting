@@ -206,6 +206,7 @@ class TestDistrictController:
         dlg = mocker.patch('redistricting.controllers.MetricsCtlr.DlgSplitDetail')
         # pylint: disable-next=unused-variable
         metctlr = MetricsController(qgis_iface, mock_project, mock_planmanager, mock_toolbar)
+        metctlr.planChanged(mock_planmanager.activePlan)
         index = mocker.create_autospec(spec=QModelIndex, instance=True)
         index.row.return_value = 8
         index.column.return_value = 1

@@ -19,16 +19,6 @@ from redistricting.services.PlanBuilder import PlanBuilder
 
 class PlanFixtures:
 
-    @pytest.fixture
-    def patch_iface(self, qgis_iface,  mocker: MockerFixture):
-        qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
-        qgis_iface.addCustomActionForLayer = mocker.MagicMock()
-        qgis_iface.vectorMenu = mocker.MagicMock()
-        qgis_iface.addPluginToVectorMenu = mocker.MagicMock()
-        qgis_iface.removeDockWidget = mocker.MagicMock()
-        qgis_iface.removePluginVectorMenu = mocker.MagicMock()
-        qgis_iface.layerTreeView = mocker.MagicMock()
-
     @ pytest.fixture
     def minimal_plan(self):
         return RdsPlan('minimal', 5)

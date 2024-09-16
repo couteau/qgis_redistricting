@@ -20,6 +20,18 @@ def pytest_configure(config: pytest.Config):
     config.pluginmanager.register(PlanFixtures())
 
 
+@pytest.fixture(autouse=True)
+def patch_iface(qgis_iface,  mocker: MockerFixture):
+    qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
+    qgis_iface.removeCustomActionForLayerType = mocker.MagicMock()
+    qgis_iface.addCustomActionForLayer = mocker.MagicMock()
+    qgis_iface.vectorMenu = mocker.MagicMock()
+    qgis_iface.addPluginToVectorMenu = mocker.MagicMock()
+    qgis_iface.removeDockWidget = mocker.MagicMock()
+    qgis_iface.removePluginVectorMenu = mocker.MagicMock()
+    qgis_iface.layerTreeView = mocker.MagicMock()
+
+
 @pytest.fixture
 def datadir(tmp_path: pathlib.Path):
     d = tmp_path / 'data'

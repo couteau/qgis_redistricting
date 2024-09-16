@@ -45,10 +45,10 @@ from qgis.PyQt.QtGui import (
 
 from ..models import (
     DistrictColumns,
+    MetricsColumns,
     RdsDistrict,
     RdsPlan
 )
-from ..utils import tr
 from .PlanColors import getColorForDistrict
 
 
@@ -70,14 +70,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
     def updatePlanFields(self):
         self.beginResetModel()
         self._keys = list(DistrictColumns)
-        self._headings = [
-            tr('District'),
-            tr('District'),
-            tr('Members'),
-            tr('Population'),
-            tr('Deviation'),
-            tr('%Deviation')
-        ]
+        self._headings = [s.comment for s in DistrictColumns]
 
         for field in self._plan.popFields:
             self._keys.append(field.fieldName)
@@ -92,12 +85,8 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 self._keys.append(f"pct_{fn}")
                 self._headings.append(f"%{field.caption}")
 
-        self._keys.extend(['polsbypopper', 'reock', 'convexhull'])
-        self._headings.extend([
-            tr('Polsby-Popper'),
-            tr('Reock'),
-            tr('Convex Hull'),
-        ])
+        self._keys.extend(MetricsColumns.CompactnessScores())
+        self._headings.extend([s.comment for s in MetricsColumns.CompactnessScores()])  # pylint: disable=no-member
         self.endResetModel()
 
     @plan.setter
@@ -178,7 +167,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
                     value = f'{value:+,}'
                 elif key == 'pct_deviation':
                     value = f'{value:+.2%}'
-                elif key in {'polsbypopper', 'reock', 'convexhull'}:
+                elif key in MetricsColumns.CompactnessScores():
                     value = f'{value:0.3}'
                 elif key[:3] == 'pct':
                     value = f'{value:.2%}'

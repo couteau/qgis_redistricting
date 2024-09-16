@@ -18,7 +18,7 @@
 """
 from pytest_mock import MockerFixture
 
-from redistricting.models.columns import StatsColumns
+from redistricting.models.columns import MetricsColumns
 from redistricting.models.Field import RdsGeoField
 from redistricting.models.Plan import RdsPlanMetrics
 
@@ -34,6 +34,6 @@ class TestPlanStats:
         geofields.__iter__.return_value = [mocker.create_autospec(spec=RdsGeoField, instance=True)]
         stats = RdsPlanMetrics(mock_plan)
         assert stats.cutEdges is None
-        for f in StatsColumns.CompactnessScores():
+        for f in MetricsColumns.CompactnessScores():
             assert getattr(stats, f) == 0.5
         assert len(stats.splits) == 1

@@ -53,7 +53,8 @@ class DeltaUpdate:
     task: AggregatePendingChangesTask = None
 
     def __post_init__(self):
-        self.delta = DeltaList()
+        if self.delta is None:
+            self.delta = DeltaList()
 
     def clear(self):
         self.assignments = None

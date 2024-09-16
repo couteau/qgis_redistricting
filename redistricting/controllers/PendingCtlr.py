@@ -64,10 +64,10 @@ class PendingChangesController(BaseController):
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.deltaService = deltaService
-        self.deltaService.updateCompleted.connect(self.updateDelta)
         self.dockwidget: DockPendingChanges = None
         self.actionToggle: QAction = None
         self.model: DeltaListModel = DeltaListModel(self.iface)
+        self.deltaService.updateCompleted.connect(self.updateDelta)
 
     def load(self):
         self.setupPendingChangesWidget()

@@ -69,6 +69,7 @@ class RdsTableView(QTableView):
 
     def init(self):
         self._frozenColumnsView.setFocusPolicy(Qt.NoFocus)
+        self._frozenColumnsView.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         self._frozenColumnsView.verticalHeader().hide()
         self._frozenColumnsView.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
 

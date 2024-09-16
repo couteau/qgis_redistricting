@@ -15,21 +15,29 @@ from qgis.PyQt.QtGui import (
     QFont
 )
 
-from ..models import RdsPlanMetrics
+from ..models import (
+    DistrictColumns,
+    MetricsColumns,
+    RdsPlanMetrics
+)
 from ..utils import tr
 
 
 class RdsPlanMetricsModel(QAbstractTableModel):
     MetricLabels = [
-        tr('Population'),
+        DistrictColumns.POPULATION.comment,  # pylint: disable=no-member
         tr('Continguous'),
-        tr('Compactness'),
-        tr('   Avg. Polsby-Popper'),
-        tr('   Avg. Reock'),
-        tr('   Avg. Convex-Hull'),
-        tr('   Cut Edges'),
-        tr('Splits')
+        tr('Compactness')
     ]
+    # pylint: disable-next=no-member
+    MetricLabels.extend(f"   {tr('Avg.')} {s.comment}" for s in MetricsColumns.CompactnessScores())
+    MetricLabels.extend(
+        [
+            tr('   Cut Edges'),
+            tr('Splits')
+        ]
+    )
+
     SPLITS_OFFSET = 8
 
     def __init__(self, metrics: RdsPlanMetrics, parent: Optional[QObject] = None):

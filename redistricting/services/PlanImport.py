@@ -45,7 +45,6 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .DistrictUpdate import DistrictUpdater
 from .ErrorList import ErrorListMixin
 from .feedback import Feedback
 from .Tasks import (
@@ -71,7 +70,7 @@ class PlanImporter(ErrorListMixin, QObject):
         self._errorLevel = None
         self._importTask: QgsTask = None
 
-    def _isValid(self) -> bool:
+    def isValid(self) -> bool:
         result = True
         if not self._plan:
             self.pushError(tr('No plan provided to import service'), Qgis.Critical)
@@ -122,12 +121,12 @@ class PlanImporter(ErrorListMixin, QObject):
         self._importTask = None
         self.importTerminated.emit(self._plan)
 
-    def importPlan(self, plan: "RdsPlan"):
+    def importPlan(self, plan: "RdsPlan", startTask: bool = True):
         self.clearErrors()
 
         self._plan = plan
 
-        if not self._isValid():
+        if not self.isValid():
             return None
 
         if self._plan.assignLayer.isEditable():
@@ -139,9 +138,13 @@ class PlanImporter(ErrorListMixin, QObject):
         self._importTask.taskTerminated.connect(self.taskTerminated)
         self._importTask.progressChanged.connect(self.setProgress)
 
-        QgsApplication.taskManager().addTask(self._importTask)
+        if startTask:
+            self.startImport()
 
         return self._importTask
+
+    def startImport(self):
+        QgsApplication.taskManager().addTask(self._importTask)
 
 
 class AssignmentImporter(PlanImporter):
@@ -179,8 +182,8 @@ class AssignmentImporter(PlanImporter):
         self._quotechar = value
         return self
 
-    def _isValid(self) -> bool:
-        result = super()._isValid()
+    def isValid(self) -> bool:
+        result = super().isValid()
         if result:
             if self._joinField is None:
                 self._joinField = self._plan.geoIdField
@@ -214,8 +217,8 @@ class ShapefileImporter(PlanImporter):
         self._membersField: str = None
         self._layer: QgsVectorLayer = None
 
-    def _isValid(self) -> bool:
-        result = super()._isValid()
+    def isValid(self) -> bool:
+        result = super().isValid()
 
         if result:
             self._layer = QgsVectorLayer(str(self._file), '__import_layer')
@@ -279,18 +282,21 @@ class PlanImportService(QObject):
     importComplete = pyqtSignal("PyQt_PyObject")
     importTerminated = pyqtSignal("PyQt_PyObject")
 
-    def __init__(self, updater: DistrictUpdater, parent: Optional[QObject] = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._tasks: dict[RdsPlan, QgsTask] = {}
-        self._updater = updater
 
     def removeTask(self, plan):
         if plan in self._tasks:
             del self._tasks[plan]
 
-    def startUpdate(self, plan):
+    def completed(self, plan):
         self.removeTask(plan)
-        self._updater.updateDistricts(plan, needDemographics=True, needGeometry=True, needSplits=True, force=True)
+        self.importComplete.emit(plan)
+
+    def terminated(self, plan):
+        self.removeTask(plan)
+        self.importTerminated.emit(plan)
 
     def importEquivalencyFile(
         self,
@@ -302,14 +308,15 @@ class PlanImportService(QObject):
         distColumn: int = 1,
         delimiter: str = None,
         quotechar: str = None,
-        progress: Feedback = None
+        progress: Feedback = None,
+        startTask: bool = True
     ):
         if plan in self._tasks and self._tasks[plan].status() < QgsTask.Complete:
-            return
+            return None
 
         importer = AssignmentImporter(self)
-        importer.importComplete.connect(self.importComplete)
-        importer.importTerminated.connect(self.importTerminated)
+        importer.importComplete.connect(self.completed)
+        importer.importTerminated.connect(self.terminated)
         if progress:
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
@@ -325,10 +332,10 @@ class PlanImportService(QObject):
         if quotechar is not None:
             importer.setQuoteChar(quotechar)
 
-        task = importer.importPlan(plan)
-        task.taskCompleted.connect(lambda: self.startUpdate(plan))
-        task.taskTerminated.connect(lambda: self.removeTask(plan))
+        task = importer.importPlan(plan, startTask)
         self._tasks[plan] = task
+
+        return importer
 
     def importShapeFile(
         self,
@@ -337,14 +344,15 @@ class PlanImportService(QObject):
         distField: str,
         nameField: str,
         membersField: str,
-        progress: Feedback
+        progress: Feedback = None,
+        startTask: bool = True
     ):
         if plan in self._tasks and self._tasks[plan].status() < QgsTask.Complete:
-            return
+            return None
 
         importer = ShapefileImporter(self)
-        importer.importComplete.connect(self.importComplete)
-        importer.importTerminated.connect(self.importTerminated)
+        importer.importComplete.connect(self.completed)
+        importer.importTerminated.connect(self.terminated)
         if progress:
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
@@ -354,9 +362,16 @@ class PlanImportService(QObject):
             .setNameField(nameField)\
             .setMembersField(membersField)
 
-        task = importer.importPlan(plan)
-        task.taskCompleted.connect(lambda: self.startUpdate(plan))
-        task.taskTerminated.connect(lambda: self.removeTask(plan))
-        self._tasks[plan] = task
+        if plan is not None and startTask:
+            self.startImport(plan, importer)
 
         return importer
+
+    def startImport(self, plan, importer: PlanImporter, progress: Feedback = None):
+        if progress:
+            importer.progressChanged.connect(progress.setValue)
+            progress.canceled.connect(importer.cancel)
+
+        task = importer.importPlan(plan)
+        self._tasks[plan] = task
+        return task

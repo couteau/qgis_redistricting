@@ -38,8 +38,8 @@ from qgis.PyQt.QtXml import QDomDocument
 
 from ..models import (
     DistrictColumns,
+    MetricsColumns,
     RdsPlan,
-    StatsColumns,
     deserialize,
     serialize
 )
@@ -99,7 +99,7 @@ class ProjectStorage:
                 columns.append(f.fieldName)
             if f.pctBase:
                 columns.append(f'pct_{f.fieldName}')
-        columns.extend(StatsColumns)
+        columns.extend(MetricsColumns)
 
         districtReader = DistrictReader(plan.distLayer, plan.distField, plan.popField, columns)
         districtReader.loadDistricts(plan)
@@ -113,7 +113,7 @@ class ProjectStorage:
             columns.append(f.fieldName)
         for f in plan.dataFields:
             columns.append(f.fieldName)
-        columns.extend([s for s in StatsColumns])
+        columns.extend([s for s in MetricsColumns])
         if plan.distLayer:
             writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
             writer.writeToLayer(plan.districts)

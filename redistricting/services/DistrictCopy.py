@@ -81,6 +81,8 @@ class DistrictCopier(QObject):
             action = self.sender()
             if isinstance(action, QAction):
                 dist = action.data()
+                if dist is None:
+                    return
             else:
                 return
 
@@ -100,14 +102,17 @@ class DistrictCopier(QObject):
         assignments = pd.read_csv(io.StringIO(cb.mimeData().text()), index_col="fid")
 
         if not assignments.empty:
+            planid = UUID(bytes=cb.mimeData().data('application/x-redist-planid').data())
+            plan = self.planManager[planid]
             groups = assignments.groupby(self.planManager.activePlan.distField).groups
 
             assign = self.assignmentsService.getEditor(self.planManager.activePlan)
-            assign.startEditCommand(tr('Paste district'))
+            assign.startEditCommand(tr('Paste district from {}').format(plan.name))
 
             # clear the current assignments for any districts that are being pasted
             for d in groups.keys():
                 assign.reassignDistrict(d, 0)
 
-            assign.changeAssignments(groups)
+            for dist, fids in groups.items():
+                assign.assignFeaturesToDistrict(fids, dist)
             assign.endEditCommand()

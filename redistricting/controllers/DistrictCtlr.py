@@ -119,7 +119,7 @@ class DistrictController(BaseController):
         self.actionZoomToDistrict = self.actions.createAction(
             name="actionZoomToDistrict",
             icon=':/plugins/redistricting/zoomdistrict.svg',
-            text=tr("Zoom to district"),
+            text=tr("Zoom to District"),
             callback=self.zoomToDistrict,
             parent=self.iface.mainWindow()
         )
@@ -127,7 +127,7 @@ class DistrictController(BaseController):
         self.actionFlashDistrict = self.actions.createAction(
             name='actionFlashDistrict',
             icon=':/plugins/redistricting/flashdistrict.svg',
-            text=self.tr("Flash district"),
+            text=self.tr("Flash District"),
             callback=self.flashDistrict,
             parent=self.iface.mainWindow()
         )
@@ -135,7 +135,7 @@ class DistrictController(BaseController):
         self.actionCopyDistrictData = self.actions.createAction(
             name="actionCopyDistrictsData",
             icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
-            text=self.tr("Copy data"),
+            text=self.tr("Copy Data"),
             tooltip=self.tr("Copy selected demographic data to clipboard"),
             callback=self.copySelection,
             shortcut=QKeySequence.Copy,
@@ -150,6 +150,13 @@ class DistrictController(BaseController):
             statustip=self.tr("Reaggregate all demographics"),
             callback=self.recalculate
         )
+
+        self.dataTableContextMenu = QMenu()
+        self.dataTableContextMenu.addAction(self.actionCopyDistrictData)
+        self.dataTableContextMenu.addAction(self.actionCopyDistrict)
+        self.dataTableContextMenu.addAction(self.actionPasteDistrict)
+        self.dataTableContextMenu.addAction(self.actionZoomToDistrict)
+        self.dataTableContextMenu.addAction(self.actionFlashDistrict)
 
     def load(self):
         self.createDataTableDockWidget()
@@ -247,24 +254,20 @@ class DistrictController(BaseController):
         return True
 
     def createDataTableContextMenu(self, pos: QPoint):
-        menu = QMenu()
-        menu.addAction(self.actionCopyDistrictData)
-
         idx = self.dockwidget.tblDataTable.indexAt(pos)
-        district = self.planManager.activePlan.districts[idx.row()]
+        if self.activePlan is None:
+            return
 
-        menu.addAction(self.actionCopyDistrict)
+        district = self.planManager.activePlan.districts[idx.row()]
         self.actionCopyDistrict.setData(district.district)
         self.actionCopyDistrict.setEnabled(district.district != 0)
-        menu.addAction(self.actionPasteDistrict)
         self.actionPasteDistrict.setData(district.district)
         self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
-        menu.addAction(self.actionZoomToDistrict)
         self.actionZoomToDistrict.setData(district.district)
-        menu.addAction(self.actionFlashDistrict)
         self.actionFlashDistrict.setData(district.district)
         self.actionFlashDistrict.setEnabled(district.district != 0)
-        menu.exec(self.dockwidget.tblDataTable.mapToGlobal(pos))
+
+        self.dataTableContextMenu.exec(self.dockwidget.tblDataTable.mapToGlobal(pos))
 
     def districtAction(self, district, method, refresh):
         if self.planManager.activePlan is None:

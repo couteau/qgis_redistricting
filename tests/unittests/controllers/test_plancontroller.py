@@ -107,16 +107,23 @@ class TestPlanController:
         return updater
 
     @pytest.fixture
+    def mock_import_service(self, mocker: MockerFixture) -> services.PlanImportService:
+        importer = mocker.create_autospec(spec=services.PlanImportService)
+        importer.importComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        importer.importTerminated = mocker.create_autospec(spec=pyqtBoundSignal)
+        return importer
+
+    @pytest.fixture
     def mock_styler(self, mocker: MockerFixture) -> services.PlanStylerService:
         styler = mocker.create_autospec(spec=services.PlanStylerService)
         return styler
 
     @pytest.fixture
-    def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_styler, mocker: MockerFixture):
+    def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_styler, mock_import_service, mocker: MockerFixture):
         layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
         controller = controllers.PlanController(
             qgis_iface, mock_project, mock_planmanager,
-            mock_toolbar, layerTreeManager, mock_styler, mock_update_service
+            mock_toolbar, layerTreeManager, mock_styler, mock_update_service, mock_import_service
         )
         mocker.patch.object(controller, "startProgress")
 
@@ -125,11 +132,11 @@ class TestPlanController:
         controller.unload()
 
     @pytest.fixture
-    def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_styler, mocker: MockerFixture):
+    def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_styler, mock_import_service, mocker: MockerFixture):
         layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
         controller = controllers.PlanController(
             qgis_iface, mock_project, mock_planmanager_with_active_plan,
-            mock_toolbar, layerTreeManager, mock_styler, mock_update_service
+            mock_toolbar, layerTreeManager, mock_styler, mock_update_service, mock_import_service
         )
         mocker.patch.object(controller, "startProgress")
         controller.load()
@@ -326,7 +333,6 @@ class TestPlanController:
     ):
         builder = mock_builder.return_value
         dlg = mock_edit_dlg.return_value
-        importer_class = mocker.patch('redistricting.controllers.PlanCtlr.AssignmentImporter')
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         type(layer).id = mocker.PropertyMock(return_value=uuid4())
         controller.project.mapLayers.return_value = {layer.id: layer}
@@ -337,11 +343,11 @@ class TestPlanController:
         mock_builder.assert_called_once()
         builder.setName.assert_called_once_with('mocked')
         builder.createPlan.assert_called_once()
-        importer_class.assert_not_called()
+        controller.importService.importEquivalencyFile.assert_not_called()
 
         dlg.importPlan.return_value = True
         controller.newPlan()
-        importer_class.assert_called_once()
+        controller.importService.importEquivalencyFile.assert_called_once()
 
     def test_create_plan_no_layers_warns(
         self,
@@ -423,12 +429,11 @@ class TestPlanController:
         dlgImportPlan.quotechar = '"'
         dlgImportPlan.exec.return_value = QDialog.Accepted
 
-        importer_class = mocker.patch('redistricting.controllers.PlanCtlr.AssignmentImporter',
-                                      spec=services.AssignmentImporter)
+        importService = mocker.patch.object(controller_with_active_plan, 'importService')
 
         controller_with_active_plan.importPlan()
         dlg_class.assert_called_once()
-        importer_class.assert_called_once()
+        importService.importEquivalencyFile.assert_called_once()
         dlgImportPlan.exec.assert_called_once()
 
     def test_import_shapefile_no_active_plan_warns(
@@ -458,12 +463,11 @@ class TestPlanController:
         dlgImportPlan.membersField = None
         dlgImportPlan.exec.return_value = QDialog.Accepted
 
-        importer_class = mocker.patch('redistricting.controllers.PlanCtlr.ShapefileImporter',
-                                      spec=services.ShapefileImporter)
+        importService = mocker.patch.object(controller_with_active_plan, 'importService')
 
         controller_with_active_plan.importShapefile()
         dlg_class.assert_called_once()
-        importer_class.assert_called_once()
+        importService.importShapeFile.assert_called_once()
         dlgImportPlan.exec.assert_called_once()
 
     def test_export_plan_no_active_plan_warns(
