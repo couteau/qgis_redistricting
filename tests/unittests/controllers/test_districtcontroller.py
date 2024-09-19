@@ -210,5 +210,5 @@ class TestDistrictController:
         index = mocker.create_autospec(spec=QModelIndex, instance=True)
         index.row.return_value = 8
         index.column.return_value = 1
-        controller_with_active_plan.showSplitsDialog(index)
+        controller_with_active_plan.showMetricsDetail(index)
         dlg.assert_called_once()

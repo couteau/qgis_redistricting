@@ -22,6 +22,14 @@
  *                                                                         *
  ***************************************************************************/
 """
+from qgis.PyQt.QtCore import (
+    QEvent,
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtGui import QKeyEvent
+from qgis.PyQt.QtWidgets import QTableView
+
 from .DistrictDataTable import DockDistrictDataTable
 from .DistrictTools import DockRedistrictingToolbox
 from .DlgConfirmDelete import DlgConfirmDelete
@@ -39,6 +47,19 @@ from .PaintTool import (
     PaintMode
 )
 from .PendingChanges import DockPendingChanges
+
+
+class TableViewKeyEventFilter(QObject):
+    def eventFilter(self, obj: QTableView, event: QKeyEvent):  # pylint: disable=unused-argument
+        if event.type() != QEvent.KeyPress:
+            return False
+
+        if event.key() in (Qt.Key_Enter, Qt.Key_Return):
+            obj.activated.emit(obj.currentIndex())
+            return True
+
+        return False
+
 
 __all__ = [
     'DlgEditPlan',

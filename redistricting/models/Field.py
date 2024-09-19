@@ -36,7 +36,8 @@ from qgis.core import (
     QgsFeature,
     QgsFeatureRequest,
     QgsField,
-    QgsVectorLayer
+    QgsVectorLayer,
+    QgsVectorLayerJoinInfo
 )
 from qgis.PyQt.QtCore import (
     QMetaType,
@@ -50,6 +51,7 @@ from .base import (
     RdsBaseModel,
     rds_property
 )
+from .columns import FieldCategory
 
 
 class RdsField(RdsBaseModel):
@@ -58,6 +60,7 @@ class RdsField(RdsBaseModel):
     layer: QgsVectorLayer = rds_property(private=True)
     field: str = rds_property(private=True)
     caption: str = None
+    category: int = FieldCategory.Population
 
     def __pre_init__(self):
         self._icon: QIcon = None
@@ -240,6 +243,7 @@ class RdsGeoField(RdsField):
 
         return nameField
 
+    category: int = FieldCategory.Geography
     nameField: RdsRelatedField = rds_property(private=True, factory=Factory(_createNameField))
 
     def getRelation(self):
@@ -278,11 +282,31 @@ class RdsGeoField(RdsField):
 
         return None
 
+    def makeJoin(self):
+        rel = self.getRelation()
+        pair = rel.fieldPairs()
+        if len(pair) > 1:
+            return None
+        l = rel.referencedLayer()
+        k = rel.referencedFields()
+        if len(k) > 1:
+            return None
+        keyField = l.fields().field(k[0]).name()  # pair[self.fieldName]
+
+        join = QgsVectorLayerJoinInfo()
+        join.setJoinLayer(l)
+        join.setJoinFieldName(keyField)
+        join.setTargetFieldName(self.fieldName)
+        join.setJoinFieldNamesSubset([self.nameField.field])
+        join.setPrefix(f'{self.fieldName}_')
+        return join
+
 
 class RdsDataField(RdsField):
     sumFieldChanged = pyqtSignal()
     pctBaseChanged = pyqtSignal()
 
+    category: int = FieldCategory.Demographic
     sumField: bool = rds_property(
         private=True,
         fvalid=lambda inst, value: value and inst.isNumeric(),
