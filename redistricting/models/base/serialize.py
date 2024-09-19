@@ -94,14 +94,14 @@ def serialize_model(obj, memo=None, exclude_none=True):
 
 def serialize_value(value, memo: dict[int, Any], exclude_none=True):
     if not id(value) in memo:
-        if isinstance(value, RdsBaseModel):
+        if type(value) in serializers:
+            memo[id(value)] = serializers[type(value)](value)
+        elif isinstance(value, RdsBaseModel):
             memo[id(value)] = serialize_model(value, memo, exclude_none)
         elif isinstance(value, Mapping):
             memo[id(value)] = {k: serialize_value(v, memo) for k, v in value.items()}
         elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
             memo[id(value)] = [serialize_value(v, memo) for v in value]
-        elif type(value) in serializers:
-            memo[id(value)] = serializers[type(value)](value)
         else:
             memo[id(value)] = value
 
@@ -190,7 +190,9 @@ def deserialize_value(t: type, value: Any, **kw):
         args = ()
         cls_anns = {}
 
-    if issubclass(t, RdsBaseModel):
+    if t in deserializers:
+        value = deserializers[t](value)
+    elif issubclass(t, RdsBaseModel):
         if issubclass(t, Generic) and args:
             cls_anns = dict(zip(t.__parameters__, args))
             args = tuple(cls_anns[a] if a in cls_anns else a for a in args)
@@ -201,8 +203,6 @@ def deserialize_value(t: type, value: Any, **kw):
         value = t(deserialize_iterable(value, *args))
     elif issubclass(t, Iterable) and t not in (str, bytes):
         value = t(deserialize_iterable(value, *args))
-    elif t in deserializers:
-        value = deserializers[t](value)
 
     return value
 
