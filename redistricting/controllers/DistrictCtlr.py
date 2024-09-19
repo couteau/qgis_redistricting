@@ -54,7 +54,10 @@ from qgis.PyQt.QtWidgets import (
     QToolBar
 )
 
-from ..gui import DockDistrictDataTable
+from ..gui import (
+    DockDistrictDataTable,
+    TableViewKeyEventFilter
+)
 from ..models import RdsPlan
 from ..services import (
     ActionRegistry,
@@ -64,6 +67,7 @@ from ..services import (
     DistrictUpdater,
     PlanManager,
     RdsDistrictDataModel,
+    RdsDistrictFilterFieldsProxyModel,
     RdsPlanMetricsModel
 )
 from ..utils import tr
@@ -94,6 +98,7 @@ class DistrictController(BaseController):
         self.updateService = updateService
         self.actionToggle: QAction = None
         self.model: RdsDistrictDataModel = None
+        self.proxyModel: RdsDistrictFilterFieldsProxyModel = None
         self.metricsModel: RdsPlanMetricsModel = None
         self.dockwidget: DockDistrictDataTable = None
         self.actions = ActionRegistry()
@@ -151,6 +156,8 @@ class DistrictController(BaseController):
             callback=self.recalculate
         )
 
+        self.actionToggleMetrics: QAction = None
+
         self.dataTableContextMenu = QMenu()
         self.dataTableContextMenu.addAction(self.actionCopyDistrictData)
         self.dataTableContextMenu.addAction(self.actionCopyDistrict)
@@ -161,8 +168,6 @@ class DistrictController(BaseController):
     def load(self):
         self.createDataTableDockWidget()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
-        self.planManager.planAdded.connect(self.planAdded)
-        self.planManager.planRemoved.connect(self.planRemoved)
         self.updateService.updateStarted.connect(self.showOverlay)
         self.updateService.updateComplete.connect(self.hideOverlay)
         self.updateService.updateTerminated.connect(self.hideOverlay)
@@ -182,28 +187,45 @@ class DistrictController(BaseController):
     def createDataTableDockWidget(self):
         """Create the dockwidget that displays district statistics and wire up the interface."""
         self.model = RdsDistrictDataModel()
+        self.proxyModel = RdsDistrictFilterFieldsProxyModel()
+        self.proxyModel.setSourceModel(self.model)
+        self.proxyModel.setSortRole(RdsDistrictDataModel.RawDataRole)
         self.updateService.updateComplete.connect(self.model.districtsUpdated)
 
         self.metricsModel = RdsPlanMetricsModel(None)
 
         dockwidget = DockDistrictDataTable()
         dockwidget.installEventFilter(self)
-        dockwidget.tblDataTable.doubleClicked.connect(self.editDistrict)
+        dockwidget.tblDataTable.activated.connect(self.editDistrict)
         dockwidget.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
         dockwidget.tblDataTable.customContextMenuRequested.connect(self.createDataTableContextMenu)
-        dockwidget.tblDataTable.setModel(self.model)
+        dockwidget.tblDataTable.setModel(self.proxyModel)
         dockwidget.tblPlanMetrics.setModel(self.metricsModel)
-        dockwidget.tblPlanMetrics.doubleClicked.connect(self.showSplitsDialog)
+        dockwidget.tblPlanMetrics.installEventFilter(TableViewKeyEventFilter(dockwidget))
+        dockwidget.tblPlanMetrics.activated.connect(self.showMetricsDetail)
         dockwidget.btnCopy.setDefaultAction(self.actionCopyDistrictData)
         dockwidget.btnRecalculate.setDefaultAction(self.actionRecalculate)
+        dockwidget.btnDemographics.toggled.connect(self.proxyModel.showDemographics)
+        dockwidget.btnMetrics.toggled.connect(self.proxyModel.showMetrics)
         self.iface.addDockWidget(Qt.BottomDockWidgetArea, dockwidget)
 
         self.actionToggle = dockwidget.toggleViewAction()
         self.actionToggle.setIcon(QgsApplication.getThemeIcon('/mActionOpenTable.svg'))
         self.actionToggle.setText(tr('District Data'))
-        self.actionToggle.setStatusTip(tr('Show/hide district demographic data/metrics table'))
+        self.actionToggle.setToolTip(tr('Show/hide district demographic data/metrics table'))
         self.actions.registerAction('actionToggleDataTable', self.actionToggle)
         self.toolbar.addAction(self.actionToggle)
+
+        self.actionToggleMetrics = self.actions.createAction(
+            'actionToggleMetrics',
+            ':/plugins/redistricting/planmetrics.svg',
+            'Plan metrics',
+            'Show/hide plan metrics',
+            checkable=True,
+            callback=dockwidget.gbxPlanMetrics.setVisible
+        )
+        self.actionToggleMetrics.setChecked(True)
+        dockwidget.btnPlanMetrics.setDefaultAction(self.actionToggleMetrics)
 
         self.dockwidget = dockwidget
         return self.dockwidget
@@ -220,17 +242,6 @@ class DistrictController(BaseController):
         self.actionCopyDistrictData.setEnabled(plan is not None)
         if self.updateService.planIsUpdating(plan):
             self.dockwidget.setWaiting(True)
-
-    def planAdded(self, plan: RdsPlan):
-        plan.metricsChanged.connect(self.updateMetrics)
-
-    def planRemoved(self, plan: RdsPlan):
-        plan.metricsChanged.disconnect(self.updateMetrics)
-
-    def updateMetrics(self):
-        plan: RdsPlan = self.sender()
-        if plan == self.planManager.activePlan:
-            self.metricsModel.setMetrics(plan.metrics)
 
     def addCanvasContextMenuItems(self, menu: QMenu, event: QgsMapMouseEvent):
         if self.planManager.activePlan is None:
@@ -288,7 +299,7 @@ class DistrictController(BaseController):
             raise ValueError()
 
         fid = self.planManager.activePlan.districts[district].fid
-        if fid is not None:
+        if fid != -1:
             method(self.planManager.activePlan.distLayer, [fid])
             if refresh:
                 self.canvas.refresh()
@@ -347,12 +358,19 @@ class DistrictController(BaseController):
         self.actions.actionEditDistrict.setData(district)
         self.actions.actionEditDistrict.trigger()
 
-    def showSplitsDialog(self, index: QModelIndex):
-        if not self.actions.actionShowSplitsDialog.isEnabled():
-            return
-
+    def showMetricsDetail(self, index: QModelIndex):
         row = index.row()
-        if row >= self.metricsModel.SPLITS_OFFSET:
+        if row == 1:
+            if not self.actions.actionShowSplitDistrictsDialog.isEnabled():
+                return
+            self.actions.actionShowSplitDistrictsDialog.trigger()
+        elif row == 2:
+            if not self.actions.actionShowUnassignedGeographyDialog.isEnabled():
+                return
+            self.actions.actionShowUnassignedGeographyDialog.trigger()
+        elif row >= self.metricsModel.SPLITS_OFFSET:
+            if not self.actions.actionShowSplitsDialog.isEnabled():
+                return
             field = self.planManager.activePlan.geoFields[row-self.metricsModel.SPLITS_OFFSET]
             self.actions.actionShowSplitsDialog.setData(field)
             self.actions.actionShowSplitsDialog.trigger()

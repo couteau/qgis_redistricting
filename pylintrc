@@ -278,6 +278,7 @@ check-protected-access-in-special-methods=no
 defining-attr-methods=__init__,
                       __new__,
                       setUp,
+                      setupUi,
                       __post_init__,
                       __pre_init__
 

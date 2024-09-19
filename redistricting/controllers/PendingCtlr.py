@@ -29,8 +29,7 @@ from typing import (
 
 from qgis.PyQt.QtCore import (
     QObject,
-    Qt,
-    QTransposeProxyModel
+    Qt
 )
 from qgis.PyQt.QtGui import QIcon
 
@@ -40,6 +39,7 @@ from ..models import (
     RdsPlan
 )
 from ..services import (
+    DeltaFieldFilterProxy,
     DeltaListModel,
     DeltaUpdateService,
     PlanManager
@@ -68,7 +68,7 @@ class PendingChangesController(BaseController):
         self.dockwidget: DockPendingChanges = None
         self.actionToggle: QAction = None
         self.model: DeltaListModel = DeltaListModel(self.iface)
-        self.proxyModel = QTransposeProxyModel(self.iface)
+        self.proxyModel = DeltaFieldFilterProxy(self.iface)
         self.proxyModel.setSourceModel(self.model)
         self.deltaService.updateCompleted.connect(self.updateDelta)
 
@@ -92,7 +92,8 @@ class PendingChangesController(BaseController):
         """Create the dockwidget with displays the impact of pending
         changes on affected districts."""
         dockwidget = DockPendingChanges()
-        dockwidget.tblPending.setModel(self.proxyModel)
+        dockwidget.setModel(self.proxyModel)
+        dockwidget.btnDemographics.toggled.connect(self.proxyModel.showDemographics)
 
         self.iface.addDockWidget(Qt.LeftDockWidgetArea, dockwidget)
 

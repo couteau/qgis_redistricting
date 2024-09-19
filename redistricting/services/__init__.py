@@ -24,17 +24,22 @@
 """
 from .actions import ActionRegistry
 from .clipboard import DistrictClipboardAccess
-from .DeltaListModel import DeltaListModel
+from .DeltaListModel import (
+    DeltaFieldFilterProxy,
+    DeltaListModel
+)
 from .DeltaUpdate import DeltaUpdateService
 from .DistrictCopy import DistrictCopier
-from .DistrictDataModel import RdsDistrictDataModel
+from .DistrictDataModel import (
+    RdsDistrictDataModel,
+    RdsDistrictFilterFieldsProxyModel
+)
 from .DistrictModels import (
     DistrictSelectModel,
     SourceDistrictModel,
     TargetDistrictModel
 )
 from .DistrictUpdate import DistrictUpdater
-from .DistrictValid import DistrictValidator
 from .ErrorList import ErrorListMixin
 from .FieldListModels import (
     GeoFieldsModel,
@@ -66,10 +71,11 @@ from .storage import ProjectStorage
 __all__ = (
     'ActionRegistry', 'PlanManager', 'LayerTreeManager', 'DistrictClipboardAccess',
     'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
-    'DistrictUpdater', 'DeltaUpdateService', 'DistrictValidator',
+    'DistrictUpdater', 'DeltaUpdateService',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'PlanImporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
     'ProjectStorage', 'ErrorListMixin', 'getColorForDistrict',
-    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'DeltaListModel', 'RdsSplitsModel',
+    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'RdsDistrictFilterFieldsProxyModel',
+    'DeltaListModel', 'DeltaFieldFilterProxy', 'RdsSplitsModel',
     'DistrictSelectModel', 'TargetDistrictModel', 'SourceDistrictModel', 'PlanListModel'
 )

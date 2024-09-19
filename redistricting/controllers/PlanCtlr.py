@@ -199,7 +199,7 @@ class PlanController(BaseController):
 
         self.actionEditActivePlan = self.actions.createPlanAction(
             'actionEditActivePlan',
-            QIcon(':/plugins/redistricting/icon.png'),
+            QIcon(':/plugins/redistricting/editplan.svg'),
             tr('Edit Active Plan'),
             callback=self.editPlan,
             parent=self.iface.mainWindow()
@@ -393,6 +393,7 @@ class PlanController(BaseController):
                 .setNumSeats(dlgNewPlan.numSeats()) \
                 .setDescription(dlgNewPlan.description()) \
                 .setDeviation(dlgNewPlan.deviation()) \
+                .setDeviationType(dlgNewPlan.deviationType()) \
                 .setGeoIdField(dlgNewPlan.geoIdField()) \
                 .setGeoDisplay(dlgNewPlan.geoIdCaption()) \
                 .setGeoLayer(dlgNewPlan.geoLayer()) \
@@ -437,6 +438,7 @@ class PlanController(BaseController):
                 .setNumSeats(dlgEditPlan.numSeats()) \
                 .setDescription(dlgEditPlan.description()) \
                 .setDeviation(dlgEditPlan.deviation()) \
+                .setDeviationType(dlgEditPlan.deviationType()) \
                 .setGeoDisplay(dlgEditPlan.geoIdCaption()) \
                 .setPopLayer(dlgEditPlan.popLayer()) \
                 .setPopField(dlgEditPlan.popField()) \

@@ -41,6 +41,24 @@ class Ui_qdwDistrictData(object):
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2.setSpacing(4)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
+        self.btnDemographics = QtWidgets.QToolButton(self.frame)
+        self.btnDemographics.setCheckable(True)
+        self.btnDemographics.setChecked(True)
+        self.btnDemographics.setAutoRaise(True)
+        self.btnDemographics.setObjectName("btnDemographics")
+        self.horizontalLayout_2.addWidget(self.btnDemographics)
+        self.btnMetrics = QtWidgets.QToolButton(self.frame)
+        self.btnMetrics.setCheckable(True)
+        self.btnMetrics.setChecked(True)
+        self.btnMetrics.setAutoRaise(True)
+        self.btnMetrics.setObjectName("btnMetrics")
+        self.horizontalLayout_2.addWidget(self.btnMetrics)
+        self.btnPlanMetrics = QtWidgets.QToolButton(self.frame)
+        self.btnPlanMetrics.setCheckable(True)
+        self.btnPlanMetrics.setChecked(True)
+        self.btnPlanMetrics.setAutoRaise(True)
+        self.btnPlanMetrics.setObjectName("btnPlanMetrics")
+        self.horizontalLayout_2.addWidget(self.btnPlanMetrics)
         self.btnCopy = QtWidgets.QToolButton(self.frame)
         self.btnCopy.setAutoRaise(True)
         self.btnCopy.setObjectName("btnCopy")
@@ -79,6 +97,7 @@ class Ui_qdwDistrictData(object):
         self.gloDistrictDemographics.setObjectName("gloDistrictDemographics")
         self.tblDataTable = RdsTableView(self.gbxDistrictDemographics)
         self.tblDataTable.setMinimumSize(QtCore.QSize(20, 0))
+        self.tblDataTable.setSortingEnabled(True)
         self.tblDataTable.setObjectName("tblDataTable")
         self.gloDistrictDemographics.addWidget(self.tblDataTable, 0, 0, 1, 1)
         self.gbxPlanMetrics = QtWidgets.QGroupBox(self.splitter)
@@ -88,18 +107,19 @@ class Ui_qdwDistrictData(object):
         self.gloMetrics.setObjectName("gloMetrics")
         self.tblPlanMetrics = QtWidgets.QTableView(self.gbxPlanMetrics)
         self.tblPlanMetrics.setStyleSheet("QHeaderView {\n"
-"                                                                        border: none;\n"
-"                                                                        padding-left: 5px\n"
-"                                                                        }\n"
-"                                                                        QHeaderView::section {\n"
-"                                                                        border: none;\n"
-"                                                                        }")
+"                                                border: none;\n"
+"                                                padding-left: 5px\n"
+"                                                }\n"
+"                                                QHeaderView::section {\n"
+"                                                border: none;\n"
+"                                                }")
         self.tblPlanMetrics.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.tblPlanMetrics.setFrameShadow(QtWidgets.QFrame.Plain)
         self.tblPlanMetrics.setShowGrid(False)
         self.tblPlanMetrics.setGridStyle(QtCore.Qt.NoPen)
         self.tblPlanMetrics.setObjectName("tblPlanMetrics")
         self.tblPlanMetrics.horizontalHeader().setVisible(False)
+        self.tblPlanMetrics.horizontalHeader().setStretchLastSection(True)
         self.tblPlanMetrics.verticalHeader().setDefaultSectionSize(24)
         self.gloMetrics.addWidget(self.tblPlanMetrics, 5, 0, 1, 1)
         self.verticalLayout.addWidget(self.splitter)
@@ -107,22 +127,35 @@ class Ui_qdwDistrictData(object):
 
         self.retranslateUi(qdwDistrictData)
         QtCore.QMetaObject.connectSlotsByName(qdwDistrictData)
+        qdwDistrictData.setTabOrder(self.btnDemographics, self.btnMetrics)
+        qdwDistrictData.setTabOrder(self.btnMetrics, self.btnPlanMetrics)
+        qdwDistrictData.setTabOrder(self.btnPlanMetrics, self.btnCopy)
+        qdwDistrictData.setTabOrder(self.btnCopy, self.btnRecalculate)
+        qdwDistrictData.setTabOrder(self.btnRecalculate, self.btnAddFields)
+        qdwDistrictData.setTabOrder(self.btnAddFields, self.btnHelp)
+        qdwDistrictData.setTabOrder(self.btnHelp, self.tblDataTable)
+        qdwDistrictData.setTabOrder(self.tblDataTable, self.tblPlanMetrics)
 
     def retranslateUi(self, qdwDistrictData):
         _translate = QtCore.QCoreApplication.translate
         qdwDistrictData.setWindowTitle(_translate("qdwDistrictData", "Redistricting - Plan Analysis"))
         self.label.setText(_translate("qdwDistrictData", "Plan"))
         self.lblPlanName.setText(_translate("qdwDistrictData", "No plan selected"))
-        self.btnCopy.setToolTip(_translate("qdwDistrictData", "Copy entire table to\n"
-"                                                                              clipboard"))
+        self.btnDemographics.setToolTip(_translate("qdwDistrictData", "Show/hide district demographic data"))
+        self.btnDemographics.setText(_translate("qdwDistrictData", "..."))
+        self.btnMetrics.setToolTip(_translate("qdwDistrictData", "Show/hide district metrics"))
+        self.btnMetrics.setText(_translate("qdwDistrictData", "..."))
+        self.btnPlanMetrics.setToolTip(_translate("qdwDistrictData", "Show/hide plan metrics"))
+        self.btnPlanMetrics.setText(_translate("qdwDistrictData", "..."))
+        self.btnCopy.setToolTip(_translate("qdwDistrictData", "Copy entire table to clipboard"))
         self.btnCopy.setText(_translate("qdwDistrictData", "..."))
         self.btnRecalculate.setToolTip(_translate("qdwDistrictData", "Recalculate"))
         self.btnRecalculate.setStatusTip(_translate("qdwDistrictData", "Reaggregate all\n"
-"                                                                              demographics"))
+"                                                    demographics"))
         self.btnRecalculate.setText(_translate("qdwDistrictData", "..."))
-        self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data\n"
-"                                                                              fields"))
+        self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data fields"))
         self.btnAddFields.setText(_translate("qdwDistrictData", "..."))
+        self.btnHelp.setToolTip(_translate("qdwDistrictData", "Help on plan analysis panel"))
         self.btnHelp.setText(_translate("qdwDistrictData", "..."))
         self.gbxDistrictDemographics.setTitle(_translate("qdwDistrictData", "District Demographics"))
         self.gbxPlanMetrics.setTitle(_translate("qdwDistrictData", "Plan Metrics"))

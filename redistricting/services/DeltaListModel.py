@@ -28,13 +28,17 @@ from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QObject,
+    QSortFilterProxyModel,
     Qt,
     QVariant
 )
+from qgis.PyQt.QtGui import QBrush
 
 from ..models import (
     DeltaList,
     DistrictColumns,
+    FieldCategory,
+    FieldColors,
     RdsDataField,
     RdsField,
     RdsPlan
@@ -43,11 +47,17 @@ from ..utils import tr
 
 
 class DeltaListModel(QAbstractTableModel):
+    FieldTypeRole = Qt.UserRole + 1
+
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._plan = None
         self._fields = []
         self._delta: DeltaList = None
+
+    @property
+    def plan(self):
+        return self._plan
 
     def setDelta(self, plan: RdsPlan, delta: DeltaList):
         if plan != self._plan or delta != self._delta:
@@ -85,23 +95,27 @@ class DeltaListModel(QAbstractTableModel):
         self._fields = [
             {
                 'name': f'new_{DistrictColumns.POPULATION}',
-                'caption': tr('Population'),
-                'format': '{:,.0f}'
+                'caption': DistrictColumns.POPULATION.comment,  # pylint: disable=no-member
+                'format': '{:,.0f}',
+                'field-type': FieldCategory.Population
             },
             {
                 'name': DistrictColumns.POPULATION,
-                'caption': tr('Population') + ' - ' + tr('Change'),
-                'format': '{:+,.0f}'
+                'caption': f'{DistrictColumns.POPULATION.comment} - {tr("Change")}',  # pylint: disable=no-member
+                'format': '{:+,.0f}',
+                'field-type': FieldCategory.Population
             },
             {
-                'name': 'deviation',
-                'caption': tr('Deviation'),
-                'format': '{:,.0f}'
+                'name': DistrictColumns.DEVIATION,
+                'caption': DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
+                'format': '{:,.0f}',
+                'field-type': FieldCategory.Population
             },
             {
-                'name': 'pct_deviation',
-                'caption': tr('%Deviation'),
-                'format': '{:+.2%}'
+                'name': DistrictColumns.PCT_DEVIATION,
+                'caption': DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
+                'format': '{:+.2%}',
+                'field-type': FieldCategory.Population
             }
         ]
 
@@ -112,12 +126,14 @@ class DeltaListModel(QAbstractTableModel):
                 {
                     'name': f'new_{fn}',
                     'caption': field.caption,
-                    'format': '{:,.0f}'
+                    'format': '{:,.0f}',
+                    'field-type': field.category
                 },
                 {
                     'name': fn,
-                    'caption': field.caption + ' - ' + tr('Change'),
-                    'format': '{:+,.0f}'
+                    'caption': f'{field.caption} - {tr("Change")}',
+                    'format': '{:+,.0f}',
+                    'field-type': field.category
                 }
             ])
 
@@ -129,12 +145,14 @@ class DeltaListModel(QAbstractTableModel):
                     {
                         'name': f'new_{fn}',
                         'caption': field.caption,
-                        'format': '{:,.0f}'
+                        'format': '{:,.0f}',
+                        'field-type': field.category
                     },
                     {
                         'name': fn,
                         'caption': field.caption + ' - ' + tr('Change'),
-                        'format': '{:+,.0f}'
+                        'format': '{:+,.0f}',
+                        'field-type': field.category
                     }
                 ])
 
@@ -142,14 +160,15 @@ class DeltaListModel(QAbstractTableModel):
                 self._fields.append({
                     'name': f'pct_{fn}',
                     'caption': f'%{field.caption}',
-                    'format': '{:.2%}'
+                    'format': '{:.2%}',
+                    'field-type': field.category
                 })
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._delta) if self._delta is not None and not parent.isValid() else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._fields) if not parent.isValid() else 0
+        return len(self._fields) if self._delta is not None and not parent.isValid() else 0
 
     def data(self, index: QModelIndex, role: int = ...):
         if self._delta:
@@ -159,6 +178,9 @@ class DeltaListModel(QAbstractTableModel):
             if role in {Qt.DisplayRole, Qt.EditRole}:
                 value = self._delta[row, col]
                 return self._fields[col]['format'].format(value) if value is not None else None
+
+            if role == DeltaListModel.FieldTypeRole:
+                return self._fields[col]['field-type']
 
         return QVariant()
 
@@ -170,12 +192,45 @@ class DeltaListModel(QAbstractTableModel):
                 else:
                     return self._fields[section]['caption']
             if role == Qt.TextAlignmentRole:
-                return int(Qt.AlignVCenter | Qt.AlignRight) if orientation == Qt.Vertical else int(Qt.AlignCenter)
+                return int(Qt.AlignVCenter | Qt.AlignRight) if orientation == Qt.Horizontal else int(Qt.AlignCenter)
 
-        return QVariant()
+            if role == Qt.BackgroundRole and orientation == Qt.Horizontal:
+                ft = self._fields[section]['field-type']
+                if ft in FieldColors:
+                    return QBrush(FieldColors[ft])
+
+            if role == DeltaListModel.FieldTypeRole and orientation == Qt.Horizontal:
+                return self._fields[section]['field-type']
+
+        return None
 
     def startUpdate(self):
         self.beginResetModel()
 
     def endUpdate(self):
         self.endResetModel()
+
+
+class DeltaFieldFilterProxy(QSortFilterProxyModel):
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self._plan = None
+        self._connection = None
+        self._demographics: bool = True
+
+    @property
+    def deltaModel(self) -> DeltaListModel:
+        return self.sourceModel()
+
+    @property
+    def plan(self):
+        return self._plan
+
+    def showDemographics(self, show: bool = True):
+        if show != self._demographics:
+            self._demographics = show
+            self.invalidateFilter()
+
+    def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
+        field_type = self.deltaModel._fields[source_column]['field-type']  # pylint: disable=protected-access
+        return field_type == FieldCategory.Population or self._demographics

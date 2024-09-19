@@ -17,5 +17,8 @@
     <file alias="paintpalette.svg">paintpalette.svg</file>
     <file alias="paintcursor.png">paintcursor16.png</file>
     <file alias="preview.svg">preview.svg</file>
+    <file alias="population.svg">population.svg</file>
+    <file alias="demographics.svg">demographics.svg</file>
+    <file alias="planmetrics.svg">planmetrics.svg</file>
   </qresource>
 </RCC>

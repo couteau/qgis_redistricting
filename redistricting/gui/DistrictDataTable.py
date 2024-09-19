@@ -30,6 +30,7 @@ from qgis.PyQt.QtCore import (
     QCoreApplication,
     QObject
 )
+from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
     QDockWidget,
     QWidget
@@ -65,6 +66,9 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
         self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
+
+        self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))
+        self.btnMetrics.setIcon(QgsApplication.getThemeIcon('/mActionMeasureArea.svg'))
 
         self._plan: RdsPlan = None
 

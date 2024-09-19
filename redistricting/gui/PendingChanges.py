@@ -22,6 +22,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+from qgis.PyQt.QtCore import (
+    QAbstractItemModel,
+    QTransposeProxyModel
+)
+from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QDockWidget
 
 from ..models import RdsPlan
@@ -37,6 +42,10 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
         self.lblWaiting.setVisible(False)
 
         self._plan: RdsPlan = None
+        self._model = QTransposeProxyModel(self)
+        self.tblPending.setModel(self._model)
+
+        self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))
 
     @property
     def plan(self) -> RdsPlan:
@@ -50,5 +59,11 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
     def setWaiting(self, on: bool = True):
         if on and not self.lblWaiting.isVisible():
             self.lblWaiting.start()
-        elif self.lblWaiting.isVisible():
+        elif not on and self.lblWaiting.isVisible():
             self.lblWaiting.stop()
+
+    def model(self):
+        return self._model.sourceModel()
+
+    def setModel(self, model: QAbstractItemModel):
+        self._model.setSourceModel(model)

@@ -1,10 +1,34 @@
 
+from enum import IntEnum
 from typing import (
     Any,
     Iterable
 )
 
+from qgis.PyQt.QtGui import QColor
+
 from ..utils import tr
+
+
+class FieldCategory(IntEnum):
+    Population = 1
+    Geography = 2
+    Demographic = 3
+    Metrics = 4
+    User = 5
+
+
+FieldColors = {
+    FieldCategory.Population: QColor(0x566f9fff),
+    FieldCategory.Geography: QColor(0xcfeb9fff),
+    FieldCategory.Demographic: QColor(0x5c98a9ff),
+    FieldCategory.Metrics: QColor(0x83df86ff),
+    FieldCategory.User: QColor(0x9189d7ff),
+    FieldCategory.User + 1: QColor(0xab89d7ff),
+    FieldCategory.User + 2: QColor(0xcc94e3ff),
+    FieldCategory.User + 3: QColor(0xdda6d8ff),
+    FieldCategory.User + 4: QColor(0xf594c6ff)
+}
 
 
 class ConstStr(str):
@@ -22,7 +46,7 @@ class ConstStr(str):
 
 
 class ConstantsMeta(type):
-    """Simplified Enum type class where members are of the type of their value, not an instance of the Enum subclass"""
+    """Simplified Enum type class where members are proper strings, not an instance of the Enum subclass"""
     _member_names: dict[str, ConstStr]
 
     def __new__(cls, name, bases, classdict: dict[str, Any]):
