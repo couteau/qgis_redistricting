@@ -104,7 +104,7 @@ class RdsTableView(QTableView):
         super().scrollTo(index, hint)
 
     def updateFrozenTableGeometry(self):
-        width = sum(self.columnWidth(i) for i in range(self._frozenColumnCount))
+        width = sum(self.columnWidth(i) for i in range(self._frozenColumnCount)) - 2
         self._frozenColumnsView.setGeometry(
             self.verticalHeader().width() + self.frameWidth(),
             self.frameWidth(),
