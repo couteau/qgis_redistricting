@@ -25,6 +25,7 @@
 from typing import (
     Any,
     Iterable,
+    Optional,
     Sequence,
     Union
 )
@@ -35,6 +36,7 @@ from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QObject,
+    QSortFilterProxyModel,
     Qt
 )
 from qgis.PyQt.QtGui import (
@@ -44,8 +46,12 @@ from qgis.PyQt.QtGui import (
 )
 
 from ..models import (
+    BaseDeviationValidator,
+    DeviationType,
     DistrictColumns,
+    MaxDeviationValidator,
     MetricsColumns,
+    PlusMinusDeviationValidator,
     RdsDistrict,
     RdsPlan
 )
@@ -53,6 +59,8 @@ from .PlanColors import getColorForDistrict
 
 
 class RdsDistrictDataModel(QAbstractTableModel):
+    RawDataRole = Qt.UserRole + 2
+
     _plan: RdsPlan = None
 
     def __init__(self, plan: RdsPlan = None, parent: QObject = None):
@@ -61,6 +69,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self._headings = []
         self._plan = None
         self._districts: Sequence[RdsDistrict] = []
+        self._validator: BaseDeviationValidator = None
         self.plan = plan
 
     @property
@@ -98,6 +107,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             self._plan.dataFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.popFieldsChanged.disconnect(self.updatePlanFields)
             self._plan.deviationChanged.disconnect(self.deviationChanged)
+            self._plan.deviationTypeChanged.disconnect(self.deviationTypeChanged)
             self._plan.districtAdded.disconnect(self.districtListChanged)
             self._plan.districtRemoved.disconnect(self.districtListChanged)
 
@@ -105,10 +115,14 @@ class RdsDistrictDataModel(QAbstractTableModel):
         if self._plan:
             self._districts = self._plan.districts
             self.updatePlanFields()
+            self._validator = PlusMinusDeviationValidator(self._plan) \
+                if self._plan.deviationType == DeviationType.OverUnder \
+                else MaxDeviationValidator(self._plan)
             self._plan.districtDataChanged.connect(self.districtChanged)
             self._plan.dataFieldsChanged.connect(self.updatePlanFields)
             self._plan.popFieldsChanged.connect(self.updatePlanFields)
             self._plan.deviationChanged.connect(self.deviationChanged)
+            self._plan.deviationTypeChanged.connect(self.deviationTypeChanged)
             self._plan.districtAdded.connect(self.districtListChanged)
             self._plan.districtRemoved.connect(self.districtListChanged)
         else:
@@ -119,6 +133,10 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self.endResetModel()
 
     def deviationChanged(self):
+        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+
+    def deviationTypeChanged(self):
+        self._validator = PlusMinusDeviationValidator() if self._plan.deviationType == DeviationType.OverUnder else MaxDeviationValidator()
         self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
 
     def districtListChanged(self):
@@ -143,11 +161,11 @@ class RdsDistrictDataModel(QAbstractTableModel):
     def data(self, index, role=Qt.DisplayRole):
         value = None
         try:
-            if role in (Qt.DisplayRole, Qt.EditRole):
-                row = index.row()
-                col = index.column()
-                district = self._districts[row]
+            row = index.row()
+            col = index.column()
+            district = self._districts[row]
 
+            if role in (Qt.DisplayRole, Qt.EditRole, RdsDistrictDataModel.RawDataRole):
                 key = self._keys[col]
                 if key[:3] == 'pct' and key != 'pct_deviation':
                     pctbase = self._plan.dataFields[key[4:]].pctBase
@@ -163,25 +181,34 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 if pd.isna(value):
                     return None
 
-                if key == 'deviation':
-                    value = f'{value:+,}'
-                elif key == 'pct_deviation':
-                    value = f'{value:+.2%}'
-                elif key in MetricsColumns.CompactnessScores():
-                    value = f'{value:0.3}'
-                elif key[:3] == 'pct':
-                    value = f'{value:.2%}'
-                elif isinstance(value, (int, np.integer)):
-                    value = f'{value:,}'
-                elif isinstance(value, (float, np.floating)):
-                    value = f'{value:,.2f}'
+                if role != RdsDistrictDataModel.RawDataRole:
+                    if district.district == 0:
+                        if key == 'district':
+                            value = district.name
+                        elif key == 'name':
+                            value = None
+
+                    if key == 'deviation':
+                        value = f'{value:+,}'
+                    elif key == 'pct_deviation':
+                        value = f'{value:+.2%}'
+                    elif key in MetricsColumns.CompactnessScores():
+                        value = f'{value:0.3}'
+                    elif key[:3] == 'pct':
+                        value = f'{value:.2%}'
+                    elif isinstance(value, (int, np.integer)):
+                        value = f'{value:,}'
+                    elif isinstance(value, (float, np.floating)):
+                        value = f'{value:,.2f}'
 
             elif role == Qt.BackgroundRole:
-                row = index.row()
-                col = index.column()
-                if col == 0:
-                    color = getColorForDistrict(self._plan, self._districts[row].district)
+                if col == 0 or district.district == 0:
+                    color = getColorForDistrict(self._plan, district.district)
                     value = QBrush(color)
+                elif 3 <= col <= 5:
+                    if self._validator.validateDistrict(district):
+                        color = QColor(0x60, 0xbd, 0x63)  # QColor(99, 196, 101)  # 60be63ff
+                        value = QBrush(color)
 
             elif role == Qt.FontRole:
                 row = index.row()
@@ -197,13 +224,9 @@ class RdsDistrictDataModel(QAbstractTableModel):
             elif role == Qt.TextColorRole:
                 row = index.row()
                 col = index.column()
-                if col == 0:
+                if col == 0 or district.district == 0:
                     value = QColor(55, 55, 55)
-                elif 4 <= col <= 5:
-                    if self._districts[row].isValid():
-                        value = QColor(99, 196, 101)
-                    else:
-                        value = QColor(207, 99, 92)
+
         except Exception as e:  # pylint: disable=broad-exception-caught, unused-variable
             return None
 
@@ -246,3 +269,37 @@ class RdsDistrictDataModel(QAbstractTableModel):
         else:
             self.beginResetModel()
             self.endResetModel()
+
+
+class RdsDistrictFilterFieldsProxyModel(QSortFilterProxyModel):
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        self._demographics: bool = True
+        self._metrics: bool = True
+
+    @property
+    def districtModel(self) -> RdsDistrictDataModel:
+        return self.sourceModel()
+
+    def showDemographics(self, show: bool = True):
+        if show != self._demographics:
+            self._demographics = show
+            self.invalidateFilter()
+
+    def showMetrics(self, show: bool = True):
+        if show != self._metrics:
+            self._metrics = show
+            self.invalidateFilter()
+
+    def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
+        name = self.districtModel._keys[source_column]  # pylint: disable=protected-access
+        return name in DistrictColumns or name in {f.fieldName for f in self.districtModel.plan.popFields} or (self._metrics and name in MetricsColumns) or (self._demographics and name not in MetricsColumns)
+
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        """Keep 'Unassigned' row at the top no matter what the sort order is"""
+        if self.districtModel._districts[right.row()].district == 0:  # pylint: disable=protected-access
+            return self.sortOrder() == Qt.DescendingOrder
+        if self.districtModel._districts[left.row()].district == 0:  # pylint: disable=protected-access
+            return self.sortOrder() == Qt.AscendingOrder
+
+        return super().lessThan(left, right)

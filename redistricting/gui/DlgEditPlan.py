@@ -33,7 +33,10 @@ from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
 from qgis.utils import iface
 
-from ..models import RdsPlan
+from ..models import (
+    DeviationType,
+    RdsPlan
+)
 from ..utils import tr
 from ._dlgEditPlanDetailsPage import dlgEditPlanDetailsPage
 from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
@@ -84,6 +87,7 @@ class DlgEditPlan(QWizard):
             self.setField('numDistricts', plan.numDistricts)
             self.setField('numSeats', plan.numSeats)
             self.setField('deviation', plan.deviation * 100)
+            self.setField('deviationType', plan.deviationType == DeviationType.OverUnder)
             self.setField('geoIdField', plan.geoIdField)
             self.setField('geoCaption', plan.geoIdCaption)
             self.setField('gpkgPath', plan.geoPackagePath)
@@ -148,6 +152,9 @@ class DlgEditPlan(QWizard):
 
     def deviation(self):
         return self.field('deviation') / 100
+
+    def deviationType(self):
+        return DeviationType.OverUnder if self.field('deviationType') else DeviationType.TopToBottom
 
     def popFields(self):
         return self.field('popFields')

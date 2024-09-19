@@ -32,6 +32,7 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QObject
 
 from ..models import (
+    DeviationType,
     RdsDataField,
     RdsField,
     RdsGeoField,
@@ -54,6 +55,7 @@ class PlanValidator(ErrorListMixin, QObject):
         self._numDistricts = 0
         self._numSeats = 0
         self._deviation = 0.0
+        self._deviationType = DeviationType.OverUnder
 
         self._geoIdField = None
         self._geoIdCaption = ''

@@ -28,6 +28,8 @@ from .base import (
 )
 from .columns import (
     DistrictColumns,
+    FieldCategory,
+    FieldColors,
     MetricsColumns
 )
 from .DeltaList import (
@@ -39,6 +41,11 @@ from .District import (
     RdsDistrict,
     RdsUnassigned
 )
+from .DistrictValid import (
+    BaseDeviationValidator,
+    MaxDeviationValidator,
+    PlusMinusDeviationValidator
+)
 from .Field import (
     RdsDataField,
     RdsField,
@@ -46,6 +53,7 @@ from .Field import (
     RdsRelatedField
 )
 from .Plan import (
+    DeviationType,
     RdsPlan,
     RdsPlanMetrics
 )
@@ -59,12 +67,17 @@ from .Splits import (
 __all__ = (
     'DistrictColumns',
     'MetricsColumns',
+    'FieldCategory',
+    'FieldColors',
     'RdsField',
     'RdsGeoField',
     'RdsRelatedField',
     'RdsDataField',
     'Delta',
     'DeltaList',
+    'BaseDeviationValidator',
+    'PlusMinusDeviationValidator',
+    'MaxDeviationValidator',
     'RdsDistrict',
     'RdsUnassigned',
     'DistrictList',

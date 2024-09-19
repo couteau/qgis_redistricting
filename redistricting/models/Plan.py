@@ -1,6 +1,8 @@
 
 import pathlib
 from contextlib import contextmanager
+from enum import IntEnum
+from functools import cached_property
 from itertools import repeat
 from math import (
     ceil,
@@ -24,7 +26,11 @@ from uuid import (
 )
 
 import pandas as pd
-from qgis.core import QgsVectorLayer
+from qgis.core import (
+    QgsFeature,
+    QgsVectorLayer,
+    QgsVectorLayerCache
+)
 from qgis.PyQt.QtCore import (
     QObject,
     pyqtSignal
@@ -50,12 +56,18 @@ from .District import (
     RdsDistrict,
     RdsUnassigned
 )
+from .DistrictValid import BaseDeviationValidator
 from .Field import (
     RdsDataField,
     RdsField,
     RdsGeoField
 )
 from .Splits import RdsSplits
+
+
+class DeviationType(IntEnum):
+    OverUnder = 0
+    TopToBottom = 1
 
 
 class RdsPlanMetrics(RdsBaseModel):
@@ -83,23 +95,43 @@ class RdsPlanMetrics(RdsBaseModel):
 
     def __pre_init__(self):
         self.plan: 'RdsPlan' = None
+        self.cache: QgsVectorLayerCache = None
 
     @property
     def totalPopulation(self) -> int:
         return self.plan.totalPopulation
 
     @property
-    def contiguous(self):
-        if len(self.plan.districts) == 1:
-            return True
-
-        return not any(d['pieces'] > 1 for d in self.plan.districts[1:] if d['pieces'] is not None)  # pylint: disable=not-an-iterable
+    def deviation(self) -> tuple[float, float, bool]:
+        validator = BaseDeviationValidator(self.plan)
+        minDev, maxDev = validator.minmaxDeviations()
+        valid = (minDev >= -self.plan.deviation and maxDev < self.plan.deviation) \
+            if self.plan.deviationType == DeviationType.OverUnder \
+            else (maxDev - minDev <= self.plan.deviation)
+        return minDev, maxDev, valid
 
     @property
+    def devationType(self):
+        return self.plan.deviationType
+
+    @cached_property
+    def contiguous(self):
+        if len(self.plan.districts) == 1:
+            return None
+
+        f: QgsFeature
+        for f in self.plan.distLayer.getFeatures():
+            if f.hasGeometry() and len(list(f.geometry().constParts())) > 1:
+                return False
+
+        return True
+
+        # return not any(d['pieces'] > 1 for d in self.plan.districts[1:] if d['pieces'] is not None)  # pylint: disable=not-an-iterable
+
+    @cached_property
     def complete(self):
         fiter = self.plan.assignLayer.getFeatures(f"{self.plan.distField} IS NULL OR {self.plan.distField} = 0")
-        _, hasUnassigned = fiter.nextFeature()
-        return not hasUnassigned
+        return next(fiter, None) is None
 
     # stats
 
@@ -129,6 +161,13 @@ class RdsPlanMetrics(RdsBaseModel):
 
     def updateMetrics(self, cutEdges: int, splits: dict[str, pd.DataFrame]):
         self.metricsAboutToChange.emit()
+
+        # froce recalculation of cached properties
+        if hasattr(self, "contiguous"):
+            delattr(self, "contiguous")
+        if hasattr(self, "complete"):
+            delattr(self, "complete")
+
         if cutEdges is not None:
             self.cutEdges = cutEdges
 
@@ -149,6 +188,7 @@ class RdsPlan(RdsBaseModel):
     numSeatsChanged = pyqtSignal()
     geoIdCaptionChanged = pyqtSignal()
     deviationChanged = pyqtSignal()
+    deviationTypeChanged = pyqtSignal()
     popFieldChanged = pyqtSignal()
     popFieldsChanged = pyqtSignal()
     geoFieldsChanged = pyqtSignal()
@@ -172,6 +212,9 @@ class RdsPlan(RdsBaseModel):
     numSeats:  int = None
     deviation: Annotated[float, in_range(0.0)] = rds_property(
         private=True, strict=True, default=0.0, notify=deviationChanged
+    )
+    deviationType: DeviationType = rds_property(
+        private=True, default=DeviationType.OverUnder, notify=deviationTypeChanged
     )
 
     districts: DistrictList = rds_property(

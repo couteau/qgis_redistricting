@@ -251,20 +251,21 @@ class PlanEditor(BasePlanBuilder):
             self._plan.numSeats = self._numSeats
             self._plan.description = self._description
             self._plan.deviation = self._deviation
+            self._plan.deviationType = self._deviationType
 
             self._plan.popLayer = self._popLayer
             self._plan.popJoinField = self._popJoinField
             self._plan.popField = self._popField
 
-            if self._popFields != self._plan.popFields:
+            if self._popFields != list(self._plan.popFields):
                 self._updatePopFields()
 
-            if self._dataFields != self._plan.dataFields:
+            if self._dataFields != list(self._plan.dataFields):
                 self._updateDataFields()
 
             self._plan.geoIdCaption = self._geoIdCaption
 
-            if self._geoFields != self._plan.geoFields:
+            if self._geoFields != list(self._plan.geoFields):
                 self._updateGeoFields()
 
             self.endPlanUpdate()

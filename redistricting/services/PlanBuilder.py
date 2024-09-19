@@ -189,6 +189,7 @@ class PlanBuilder(BasePlanBuilder):
             'num-districts': self._numDistricts,
             'num-seats': self._numSeats if self._numSeats > self._numDistricts else None,
             'deviation': self._deviation,
+            'deviation-type': self._deviationType,
             'geo-id-field': self._geoIdField,
             'geo-id-caption': self._geoIdCaption,
             'dist-field': self._distField,

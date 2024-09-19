@@ -50,6 +50,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.registerField('joinField', self.cmbJoinField)
         self.registerField('popField*', self.cmbPopField)
         self.registerField('deviation', self.sbxMaxDeviation, 'value', self.sbxMaxDeviation.valueChanged)
+        self.registerField('deviationType', self.rbDeviationOverUnder)
         self.registerField('popFields', self.tblAddlPopulation, 'fields', self.tblAddlPopulation.fieldsChanged)
 
         self.fieldsModel = self.tblAddlPopulation.model()
@@ -61,6 +62,8 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
         self.cmbPopLayer.layerChanged.connect(self.setPopLayer)
         self.btnUseGeoLayer.toggled.connect(self.updatePopLayer)
+
+        self.rbDeviationOverUnder.toggled.connect(self.deviationTypeChanged)
 
         self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
         self.cmbAddlPopField.setFilters(QgsFieldProxyModel.Numeric)
@@ -140,3 +143,11 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
         layer = self.field('popLayer')
         self.fieldsModel.appendField(layer, field, isExpression)
+
+    def deviationTypeChanged(self, overUnder: bool):
+        if overUnder:
+            self.sbxMaxDeviation.setPrefix("±")
+            self.sbxMaxDeviation.setValue(self.sbxMaxDeviation.value() / 2)
+        else:
+            self.sbxMaxDeviation.setPrefix("")
+            self.sbxMaxDeviation.setValue(self.sbxMaxDeviation.value() * 2)

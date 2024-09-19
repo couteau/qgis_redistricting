@@ -36,6 +36,7 @@ from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
 from ..models import (
+    DeviationType,
     RdsDataField,
     RdsField,
     RdsPlan
@@ -108,6 +109,10 @@ class BasePlanBuilder(PlanValidator):
             raise ValueError(tr('Deviation must be numeric'))
 
         self._deviation = float(value)
+        return self
+
+    def setDeviationType(self, value: DeviationType):
+        self._deviationType = value
         return self
 
     def setGeoIdField(self, value: str):
