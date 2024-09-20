@@ -139,7 +139,7 @@ class Ui_wzpPopulation(object):
         self.gbxPopFields.setTitle(_translate("wzpPopulation", "Additional Population Totals"))
         self.btnAddAddlPopField.setText(_translate("wzpPopulation", "..."))
         self.rbDeviationOverUnder.setText(_translate("wzpPopulation", "Over/Under"))
-        self.rbDeviationTopToBottom.setText(_translate("wzpPopulation", "Top-to-Botton"))
+        self.rbDeviationTopToBottom.setText(_translate("wzpPopulation", "Top-to-Bottom"))
         self.lblDeviationMeasure.setText(_translate("wzpPopulation", "Deviation Measure"))
         self.sbxMaxDeviation.setPrefix(_translate("wzpPopulation", "±"))
         self.sbxMaxDeviation.setSuffix(_translate("wzpPopulation", "%"))
