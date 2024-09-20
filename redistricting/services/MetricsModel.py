@@ -2,11 +2,14 @@ import textwrap
 from enum import IntEnum
 from typing import (
     Any,
+    Iterable,
+    List,
     Optional
 )
 
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
+    QMimeData,
     QModelIndex,
     QObject,
     Qt
@@ -42,7 +45,7 @@ class RdsPlanMetricsModel(QAbstractTableModel):
         tr('Compactness')
     ]
     # pylint: disable-next=no-member
-    MetricLabels.extend(f"   {tr('Avg.')} {s.comment}" for s in MetricsColumns.CompactnessScores())
+    MetricLabels.extend(f"   {tr('Mean')} {s.comment}" for s in MetricsColumns.CompactnessScores())
     MetricLabels.extend(
         [
             tr('   Cut Edges'),
@@ -109,10 +112,10 @@ class RdsPlanMetricsModel(QAbstractTableModel):
                 result = tr('Yes') if self._metrics.contiguous else tr('No')
             elif row == Metrics.Completeness:
                 result = tr('Yes') if self._metrics.complete else tr('No')
-            elif Metrics.CompactnessSection < row < Metrics.CompactnessSection + len(MetricsColumns.CompactnessScores()):
-                score = getattr(self._metrics, MetricsColumns.CompactnessScores()[row-4])
+            elif Metrics.CompactnessSection < row <= Metrics.CompactnessSection + len(MetricsColumns.CompactnessScores()):
+                score = getattr(self._metrics, MetricsColumns.CompactnessScores()[row-Metrics.CompactnessSection - 1])
                 result = f'{score:.3f}' if score is not None else ''
-            elif row == Metrics.CompactnessSection + len(MetricsColumns.CompactnessScores()):
+            elif row == Metrics.CompactnessSection + len(MetricsColumns.CompactnessScores()) + 1:
                 result = f'{self._metrics.cutEdges:,}' if self._metrics.cutEdges else ''
             elif RdsPlanMetricsModel.SPLITS_OFFSET <= row < RdsPlanMetricsModel.SPLITS_OFFSET + len(self._metrics.splits):
                 result = f'{len(self._metrics.splits[row-RdsPlanMetricsModel.SPLITS_OFFSET]):,}'
@@ -150,3 +153,15 @@ class RdsPlanMetricsModel(QAbstractTableModel):
             result = None
 
         return result
+
+    def mimeTypes(self) -> List[str]:
+        return ['text/csv', 'text/plain']
+
+    def mimeData(self, indexes: Iterable[QModelIndex]) -> QMimeData:
+        data = {self.headerData(idx.row(), Qt.Vertical, Qt.DisplayRole):
+                self.data(idx, Qt.DisplayRole) or ''
+                for idx in indexes}
+        mime = QMimeData()
+        mime.setData('text/csv', '\n'.join(','.join(r) for r in data.items()).encode())
+        mime.setText('\n'.join('\t'.join(r) for r in data.items()))
+        return mime

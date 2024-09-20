@@ -154,7 +154,7 @@ class TestDistrictController:
 
     def test_data_table_context_menu(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):
         menu = mocker.patch('redistricting.controllers.DistrictCtlr.QMenu')
-        controller_with_active_plan.createDataTableContextMenu(QPoint(0, 0))
+        controller_with_active_plan.prepareDataTableContextMenu(QPoint(0, 0))
         assert menu.return_value.addAction.call_count == 5
         menu.return_value.addAction.assert_any_call(controller_with_active_plan.actionCopyDistrict)
 

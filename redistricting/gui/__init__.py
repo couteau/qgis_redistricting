@@ -47,6 +47,7 @@ from .PaintTool import (
     PaintMode
 )
 from .PendingChanges import DockPendingChanges
+from .PlanMetrics import DockPlanMetrics
 
 
 class TableViewKeyEventFilter(QObject):
@@ -74,6 +75,7 @@ __all__ = [
     'DockRedistrictingToolbox',
     'DockDistrictDataTable',
     'DockPendingChanges',
+    'DockPlanMetrics',
     'PaintDistrictsTool',
     'PaintMode',
 ]

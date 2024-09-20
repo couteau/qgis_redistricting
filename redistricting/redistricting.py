@@ -129,7 +129,7 @@ class Redistricting:
         self.toolbar: QToolBar = QToolBar(self.name)
         self.toolbar.setObjectName(self.name)
 
-        # create controllers
+        # create controllers - no fancy dependency injection; we do it mannually
         self.planController = PlanController(
             self.iface,
             self.project,
@@ -153,7 +153,8 @@ class Redistricting:
             self.iface,
             self.project,
             self.planManager,
-            self.toolbar
+            self.toolbar,
+            self.updaterService
         )
 
         self.districtController = DistrictController(

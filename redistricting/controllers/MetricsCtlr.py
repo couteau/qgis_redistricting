@@ -1,3 +1,5 @@
+import csv
+import io
 from typing import (
     Any,
     Optional
@@ -21,7 +23,12 @@ from qgis.gui import (
 from qgis.PyQt.QtCore import (
     QLocale,
     QModelIndex,
-    QObject
+    QObject,
+    Qt
+)
+from qgis.PyQt.QtGui import (
+    QIcon,
+    QKeySequence
 )
 from qgis.PyQt.QtWidgets import (
     QDialog,
@@ -33,6 +40,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..gui import (
     DlgSplitDetail,
+    DockPlanMetrics,
     TableViewKeyEventFilter
 )
 from ..models import (
@@ -42,10 +50,12 @@ from ..models import (
 )
 from ..services import (
     ActionRegistry,
-    PlanManager
+    DistrictUpdater,
+    PlanManager,
+    RdsPlanMetricsModel
 )
 from ..utils import tr
-from .BaseCtlr import BaseController
+from .BaseCtlr import DockWidgetController
 
 
 class RdsNullsAsBlanksDelegate(QStyledItemDelegate):
@@ -56,9 +66,14 @@ class RdsNullsAsBlanksDelegate(QStyledItemDelegate):
         return super().displayText(value, locale)
 
 
-class MetricsController(BaseController):
-    def __init__(self, iface: QgisInterface, project: QgsProject, planManager: PlanManager, toolbar: QToolBar, parent: Optional[QObject] = None):
+class MetricsController(DockWidgetController):
+    def __init__(self, iface: QgisInterface, project: QgsProject, planManager: PlanManager, toolbar: QToolBar, updateService: DistrictUpdater, parent: Optional[QObject] = None):
         super().__init__(iface, project, planManager, toolbar, parent)
+        self.updateService = updateService
+
+        self.dockwidget: DockPlanMetrics
+
+        self.metricsModel = RdsPlanMetricsModel(None)
         self.dlgSplits: DlgSplitDetail = None
         self.dlgSplitDistricts: QDialog = None
         self.splitDistrictsModel: QgsAttributeTableFilterModel = None
@@ -88,17 +103,66 @@ class MetricsController(BaseController):
         )
         self.actionShowUnassignedGeographyDialog.setEnabled(False)
 
+        self.actionCopyMetrics = self.actions.createAction(
+            name="actionCopyMetrics",
+            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            text=self.tr("Copy Metrics"),
+            tooltip=self.tr("Copy metrics to clipboard"),
+            callback=self.copyMetrics,
+            parent=self.iface.mainWindow()
+        )
+        self.actionCopySelectedMetrics = self.actions.createAction(
+            name="actionCopyselectedMetrics",
+            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            text=self.tr("Copy Metrics"),
+            tooltip=self.tr("Copy selected metrics to clipboard"),
+            callback=self.copySelection,
+            shortcut=QKeySequence.Copy,
+            parent=self.iface.mainWindow()
+        )
+
+    def createDockWidget(self):
+        dockwidget = DockPlanMetrics(self.iface.mainWindow())
+        dockwidget.btnCopy.setDefaultAction(self.actionCopyMetrics)
+        dockwidget.tblPlanMetrics.setModel(self.metricsModel)
+        dockwidget.tblPlanMetrics.installEventFilter(TableViewKeyEventFilter(dockwidget))
+        dockwidget.tblPlanMetrics.activated.connect(self.showMetricsDetail)
+        return dockwidget
+
+    def createToggleAction(self):
+        action = super().createToggleAction()
+        if action is not None:
+            action.setIcon(QIcon(':/plugins/redistricting/planmetrics.svg'))
+            action.setText('Plan metrics')
+            action.setToolTip('Show/hide plan metrics')
+
+        return action
+
     def load(self):
+        super().load()
         self.planManager.activePlanChanged.connect(self.planChanged)
         self.planManager.planAdded.connect(self.planAdded)
         self.planManager.planRemoved.connect(self.planRemoved)
+        self.updateService.updateStarted.connect(self.showOverlay)
+        self.updateService.updateComplete.connect(self.hideOverlay)
+        self.updateService.updateTerminated.connect(self.hideOverlay)
 
     def unload(self):
+        self.updateService.updateStarted.disconnect(self.showOverlay)
+        self.updateService.updateComplete.disconnect(self.hideOverlay)
+        self.updateService.updateTerminated.disconnect(self.hideOverlay)
         self.planManager.planRemoved.disconnect(self.planRemoved)
         self.planManager.planAdded.disconnect(self.planAdded)
         self.planManager.activePlanChanged.disconnect(self.planChanged)
+        super().unload()
 
     def planChanged(self, plan: RdsPlan):
+        self.dockwidget.setWaiting(False)
+        if plan is not None:
+            self.metricsModel.setMetrics(plan.metrics)
+        else:
+            self.metricsModel.setMetrics(None)
+        self.dockwidget.plan = plan
         if self.dlgSplits:
             self.dlgSplits.close()
             self.dlgSplits = None
@@ -113,12 +177,55 @@ class MetricsController(BaseController):
             self.dlgSplitDistricts.close()
             self.dlgSplitDistricts.destroy(True, True)
             self.dlgSplitDistricts = None
+        if self.updateService.planIsUpdating(plan):
+            self.dockwidget.setWaiting(True)
 
     def planAdded(self, plan: RdsPlan):
         plan.metricsChanged.connect(self.updateMetricsDialogs)
 
     def planRemoved(self, plan: RdsPlan):
         plan.metricsChanged.disconnect(self.updateMetricsDialogs)
+
+    def showOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(True)
+
+    def hideOverlay(self, plan: RdsPlan):
+        if plan == self.activePlan:
+            self.dockwidget.setWaiting(False)
+
+    def copyMetrics(self):
+        indexes = (self.metricsModel.createIndex(d, 0) for d in range(self.metricsModel.rowCount()))
+        QgsApplication.instance().clipboard().setMimeData(self.metricsModel.mimeData(indexes))
+
+    def copySelection(self):
+        selection = self.dockwidget.tblPlanMetrics.selectedIndexes()
+        if selection:
+            selection.sort(key=lambda idx: idx.row())
+            table = []
+            for idx in selection:
+                table.append([self.metricsModel.headerData(
+                    idx.row(), Qt.Vertical, Qt.DisplayRole), idx.data()])
+            stream = io.StringIO()
+            csv.writer(stream, delimiter='\t').writerows(table)
+            QgsApplication.instance().clipboard().setText(stream.getvalue())
+
+    def showMetricsDetail(self, index: QModelIndex):
+        row = index.row()
+        if row == 1:
+            if not self.actionShowSplitDistrictsDialog.isEnabled():
+                return
+            self.actionShowSplitDistrictsDialog.trigger()
+        elif row == 2:
+            if not self.actionShowUnassignedGeographyDialog.isEnabled():
+                return
+            self.actionShowUnassignedGeographyDialog.trigger()
+        elif row >= self.metricsModel.SPLITS_OFFSET:
+            if not self.actionShowSplitsDialog.isEnabled():
+                return
+            field = self.planManager.activePlan.geoFields[row-self.metricsModel.SPLITS_OFFSET]
+            self.actionShowSplitsDialog.setData(field)
+            self.actionShowSplitsDialog.trigger()
 
     def showSplits(self, field: Optional[RdsGeoField] = None):
         if not isinstance(field, RdsGeoField):

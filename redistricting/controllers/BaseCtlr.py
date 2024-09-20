@@ -21,7 +21,9 @@
  *                                                                         *
  ***************************************************************************/
 """
+from abc import abstractmethod
 from typing import (
+    TYPE_CHECKING,
     Iterable,
     Optional
 )
@@ -30,13 +32,17 @@ from qgis.core import (
     Qgis,
     QgsProject
 )
-from qgis.gui import QgisInterface
+from qgis.gui import (
+    QgisInterface,
+    QgsDockWidget
+)
 from qgis.PyQt.QtCore import (
     QCoreApplication,
     QObject,
     Qt
 )
 from qgis.PyQt.QtWidgets import (
+    QDockWidget,
     QProgressDialog,
     QToolBar
 )
@@ -47,6 +53,11 @@ from ..services import (
     PlanManager
 )
 from ..utils import tr
+
+if TYPE_CHECKING:
+    from PyQt5.QtWidgets import QAction
+else:
+    from qgis.PyQt.QtWidgets import QAction
 
 
 class RdsProgressDialog(QProgressDialog):
@@ -78,6 +89,14 @@ class BaseController(QObject):
         self.toolbar = toolbar
         self.dlg = None
         self.errorList = None
+
+    @abstractmethod
+    def load(self):
+        ...
+
+    @abstractmethod
+    def unload(self):
+        ...
 
     def progressCanceled(self):
         """Hide progress dialog and display message on cancel"""
@@ -164,3 +183,51 @@ class BaseController(QObject):
     @property
     def activePlan(self):
         return self.planManager.activePlan
+
+
+class DockWidgetController(BaseController):
+    """Controller that manages a QDockWidget"""
+
+    def __init__(
+        self,
+        iface: QgisInterface,
+        project: QgsProject,
+        planManager: PlanManager,
+        toolbar: QToolBar,
+        parent: Optional[QObject] = None
+    ):
+        super().__init__(iface, project, planManager, toolbar, parent)
+        self.dockwidget: QDockWidget = None
+        self.actionToggle: QAction = None
+        self.defaultArea = Qt.BottomDockWidgetArea
+
+    @abstractmethod
+    def createDockWidget(self) -> QgsDockWidget:
+        pass
+
+    def createToggleAction(self) -> QAction:
+        if self.dockwidget is None:
+            return None
+
+        if isinstance(self.dockwidget, QgsDockWidget):
+            action = QAction(self.dockwidget)
+            self.dockwidget.setToggleVisibilityAction(action)
+        else:
+            action = self.dockwidget.toggleViewAction()
+
+        return action
+
+    def load(self):
+        self.dockwidget = self.createDockWidget()
+        self.iface.addDockWidget(Qt.BottomDockWidgetArea, self.dockwidget)
+        self.actionToggle = self.createToggleAction()
+        self.actions.registerAction(f'actionToggle{self.dockwidget.objectName()}', self.actionToggle)
+        self.toolbar.addAction(self.actionToggle)
+
+    def unload(self):
+        self.toolbar.removeAction(self.actionToggle)
+        self.iface.removeDockWidget(self.dockwidget)
+        self.dockwidget.setParent(None)
+        self.dockwidget.destroy(True, True)
+        self.dockwidget = None
+        self.actionToggle = None

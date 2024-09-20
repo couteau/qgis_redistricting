@@ -29,10 +29,31 @@
 """
 
 import math
-from typing import Optional, Union, overload
-from qgis.PyQt.QtCore import Qt, QObject, QEvent, pyqtProperty, QTimer, QRect, QPropertyAnimation, QEasingCurve
-from qgis.PyQt.QtGui import QColor, QPainter, QPaintEvent
-from qgis.PyQt.QtWidgets import QWidget, QGraphicsOpacityEffect
+from typing import (
+    Optional,
+    Union,
+    overload
+)
+
+from qgis.PyQt.QtCore import (
+    QEasingCurve,
+    QEvent,
+    QObject,
+    QPropertyAnimation,
+    QRect,
+    Qt,
+    QTimer,
+    pyqtProperty
+)
+from qgis.PyQt.QtGui import (
+    QColor,
+    QPainter,
+    QPaintEvent
+)
+from qgis.PyQt.QtWidgets import (
+    QGraphicsOpacityEffect,
+    QWidget
+)
 
 
 class OverlayWidget(QWidget):
@@ -252,6 +273,17 @@ class OverlayWidget(QWidget):
             return
         self.parent().installEventFilter(self)
         self.raise_()
+
+    def setParent(self, parent: QWidget, f: Union[Qt.WindowFlags, Qt.WindowType] = None):
+        if self.parent() is not None:
+            self.parent().removeEventFilter(self)
+
+        if f is None:
+            super().setParent(parent)
+        else:
+            super().setParent(parent, f)
+
+        self.newParent()
 
     def eventFilter(self, obj: QObject, evt: QEvent) -> bool:
         if obj == self.parent():
