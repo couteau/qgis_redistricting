@@ -20,5 +20,6 @@
     <file alias="population.svg">population.svg</file>
     <file alias="demographics.svg">demographics.svg</file>
     <file alias="planmetrics.svg">planmetrics.svg</file>
+    <file alias="paintcursor.svg">Antu_oilpaint.svg</file>
   </qresource>
 </RCC>

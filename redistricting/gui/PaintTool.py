@@ -68,121 +68,6 @@ class PaintDistrictsTool(QgsMapToolIdentify):
     paintingCanceled = pyqtSignal()
     selectFeatures = pyqtSignal("PyQt_PyObject", int, int, "PyQt_PyObject")
 
-    PAINT_CURSOR = [
-        # columns rows colors chars-per-pixel
-        "16 16 3 1 ",
-        "  c None",
-        ". c black",
-        "X c white",
-        # pixels
-        "         X.X    ",
-        "         X..X   ",
-        "        X....X  ",
-        "        X.....X ",
-        "       X.......X",
-        "       X.....XX ",
-        "       X.....X  ",
-        "     XXXX...X   ",
-        "    X...XXXX    ",
-        "    X....X      ",
-        "   X.....X      ",
-        "   X.....X      ",
-        "  X.....X       ",
-        " XX....X        ",
-        "X....XX         ",
-        ".XXXX           "
-    ]
-
-    PAINT_CURSOR24 = [
-        # columns rows colors chars-per-pixel
-        "24 24 3 1 ",
-        "  c None",
-        ". c black",
-        "+ c white",
-        # pixels
-        "                 ++     ",
-        "                +..++   ",
-        "                +....+  ",
-        "               +......+ ",
-        "               +.......+",
-        "              +........+",
-        "             +........+ ",
-        "             +.......+  ",
-        "            +.......+   ",
-        "           +.......+    ",
-        "           +......+     ",
-        "         +++++...+      ",
-        "       ++....++..+      ",
-        "      +.......+++       ",
-        "     +........+         ",
-        "     +.........+        ",
-        "    +..........+        ",
-        "    +..........+        ",
-        "    +..........+        ",
-        "   +..........+         ",
-        "   +..........+         ",
-        "  +.........++          ",
-        "  +.......++            ",
-        " +.+++++++              "
-    ]
-    PAINT_CURSOR32 = [
-        # columns rows colors chars-per-pixel
-        "32 32 20 1 ",
-        "  c None",
-        ". c black",
-        "X c #010101",
-        "o c #020202",
-        "O c gray1",
-        "+ c #040404",
-        "@ c gray2",
-        "# c #060606",
-        "$ c #070707",
-        "% c gray3",
-        "& c #090909",
-        "* c #0B0B0B",
-        "= c #0C0C0C",
-        "- c gray5",
-        "; c gray6",
-        ": c #101010",
-        "> c #111111",
-        ", c gray7",
-        "< c #131313",
-        "1 c #151515",
-        # pixels
-        "                        -       ",
-        "                       @@@      ",
-        "                       @@@@     ",
-        "                      @@@@@@-   ",
-        "                     @@@@@@@@@  ",
-        "                     @@@@@@@@@@ ",
-        "                    @@@@@@@@@@@-",
-        "                   -@@@@@@@@@@- ",
-        "                   @@@@@@@@@@@  ",
-        "                  @@@@@@@@@@@   ",
-        "                 -@@@@@@@@@@    ",
-        "                 @@@@@@@@@@     ",
-        "                @@@@@@@@@@      ",
-        "                @@@@@@@@@       ",
-        "                @@@@@@@@>       ",
-        "                 >@@@@@-        ",
-        "           -@@@    @@@@         ",
-        "          @@@@@@>   @@          ",
-        "         @@@@@@@@@              ",
-        "        @@@@@@@@@@@             ",
-        "       @@@@@@@@@@@@@            ",
-        "       @@@@@@@@@@@@@            ",
-        "      -@@@@@@@@@@@@@            ",
-        "      @@@@@@@@@@@@@@            ",
-        "      @@@@@@@@@@@@@@            ",
-        "      @@@@@@@@@@@@@>            ",
-        "     @@@@@@@@@@@@@@             ",
-        "     @@@@@@@@@@@@@-             ",
-        "    @@@@@@@@@@@@@@              ",
-        "    @@@@@@@@@@@@-               ",
-        "   @@@@@@@@@@@>                 ",
-        " @@@@@@@@-                      "
-    ]
-
     MinPixelZoom = 20
 
     def __init__(self, canvas: QgsMapCanvas):
@@ -190,9 +75,9 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._distTarget: int = None
         self._distSource: int = None
 
-        pixmap = QPixmap(PaintDistrictsTool.PAINT_CURSOR24)
+        pixmap = QPixmap(':/plugins/redistricting/paintcursor.svg')
         self.setCursor(QCursor(
-            pixmap, 2, 23)
+            pixmap, 3, 18)
         )
 
         self._paintMode: PaintMode = PaintMode.PaintByGeography
