@@ -24,18 +24,14 @@
  """
 from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import pyqtSignal
-from qgis.PyQt.QtWidgets import (
-    QDockWidget,
-    QUndoStack
-)
+from qgis.PyQt.QtWidgets import QUndoStack
 
 from ..models import RdsPlan
-from ..utils import tr
-from .help import showHelp
+from .RdsDockWidget import RdsDockWidget
 from .ui.DistrictTools import Ui_qdwDistrictTools
 
 
-class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
+class DockRedistrictingToolbox(Ui_qdwDistrictTools, RdsDockWidget):
 
     _plan: RdsPlan = None
     geoFieldChanged = pyqtSignal(int)
@@ -55,6 +51,7 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.btnUndo.setEnabled(False)
         self.btnRedo.setEnabled(False)
 
+        self.helpContext = 'usage/toolbox.html'
         self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
 
@@ -62,23 +59,12 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
         self.plan = plan
 
-    @property
-    def plan(self) -> RdsPlan:
-        return self._plan
-
-    @plan.setter
+    @RdsDockWidget.plan.setter
     def plan(self, value: RdsPlan):
+        RdsDockWidget.plan.fset(self, value)
         if self._plan:
-            self._plan.nameChanged.disconnect(self.planNameChanged)
-
-        self._plan = value
-
-        if self._plan:
-            self.lblPlanName.setText(self._plan.name)
-            self._plan.nameChanged.connect(self.planNameChanged)
             self.undoStack = self._plan.assignLayer.undoStack()
         else:
-            self.lblPlanName.setText(tr('No plan selected'))
             self.undoStack = None
 
         self.cmbSource.setEnabled(self._plan is not None)
@@ -103,9 +89,3 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
         self.btnUndo.setDefaultAction(self.undoAction)
         self.btnRedo.setDefaultAction(self.redoAction)
-
-    def planNameChanged(self):
-        self.lblPlanName.setText(self._plan.name)
-
-    def btnHelpClicked(self):
-        showHelp('usage/toolbox.html')

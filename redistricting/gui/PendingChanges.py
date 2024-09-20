@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - QDockWidget showing pending district changes
 
-        begin                : 2022-01-15
+        begin                : 2024-09-20
         git sha              : $Format:%H$
-        copyright            : (C) 2022 by Cryptodira
+        copyright            : (C) 2024 by Cryptodira
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -22,45 +22,31 @@
  *                                                                         *
  ***************************************************************************/
 """
+from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import (
     QAbstractItemModel,
     QTransposeProxyModel
 )
 from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QDockWidget
 
-from ..models import RdsPlan
-from .RdsOverlayWidget import OverlayWidget
+from .RdsDockWidget import RdsDockWidget
 from .ui.PendingChanges import Ui_qdwPendingChanges
 
 
-class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
+class DockPendingChanges(Ui_qdwPendingChanges, RdsDockWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
-        self.lblWaiting = OverlayWidget(self.tblPending)
-        self.lblWaiting.setVisible(False)
+        self.lblWaiting.setParent(self.tblPending)
 
-        self._plan: RdsPlan = None
         self._model = QTransposeProxyModel(self)
         self.tblPending.setModel(self._model)
 
+        self.helpContext = 'usage/preview.html'
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.clicked.connect(self.btnHelpClicked)
+
         self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))
-
-    @property
-    def plan(self) -> RdsPlan:
-        return self._plan
-
-    @plan.setter
-    def plan(self, value: RdsPlan):
-        if self._plan != value:
-            self._plan = value
-
-    def setWaiting(self, on: bool = True):
-        if on and not self.lblWaiting.isVisible():
-            self.lblWaiting.start()
-        elif not on and self.lblWaiting.isVisible():
-            self.lblWaiting.stop()
 
     def model(self):
         return self._model.sourceModel()

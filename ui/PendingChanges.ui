@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>qdwPendingChanges</class>
- <widget class="QDockWidget" name="qdwPendingChanges">
+ <widget class="QgsDockWidget" name="qdwPendingChanges">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -74,6 +74,16 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QToolButton" name="btnHelp">
+         <property name="toolTip">
+          <string>Help on pending changes panel</string>
+         </property>
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -90,6 +100,14 @@
    </layout>
   </widget>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>QgsDockWidget</class>
+   <extends>QDockWidget</extends>
+   <header>qgsdockwidget.h</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

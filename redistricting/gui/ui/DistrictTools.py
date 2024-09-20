@@ -23,7 +23,7 @@ class Ui_qdwDistrictTools(object):
         self.dockWidgetContents = QtWidgets.QWidget()
         self.dockWidgetContents.setObjectName("dockWidgetContents")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.dockWidgetContents)
-        self.verticalLayout.setContentsMargins(-1, 4, -1, -1)
+        self.verticalLayout.setContentsMargins(0, 4, 0, 0)
         self.verticalLayout.setSpacing(4)
         self.verticalLayout.setObjectName("verticalLayout")
         self.frame = QtWidgets.QFrame(self.dockWidgetContents)
@@ -161,7 +161,8 @@ class Ui_qdwDistrictTools(object):
         self.btnHelp.setText(_translate("qdwDistrictTools", "..."))
         self.lblPlanName.setText(_translate("qdwDistrictTools", "No plan selected"))
         self.lblGeoSelect.setToolTip(_translate("qdwDistrictTools", "District by geography"))
-        self.lblGeoSelect.setStatusTip(_translate("qdwDistrictTools", "When painting districts, all features within the geography specified by the selected field will be painted"))
+        self.lblGeoSelect.setStatusTip(_translate("qdwDistrictTools", "When painting districts, all features within the\n"
+"                                        geography specified by the selected field will be painted"))
         self.lblGeoSelect.setText(_translate("qdwDistrictTools", "Geography"))
         self.lblPlan.setText(_translate("qdwDistrictTools", "Redistricting Plan"))
         self.lblSource.setText(_translate("qdwDistrictTools", "Source"))
@@ -173,3 +174,4 @@ class Ui_qdwDistrictTools(object):
         self.btnEditSourceDistrict.setText(_translate("qdwDistrictTools", "..."))
         self.btnEditTargetDistrict.setText(_translate("qdwDistrictTools", "..."))
         self.btnAddDistrict.setText(_translate("qdwDistrictTools", "..."))
+from qgsdockwidget import QgsDockWidget

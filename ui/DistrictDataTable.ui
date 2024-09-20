@@ -158,7 +158,7 @@
          <item>
           <widget class="QToolButton" name="btnHelp">
            <property name="toolTip">
-            <string>Help on plan analysis panel</string>
+            <string>Help on district analysis panel</string>
            </property>
            <property name="text">
             <string>...</string>

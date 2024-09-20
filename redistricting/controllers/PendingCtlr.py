@@ -27,10 +27,7 @@ from typing import (
     Union
 )
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    Qt
-)
+from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 
 from ..gui import DockPendingChanges
@@ -45,7 +42,7 @@ from ..services import (
     PlanManager
 )
 from ..utils import tr
-from .BaseCtlr import BaseController
+from .BaseCtlr import DockWidgetController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction
@@ -53,7 +50,7 @@ else:
     from qgis.PyQt.QtWidgets import QAction
 
 
-class PendingChangesController(BaseController):
+class PendingChangesController(DockWidgetController):
     def __init__(
         self,
         iface,
@@ -65,15 +62,14 @@ class PendingChangesController(BaseController):
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.deltaService = deltaService
-        self.dockwidget: DockPendingChanges = None
-        self.actionToggle: QAction = None
+        self.dockwidget: DockPendingChanges
         self.model: DeltaListModel = DeltaListModel(self.iface)
         self.proxyModel = DeltaFieldFilterProxy(self.iface)
         self.proxyModel.setSourceModel(self.model)
         self.deltaService.updateCompleted.connect(self.updateDelta)
 
     def load(self):
-        self.setupPendingChangesWidget()
+        super().load()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.deltaService.updateStarted.connect(self.showOverlay)
         self.deltaService.updateCompleted.connect(self.hideOverlay)
@@ -84,27 +80,25 @@ class PendingChangesController(BaseController):
         self.deltaService.updateCompleted.disconnect(self.hideOverlay)
         self.deltaService.updateTerminated.disconnect(self.hideOverlay)
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
-        self.iface.removeDockWidget(self.dockwidget)
-        self.dockwidget.destroy()
-        self.dockwidget = None
+        super().unload()
 
-    def setupPendingChangesWidget(self):
+    def createDockWidget(self):
         """Create the dockwidget with displays the impact of pending
         changes on affected districts."""
         dockwidget = DockPendingChanges()
         dockwidget.setModel(self.proxyModel)
         dockwidget.btnDemographics.toggled.connect(self.proxyModel.showDemographics)
 
-        self.iface.addDockWidget(Qt.LeftDockWidgetArea, dockwidget)
+        return dockwidget
 
-        self.actionToggle = dockwidget.toggleViewAction()
-        self.actionToggle.setIcon(QIcon(':/plugins/redistricting/preview.svg'))
-        self.actionToggle.setText(tr('Pending Changes'))
-        self.actionToggle.setStatusTip(tr('Show/hide pending changes dock widget'))
-        self.toolbar.addAction(self.actionToggle)
+    def createToggleAction(self) -> QAction:
+        action = super().createToggleAction()
+        if action is not None:
+            action.setIcon(QIcon(':/plugins/redistricting/preview.svg'))
+            action.setText(tr('Pending Changes'))
+            action.setStatusTip(tr('Show/hide pending changes dock widget'))
 
-        self.dockwidget = dockwidget
-        return self.dockwidget
+        return action
 
     def activePlanChanged(self, plan: Union[RdsPlan, None]):
         self.dockwidget.setWaiting(False)

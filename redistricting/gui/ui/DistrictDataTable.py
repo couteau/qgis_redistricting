@@ -104,7 +104,7 @@ class Ui_qdwDistrictData(object):
         self.btnRecalculate.setText(_translate("qdwDistrictData", "..."))
         self.btnAddFields.setToolTip(_translate("qdwDistrictData", "Add or edit data fields"))
         self.btnAddFields.setText(_translate("qdwDistrictData", "..."))
-        self.btnHelp.setToolTip(_translate("qdwDistrictData", "Help on plan analysis panel"))
+        self.btnHelp.setToolTip(_translate("qdwDistrictData", "Help on district analysis panel"))
         self.btnHelp.setText(_translate("qdwDistrictData", "..."))
 from .RedistrictingWidgets import RdsTableView
 from qgsdockwidget import QgsDockWidget

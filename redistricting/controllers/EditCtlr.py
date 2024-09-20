@@ -36,10 +36,7 @@ from qgis.core import (
 )
 from qgis.gui import Qgis
 from qgis.PyQt import sip
-from qgis.PyQt.QtCore import (
-    QObject,
-    Qt
-)
+from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QDialog
 
@@ -62,7 +59,7 @@ from ..services import (
     TargetDistrictModel
 )
 from ..utils import tr
-from .BaseCtlr import BaseController
+from .BaseCtlr import DockWidgetController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction
@@ -70,7 +67,7 @@ else:
     from qgis.PyQt.QtWidgets import QAction
 
 
-class EditAssignmentsController(BaseController):
+class EditAssignmentsController(DockWidgetController):
     def __init__(
         self,
         iface,
@@ -195,7 +192,7 @@ class EditAssignmentsController(BaseController):
         self.actionEditSourceDistrict.setEnabled(False)
 
     def load(self):
-        self.createPlanToolsDockWidget()
+        super().load()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.planManager.planAdded.connect(self.connectPlanSignals)
         self.planManager.planRemoved.connect(self.disconnectPlanSignals)
@@ -204,11 +201,9 @@ class EditAssignmentsController(BaseController):
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         self.planManager.planAdded.disconnect(self.connectPlanSignals)
         self.planManager.planRemoved.disconnect(self.disconnectPlanSignals)
-        self.iface.removeDockWidget(self.dockwidget)
-        self.dockwidget.destroy()
-        self.dockwidget = None
+        super().unload()
 
-    def createPlanToolsDockWidget(self):
+    def createDockWidget(self):
         """Create the dockwidget with tools for painting districts and wire up the actions."""
         dockwidget = DockRedistrictingToolbox(None)
 
@@ -225,16 +220,16 @@ class EditAssignmentsController(BaseController):
         dockwidget.btnEditTargetDistrict.setDefaultAction(self.actionEditTargetDistrict)
         dockwidget.btnEditSourceDistrict.setDefaultAction(self.actionEditSourceDistrict)
 
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, dockwidget)
+        return dockwidget
 
-        self.actionToggle = dockwidget.toggleViewAction()
-        self.actionToggle.setIcon(QIcon(':/plugins/redistricting/paintdistricts.svg'))
-        self.actionToggle.setText(tr('Paint Districts'))
-        self.actionToggle.setStatusTip(tr('Show/hide tools for creating/editing districts'))
-        self.toolbar.addAction(self.actionToggle)
+    def createToggleAction(self) -> QAction:
+        action = super().createToggleAction()
+        if action is not None:
+            action.setIcon(QIcon(':/plugins/redistricting/paintdistricts.svg'))
+            action.setText(tr('Paint Districts'))
+            action.setStatusTip(tr('Show/hide tools for creating/editing districts'))
 
-        self.dockwidget = dockwidget
-        return self.dockwidget
+        return action
 
     # slots
 
