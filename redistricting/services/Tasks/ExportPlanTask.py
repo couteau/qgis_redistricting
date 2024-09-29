@@ -49,9 +49,7 @@ from qgis.core import (
 from qgis.PyQt.QtCore import QMetaType
 from qgis.utils import spatialite_connect
 
-from redistricting.models.columns import DistrictColumns
-
-from ...exception import RdsException
+from ...models import DistrictColumns
 from ...utils import tr
 from ._debug import debug_thread
 
@@ -230,7 +228,7 @@ class ExportRedistrictingPlanTask(QgsTask):
         if success:
             layer.updateExtents()
         else:
-            self.exception = RdsException(
+            self.exception = RuntimeError(
                 tr("Error when creating shapefile: {}").format(pr.lastError())
             )
 
@@ -259,7 +257,7 @@ class ExportRedistrictingPlanTask(QgsTask):
             )
 
             if error != QgsVectorFileWriter.NoError:
-                self.exception = RdsException(msg)
+                self.exception = RuntimeError(msg)
                 return False
         else:
             return False
@@ -308,7 +306,7 @@ class ExportRedistrictingPlanTask(QgsTask):
             )
 
             if error != QgsVectorFileWriter.NoError:
-                self.exception = RdsException(msg)
+                self.exception = RuntimeError(msg)
                 return False
 
         return True

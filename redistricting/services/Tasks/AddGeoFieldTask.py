@@ -39,7 +39,6 @@ from qgis.core import (
 )
 from qgis.utils import spatialite_connect
 
-from ...exception import RdsException
 from ...utils import tr
 from ._debug import debug_thread
 
@@ -68,10 +67,10 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
 
     def run(self):
         def makeGetter(field: "RdsField"):
-            if not field.expression:
+            if not field.isExpression():
                 findex = self.srcLayer.fields().lookupField(field.field)
                 if findex == -1:
-                    raise RdsException(tr('Could not find {field} in {source} layer').format(
+                    raise RuntimeError(tr('Could not find {field} in {source} layer').format(
                         field=field.field,
                         source=tr('source')
                     ))
@@ -88,7 +87,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
 
             gindex = self.srcLayer.fields().lookupField(self.srcIdField)
             if gindex == -1:
-                self.exception = RdsException(tr('Could not find {field} in {source} layer').format(
+                self.exception = RuntimeError(tr('Could not find {field} in {source} layer').format(
                     field=self.srcIdField,
                     source=tr('source')
                 ))

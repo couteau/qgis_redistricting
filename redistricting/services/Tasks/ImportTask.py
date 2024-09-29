@@ -38,9 +38,9 @@ from qgis.core import (
 )
 from qgis.utils import spatialite_connect
 
-from ...exception import CanceledError
 from ...utils import tr
 from ._debug import debug_thread
+from .exception import CanceledError
 
 if TYPE_CHECKING:
     from ...models import RdsPlan

@@ -30,10 +30,7 @@ from typing import (
     Union
 )
 
-from qgis.core import (
-    Qgis,
-    QgsApplication
-)
+from qgis.core import QgsApplication
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QCoreApplication,
@@ -55,9 +52,7 @@ from qgis.PyQt.QtWidgets import (
     QTableView,
     QWidget
 )
-from qgis.utils import iface
 
-from ..exception import RdsException
 from ..models import (
     RdsDataField,
     RdsField
@@ -281,11 +276,7 @@ class FieldListModel(QAbstractTableModel):
             if f.field == field:
                 return None
 
-        try:
-            fld = self._fieldType(layer, field, caption)
-        except RdsException as e:
-            iface.messageBar().pushMessage(tr('Error'), str(e), level=Qgis.Critical)
-            return None
+        fld = self._fieldType(layer, field, caption)
 
         self.beginInsertRows(QModelIndex(), len(self._data), len(self._data))
         self._data.append(fld)

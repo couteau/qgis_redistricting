@@ -29,10 +29,10 @@ from typing import (
 
 import pandas as pd
 
-from ...exception import CanceledError
 from ...models import DistrictColumns
 from ...utils import tr
 from ._debug import debug_thread
+from .exception import CanceledError
 from .UpdateTask import AggregateDataTask
 
 if TYPE_CHECKING:

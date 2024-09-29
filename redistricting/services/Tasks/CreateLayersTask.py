@@ -43,7 +43,6 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QVariant
 
-from ...exception import CanceledError
 from ...models import (
     DistrictColumns,
     MetricsColumns
@@ -56,6 +55,7 @@ from ...utils import (
     tr
 )
 from ._debug import debug_thread
+from .exception import CanceledError
 
 if TYPE_CHECKING:
     from ...models import (
