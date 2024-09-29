@@ -38,7 +38,8 @@ from shapely import wkb
 
 from .gpkg import spatialite_connect
 
-pd.options.mode.copy_on_write = "warn"
+if hasattr(pd.options.mode, "copy_on_write"):
+    pd.options.mode.copy_on_write = "warn"
 
 DEC2FLOAT = psycopg2.extensions.new_type(
     psycopg2.extensions.DECIMAL.values,
@@ -50,7 +51,7 @@ psycopg2.extensions.register_type(DEC2FLOAT)
 
 try:
     # pylint: disable-next=unused-import
-    import pyogrio
+    import pyogrio  # type: ignore
 
     gpd_io_engine = "pyogrio"
 
@@ -86,7 +87,23 @@ except ImportError:
     gpd_io_engine = "fiona"
     gpd_read_file = gpd.read_file
 
+    HeaderSize = {
+        0: 8,
+        1: 40,
+        2: 56,
+        3: 46,
+        4: 72
+    }
+
     def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+        def sql_to_wkb(geom: bytes):
+            if geom[:2] == b'GP':
+                s = HeaderSize[geom[3] >> 1 & 0b111]
+                ofs = slice(s, None)
+            else:
+                ofs = slice(38, -1)
+            return wkb.loads(geom[ofs])
+
         path = pathlib.Path(filename)
         if path.suffix in ('.gpkg', '.sqlite', '.db') and "layer" in kwargs:
             with spatialite_connect(path) as db:
@@ -128,7 +145,7 @@ except ImportError:
                         sql = f"{sql} LIMIT {rows}"
 
                     df = pd.read_sql(sql, db)
-                    df[geometry_column] = df[geometry_column].apply(lambda x: wkb.loads(x[38:-1]))
+                    df[geometry_column] = df[geometry_column].apply(sql_to_wkb)
                     df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
                     return df
 
@@ -185,7 +202,7 @@ except ImportError:
 if parse_version(gdal.__version__) > parse_version("3.6"):
     try:
         # pylint: disable-next=unused-import
-        import pyarrow
+        import pyarrow  # type: ignore
         os.environ["PYOGRIO_USE_ARROW"] = "1"
     except ImportError:
         pass
