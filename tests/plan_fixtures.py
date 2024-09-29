@@ -12,7 +12,7 @@ from qgis.PyQt.QtCore import pyqtBoundSignal
 from redistricting.models.base.serialize import deserialize
 from redistricting.models.Plan import RdsPlan
 from redistricting.services.DistrictIO import DistrictReader
-from redistricting.services.PlanBuilder import PlanBuilder
+from redistricting.services.PlanBldr import PlanBuilder
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 

@@ -27,95 +27,72 @@ from typing import (
     Union
 )
 
-from qgis.PyQt.QtCore import Qt
+from qgis.PyQt.QtCore import (
+    QAbstractItemModel,
+    QModelIndex,
+    QObject,
+    Qt,
+    pyqtSignal
+)
 from qgis.PyQt.QtWidgets import (
     QDialog,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QTreeView,
     QWidget
 )
 
-from ..models import (
-    RdsGeoField,
-    RdsPlan
-)
-from ..services import RdsSplitsModel
-from ..utils import tr
+from ..models import RdsPlan
 from .ui.DlgSplits import Ui_dlgSplits
 
 
+class RdsSplitDistrictsDelegate(QStyledItemDelegate):
+    """Hide display of comma-delimited list of districts for expanded geographies"""
+
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
+        if isinstance(parent, QTreeView):
+            self._view = parent
+        else:
+            self._view = None
+
+    def setParent(self, parent: QObject) -> None:
+        super().setParent(parent)
+        if isinstance(parent, QTreeView):
+            self._view = parent
+
+    def initStyleOption(self, option: QStyleOptionViewItem, index: QModelIndex):
+        super().initStyleOption(option, index)
+        if self._view is not None and self._view.isExpanded(index.siblingAtColumn(0)):
+            option.text = ""
+
+
 class DlgSplitDetail(Ui_dlgSplits, QDialog):
+    geographyChanged = pyqtSignal(int)
+
     def __init__(
             self,
             plan: RdsPlan,
-            geoField: RdsGeoField,
             parent: Optional[QWidget] = None,
             flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
     ):
         super().__init__(parent, flags)
         self.setupUi(self)
 
-        self._model = None
-        self._plan: RdsPlan = None
-        self._field: RdsGeoField = None
+        self._plan: RdsPlan = plan
+        self._plan.nameChanged.connect(self.planNameChanged)
+        self._plan.geoFieldsChanged.connect(self.updateGeography)
+        self.updateGeography()
 
-        self.plan = plan
-        self.geoField = geoField
+        self.lblPlan.setText(self._plan.name)
         self.cmbGeography.currentIndexChanged.connect(self.geographyChanged)
+        self.tvSplits.setItemDelegateForColumn(1, RdsSplitDistrictsDelegate(self.tvSplits))
 
-    @property
-    def plan(self) -> RdsPlan:
-        return self._plan
+    def model(self):
+        return self.tvSplits.model()
 
-    @plan.setter
-    def plan(self, value: RdsPlan):
-        if self._plan:
-            self.plan.nameChanged.disconnect(self.planNameChanged)
-            self.plan.geoFieldsChanged.disconnect(self.updateGeography)
-            if self._model:
-                self.tvSplits.expanded.disconnect(self._model.setExpanded)
-                self.tvSplits.collapsed.disconnect(self._model.setCollapsed)
-
-        self._plan = value
-
-        if self._plan:
-            if self._field:
-                self._model = RdsSplitsModel(self._plan, self._plan.metrics.splits[self._field], self)
-                self.tvSplits.expanded.connect(self._model.setExpanded)
-                self.tvSplits.collapsed.connect(self._model.setCollapsed)
-            else:
-                self._model = None
-            self.lblPlan.setText(self._plan.name)
-            self.updateGeography()
-            self.plan.nameChanged.connect(self.planNameChanged)
-            self.plan.geoFieldsChanged.connect(self.updateGeography)
-
-        self.tvSplits.setModel(self._model)
-
-    @property
-    def geoField(self) -> RdsGeoField:
-        return self._field
-
-    @geoField.setter
-    def geoField(self, value: RdsGeoField):
-        self._field = value
-        if self._model:
-            self.tvSplits.expanded.disconnect(self._model.setExpanded)
-            self.tvSplits.collapsed.disconnect(self._model.setCollapsed)
-
-        if self._plan and self._field:
-            self._model = RdsSplitsModel(self._plan, self._plan.metrics.splits[self._field.field], self)
-            self.tvSplits.expanded.connect(self._model.setExpanded)
-            self.tvSplits.collapsed.connect(self._model.setCollapsed)
-        else:
-            self._model = None
-
-        self.tvSplits.setModel(self._model)
-
-        if self._field:
-            self.setWindowTitle(f"{self._field.caption} {tr('Splits')}")
-            self.cmbGeography.setCurrentText(self._field.caption)
-
-    def geographyChanged(self, index):
-        self.geoField = self.plan.geoFields[index]
+    def setModel(self, value: QAbstractItemModel):
+        self.tvSplits.setModel(value)
 
     def planNameChanged(self):
         self.lblPlan.setText(self._plan.name)

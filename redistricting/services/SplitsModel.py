@@ -57,17 +57,6 @@ class RdsSplitsModel(QAbstractItemModel):
         self._data: pd.DataFrame = splits.data
         self._header = [self._splits.geoField.caption, tr("Districts"), tr('Population')]
         self._header.extend(f.caption for f in [*plan.popFields, *plan.dataFields])
-        self._expandedGeogs: set[RdsSplitGeography] = set()
-
-    def setExpanded(self, index: QModelIndex):
-        item: RdsSplitBase = index.internalPointer()
-        if isinstance(item, RdsSplitGeography):
-            self._expandedGeogs.add(item)
-
-    def setCollapsed(self, index: QModelIndex):
-        item: RdsSplitBase = index.internalPointer()
-        if isinstance(item, RdsSplitGeography) and item in self._expandedGeogs:
-            self._expandedGeogs.remove(item)
 
     def rowCount(self, parent: QModelIndex = ...) -> int:
         if not parent.isValid():  # it's the root node
@@ -105,7 +94,7 @@ class RdsSplitsModel(QAbstractItemModel):
         item: RdsSplitBase = index.internalPointer()
         col = index.column()
         if isinstance(item, RdsSplitGeography):
-            if (col == 1 and item in self._expandedGeogs) or col >= 2:
+            if col >= 2:
                 return QVariant()
         else:
             if col == 0:

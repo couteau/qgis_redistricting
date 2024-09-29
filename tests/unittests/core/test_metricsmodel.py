@@ -21,17 +21,18 @@ class TestMetricsModel:
         qtmodeltester.check(metrics_model)
 
     def test_rowcount(self, metrics_model: RdsPlanMetricsModel):
-        assert metrics_model.rowCount() == 9
+        assert metrics_model.rowCount() == 11
 
     def test_headerdata(self, metrics_model: RdsPlanMetricsModel):
         assert metrics_model.headerData(0, Qt.Vertical, Qt.DisplayRole) == 'Population'
 
     @pytest.mark.parametrize("row,value", [
         (0, '227,036'),
-        (1, 'Yes'),
-        (3, '0.341'),
-        (4, '0.417'),
-        (5, '0.811'),
+        (2, 'Yes'),
+        (3, 'Yes'),
+        (5, '0.341'),
+        (6, '0.417'),
+        (7, '0.811'),
     ])
     def test_data(self, metrics_model: RdsPlanMetricsModel, row, value):
         data = metrics_model.data(metrics_model.createIndex(row, 0), Qt.DisplayRole)

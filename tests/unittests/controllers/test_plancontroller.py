@@ -33,6 +33,7 @@ class TestPlanController:
         builder.setNumSeats.return_value = builder
         builder.setDescription.return_value = builder
         builder.setDeviation.return_value = builder
+        builder.setDeviationType.return_value = builder
         builder.setGeoIdField.return_value = builder
         builder.setGeoDisplay.return_value = builder
         builder.setGeoLayer.return_value = builder
@@ -56,6 +57,7 @@ class TestPlanController:
         builder.setNumSeats.return_value = builder
         builder.setDescription.return_value = builder
         builder.setDeviation.return_value = builder
+        builder.setDeviationType.return_value = builder
         builder.setGeoIdField.return_value = builder
         builder.setGeoDisplay.return_value = builder
         builder.setGeoLayer.return_value = builder

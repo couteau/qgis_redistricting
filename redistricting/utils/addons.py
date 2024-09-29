@@ -26,14 +26,16 @@ import pathlib
 import subprocess
 import sys
 
+from packaging.version import parse as parse_version
+
 # from pip import main as pipmain
 
 
 def python_executable():
     if sys.platform == "win32":
-        return pathlib.Path(sys.prefix) / 'python.exe'
+        return pathlib.Path(sys.prefix) / 'python3.exe'
 
-    return pathlib.Path(sys.prefix) / 'bin' / 'python'
+    return pathlib.Path(sys.prefix) / 'bin' / 'python3'
 
 
 def install_addon(pkg: str, *options):
@@ -47,6 +49,13 @@ def install_addon(pkg: str, *options):
 
 
 def install_pyogrio():
+    import geopandas
+    if parse_version(geopandas.__version__) < parse_version('0.12.0'):
+        install_addon('geopandas', "--no-deps")
+    import shapely
+    if parse_version(shapely.__version__) < parse_version('2.0.0'):
+        install_addon('shapeley', "--no-deps")
+
     install_addon('pyogrio', '--no-deps')
 
 

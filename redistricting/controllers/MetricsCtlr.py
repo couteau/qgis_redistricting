@@ -26,7 +26,8 @@ import csv
 import io
 from typing import (
     Any,
-    Optional
+    Optional,
+    Union
 )
 
 from qgis.core import (
@@ -76,7 +77,8 @@ from ..services import (
     ActionRegistry,
     DistrictUpdater,
     PlanManager,
-    RdsPlanMetricsModel
+    RdsPlanMetricsModel,
+    RdsSplitsModel
 )
 from ..utils import tr
 from .BaseCtlr import DockWidgetController
@@ -234,13 +236,21 @@ class MetricsController(DockWidgetController):
             csv.writer(stream, delimiter='\t').writerows(table)
             QgsApplication.instance().clipboard().setText(stream.getvalue())
 
+    def deleteDialog(self, dlg: QObject):
+        if dlg.objectName() == 'dlgSplits':
+            self.dlgSplits = None
+        elif dlg.objectName() == 'dlgSplitDistricts':
+            self.dlgSplitDistricts = None
+        elif dlg.objectName() == 'dlgUnassignedGeography':
+            self.dlgUnassignedGeography = None
+
     def showMetricsDetail(self, index: QModelIndex):
         row = index.row()
-        if row == 1:
+        if row == 2:
             if not self.actionShowSplitDistrictsDialog.isEnabled():
                 return
             self.actionShowSplitDistrictsDialog.trigger()
-        elif row == 2:
+        elif row == 3:
             if not self.actionShowUnassignedGeographyDialog.isEnabled():
                 return
             self.actionShowUnassignedGeographyDialog.trigger()
@@ -258,11 +268,23 @@ class MetricsController(DockWidgetController):
         if field is None:
             return
 
-        if self.dlgSplits is not None:
-            self.dlgSplits.geoField = field
-        else:
-            self.dlgSplits = DlgSplitDetail(self.planManager.activePlan, field, self.iface.mainWindow())
+        if self.dlgSplits is None:
+            self.dlgSplits = DlgSplitDetail(self.planManager.activePlan, self.iface.mainWindow())
+            self.dlgSplits.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgSplits.destroyed.connect(self.deleteDialog)
+            self.dlgSplits.geographyChanged.connect(self.updateSplitsDialog)
+
+        self.updateSplitsDialog(field)
+
         self.dlgSplits.show()
+
+    def updateSplitsDialog(self, field: Union[RdsGeoField, int]):
+        if isinstance(field, int):
+            field: RdsGeoField = self.activePlan.geoFields[field]
+        self.dlgSplits.setWindowTitle(f"{field.caption} {tr('Splits')}")
+        model = RdsSplitsModel(self.activePlan, self.activePlan.metrics.splits[field.field])
+        self.dlgSplits.setModel(model)
+        self.dlgSplits.cmbGeography.setCurrentText(field.caption)
 
     def zoomToSplitDistrict(self, index: QModelIndex):
         filter_id = self.splitDistrictsModel.rowToId(index)
@@ -307,7 +329,10 @@ class MetricsController(DockWidgetController):
     def showSplitDistricts(self):
         if self.dlgSplitDistricts is None:
             self.dlgSplitDistricts = QDialog()
+            self.dlgSplitDistricts.setObjectName('dlgSplitDistricts')
             self.dlgSplitDistricts.setWindowTitle(tr("Non-contiguous Districts"))
+            self.dlgSplitDistricts.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgSplitDistricts.destroyed.connect(self.deleteDialog)
             vbox = QVBoxLayout(self.dlgSplitDistricts)
             self.dlgSplitDistricts.splitsTable = QTableView(self.dlgSplitDistricts)
             self.dlgSplitDistricts.splitsTable.installEventFilter(TableViewKeyEventFilter(self.dlgSplitDistricts))
@@ -377,7 +402,10 @@ class MetricsController(DockWidgetController):
     def showUnassignedGeography(self):
         if self.dlgUnassignedGeography is None:
             self.dlgUnassignedGeography = QDialog()
+            self.dlgUnassignedGeography.setObjectName('dlgUnassignedGeography')
             self.dlgUnassignedGeography.setWindowTitle(tr("Unassigned Geography"))
+            self.dlgUnassignedGeography.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgUnassignedGeography.destroyed.connect(self.deleteDialog)
 
             vbox = QVBoxLayout(self.dlgUnassignedGeography)
             self.dlgUnassignedGeography.unassignedTable = QTableView(self.dlgUnassignedGeography)

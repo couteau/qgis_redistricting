@@ -113,7 +113,7 @@ class TestPendingChangesController:
         planmanager.appendPlan(plan, True)
         assert controller.model._delta is delta
 
-    def test_update_delta_updates_model(self, controller_with_active_plan, plan: RdsPlan, delta_update_service: DeltaUpdateService, qtbot):
+    def test_update_delta_updates_model(self, controller_with_active_plan: PendingChangesController, plan: RdsPlan, delta_update_service: DeltaUpdateService, qtbot):
         assert controller_with_active_plan.model._delta is None
         delta_update_service.watchPlan(plan)
         with qtbot.waitSignal(delta_update_service.updateCompleted, timeout=20000):
@@ -123,5 +123,5 @@ class TestPendingChangesController:
 
         assert controller_with_active_plan.model._delta is not None
         assert controller_with_active_plan.model.data(
-            controller_with_active_plan.model.createIndex(1, 0), Qt.DisplayRole) == '+600'
+            controller_with_active_plan.model.createIndex(0, 1), Qt.DisplayRole) == '+600'
         plan.assignLayer.rollBack(True)

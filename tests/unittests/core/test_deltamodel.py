@@ -58,15 +58,15 @@ class TestDeltaModel:
         yield model
 
     def test_create(self, empty_model: DeltaListModel):
-        assert empty_model.rowCount() == 15
+        assert empty_model.columnCount() == 15
 
     def test_model(self, delta_model, empty_model, qtmodeltester):
         qtmodeltester.check(delta_model)
         qtmodeltester.check(empty_model)
 
     def test_heading(self, delta_model: DeltaListModel):
-        assert delta_model.headerData(3, Qt.Vertical, Qt.DisplayRole) == '%Deviation'
+        assert delta_model.headerData(3, Qt.Horizontal, Qt.DisplayRole) == '%Deviation'
 
     def test_update_districts(self, delta_model, mock_delta):
         mock_delta.__len__.return_value = 1
-        assert delta_model.columnCount() == 1
+        assert delta_model.rowCount() == 1

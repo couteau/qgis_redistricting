@@ -125,7 +125,7 @@ class DistrictWriter:
         for d in districts:
             if d.fid == -1:
                 feat = QgsFeature(self._fields)
-                feat.setAttribute(DistrictColumns.DISTRICT, d.district)
+                feat.setAttribute(int(DistrictColumns.DISTRICT), d.district)
             else:
                 feat = self._layer.getFeature(d.fid)
             changeAttributes(d, feat)

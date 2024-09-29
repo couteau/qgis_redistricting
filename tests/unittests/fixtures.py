@@ -77,3 +77,21 @@ class Fixtures:
     def mock_toolbar(self, mocker: MockerFixture):
         toolbar = mocker.create_autospec(spec=QToolBar)
         return toolbar
+
+    @pytest.fixture
+    def mock_updater(self, mocker: MockerFixture) -> services.DistrictUpdater:
+        updater = mocker.create_autospec(spec=services.DistrictUpdater, instance=True)
+        updater.updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+        updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        updater.updateTerminated = mocker.create_autospec(spec=pyqtBoundSignal)
+        return updater
+
+    @pytest.fixture
+    def mock_copier(self, mocker: MockerFixture) -> services.DistrictCopier:
+        copier = mocker.create_autospec(spec=services.DistrictCopier, instance=True)
+        return copier
+
+    @pytest.fixture
+    def mock_assignments_service(self, mocker: MockerFixture) -> services.AssignmentsService:
+        assignments_service = mocker.create_autospec(spec=services.AssignmentsService, instance=True)
+        return assignments_service

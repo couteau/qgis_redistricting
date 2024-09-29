@@ -24,14 +24,13 @@
 """
 import inspect
 from functools import wraps
-from typing import (
-    Any,
-    Callable,
-    Generic,
+from typing import (  # pylint: disable=no-name-in-module
+    Annotated,
     Optional,
     TypeVar,
-    TypeVarTuple,
     dataclass_transform,
+    get_args,
+    get_origin,
     get_type_hints
 )
 
@@ -39,40 +38,11 @@ from qgis.PyQt.QtCore import QObject
 
 from .prop import (
     MISSING,
+    Factory,
     rds_property
 )
 
-F = TypeVar("F")
-
-
-class Factory(Generic[F]):
-    """Factory class for wrapping default factory functions that take the instance as a parameter
-    """
-
-    def __init__(self, factory: Callable[[Any], F], with_owner: bool = True, defer: bool = False):
-        """Constructor for Factory class for initializing model attributes
-
-        Args:
-            factory (Callable): The factory function wrapped by this Factory instance.
-            with_owner (bool, optional): Whether the factory function takes the instance as an argument. Defaults to True.
-            defer (bool, optional): Whether the factory should be called after all other instance attributes have been set. Defaults to False.
-        """
-        self.factory = factory
-        self.with_owner = with_owner
-        self.defer = defer
-
-    def __call__(self, owner) -> F:
-        if self.with_owner:
-            return self.factory(owner)
-
-        return self.factory()
-
-
-ListFactory = Factory(list, False)
-DictFactory = Factory(dict, False)
-
 T = TypeVar("T")
-C = TypeVarTuple("C")
 _FACTORY_MARKER = object()
 
 
@@ -142,6 +112,22 @@ class RdsBaseModel(QObject):
             return wrapped_init
 
         super().__init_subclass__()
+        for n, t in get_type_hints(cls, include_extras=True).items():
+            # create properties for any type hints that include a validator annotation but have no defined property
+            if get_origin(t) is Annotated:
+                default = getattr(cls, n, MISSING)
+                if isinstance(default, (rds_property, property)):
+                    continue
+                if isinstance(default, Factory):
+                    factory = default
+                    default = MISSING
+                else:
+                    factory = MISSING
+                args = get_args(t)
+                v = args[1]
+
+                setattr(cls, n, rds_property(private=True, fvalid=v, default=default, factory=factory))
+
         setattr(cls, "__init__", wrap_init(getattr(cls, "__init__")))
 
     def __pre_init__(self):

@@ -107,7 +107,7 @@ class DeltaListModel(QAbstractTableModel):
             },
             {
                 'name': DistrictColumns.DEVIATION,
-                'caption': DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
+                'caption': DistrictColumns.DEVIATION.comment,  # pylint: disable=no-member
                 'format': '{:,.0f}',
                 'field-type': FieldCategory.Population
             },
@@ -168,7 +168,7 @@ class DeltaListModel(QAbstractTableModel):
         return len(self._delta) if self._delta is not None and not parent.isValid() else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
-        return len(self._fields) if self._delta is not None and not parent.isValid() else 0
+        return len(self._fields) if not parent.isValid() else 0
 
     def data(self, index: QModelIndex, role: int = ...):
         if self._delta:

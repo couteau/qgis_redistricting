@@ -46,7 +46,7 @@ from ..models import RdsSplits
 from ..utils import tr
 from .DistrictIO import DistrictReader
 from .ErrorList import ErrorListMixin
-from .PlanBuilder import PlanBuilder
+from .PlanBldr import PlanBuilder
 
 if TYPE_CHECKING:
     from ..models.Plan import RdsPlan

@@ -45,8 +45,8 @@ class TestDeltaModel:
         return model
 
     def test_update_fields(self, delta_model: DeltaListModel, plan: RdsPlan, block_layer):
-        assert delta_model.rowCount() == 15
+        assert delta_model.columnCount() == 15
         e = PlanEditor.fromPlan(plan)
         e.appendDataField('vap_nh_black')
         e.updatePlan()
-        assert delta_model.rowCount() == 18
+        assert delta_model.columnCount() == 18

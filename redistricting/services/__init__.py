@@ -45,13 +45,13 @@ from .FieldListModels import (
     GeoFieldsModel,
     PopFieldsModel
 )
-from .LayerTreeManager import LayerTreeManager
+from .LayerTreeMgr import LayerTreeManager
 from .MetricsModel import RdsPlanMetricsModel
 from .PlanAssignments import (
     AssignmentsService,
     PlanAssignmentEditor
 )
-from .PlanBuilder import PlanBuilder
+from .PlanBldr import PlanBuilder
 from .PlanColors import getColorForDistrict
 from .PlanCopy import PlanCopier
 from .PlanEdit import PlanEditor

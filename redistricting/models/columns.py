@@ -46,7 +46,7 @@ class ConstStr(str):
 
 
 class ConstantsMeta(type):
-    """Simplified Enum type class where members are proper strings, not an instance of the Enum subclass"""
+    """Simplified Enum type class where members are strings, not instances of the Enum"""
     _member_names: dict[str, ConstStr]
 
     def __new__(cls, name, bases, classdict: dict[str, Any]):
@@ -68,11 +68,12 @@ class ConstantsMeta(type):
             else:
                 comment = None
 
-            if isinstance(v, str) and not isinstance(v, ConstStr):
-                classdict[f] = ConstStr(v, len(member_names), comment)
-                member_names[f] = classdict[f]
-            else:
-                member_names[f] = v
+            if isinstance(v, str):
+                if not isinstance(v, ConstStr):
+                    classdict[f] = ConstStr(v, len(member_names), comment)
+                    member_names[f] = classdict[f]
+                else:
+                    member_names[f] = v
 
         classdict['_member_names'] = member_names
         return super().__new__(cls, name, bases, classdict)

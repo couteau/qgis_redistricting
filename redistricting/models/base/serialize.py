@@ -1,5 +1,11 @@
+import json
 import re
-from functools import partial
+from functools import (
+    partial,
+    reduce,
+    wraps
+)
+from io import StringIO
 from types import GenericAlias
 from typing import (
     Annotated,
@@ -30,16 +36,29 @@ from qgis.PyQt.QtCore import QObject
 from .model import RdsBaseModel
 from .prop import rds_property
 
+
+def compose(f, *fns):
+    @wraps(f)
+    def inner(*args, **kwargs):
+        return reduce(lambda x, fn: fn(x), fns, f(*args, **kwargs))
+
+    return inner
+
+
+serialize_dataframe = compose(partial(pd.DataFrame.to_json, orient="table"), json.loads)
+deserialize_dataframe = compose(json.dumps, StringIO, partial(pd.read_json, orient="table"))
+
+
 serializers = {
     UUID: str,
     QgsVectorLayer: QgsVectorLayer.id,
-    pd.DataFrame: partial(pd.DataFrame.to_dict, orient="tight")
+    pd.DataFrame: serialize_dataframe
 }
 
 deserializers = {
     UUID: UUID,
     QgsVectorLayer: QgsProject.instance().mapLayer,
-    pd.DataFrame: partial(pd.DataFrame.from_dict, orient="tight")
+    pd.DataFrame: deserialize_dataframe
 }
 
 
@@ -191,7 +210,10 @@ def deserialize_value(t: type, value: Any, **kw):
         cls_anns = {}
 
     if t in deserializers:
-        value = deserializers[t](value)
+        try:
+            value = deserializers[t](value)
+        except Exception:  # pylint: disable=broad-except
+            value = None
     elif issubclass(t, RdsBaseModel):
         if issubclass(t, Generic) and args:
             cls_anns = dict(zip(t.__parameters__, args))

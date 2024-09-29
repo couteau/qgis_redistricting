@@ -9,6 +9,7 @@ from redistricting.models import (
     RdsPlan
 )
 from redistricting.services import (
+    DeltaFieldFilterProxy,
     DeltaListModel,
     DeltaUpdateService
 )
@@ -53,6 +54,7 @@ class TestPendingChangesController:
 
     @pytest.fixture
     def mock_model(self, mocker: MockerFixture) -> type[DeltaListModel]:
+        mocker.patch('redistricting.controllers.PendingCtlr.DeltaFieldFilterProxy', spec=DeltaFieldFilterProxy)
         cls = mocker.patch('redistricting.controllers.PendingCtlr.DeltaListModel', spec=DeltaListModel)
         cls.return_value = mocker.create_autospec(spec=DeltaListModel())
         return cls

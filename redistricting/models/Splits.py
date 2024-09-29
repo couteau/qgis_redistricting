@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from functools import partial
 from typing import (
     Any,
     Optional,
@@ -111,7 +112,7 @@ class RdsSplits(RdsBaseModel):
     splitUpdated = pyqtSignal()
 
     field: str
-    data: pd.DataFrame = Factory(pd.DataFrame, False)
+    data: pd.DataFrame = Factory(partial(pd.DataFrame, index=pd.RangeIndex(0)), False)
     geoField: RdsGeoField = rds_property(private=True, serialize=False, default=None)
 
     def __init__(self, field: Union[str, RdsGeoField], data: pd.DataFrame = MISSING, parent: Optional[QObject] = None):

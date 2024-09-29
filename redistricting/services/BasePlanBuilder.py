@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import pathlib
 from numbers import Number
-from typing import (
+from typing import (  # pylint: disable=no-name-in-module
     Optional,
     Self,
     overload
@@ -328,7 +328,7 @@ class BasePlanBuilder(PlanValidator):
                     pctBase = self._vap.field
                 elif self._cvap and matchField(field, self._popLayer, defaults.CVAP_FIELDS):
                     pctBase = self._cvap.field
-            field = RdsDataField(self._popLayer, field, caption, sumField, pctBase)
+            field = RdsDataField(self._popLayer, field, caption, sumField=sumField, pctBase=pctBase)
         elif not isinstance(field, RdsDataField):
             raise TypeError(
                 tr('Field must by an RdsField or the name of a field').

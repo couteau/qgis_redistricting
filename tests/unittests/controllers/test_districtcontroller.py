@@ -9,8 +9,7 @@ from qgis.PyQt.QtCore import (
     QEvent,
     QModelIndex,
     QPoint,
-    Qt,
-    pyqtBoundSignal
+    Qt
 )
 from qgis.PyQt.QtGui import QContextMenuEvent
 from qgis.PyQt.QtWidgets import (
@@ -20,15 +19,10 @@ from qgis.PyQt.QtWidgets import (
 
 from redistricting.controllers import (
     DistrictController,
-    EditAssignmentsController,
-    MetricsController
+    EditAssignmentsController
 )
 from redistricting.models import RdsPlan
-from redistricting.services import (
-    AssignmentsService,
-    DistrictCopier,
-    DistrictUpdater
-)
+from redistricting.services import DistrictCopier
 
 
 class TestDistrictController:
@@ -36,24 +30,6 @@ class TestDistrictController:
     def dockwidget(self, mocker: MockerFixture):
         widget_class = mocker.patch('redistricting.controllers.DistrictCtlr.DockDistrictDataTable')
         return widget_class
-
-    @pytest.fixture
-    def mock_updater(self, mocker: MockerFixture) -> DistrictUpdater:
-        updater = mocker.create_autospec(spec=DistrictUpdater, instance=True)
-        updater.updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
-        updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
-        updater.updateTerminated = mocker.create_autospec(spec=pyqtBoundSignal)
-        return updater
-
-    @pytest.fixture
-    def mock_copier(self, mocker: MockerFixture) -> DistrictCopier:
-        copier = mocker.create_autospec(spec=DistrictCopier, instance=True)
-        return copier
-
-    @pytest.fixture
-    def mock_assignments_service(self, mocker: MockerFixture) -> AssignmentsService:
-        assignments_service = mocker.create_autospec(spec=AssignmentsService, instance=True)
-        return assignments_service
 
     @pytest.fixture
     def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_assignments_service, mock_copier, mock_updater):
@@ -152,11 +128,11 @@ class TestDistrictController:
         event = QEvent(QEvent.MouseButtonPress)
         assert not controller.eventFilter(controller.dockwidget, event)
 
-    def test_data_table_context_menu(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):
+    def test_data_table_context_menu(self, controller: DistrictController, mocker: MockerFixture):
         menu = mocker.patch('redistricting.controllers.DistrictCtlr.QMenu')
-        controller_with_active_plan.prepareDataTableContextMenu(QPoint(0, 0))
+        controller.load()
         assert menu.return_value.addAction.call_count == 5
-        menu.return_value.addAction.assert_any_call(controller_with_active_plan.actionCopyDistrict)
+        menu.return_value.addAction.assert_any_call(controller.actionCopyDistrict)
 
     def test_copy_data_to_clipboard(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):
         clipboard = mocker.patch('redistricting.controllers.DistrictCtlr.DistrictClipboardAccess')
@@ -200,15 +176,4 @@ class TestDistrictController:
         index.column.return_value = 1
 
         controller_with_active_plan.editDistrict(index)
-        dlg.assert_called_once()
-
-    def test_show_splits_dialog(self, controller_with_active_plan: DistrictController, qgis_iface, mock_project, mock_planmanager, mock_toolbar, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.controllers.MetricsCtlr.DlgSplitDetail')
-        # pylint: disable-next=unused-variable
-        metctlr = MetricsController(qgis_iface, mock_project, mock_planmanager, mock_toolbar)
-        metctlr.planChanged(mock_planmanager.activePlan)
-        index = mocker.create_autospec(spec=QModelIndex, instance=True)
-        index.row.return_value = 8
-        index.column.return_value = 1
-        controller_with_active_plan.showMetricsDetail(index)
         dlg.assert_called_once()

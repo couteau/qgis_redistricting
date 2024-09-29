@@ -49,8 +49,12 @@ class BaseDeviationValidator(QObject):
     def updateIdeal(self):
         self._perMemberIdeal = self._plan.totalPopulation / self._plan.numSeats
 
-    def districtIdeal(self, district: 'RdsDistrict'):
+    def districtIdeal(self, district: 'RdsDistrict') -> float:
         return district.members * self._perMemberIdeal
+
+    def districtIdealRange(self, district: 'RdsDistrict') -> tuple[float, int, int]:
+        ideal = self.districtIdeal(district)
+        return ideal, floor(ideal), ceil(ideal)
 
     def districtPctDeviation(self, district: 'RdsDistrict'):
         return (district.population - (district.members * self._perMemberIdeal)) / (district.members * self._perMemberIdeal)
@@ -61,7 +65,10 @@ class BaseDeviationValidator(QObject):
 
     def minmaxDeviations(self):
         deviations = [self.districtPctDeviation(d) for d in self._plan.districts if d.district != 0]
-        return min(deviations), max(*deviations)
+        if len(deviations) == 0:
+            return None, None
+
+        return min(deviations, default=0), max(deviations, default=0)
 
     @abstractmethod
     def validateDistrict(self, district: 'RdsDistrict'):
@@ -73,10 +80,10 @@ class PlusMinusDeviationValidator(BaseDeviationValidator):
     """
 
     def validateDistrict(self, district: 'RdsDistrict'):
-        maxDeviation = district.members * int(self._plan.deviation * self._perMemberIdeal)
-        idealUpper = ceil(district.members * self._perMemberIdeal) + maxDeviation
-        idealLower = floor(district.members * self._perMemberIdeal) - maxDeviation
-        return idealLower <= district.population <= idealUpper
+        ideal, idealLower, idealUpper = self. districtIdealRange(district)
+        maxDev = self._plan.deviation * ideal
+
+        return min(idealLower, ideal - maxDev) <= district.population <= max(idealUpper, ideal + maxDev)
 
 
 class MaxDeviationValidator(BaseDeviationValidator):
@@ -84,11 +91,26 @@ class MaxDeviationValidator(BaseDeviationValidator):
     """
 
     def validateDistrict(self, district: 'RdsDistrict'):
-        pctDeviation = self.districtPctDeviation(district)
-        districtDeviations = [
-            self.districtPctDeviation(d) for d in self._plan.districts if d is not district and d.district != 0
-        ]
-        planMax = max(*districtDeviations)
-        planMin = min(*districtDeviations)
+        districtIdeal, districtIdealMin, districtIdealMax = self.districtIdealRange((district))
+        if districtIdealMin <= district.population <= districtIdealMax:
+            return True
 
-        return planMin <= pctDeviation <= planMin + self._plan.deviation or planMax - self._plan.deviation <= pctDeviation <= planMax
+        minPctIdeal = (districtIdealMin - districtIdeal) / districtIdeal
+        maxPctIdeal = (districtIdealMax - districtIdeal) / districtIdeal
+        maxPctOver = max(maxPctIdeal, self._plan.deviation * (self._plan.numSeats - 1) / self._plan.numSeats)
+        maxPctUnder = min(minPctIdeal, -self._plan.deviation * (self._plan.numSeats - 1) / self._plan.numSeats)
+        pctDeviation = self.districtPctDeviation(district)
+
+        if pctDeviation < maxPctUnder or pctDeviation > maxPctOver:
+            return False
+
+        deviations = []
+        for d in self._plan.districts:
+            dev = self.districtPctDeviation(d)
+            if d is not district and d.district != 0 and maxPctUnder <= dev <= maxPctOver:
+                deviations.append(dev)
+
+        planMax = max(deviations, default=maxPctOver)
+        planMin = min(deviations, default=maxPctUnder)
+        return planMin <= pctDeviation <= max(planMin + self._plan.deviation, maxPctIdeal) \
+            or min(planMax - self._plan.deviation, minPctIdeal) <= pctDeviation <= planMax

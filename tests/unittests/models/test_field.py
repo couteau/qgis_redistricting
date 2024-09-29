@@ -146,7 +146,8 @@ class TestField:
         data = serialize(field)
         assert data == {'layer': block_layer.id(),
                         'field': 'vtdid',
-                        'caption': 'vtdid'}
+                        'caption': 'vtdid',
+                        'category': 1}
 
     def test_deserialize(self, block_layer):
         data = {'layer': block_layer.id(), 'field': 'vtdid'}
@@ -255,6 +256,7 @@ class TestDataField:
             'layer': block_layer.id(),
             'field': 'vap_ap_black',
             'caption': 'vap_ap_black',
+            'category': 3,
             'sum-field': True,
             'pct-base': 'vap_total'
         }

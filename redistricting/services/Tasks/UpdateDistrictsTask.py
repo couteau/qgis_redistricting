@@ -287,10 +287,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 pool.waitForDone()
                 geoms |= {t.dist: t.merged for t in tasks}
-                contig = {t.dist: len(t.merged.geoms) for t in tasks}
 
                 data["geometry"] = pd.Series(geoms)
-                data["pieces"] = pd.Series(contig)
                 data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
 
                 self.calcDistrictMetrics(data)
@@ -339,9 +337,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
                      DistrictColumns.DEVIATION: deviation,
                      DistrictColumns.PCT_DEVIATION: pct_dev}
                 )
-                # for f in self.dataFields:
-                #     if f.pctbase and f.pctbase in self.data.columns:
-                #         self.data[f'pct_{f.fieldName}'] = (self.data[f.fieldName] / self.data[f.pctbase]).fillna(0)
             else:
                 df = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
 

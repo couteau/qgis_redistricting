@@ -187,3 +187,81 @@ class TestRdsProperty:
             t(None, "")
 
         assert t(None, "name") == "name"
+
+    def test_rds_property(self):
+        class C:
+            prop: str = ""
+
+            def get_prop(self):
+                """Docstring"""
+                return self.prop
+
+            def set_prop(self, value):
+                self.prop = value
+
+            def del_prop(self):
+                del self.__dict__["prop"]
+
+            def valid_prop(self, value):
+                if len(value) > 10:
+                    raise ValueError()
+
+        p = rds_property(C.get_prop)
+        p = p.setter(C.set_prop)
+        p = p.deleter(C.del_prop)
+        p = p.validator(C.valid_prop)
+
+        assert p.fget == C.get_prop
+        assert p.fset == C.set_prop
+        assert p.fdel == C.del_prop
+        assert p.fvalid == C.valid_prop
+        assert p.__doc__ == "Docstring"
+
+    def test_rds_property_decorator(self):
+        class C:
+            prop: str = ""
+
+            @rds_property
+            def my_prop(self):
+                """Docstring"""
+                return self.prop
+
+            @my_prop.setter
+            def my_prop(self, value):
+                self.prop = value
+
+            @my_prop.deleter
+            def my_prop(self):
+                del self.__dict__["prop"]
+
+            @my_prop.validator
+            def my_prop(self, value):
+                if len(value) > 10:
+                    raise ValueError()
+
+        assert callable(C.my_prop.fget)
+        assert callable(C.my_prop.fset)
+        assert callable(C.my_prop.fdel)
+        assert callable(C.my_prop.fvalid)
+        assert C.my_prop.__doc__ == "Docstring"
+
+    def test_rds_property_private(self):
+        class C:
+            my_prop: str = rds_property(private=True)
+
+        assert C.my_prop.fset == C.my_prop.set_private
+
+        class D:
+            def __init__(self):
+                self._my_prop: list[str] = []
+
+            @rds_property[list[str]](fset=rds_property.set_list)
+            def my_prop(self):
+                return self._my_prop
+
+            @my_prop.validator
+            def my_prop(self, value: list):
+                assert all(isinstance(p, str) for p in value)
+                return value
+
+        assert D.my_prop.fset == D.my_prop.set_list

@@ -38,6 +38,7 @@ class Ui_qdwPendingChanges(object):
         self.btnDemographics.setObjectName("btnDemographics")
         self.horizontalLayout.addWidget(self.btnDemographics)
         self.btnHelp = QtWidgets.QToolButton(self.frame)
+        self.btnHelp.setAutoRaise(True)
         self.btnHelp.setObjectName("btnHelp")
         self.horizontalLayout.addWidget(self.btnHelp)
         self.verticalLayout.addWidget(self.frame)

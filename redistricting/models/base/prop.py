@@ -3,10 +3,11 @@ import numbers
 import sys
 from copy import copy
 from types import GenericAlias
-from typing import (
+from typing import (  # pylint: disable=no-name-in-module
     Annotated,
     Any,
     Callable,
+    Generic,
     Literal,
     Mapping,
     MutableMapping,
@@ -14,6 +15,7 @@ from typing import (
     Optional,
     Self,
     Sequence,
+    TypeVar,
     Union,
     _GenericAlias,
     _UnionGenericAlias,
@@ -83,8 +85,38 @@ class in_range:
         return value
 
 
-class rds_property(property):
-    def set_list(self: 'rds_property', instance, value):
+_T = TypeVar("_T")
+
+
+class Factory(Generic[_T]):
+    """Factory class for wrapping default factory functions that take the instance as a parameter
+    """
+
+    def __init__(self, factory: Callable[[Any], _T], with_owner: bool = True, defer: bool = False):
+        """Constructor for Factory class for initializing model attributes
+
+        Args:
+            factory (Callable): The factory function wrapped by this Factory instance.
+            with_owner (bool, optional): Whether the factory function takes the instance as an argument. Defaults to True.
+            defer (bool, optional): Whether the factory should be called after all other instance attributes have been set. Defaults to False.
+        """
+        self.factory = factory
+        self.with_owner = with_owner
+        self.defer = defer
+
+    def __call__(self, owner) -> _T:
+        if self.with_owner:
+            return self.factory(owner)
+
+        return self.factory()
+
+
+ListFactory = Factory(list, False)
+DictFactory = Factory(dict, False)
+
+
+class rds_property(Generic[_T]):
+    def set_list(self: 'rds_property', instance: Any, value: _T):
         v: Union[MutableSequence, MutableMapping] = self.__get__(instance)  # pylint: disable=unnecessary-dunder-call
         if v is not MISSING:
             v.clear()
@@ -95,26 +127,39 @@ class rds_property(property):
         else:
             setattr(instance, self.private, value)
 
+    def set_private(self: 'rds_property', instance: Any, value: _T):
+        setattr(instance, self.private, value)
+
     def __init__(
         self,
-        fget: Optional[Callable[[Any], Any]] = None,
-        fset: Optional[Callable[[Any, Any], None]] = None,
+        fget: Optional[Callable[[Any], _T]] = None,
+        fset: Optional[Callable[[Any, _T], None]] = None,
         fdel: Optional[Callable[[Any], None]] = None,
         doc: Optional[str] = None,
         private: Union[str, Literal[True], None] = None,
         readonly: bool = False,
-        fvalid: Optional[Callable[[Any, Any], Any]] = None,
+        fvalid: Optional[Callable[[Any, Any], _T]] = None,
         notify: Optional[pyqtSignal] = None,
-        default: Any = MISSING,
-        factory: Callable[[Any], Any] = MISSING,
+        default: Union[_T, _MISSING_TYPE] = MISSING,
+        factory: Callable[[Any], _T] = MISSING,
         strict: bool = False,
         init: bool = True,
-        serialize: Union[bool, Callable[[Any, dict], Any]] = True
+        serialize: Union[bool, Callable[[_T, dict], Any]] = True
     ):
-        if fset is rds_property.set_list:
-            fset = self.set_list
+        self.fget = fget
 
-        super().__init__(fget, fset, fdel, doc)
+        if fset is rds_property.set_list or (hasattr(fset, "__func__") and fset.__func__ is rds_property.set_list):
+            self.fset = self.set_list
+        elif (fset is None and private is not None) or (hasattr(fset, "__func__") and fset.__func__ is rds_property.set_private):
+            self.fset = self.set_private
+        else:
+            self.fset = fset
+
+        self.fdel = fdel
+        if doc is None and fget is not None:
+            doc = fget.__doc__
+        self.__doc__ = doc
+
         self.name = None
         self.type = Any
         self.private = private
@@ -136,42 +181,53 @@ class rds_property(property):
             if name in f.f_locals and not isinstance(f.f_locals[name], type(self)):
                 self.default = f.f_locals[name]
 
-    def __call__(self, fget: Callable[[Any], Any]) -> Self:
+    def __call__(self, fget: Callable[[Any], _T]) -> Self:
         return type(self)(fget, self.fset, self. fdel, self.__doc__,
                           self.private, self.readonly, self.fvalid, self.notify,
                           self.default, self.default_factory,
                           self.strict, self.init, self.serialize)
 
-    def __get__(self, instance: Any, owner: Optional[type] = None) -> Any:
-        if instance is not None:
-            if self.private and not hasattr(instance, self.private):
-                return MISSING
+    def __get__(self, instance: Any, owner: Optional[type] = None) -> _T:
+        if instance is None:
+            return self
 
-            if not self.fget and self.private:
-                return getattr(instance, self.private)
+        if self.private and not hasattr(instance, self.private):
+            return MISSING
 
-        return super().__get__(instance, owner)
+        if not self.fget and self.private:
+            return getattr(instance, self.private)
 
-    def __set__(self, instance: Any, value: Any):
-        init = (self.private and not hasattr(instance, self.private)) or getattr(instance, self.name) is MISSING
+        if self.fget is None:
+            raise AttributeError(f'property {self.name!r} of {owner.__name__!r} object has no getter')
+
+        return self.fget(instance)
+
+    def __set__(self, instance: Any, value: _T):
+        init = (self.private and not hasattr(instance, self.private)) \
+            or getattr(instance, self.name, MISSING) is MISSING
 
         if self.readonly and not init:
             raise AttributeError(f'{instance.__class__.__name__}.{self.name} is readonly')
 
+        if self.fset is None:
+            raise AttributeError(f'property {self.name!r} of {instance.__class__.__name__!r} object has no setter')
+
         if self.notify and not init:
             oldValue = copy(self.__get__(instance))
 
-        value = self.validate(instance, value)
-        if not self.fset and self.private:
-            setattr(instance, self.private, value)
-        else:
-            super().__set__(instance, value)
+        self.fset(instance, self.validate(instance, value))
 
         if self.notify and not init:
             newValue = self.__get__(instance)
             if oldValue != newValue:
                 signal = self.notify.__get__(instance, type(instance))
                 signal.emit()
+
+    def __delete__(self, instance: Any):
+        if self.fdel is None:
+            raise AttributeError(f'property {self.name!r} of {instance.__class__.__name__!r} object has no deleter')
+
+        self.fdel(instance)
 
     def __set_name__(self, owner, name: str):
         self.name = name
@@ -204,6 +260,9 @@ class rds_property(property):
             if issubclass(self.type, MutableMapping) and isinstance(value, Mapping):
                 return value
 
+        if isinstance(self.type, _UnionGenericAlias) and isinstance(value, get_args(self.type)):
+            return value
+
         if isinstance(value, self.type):
             return value
 
@@ -211,7 +270,7 @@ class rds_property(property):
             f'Cannot set {instance.__class__.__name__}.{self.name} to {value!r}: value must be of type {type_name(self.type)}'
         )
 
-    def validate(self, instance, value):
+    def validate(self, instance, value) -> _T:
         if not self.strict and value is None:
             return value
 
@@ -220,52 +279,31 @@ class rds_property(property):
 
         return self._check_type(instance, value)
 
-    def getter(self, fget: Callable[[Any], Any]) -> Self:
-        p: Self = super().getter(fget)
-        p.private = self.private
-        p.readonly = self.readonly
-        p.fvalid = self.fvalid
-        p.notify = self.notify
-        p.default = self.default
-        p.default_factory = self.default_factory
-        p.strict = self.strict
-        p.init = self.init
-        p.serialize = self.serialize
-        return p
+    def getter(self, fget: Callable[[Any], _T]) -> Self:
+        return type(self)(fget, self.fset, self.fdel, self.__doc__,
+                          self.private, self.readonly, self.fvalid, self.notify,
+                          self.default, self.default_factory,
+                          self.strict, self.init, self.serialize)
 
-    def setter(self, fset: Callable[[Any, Any], None]) -> Self:
-        p: Self = super().setter(fset)
-        p.private = self.private
-        p.readonly = self.readonly
-        p.fvalid = self.fvalid
-        p.notify = self.notify
-        p.default = self.default
-        p.default_factory = self.default_factory
-        p.strict = self.strict
-        p.init = self.init
-        p.serialize = self.serialize
-        return p
+    def setter(self, fset: Callable[[Any, _T], None]) -> Self:
+        return type(self)(self.fget, fset, self.fdel, self.__doc__,
+                          self.private, self.readonly, self.fvalid, self.notify,
+                          self.default, self.default_factory,
+                          self.strict, self.init, self.serialize)
 
     def deleter(self, fdel: Callable[[Any], None]) -> Self:
-        p: Self = super().deleter(fdel)
-        p.private = self.private
-        p.readonly = self.readonly
-        p.fvalid = self.fvalid
-        p.notify = self.notify
-        p.default = self.default
-        p.default_factory = self.default_factory
-        p.strict = self.strict
-        p.init = self.init
-        p.serialize = self.serialize
-        return p
+        return type(self)(self.fget, self.fset, fdel, self.__doc__,
+                          self.private, self.readonly, self.fvalid, self.notify,
+                          self.default, self.default_factory,
+                          self.strict, self.init, self.serialize)
 
-    def validator(self, fvalid: Callable[[Any, Any], Any]):
+    def validator(self, fvalid: Callable[[Any, Any], _T]) -> Self:
         return type(self)(self.fget, self.fset, self.fdel, self.__doc__,
                           self.private, self.readonly, fvalid, self.notify,
                           self.default, self.default_factory,
                           self.strict, self.init, self.serialize)
 
-    def factory(self, factory: Callable[[Any], Any]):
+    def factory(self, factory: Callable[[Any], _T]) -> Self:
         if self.default is not MISSING:
             raise TypeError("Cannot set both factory and default")
         return type(self)(self.fget, self.fset, self.fdel, self.__doc__,

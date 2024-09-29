@@ -22,8 +22,15 @@
  *                                                                         *
  ***************************************************************************/
 """
-import sys
 import os
+import sys
+import typing
+from typing import (
+    Any,
+    Callable,
+    TypeVar,
+    Union
+)
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -36,6 +43,37 @@ __version__ = "0.0.1"
 # noinspection PyPep8Naming
 
 
+if not hasattr(typing, "Self"):
+    class Self:
+        ...
+
+    setattr(typing, "Self", Self)
+
+
+if not hasattr(typing, "dataclass_transform"):
+    T = TypeVar("T")
+
+    def dataclass_transform(*,
+                            eq_default: bool = True,
+                            order_default: bool = False,
+                            kw_only_default: bool = False,
+                            field_specifiers: tuple[Union[type[Any], Callable[..., Any], Any]] = (),
+                            **kwargs: Any,
+                            ) -> Callable[[T], T]:
+        def decorator(cls_or_fn):
+            cls_or_fn.__dataclass_transform__ = {
+                "eq_default": eq_default,
+                "order_default": order_default,
+                "kw_only_default": kw_only_default,
+                "field_specifiers": field_specifiers,
+                "kwargs": kwargs,
+            }
+            return cls_or_fn
+        return decorator
+
+    setattr(typing, "dataclass_transform", dataclass_transform)
+
+
 def classFactory(iface):  # pylint: disable=invalid-name
     """Create an instance of the Redistricting plugin.
 
@@ -43,5 +81,6 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
     #
-    from .redistricting import Redistricting  # pylint: disable=import-outside-toplevel
+    from .redistricting import \
+        Redistricting  # pylint: disable=import-outside-toplevel
     return Redistricting(iface)

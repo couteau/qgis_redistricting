@@ -3,14 +3,12 @@ from .lists import (
     KeyedListFactory,
     SortedKeyedList
 )
-from .model import (
+from .model import RdsBaseModel
+from .prop import (
+    MISSING,
     DictFactory,
     Factory,
     ListFactory,
-    RdsBaseModel
-)
-from .prop import (
-    MISSING,
     get_real_type,
     in_range,
     not_empty,

@@ -22,12 +22,17 @@ import pytest
 from pytestqt.plugin import QtBot
 
 from redistricting.models import (
+    DeviationType,
+    FieldCategory,
     RdsDataField,
     RdsDistrict,
     RdsField,
     RdsPlan
 )
-from redistricting.models.base.serialize import serialize
+from redistricting.models.base.serialize import (
+    deserialize,
+    serialize
+)
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -161,6 +166,7 @@ class TestPlan:
             'num-districts': 5,
             'num-seats': 5,
             'deviation': 0.025,
+            'deviation-type': DeviationType.OverUnder,
             'geo-layer': block_layer.id(),
             'geo-join-field': 'geoid',
             'pop-layer': block_layer.id(),
@@ -169,7 +175,8 @@ class TestPlan:
             'pop-fields': {
                 'vap_total': {'layer': block_layer.id(),
                               'field': 'vap_total',
-                              'caption': 'VAP'}
+                              'caption': 'VAP',
+                              'category': FieldCategory.Population}
             },
             'assign-layer': assign_layer.id(),
             'geo-id-field': 'geoid',
@@ -180,27 +187,115 @@ class TestPlan:
                 'vap_ap_black': {'layer': block_layer.id(),
                                  'field': 'vap_ap_black',
                                  'caption': 'APBVAP',
+                                 'category': FieldCategory.Demographic,
                                  'sum-field': True,
                                  'pct-base': 'vap_total'},
                 'vap_nh_white': {'layer': block_layer.id(),
                                  'field': 'vap_nh_white',
                                  'caption': 'WVAP',
+                                 'category': FieldCategory.Demographic,
                                  'sum-field': True,
                                  'pct-base': 'vap_total'},
                 'vap_hispanic': {'layer': block_layer.id(),
                                  'field': 'vap_hispanic',
                                  'caption': 'HVAP',
+                                 'category': FieldCategory.Demographic,
                                  'sum-field': True,
                                  'pct-base': 'vap_total'},
             },
             'geo-fields': {
                 'vtdid': {'layer': assign_layer.id(),
                           'field': 'vtdid',
-                          'caption': 'VTD'}
+                          'caption': 'VTD',
+                          'category': FieldCategory.Geography}
             },
             'total-population': 227036,
-            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': []}}}
+            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}}
         }
+
+    def test_deserialize(self, block_layer, assign_layer, dist_layer):
+        data = {
+            'id': '6f17839d-5adc-458a-9f4b-fe88ecfc2069',
+            'name': 'test',
+            'description': '',
+            'num-districts': 5,
+            'num-seats': 5,
+            'deviation': 0.025,
+            'deviation-type': DeviationType.OverUnder,
+            'geo-layer': block_layer.id(),
+            'geo-join-field': 'geoid',
+            'pop-layer': block_layer.id(),
+            'pop-join-field': 'geoid',
+            'pop-field': 'pop_total',
+            'pop-fields': {
+                'vap_total': {'layer': block_layer.id(),
+                              'field': 'vap_total',
+                              'caption': 'VAP',
+                              'category': FieldCategory.Population}
+            },
+            'assign-layer': assign_layer.id(),
+            'geo-id-field': 'geoid',
+            'geo-id-caption': 'Block',
+            'dist-layer': dist_layer.id(),
+            'dist-field': 'district',
+            'data-fields': {
+                'vap_ap_black': {'layer': block_layer.id(),
+                                 'field': 'vap_ap_black',
+                                 'caption': 'APBVAP',
+                                 'category': FieldCategory.Demographic,
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+                'vap_nh_white': {'layer': block_layer.id(),
+                                 'field': 'vap_nh_white',
+                                 'caption': 'WVAP',
+                                 'category': FieldCategory.Demographic,
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+                'vap_hispanic': {'layer': block_layer.id(),
+                                 'field': 'vap_hispanic',
+                                 'caption': 'HVAP',
+                                 'category': FieldCategory.Demographic,
+                                 'sum-field': True,
+                                 'pct-base': 'vap_total'},
+            },
+            'geo-fields': {
+                'vtdid': {'layer': assign_layer.id(),
+                          'field': 'vtdid',
+                          'caption': 'VTD',
+                          'category': FieldCategory.Geography}
+            },
+            'total-population': 227036,
+            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}}
+        }
+        plan = deserialize(RdsPlan, data)
+        assert str(plan.id) == '6f17839d-5adc-458a-9f4b-fe88ecfc2069'
+        assert plan.name == 'test'
+        assert plan.numDistricts == 5
+        assert plan.numSeats == 5
+        assert plan.deviation == 0.025
+        assert plan.geoLayer == block_layer
+        assert plan.geoJoinField == 'geoid'
+        assert plan.popLayer == block_layer
+        assert plan.popJoinField == 'geoid'
+        assert plan.geoIdField == 'geoid'
+        assert plan.geoIdCaption == 'Block'
+        assert plan.popField == 'pop_total'
+        assert plan.assignLayer == assign_layer
+        assert plan.distLayer == dist_layer
+        assert plan.totalPopulation == 227036
+        assert len(plan.geoFields) == 1
+        assert plan.geoFields[0].field == 'vtdid'
+        assert plan.geoFields[0].layer == assign_layer
+        assert plan.geoFields[0].caption == 'VTD'
+        assert plan.geoFields[0].category == FieldCategory.Geography
+        assert len(plan.dataFields) == 3
+        assert len(plan.popFields) == 1
+        assert plan.metrics.cutEdges is None
+        assert len(plan.metrics.splits) == 1
+        assert 'vtdid' in plan.metrics.splits
+        assert plan.metrics.splits['vtdid'].field == 'vtdid'
+        assert plan.metrics.splits['vtdid'].data is not None
+        assert plan.metrics.splits['vtdid'].data.empty
 
     def test_validate_district(self, plan: RdsPlan, mocker):
         plan.totalPopulation = 500
