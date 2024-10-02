@@ -43,6 +43,10 @@ __version__ = "0.0.1"
 # noinspection PyPep8Naming
 
 
+class CanceledError(Exception):
+    ...
+
+
 if not hasattr(typing, "Self"):
     class Self:
         ...

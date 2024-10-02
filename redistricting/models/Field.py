@@ -3,7 +3,7 @@
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
-        copyright            : (C) 2022 by Cryptodira
+        copyright            : (C) 2022-2024 by Cryptodira
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -24,6 +24,7 @@
 """
 import re
 from typing import (
+    Optional,
     Union,
     overload
 )
@@ -244,7 +245,7 @@ class RdsGeoField(RdsField):
         return nameField
 
     category: int = FieldCategory.Geography
-    nameField: RdsRelatedField = rds_property(private=True, factory=Factory(_createNameField))
+    nameField: Optional[RdsRelatedField] = rds_property(private=True, factory=Factory(_createNameField))
 
     def getRelation(self):
         index = QgsExpression.expressionToLayerFieldIndex(self._field, self._layer)
@@ -306,12 +307,15 @@ class RdsDataField(RdsField):
     sumFieldChanged = pyqtSignal()
     pctBaseChanged = pyqtSignal()
 
+    def isNumeric(self):
+        return self.fieldType() in (QMetaType.Double, QMetaType.Int, QMetaType.LongLong, QMetaType.UInt, QMetaType.ULongLong)
+
     category: int = FieldCategory.Demographic
     sumField: bool = rds_property(
         private=True,
         fvalid=lambda inst, value: value and inst.isNumeric(),
         notify=sumFieldChanged,
-        factory=Factory(lambda self: self.isNumeric())
+        factory=Factory(isNumeric)
     )
     pctBase: Union[str, None] = rds_property(
         private=True,
@@ -319,6 +323,3 @@ class RdsDataField(RdsField):
         notify=pctBaseChanged,
         default=None
     )
-
-    def isNumeric(self):
-        return self.fieldType() in (QVariant.Double, QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong)

@@ -3,7 +3,7 @@
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
-        copyright            : (C) 2022 by Cryptodira
+        copyright            : (C) 2022-2024 by Cryptodira
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -33,13 +33,13 @@ from typing import (
     overload
 )
 
-from qgis.PyQt.QtCore import pyqtSignal
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
+)
 
 from ..utils import tr
 from .base import (
-    MISSING,
-    Factory,
-    RdsBaseModel,
     SortedKeyedList,
     in_range,
     not_empty,
@@ -51,7 +51,7 @@ from .columns import (
 )
 
 
-class RdsDistrict(RdsBaseModel):
+class RdsDistrict(QObject):
     BASE_COLUMNS = list(DistrictColumns)
     STATS_COLUMNS = list(MetricsColumns)
     WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
@@ -62,29 +62,29 @@ class RdsDistrict(RdsBaseModel):
     descriptionChanged = pyqtSignal()
 
     district: int
-    name: Annotated[str, not_empty] = rds_property(
-        notify=nameChanged, strict=True, factory=Factory(lambda self: str(self.district))
-    )
-    members: Annotated[int, in_range(0, 9999)] = rds_property(notify=membersChanged, strict=True, default=1)
+    name: Annotated[str, not_empty] = rds_property(notify=nameChanged)
+    members: Annotated[int, in_range(0, 9999)] = rds_property(notify=membersChanged)
     population: int = 0
     deviation: int = 0
     pct_deviation: float = 0.0
-    description: str = rds_property(private=True, notify=descriptionChanged, strict=True, default="")
+    description: str = rds_property(private=True, notify=descriptionChanged)
     fid: int = -1
 
-    def __pre_init__(self):
+    def __init__(self, district: int, name: Optional[str] = None, members: Optional[int] = 1, description: str = '', fid=-1, **kwargs):
+        super().__init__()
+        self.fid = fid
         self._data = {
-            DistrictColumns.DISTRICT: MISSING,
-            DistrictColumns.NAME: MISSING,
-            DistrictColumns.MEMBERS: 1,
+            DistrictColumns.DISTRICT: district,
+            DistrictColumns.NAME: name or str(district),
+            DistrictColumns.MEMBERS: members,
             DistrictColumns.POPULATION: 0,
             DistrictColumns.DEVIATION: 0,
             DistrictColumns.PCT_DEVIATION: 0.0,
         }
+        self._description = description
         self._data.update(zip(RdsDistrict.STATS_COLUMNS, repeat(None)))
 
-    def __post_init__(self, **data):
-        self.update(data)
+        self.update(kwargs)
 
     def __key__(self):
         return str(self.district).rjust(4, "0")
@@ -138,17 +138,14 @@ class RdsDistrict(RdsBaseModel):
         return self._data == __value._data
 
     def __getattr__(self, name):
-        if not name in self._data:
-            raise AttributeError(tr("District object has no attribute {name}").format(name=name))
-        return self._data[name]
+        if name in self._data:
+            return self._data[name]
 
-    @rds_property(readonly=True)
+        return super().__getattr__(name)
+
+    @rds_property
     def district(self):
         return self._data[DistrictColumns.DISTRICT]
-
-    @district.setter
-    def district(self, value: int):
-        self._data[DistrictColumns.DISTRICT] = value
 
     @name.getter
     def name(self):
@@ -166,7 +163,7 @@ class RdsDistrict(RdsBaseModel):
     def members(self, value: int):
         self._data[DistrictColumns.MEMBERS] = value
 
-    @rds_property(strict=True)
+    @rds_property
     def population(self):
         return self._data[DistrictColumns.POPULATION]
 
@@ -174,7 +171,7 @@ class RdsDistrict(RdsBaseModel):
     def population(self, value: int):
         self._data[DistrictColumns.POPULATION] = value
 
-    @rds_property(strict=True)
+    @rds_property
     def deviation(self):
         return self._data[DistrictColumns.DEVIATION]
 
@@ -182,7 +179,7 @@ class RdsDistrict(RdsBaseModel):
     def deviation(self, value: int):
         self._data[DistrictColumns.DEVIATION] = value
 
-    @rds_property(strict=True)
+    @rds_property
     def pct_deviation(self):
         return self._data[DistrictColumns.PCT_DEVIATION]
 
@@ -218,20 +215,22 @@ class RdsDistrict(RdsBaseModel):
 
 
 class RdsUnassigned(RdsDistrict):
-    district: Literal[0] = rds_property(
-        init=False, readonly=True, default=0, fget=RdsDistrict.district.fget, fset=RdsDistrict.district.fset)
-    name: str = rds_property(init=False, readonly=True, default=tr("Unassigned"),
-                             fget=RdsDistrict.name.fget, fset=RdsDistrict.name.fset)
+    district: Literal[0] = rds_property(fget=RdsDistrict.district.fget)
+    name: str = rds_property(fget=RdsDistrict.name.fget)
     members: Optional[int] = None
     deviation: Optional[int] = None
     pct_deviation: Optional[float] = None
 
-    def __pre_init__(self):
-        super().__pre_init__()
-        self._data[DistrictColumns.MEMBERS] = None
-        self._data[DistrictColumns.POPULATION] = None
-        self._data[DistrictColumns.DEVIATION] = None
-        self._data[DistrictColumns.PCT_DEVIATION] = None
+    def __init__(self, *, fid=-1, **kwargs):
+        if DistrictColumns.DISTRICT in kwargs:
+            del kwargs[DistrictColumns.DISTRICT]
+        if DistrictColumns.NAME in kwargs:
+            del kwargs[DistrictColumns.NAME]
+        kwargs[DistrictColumns.MEMBERS] = None
+        kwargs[DistrictColumns.DEVIATION] = None
+        kwargs[DistrictColumns.PCT_DEVIATION] = None
+
+        super().__init__(0, tr("Unassigned"), fid=fid, **kwargs)
 
     def __setitem__(self, key: Union[str, int, slice], value: Any):
         raise IndexError(tr("'{key}' field is readonly for Unassigned goegraphies").format(key=key))

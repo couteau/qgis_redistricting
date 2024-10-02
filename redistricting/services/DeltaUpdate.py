@@ -40,6 +40,7 @@ from ..models import (
     DeltaList,
     RdsPlan
 )
+from ..services import PlanManager
 from .ErrorList import ErrorListMixin
 from .Tasks import AggregatePendingChangesTask
 
@@ -66,10 +67,15 @@ class DeltaUpdateService(ErrorListMixin, QObject):
     updateStarted = pyqtSignal("PyQt_PyObject")
     updateCompleted = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")
     updateTerminated = pyqtSignal("PyQt_PyObject", bool, "PyQt_PyObject")
+    deltaStarted = pyqtSignal("PyQt_PyObject")
+    deltaStopped = pyqtSignal("PyQt_PyObject")
 
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, planManager: PlanManager, parent: Optional[QObject] = None):
         super().__init__(parent)
+        self._planManager = planManager
         self._deltas: dict[RdsPlan, DeltaUpdate] = {}
+        self._planManager.planAdded.connect(self.planAdded)
+        self._planManager.planRemoved.connect(self.planRemoved)
         self._completeSignals = QSignalMapper(self)
         self._completeSignals.mappedObject.connect(self.deltaTaskCompleted)
         self._terminatedSignals = QSignalMapper(self)
@@ -80,6 +86,24 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         self._rollbackSignals.mappedObject.connect(self.rollback)
         self._assignmentChangedSignals = QSignalMapper(self)
         self._assignmentChangedSignals.mappedObject.connect(self.undoChanged)
+        self.editingStartedSignals = QSignalMapper(self)
+        self.editingStartedSignals.mappedObject.connect(self.watchPlan)
+        self.editingStoppedSignals = QSignalMapper(self)
+        self.editingStoppedSignals.mappedObject.connect(self.unwatchPlan)
+
+    def planAdded(self, plan: RdsPlan):
+        if plan.assignLayer:
+            self.editingStartedSignals.setMapping(plan.assignLayer, plan)
+            self.editingStoppedSignals.setMapping(plan.assignLayer, plan)
+            plan.assignLayer.editingStarted.connect(self.editingStartedSignals.map)
+            plan.assignLayer.editingStopped.connect(self.editingStoppedSignals.map)
+
+    def planRemoved(self, plan: RdsPlan):
+        if plan.assignLayer:
+            plan.assignLayer.editingStarted.disconnect(self.editingStartedSignals.map)
+            plan.assignLayer.editingStopped.disconnect(self.editingStoppedSignals.map)
+            self.editingStartedSignals.removeMappings(plan.assignLayer)
+            self.editingStoppedSignals.removeMappings(plan.assignLayer)
 
     def watchPlan(self, plan: RdsPlan):
         if plan not in self._deltas:
@@ -91,9 +115,11 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             plan.assignLayer.afterRollBack.connect(self._rollbackSignals.map)
             plan.assignLayer.undoStack().indexChanged.connect(self._assignmentChangedSignals.map)
             self._deltas[plan] = delta
+            self.deltaStarted.emit(plan)
 
     def unwatchPlan(self, plan: RdsPlan):
         if plan in self._deltas:
+            self.deltaStopped.emit(plan)
             plan.assignLayer.afterCommitChanges.disconnect(self._commitSignals.map)
             plan.assignLayer.afterRollBack.disconnect(self._rollbackSignals.map)
             plan.assignLayer.undoStack().indexChanged.disconnect(self._assignmentChangedSignals.map)
@@ -114,7 +140,7 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         self._terminatedSignals.removeMappings(task)
         delta.assignments = task.assignments
         delta.popData = task.popData
-        delta.delta.setData(task.data)
+        delta.delta.update(task.data)
         delta.task = None
         self.updateCompleted.emit(plan, delta.delta)
 

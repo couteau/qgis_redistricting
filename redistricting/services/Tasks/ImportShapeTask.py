@@ -39,9 +39,9 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import NULL
 
+from ... import CanceledError
 from ...utils import tr
 from ._debug import debug_thread
-from .exception import CanceledError
 
 if TYPE_CHECKING:
     from ...models import RdsPlan

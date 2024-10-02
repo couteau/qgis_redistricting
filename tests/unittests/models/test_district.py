@@ -1,5 +1,7 @@
 """QGIS Redistricting Plugin - unit tests for District class
 
+Copyright 2022-2024, Stuart C. Naifeh
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -38,6 +40,9 @@ class TestDistrict:
         assert district.population == 0
         assert district.deviation == 0
         assert district.pct_deviation == 0
+
+        with pytest.raises(TypeError):
+            district = RdsDistrict()
 
     def test_create_with_name_sets_name(self):
         district = RdsDistrict(1, name="District 1")

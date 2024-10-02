@@ -112,7 +112,7 @@ class Redistricting:
         self.planManager = PlanManager()
         self.layerTreeManger = LayerTreeManager()
         self.planStyler = PlanStylerService(self.planManager)
-        self.deltaService = DeltaUpdateService()
+        self.deltaService = DeltaUpdateService(self.planManager)
         self.updaterService = DistrictUpdater()
         self.importService = PlanImportService()
         self.importService.importComplete.connect(
@@ -121,8 +121,6 @@ class Redistricting:
             )
         )
         self.assignmentsService = AssignmentsService()
-        self.assignmentsService.editingStarted.connect(self.deltaService.watchPlan)
-        self.assignmentsService.editingStopped.connect(self.deltaService.unwatchPlan)
         self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService)
 
         # create toolbar

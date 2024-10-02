@@ -1,3 +1,23 @@
+"""QGIS Redistricting Plugin - unit tests for model classes
+
+Copyright 2022-2024, Stuart C. Naifeh
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 from typing import (
     Annotated,
     Union
@@ -8,14 +28,17 @@ from qgis.PyQt.QtCore import QObject
 
 from redistricting.models.base import (
     Factory,
+    PrivateVar,
     RdsBaseModel,
     deserialize,
-    get_real_type,
+    field,
     in_range,
     not_empty,
     rds_property,
-    serialize
+    serialize,
+    set_list
 )
+from redistricting.models.base.model import get_real_type
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 
@@ -24,6 +47,57 @@ class TestBaseModel:
     class ModelTest(RdsBaseModel):
         prop1: str = "default"
         prop2: int = 1
+
+    def test_base_model(self):
+        class M(RdsBaseModel):
+            f1: str
+            f2: int = field(default=1)
+            f3: float = rds_property(private=True, readonly=True, default=0.0)
+            f4: list[int] = rds_property(private=True, factory=list)
+
+        assert M.f3.fset is None
+        assert M.f3.finit is not None
+
+        m = M(f1="dummy")
+        assert m.f1 == "dummy"
+        assert m.f2 == 1
+        assert m.f3 == 0.0
+        assert m.f4 == []  # pylint: disable=C1803, W0143
+        assert hasattr(m, "_f3")
+
+        l = m.f4
+        m.f4 = [1]
+
+        assert l == [1]
+        assert l is m.f4
+
+    def test_base_model_rebind(self):
+        class M(RdsBaseModel):
+            _dumdum: PrivateVar[list[int]]
+            f1: list[int]
+
+            @rds_property(fset=set_list)
+            def f1(self) -> list[int]:
+                return self._dumdum
+
+            @f1.factory
+            def f1(self) -> list[int]:
+                return []
+
+            @f1.initializer
+            def f1(self, value: list[int]):
+                self._dumdum = value
+
+        assert len(M.__fields__) == 1
+        assert M.f1.fset.__self__ == M.f1  # pylint: disable=no-member
+        assert M.f1.fset.__func__ == set_list.faccessor  # pylint: disable=no-member
+
+        m = M()
+        # pylint: disable=comparison-with-callable,protected-access
+        assert m.f1 == []
+        m.f1 = [1]
+        assert m.f1 == [1]
+        assert m._dumdum == [1]
 
     def test_init(self):
         inst = TestBaseModel.ModelTest()
@@ -98,13 +172,13 @@ class TestBaseModel:
         assert inst.prop1 == "string"
         assert inst.prop2 == [-1]
 
-    def test_base_model(self):
+    def test_base_model_with_factory(self):
         def factory():
             return []
 
         class Owned:
             def __init__(self, p: 'ModelTest7'):
-                ...
+                self.owner = p
 
         class ModelTest7(RdsBaseModel):
             field1: str
@@ -119,6 +193,7 @@ class TestBaseModel:
         assert c.field3 == []
         assert c.field4 == []
         assert isinstance(c.field5, Owned)
+        assert c.field5.owner == c  # pylint: disable=no-member
 
         parent = QObject()
 
@@ -239,6 +314,7 @@ class TestRdsProperty:
                 if len(value) > 10:
                     raise ValueError()
 
+        # pylint: disable=no-member
         assert callable(C.my_prop.fget)
         assert callable(C.my_prop.fset)
         assert callable(C.my_prop.fdel)
@@ -252,16 +328,15 @@ class TestRdsProperty:
         assert C.my_prop.fset == C.my_prop.set_private
 
         class D:
-            def __init__(self):
-                self._my_prop: list[str] = []
+            my_prop: list[str]
 
-            @rds_property[list[str]](fset=rds_property.set_list)
-            def my_prop(self):
-                return self._my_prop
+            @rds_property(private=True)
+            def my_prop(self) -> list[str]:
+                return self._my_prop  # pylint: disable=no-member
 
             @my_prop.validator
-            def my_prop(self, value: list):
+            def my_prop(self, value: list) -> list[str]:
                 assert all(isinstance(p, str) for p in value)
                 return value
 
-        assert D.my_prop.fset == D.my_prop.set_list
+        assert D.my_prop.fset == D.my_prop.set_list  # pylint: disable=no-member

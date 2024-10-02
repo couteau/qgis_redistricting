@@ -1,5 +1,7 @@
 """QGIS Redistricting Plugin - unit tests for DeltaList class
 
+Copyright 2022-2024, Stuart C. Naifeh
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *

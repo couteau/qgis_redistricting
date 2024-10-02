@@ -47,7 +47,7 @@ from qgis.core import (
 )
 from shapely import wkb
 
-from ..services.Tasks.exception import CanceledError
+from .. import CanceledError
 from .intl import tr
 from .io import gpd_io_engine
 from .sql import SqlAccess

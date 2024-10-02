@@ -156,7 +156,7 @@ disable=raw-checker-failed,
         fixme,
         C0115, # missing-class-docstring
         C0116, # missing-function-docstring
-
+        C1803, # use-implicit-booleaness-not-comparison
         R0902, # too-many-instance-attributes
         R0903, # too-few-public-methods
         R0904, # too-many-public-methods

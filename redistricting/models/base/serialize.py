@@ -1,3 +1,27 @@
+# -*- coding: utf-8 -*-
+"""QGIS Redistricting Plugin - serialization/deserialization functions
+
+        begin                : 2024-09-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2024 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 import json
 import re
 from functools import (
@@ -33,8 +57,10 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import QObject
 
-from .model import RdsBaseModel
-from .prop import rds_property
+from .model import (
+    RdsBaseModel,
+    fields
+)
 
 
 def compose(f, *fns):
@@ -92,21 +118,17 @@ def serialize_model(obj, memo=None, exclude_none=True):
     """
 
     d = {}
-    fields = get_type_hints(type(obj))
-    for f in fields:
-        if isinstance(prop := getattr(type(obj), f, None), rds_property):
-            if not prop.serialize:
-                continue
+    for prop in fields(obj):
+        if not prop.serialize:
+            continue
 
-            if callable(prop.serialize):
-                value = prop.serialize(value, memo)
-            else:
-                value = serialize_value(getattr(obj, f), memo)
+        if callable(prop.serialize):
+            value = prop.serialize(value, memo)
         else:
-            value = serialize_value(getattr(obj, f), memo)
+            value = serialize_value(getattr(obj, prop.name), memo)
 
         if value is not _memo and (value is not None or not exclude_none):
-            d[f] = value
+            d[prop.name] = value
 
     return kebab_dict(d.items())
 
@@ -173,12 +195,12 @@ _ModelType = TypeVar("_ModelType", bound=RdsBaseModel)
 def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
     kw = {}
 
-    fields = get_type_hints(cls)
+    flds = get_type_hints(cls)
 
     for k, v in data.items():
         f = to_camelcase(k)
-        if f in fields:
-            t = fields[f]
+        if f in flds:
+            t = flds[f]
         else:
             continue
 

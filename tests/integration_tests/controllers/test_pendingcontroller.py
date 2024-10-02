@@ -1,3 +1,23 @@
+"""QGIS Redistricting Plugin - integration tests
+
+Copyright 2022-2024, Stuart C. Naifeh
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 import pandas as pd
 import pytest
 from qgis.core import QgsProject
@@ -75,7 +95,7 @@ class TestPendingChangesController:
         return PendingChangesController(qgis_iface, QgsProject.instance(), planmanager, toolbar, delta_update_service)
 
     @pytest.fixture
-    def controller_with_active_plan(self, controller: PendingChangesController, planmanager, plan):
+    def controller_with_active_plan(self, controller: PendingChangesController, planmanager: PlanManager, plan):
         controller.load()
         planmanager.appendPlan(plan, True)
         return controller
@@ -115,7 +135,6 @@ class TestPendingChangesController:
 
     def test_update_delta_updates_model(self, controller_with_active_plan: PendingChangesController, plan: RdsPlan, delta_update_service: DeltaUpdateService, qtbot):
         assert controller_with_active_plan.model._delta is None
-        delta_update_service.watchPlan(plan)
         with qtbot.waitSignal(delta_update_service.updateCompleted, timeout=20000):
             plan.assignLayer.startEditing()
             plan.assignLayer.changeAttributeValue(114, 2, 1, 5)
@@ -125,3 +144,25 @@ class TestPendingChangesController:
         assert controller_with_active_plan.model.data(
             controller_with_active_plan.model.createIndex(0, 1), Qt.DisplayRole) == '+600'
         plan.assignLayer.rollBack(True)
+
+    def test_signals(self, controller_with_active_plan: PendingChangesController, plan: RdsPlan, qtbot):
+        index = plan.assignLayer.metaObject().indexOfMethod("editingStarted()")
+        method = plan.assignLayer.metaObject().method(index)
+        assert plan.assignLayer.isSignalConnected(method)
+        index = plan.assignLayer.metaObject().indexOfMethod("editingStopped()")
+        method = plan.assignLayer.metaObject().method(index)
+        assert plan.assignLayer.isSignalConnected(method)
+
+        with qtbot.waitSignals([plan.assignLayer.editingStarted, plan.assignLayer.editingStopped]):
+            plan.assignLayer.startEditing()
+            plan.assignLayer.rollBack()
+
+        with qtbot.waitSignals([plan.assignLayer.editingStarted, plan.assignLayer.editingStopped]):
+            plan.assignLayer.startEditing()
+            plan.assignLayer.commitChanges()
+
+        assert plan not in controller_with_active_plan.deltaService._deltas
+        plan.assignLayer.startEditing()
+        assert plan in controller_with_active_plan.deltaService._deltas
+        plan.assignLayer.rollBack()
+        assert plan not in controller_with_active_plan.deltaService._deltas

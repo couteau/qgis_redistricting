@@ -31,10 +31,7 @@ from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 
 from ..gui import DockPendingChanges
-from ..models import (
-    DeltaList,
-    RdsPlan
-)
+from ..models import RdsPlan
 from ..services import (
     DeltaFieldFilterProxy,
     DeltaListModel,
@@ -66,7 +63,8 @@ class PendingChangesController(DockWidgetController):
         self.model: DeltaListModel = DeltaListModel(self.iface)
         self.proxyModel = DeltaFieldFilterProxy(self.iface)
         self.proxyModel.setSourceModel(self.model)
-        self.deltaService.updateCompleted.connect(self.updateDelta)
+
+        self.deltaService.deltaStarted.connect(self.startDelta)
 
     def load(self):
         super().load()
@@ -74,8 +72,10 @@ class PendingChangesController(DockWidgetController):
         self.deltaService.updateStarted.connect(self.showOverlay)
         self.deltaService.updateCompleted.connect(self.hideOverlay)
         self.deltaService.updateTerminated.connect(self.hideOverlay)
+        # self.editingStartedSignals.mappedObject.connect(self.startDelta)
 
     def unload(self):
+        # self.editingStartedSignals.mappedObject.disconnect(self.startDelta)
         self.deltaService.updateStarted.disconnect(self.showOverlay)
         self.deltaService.updateCompleted.disconnect(self.hideOverlay)
         self.deltaService.updateTerminated.disconnect(self.hideOverlay)
@@ -104,15 +104,15 @@ class PendingChangesController(DockWidgetController):
         self.dockwidget.setWaiting(False)
         self.dockwidget.plan = plan
         if plan is None:
-            self.model.setDelta(None, None)
+            self.model.setPlan(None, None)
         else:
-            self.model.setDelta(plan, self.deltaService.getDelta(plan))
+            self.model.setPlan(plan, self.deltaService.getDelta(plan))
             if self.deltaService.isUpdating(plan):
                 self.dockwidget.setWaiting(True)
 
-    def updateDelta(self, plan, delta: DeltaList):
+    def startDelta(self, plan):
         if plan == self.activePlan:
-            self.model.setDelta(plan, delta)
+            self.model.setDelta(self.deltaService.getDelta(plan))
 
     def showOverlay(self, plan: RdsPlan):
         if plan == self.activePlan:

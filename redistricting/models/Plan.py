@@ -206,31 +206,37 @@ class RdsPlan(RdsBaseModel):
 
         return layer
 
-    name: Annotated[str, not_empty]
-    numDistricts: Annotated[int, in_range(2, 2000)]
+    name: Annotated[str, not_empty] = rds_property(private=True, notify=nameChanged)
+    numDistricts: Annotated[int, in_range(2, 2000)] = rds_property(private=True, notify=numDistrictsChanged)
     numSeats:  int = None
-    deviation: Annotated[float, in_range(0.0)] = rds_property(
-        private=True, strict=True, default=0.0, notify=deviationChanged
-    )
+    deviation: Annotated[float, in_range(0.0)] = rds_property(private=True, default=0.0, notify=deviationChanged)
     deviationType: DeviationType = rds_property(
         private=True, default=DeviationType.OverUnder, notify=deviationTypeChanged
     )
 
     districts: DistrictList = rds_property(
-        private=True, fset=rds_property.set_list, serialize=False, factory=DistrictList
+        private=True, serialize=False, factory=DistrictList
     )
     metrics: RdsPlanMetrics = Factory[RdsPlanMetrics](RdsPlanMetrics)
     totalPopulation: int = 0
 
     geoLayer: QgsVectorLayer = rds_property(private=True, fvalid=_validLayer, default=None)
     geoJoinField: str = None
-    geoFields: KeyedList[RdsGeoField]
+
+    def _setGeoFields(self, geoFields: Iterable[RdsGeoField]):
+        self._geoFields.clear()
+        self._geoFields.extend(geoFields)
+        self.metrics.updateGeoFields(self._geoFields)  # pylint: disable=no-member
+
+    geoFields: KeyedList[RdsGeoField] = rds_property(
+        private=True, fset=_setGeoFields, finit=_setGeoFields, notify=geoFieldsChanged, factory=KeyedList
+    )
 
     popLayer: QgsVectorLayer = None
     popJoinField: str = None
     popField: str
-    popFields: KeyedList[RdsField]
-    dataFields: KeyedList[RdsDataField]
+    popFields: KeyedList[RdsField] = rds_property(private=True, factory=KeyedList, notify=popFieldsChanged)
+    dataFields: KeyedList[RdsDataField] = rds_property(private=True, factory=KeyedList, notify=dataFieldsChanged)
 
     assignLayer: QgsVectorLayer = None
     geoIdField: str = rds_property(private=True, default=None)
@@ -244,14 +250,10 @@ class RdsPlan(RdsBaseModel):
     id: UUID = rds_property(private=True, readonly=True, factory=uuid4)
 
     def __pre_init__(self):
-        self._numSeats = None
         self._geoLayer = None
         self._popLayer = None
-        self._geoIdField = None
         self._distField = None
-        self._popFields: KeyedList[RdsField] = KeyedList()
-        self._dataFields: KeyedList[RdsField] = KeyedList()
-        self._geoFields: KeyedList[RdsGeoField] = KeyedList()
+        self._geoFields = KeyedList()
 
     def __post_init__(self, **kwargs):
         self.districts.append(self.createDistrict(0))
@@ -262,10 +264,6 @@ class RdsPlan(RdsBaseModel):
 
         self.metrics.metricsChanged.connect(self.metricsChanged)  # pylint: disable=no-member
 
-    @rds_property(private=True, strict=True, notify=nameChanged)
-    def name(self):
-        return self._name
-
     @name.setter
     def name(self, value: str):
         self._name = value
@@ -275,26 +273,15 @@ class RdsPlan(RdsBaseModel):
         if self.distLayer:
             self.distLayer.setName(f'{self.name}_districts')
 
-    @rds_property(private=True, strict=True, notify=numDistrictsChanged)
-    def numDistricts(self) -> int:
-        return self._numDistricts
-
     @numDistricts.setter
     def numDistricts(self, value: int):
         self._numDistricts = value
         if self._numSeats is not None and self._numSeats < self._numDistricts:
             self._numSeats = None
 
-    @rds_property(notify=numSeatsChanged)
+    @rds_property(private=True, notify=numSeatsChanged)
     def numSeats(self) -> int:
         return self._numSeats or self.numDistricts
-
-    @numSeats.validator
-    def numSeats(self, value: int):
-        if value is not None and value < self.numDistricts:
-            raise ValueError(tr("Number of seats must be equal to or greater than number of districts"))
-
-        return value
 
     @numSeats.setter
     def numSeats(self, value: int):
@@ -302,6 +289,13 @@ class RdsPlan(RdsBaseModel):
             self._numSeats = None
         else:
             self._numSeats = value
+
+    @numSeats.validator
+    def numSeats(self, value: int):
+        if value is not None and value < self.numDistricts:
+            raise ValueError(tr("Number of seats must be equal to or greater than number of districts"))
+
+        return value
 
     @geoLayer.setter
     def geoLayer(self, value: QgsVectorLayer):
@@ -316,7 +310,7 @@ class RdsPlan(RdsBaseModel):
                 if self._popLayer is None:
                     self._updatePopFieldsLayer(self._geoLayer)
 
-    @rds_property[str](private=True)
+    @rds_property(private=True)
     def geoJoinField(self) -> str:
         return self._geoJoinField or self._geoIdField
 
@@ -327,17 +321,7 @@ class RdsPlan(RdsBaseModel):
         else:
             self._geoJoinField = value
 
-    @rds_property[KeyedList[RdsGeoField]](private=True, notify=geoFieldsChanged, factory=KeyedList)
-    def geoFields(self):
-        return self._geoFields
-
-    @geoFields.setter
-    def geoFields(self, geoFields: Iterable[RdsGeoField]):
-        self._geoFields.clear()
-        self._geoFields.extend(geoFields)
-        self.metrics.updateGeoFields(self._geoFields)  # pylint: disable=no-member
-
-    @rds_property[QgsVectorLayer](fvalid=_validLayer)
+    @rds_property(private=True, fvalid=_validLayer)
     def popLayer(self) -> QgsVectorLayer:
         return self._popLayer or self._geoLayer
 
@@ -354,6 +338,15 @@ class RdsPlan(RdsBaseModel):
                 self._popLayer.willBeDeleted.connect(self.layerDestroyed)
 
             self._updatePopFieldsLayer(self.popLayer)
+
+    @popLayer.initializer
+    def popLayer(self, value: QgsVectorLayer):
+        if value == self._geoLayer:
+            self._popLayer = None
+        else:
+            self._popLayer = value
+            if self._popLayer is not None:
+                self._popLayer.willBeDeleted.connect(self.layerDestroyed)
 
     @rds_property(private=True)
     def popJoinField(self) -> str:
@@ -375,14 +368,6 @@ class RdsPlan(RdsBaseModel):
         with self.checkValid():
             self._popField = value
 
-    @rds_property[KeyedList[RdsField]](private=True, fset=rds_property.set_list, factory=KeyedListFactory, notify=popFieldsChanged)
-    def popFields(self):
-        return self._popFields
-
-    @rds_property[KeyedList[RdsDataField]](private=True, fset=rds_property.set_list, factory=KeyedListFactory, notify=dataFieldsChanged)
-    def dataFields(self):
-        return self._dataFields
-
     @geoIdField.setter
     def geoIdField(self, value: str):
         with self.checkValid():
@@ -396,7 +381,7 @@ class RdsPlan(RdsBaseModel):
             self._renameField(self.distLayer, self._distField, value)
             self._distField = value
 
-    @rds_property[str](private=True, notify=geoIdCaptionChanged)
+    @rds_property(private=True, notify=geoIdCaptionChanged)
     def geoIdCaption(self) -> str:
         return self._geoIdCaption or self.geoIdField
 

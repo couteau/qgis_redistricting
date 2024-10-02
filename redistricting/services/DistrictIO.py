@@ -53,7 +53,7 @@ class DistrictReader:
             if data.get('description', '') is None:
                 data['description'] = ''
 
-            if f[self._distField] == 0:
+            if f[str(self._distField)] == 0:
                 result.append(RdsUnassigned(fid=f.id(), **data))
             else:
                 result.append(RdsDistrict(fid=f.id(), **data))
@@ -73,7 +73,7 @@ class DistrictWriter:
     def __init__(
             self,
             distLayer: QgsVectorLayer,
-            distField=DistrictColumns,
+            distField=DistrictColumns.DISTRICT,
             popField=DistrictColumns.POPULATION,
             columns: list[str] = None
     ):
@@ -125,7 +125,7 @@ class DistrictWriter:
         for d in districts:
             if d.fid == -1:
                 feat = QgsFeature(self._fields)
-                feat.setAttribute(int(DistrictColumns.DISTRICT), d.district)
+                feat.setAttribute(self._dist_idx, d.district)
             else:
                 feat = self._layer.getFeature(d.fid)
             changeAttributes(d, feat)

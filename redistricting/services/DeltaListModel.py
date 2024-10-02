@@ -59,36 +59,37 @@ class DeltaListModel(QAbstractTableModel):
     def plan(self):
         return self._plan
 
-    def setDelta(self, plan: RdsPlan, delta: DeltaList):
-        if plan != self._plan or delta != self._delta:
+    def setPlan(self, plan: RdsPlan, delta: DeltaList):
+        if plan != self._plan:
+            if self._plan is not None:
+                self._plan.popFieldChanged.disconnect(self.updateFields)
+                self._plan.popFieldsChanged.disconnect(self.updateFields)
+                self._plan.dataFieldsChanged.disconnect(self.updateFields)
+
+            self._plan = plan
+
+            if self._plan is not None:
+                self._plan.popFieldChanged.connect(self.updateFields)
+                self._plan.popFieldsChanged.connect(self.updateFields)
+                self._plan.dataFieldsChanged.connect(self.updateFields)
+                self.updateFields()
+            else:
+                self._fields = []
+
+            self.setDelta(delta)
+
+    def setDelta(self, delta: DeltaList):
+        if delta != self._delta:
             self.beginResetModel()
-            if plan != self._plan:
-                if self._plan is not None:
-                    self._plan.popFieldChanged.disconnect(self.updateFields)
-                    self._plan.popFieldsChanged.disconnect(self.updateFields)
-                    self._plan.dataFieldsChanged.disconnect(self.updateFields)
+            if self._delta is not None:
+                self._delta.updateStarted.disconnect(self.startUpdate)
+                self._delta.updateComplete.disconnect(self.endUpdate)
 
-                self._plan = plan
+            self._delta = delta
 
-                if self._plan is not None:
-                    self._plan.popFieldChanged.connect(self.updateFields)
-                    self._plan.popFieldsChanged.connect(self.updateFields)
-                    self._plan.dataFieldsChanged.connect(self.updateFields)
-                    self.updateFields()
-                else:
-                    self._fields = []
-
-            if delta != self._delta:
-                if self._delta is not None:
-                    self._delta.updateStarted.disconnect(self.startUpdate)
-                    self._delta.updateComplete.disconnect(self.endUpdate)
-
-                self._delta = delta
-
-                if self._delta is not None:
-                    self._delta.updateStarted.connect(self.startUpdate)
-                    self._delta.updateComplete.connect(self.endUpdate)
-
+            if self._delta is not None:
+                self._delta.updateStarted.connect(self.startUpdate)
+                self._delta.updateComplete.connect(self.endUpdate)
             self.endResetModel()
 
     def updateFields(self):
@@ -232,5 +233,7 @@ class DeltaFieldFilterProxy(QSortFilterProxyModel):
             self.invalidateFilter()
 
     def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
+        if source_parent.isValid():
+            return True
         field_type = self.deltaModel._fields[source_column]['field-type']  # pylint: disable=protected-access
         return field_type == FieldCategory.Population or self._demographics

@@ -1,3 +1,23 @@
+"""QGIS Redistricting Plugin - unit tests
+
+Copyright 2022-2024, Stuart C. Naifeh
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 import pandas as pd
 import pytest
 from pytest_mock import MockerFixture
@@ -49,8 +69,10 @@ class TestPendingChangesController:
         return delta
 
     @pytest.fixture
-    def mock_update_service(self, mocker: MockerFixture) -> DeltaUpdateService:
-        return mocker.create_autospec(spec=DeltaUpdateService())
+    def mock_update_service(self, mock_delta, mock_planmanager, mocker: MockerFixture) -> DeltaUpdateService:
+        service = mocker.create_autospec(spec=DeltaUpdateService(mock_planmanager))
+        service.getDelta.return_value = mock_delta
+        return service
 
     @pytest.fixture
     def mock_model(self, mocker: MockerFixture) -> type[DeltaListModel]:
@@ -71,7 +93,6 @@ class TestPendingChangesController:
 
     def test_create(self, controller: PendingChangesController, mock_model):
         mock_model.assert_called_once()
-        controller.deltaService.updateCompleted.connect.assert_called_once()
 
     def test_load(self, controller, mock_planmanager, mock_update_service):
         mock_update_service.reset_mock()
@@ -97,7 +118,7 @@ class TestPendingChangesController:
         controller_with_active_plan.activePlanChanged(mock_plan)
         plan.assert_called_once_with(mock_plan)
         mock_update_service.getDelta.assert_called_once_with(mock_plan)
-        controller_with_active_plan.model.setDelta.assert_called_once_with(
+        controller_with_active_plan.model.setPlan.assert_called_once_with(
             mock_plan, mock_update_service.getDelta.return_value)
 
     def test_active_plan_changed_none(self, controller_with_active_plan: PendingChangesController, mock_update_service: DeltaUpdateService, mock_plan, mocker: MockerFixture):
@@ -108,9 +129,9 @@ class TestPendingChangesController:
         controller_with_active_plan.activePlanChanged(None)
         plan.assert_called_once_with(None)
         mock_update_service.getDelta.assert_not_called()
-        controller_with_active_plan.model.setDelta.assert_called_once_with(None, None)
+        controller_with_active_plan.model.setPlan.assert_called_once_with(None, None)
 
     def test_update_delta(self, controller_with_active_plan: PendingChangesController, mock_update_service: DeltaUpdateService, mock_plan, mock_delta):
         controller_with_active_plan.load()
-        controller_with_active_plan.updateDelta(mock_plan, mock_delta)
-        controller_with_active_plan.model.setDelta.assert_called_once_with(mock_plan, mock_delta)
+        controller_with_active_plan.startDelta(mock_plan)
+        controller_with_active_plan.model.setDelta.assert_called_once_with(mock_delta)
