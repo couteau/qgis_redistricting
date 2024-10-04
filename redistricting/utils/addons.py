@@ -22,41 +22,72 @@
  *                                                                         *
  ***************************************************************************/
 """
-import importlib
 import pathlib
-import subprocess
+import shutil
 import sys
 
 from packaging.version import parse as parse_version
 from qgis.gui import QgisInterface
+from qgis.PyQt.QtCore import (
+    QProcess,
+    QStandardPaths
+)
 from qgis.utils import iface
 
 iface: QgisInterface
 
 
+def vendor_dir():
+    return pathlib.Path(__file__).parent.parent / "vendor"
+
+
 def install_vendor_dir():
-    vendor_dir = pathlib.Path(__file__).parent.parent / "vendor"
-    if vendor_dir.exists():
-        sys.path.insert(0, str(vendor_dir.resolve()))
+    # create a startup.py file that will add the vendor directory to the path
+    # before other python code loads modules we have overridden
+    homePath = QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)
+    if len(homePath) > 0:
+        startuppy = pathlib.Path(homePath[0]) / 'startup.py'
+        with startuppy.open("a+") as f:
+            f.seek(0)
+            lines = f.readlines()
+            if not "import sys\n" in lines:
+                lines.insert(0, "import sys\n")
+            insert_path = f"sys.path.insert(0, {str(vendor_dir().resolve())!r})\n"
+            if not insert_path in lines:
+                lines.append(insert_path)
+            f.truncate()
+            f.writelines(lines)
+
+    sys.path.insert(0, str(vendor_dir().resolve()))
 
 
-def unload_module(mod: str):
-    mod_prefix = f"{mod}."
-    for m in list(sys.modules.keys()):
-        if m == mod or m.startswith(mod_prefix):
-            del sys.modules[m]
+def uninstall_vendor_dir():
+    homePath = QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)
+    if len(homePath) > 0:
+        startuppy = pathlib.Path(homePath[0]) / 'startup.py'
+        if startuppy.exists():
+            f = startuppy.open("r+")
+            lines = f.readlines()
+            insert_path = f"sys.path.insert(0, {str(vendor_dir().resolve())!r})\n"
+            if insert_path in lines:
+                lines.remove(insert_path)
+                if len(lines) == 1 and lines[0] == "import sys\n":
+                    f.close()
+                    startuppy.unlink()
+                else:
+                    f.truncate()
+                    f.write(lines)
+                    f.close()
 
 
-def reload_modules():
-    vendor_dir = pathlib.Path(__file__).parent.parent / "vendor"
-    if vendor_dir.exists():
-        for d in vendor_dir.iterdir():
-            if d.suffix == '.py' or (d.is_dir() and (d / '__init__.py').exists()):
-                mod = d.stem
-                if mod in sys.modules:
-                    unload_module(mod)
+def uninstall_all():
+    d = vendor_dir()
+    if d.exists():
+        shutil.rmtree(str(d))
+        if str(vendor_dir) in sys.path:
+            sys.path.remove(str(d))
 
-                importlib.import_module(mod)
+        uninstall_vendor_dir()
 
 
 def python_executable():
@@ -67,43 +98,38 @@ def python_executable():
 
 
 def install_addon(pkg: str, *options):
-    installdir = pathlib.Path(__file__).parent.parent / "vendor"
+    installdir = vendor_dir()
     if not installdir.exists():
         installdir.mkdir()
         install_vendor_dir()
 
     if (installdir / pkg).exists():
         options = (*options, "--upgrade")
-    try:
-        subprocess.check_call([python_executable(), '-m', 'pip', 'install', '-t', str(installdir), *options, pkg])
-    except subprocess.CalledProcessError:
-        iface.messageBar().pushWarning("Warning", f"Could not install addon {pkg}")
-        return False
 
-    return True
+    process = QProcess(iface.mainWindow())
+    process.setProgram(str(python_executable()))
+    process.setArguments(['-m', 'pip', 'install', '-t', str(installdir), *options, pkg])
+    process.start()
+    return process
 
 
 def install_pyogrio():
+    pkgs = []
     # pylint: disable=import-outside-toplevel
     import geopandas
     if parse_version(geopandas.__version__) < parse_version('0.12.0'):
-        install_addon('geopandas')
+        pkgs.append('geopandas')
+
     import shapely
     if parse_version(shapely.__version__) < parse_version('2.0.0'):
-        install_addon('shapeley')
+        pkgs.append('shapely')
 
-    install_addon('pyogrio')
-    reload_modules()
+    return install_addon('pyogrio', *pkgs)
 
 
 def install_pyarrow():
-    install_addon('pyarrow')
-    reload_modules()
+    return install_addon('pyarrow')
 
 
 def install_gerrychain():
-    install_addon('gerrychain==0.3.1')
-    reload_modules()
-
-
-install_vendor_dir()
+    return install_addon('gerrychain==0.3.1')
