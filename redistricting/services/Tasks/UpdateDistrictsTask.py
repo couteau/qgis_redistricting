@@ -22,7 +22,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-import math
 from collections.abc import (
     Iterable,
     Sequence
@@ -36,15 +35,13 @@ import geopandas as gpd
 import pandas as pd
 import pyproj
 import shapely.ops
-from packaging import version
 from qgis.core import (
     QgsAggregateCalculator,
     QgsExpression,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeature,
-    QgsFeatureRequest,
-    QgsGeometry
+    QgsFeatureRequest
 )
 from qgis.PyQt.QtCore import (
     QRunnable,
@@ -56,12 +53,14 @@ from shapely.geometry import (
     Polygon
 )
 
-from ...models.columns import DistrictColumns
+from ... import settings
+from ...models import DistrictColumns
 from ...utils import (
     spatialite_connect,
     tr
 )
 from ..DistrictIO import DistrictReader
+from ..scores import MetricsFunctions
 from ._debug import debug_thread
 from .UpdateTask import AggregateDataTask
 
@@ -70,16 +69,6 @@ if TYPE_CHECKING:
         RdsGeoField,
         RdsPlan
     )
-
-
-class Config:
-    @staticmethod
-    def calculateSplits():
-        return True
-
-    @staticmethod
-    def splitPopulation():
-        return True
 
 
 class DissolveWorker(QRunnable):
@@ -136,28 +125,26 @@ class AggregateDistrictDataTask(AggregateDataTask):
         self.splits = {}
         self.cutEdges = None
 
-    def calcCutEdges(self, df: gpd.GeoDataFrame, distField) -> Union[int, None]:
-        try:
-            # pylint: disable-next=import-outside-toplevel
-            from gerrychain import (  # type: ignore
-                Graph,
-                Partition,
-                updaters
-            )
+    def calcCutEdges(self) -> Union[int, None]:
+        with spatialite_connect(self.geoPackagePath) as db:
+            # select count of unit pairs where
+            #   1) assigned districts are different (also takes care of excluding unassigned units from count),
+            #   2) combination is unique (count a,b but not b,a),
+            #   3) bounding boxes overlap (using spatial index to minimize more intensive adjacency checks)
+            #   4) units are adjacent at more than a point
+            sql = "SELECT count(*) " \
+                "FROM assignments a JOIN assignments b " \
+                f"ON b.{self.distField} != a.{self.distField} AND b.{self.geoIdField} > a.{self.geoIdField} " \
+                "AND b.fid IN(SELECT id FROM rtree_assignments_geometry r " \
+                "WHERE r.minx < st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry) " \
+                "AND r.miny < st_maxy(a.geometry) and r.maxy >= st_miny(a.geometry)) " \
+                "AND st_length(st_intersection(a.geometry, b.geometry)) > 0 "
 
-            graph = Graph.from_geodataframe(df.to_crs('+proj=cea'), ignore_errors=True)
-            partition = Partition(
-                graph,
-                assignment=distField,
-                updaters={"cut_edges": updaters.cut_edges}
-            )
-            return partition['cut_edges']
-        except ImportError:
-            return None
+            c = db.execute(sql)
+            return c.fetchone()[0]
 
     def getSplitNames(self, field: 'RdsGeoField', geoids: Iterable[str]):
-        name_map = {g: field.getName(g) for g in geoids}
-        return pd.Series(name_map.values(), index=name_map.keys(), name="__name", )
+        return {g: field.getName(g) for g in geoids}
 
     def calcFracks(self, field: 'RdsGeoField', splitpop: pd.DataFrame):
         if not isinstance(self.data, gpd.GeoDataFrame):
@@ -199,7 +186,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 .sum()
 
             if field.nameField and field.getRelation() is not None:
-                names = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
+                name_map = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
+                names = pd.Series(name_map.values(), index=name_map.keys(), name="__name", dtype=str)
+
                 splitpop = splitpop \
                     .reset_index(level=1) \
                     .join(names) \
@@ -213,7 +202,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
             self.splits[field.fieldName] = splitpop
             self.updateProgress(total, len(self.splits))
 
-        self.cutEdges = self.calcCutEdges(data, self.distField)
         self.updateProgress(total, total)
 
     def calcDistrictMetrics(self, data: gpd.GeoDataFrame):
@@ -221,12 +209,8 @@ class AggregateDistrictDataTask(AggregateDataTask):
         cea: gpd.GeoSeries = data.geometry.to_crs(cea_crs)
         area = cea.area
 
-        data['polsbypopper'] = 4 * math.pi * area / (cea.length**2)
-        if version.parse(gpd.__version__) < version.parse('1.0.0'):
-            data['reock'] = cea.apply(lambda g: g.area / QgsGeometry.fromWkt(g.wkt).minimalEnclosingCircle()[0].area())
-        else:
-            data['reock'] = area / cea.minimum_bounding_circle().area
-        data['convexhull'] = area / cea.convex_hull.area
+        for m, f in MetricsFunctions.items():
+            data[m] = f(cea, area)
 
     def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
         if DistrictColumns.POPULATION in cols:
@@ -307,8 +291,14 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 self.updateProgress(total, total)
 
             self.setProgressIncrement(90, 100)
+            if settings.enableCutEdges:
+                self.cutEdges = self.calcCutEdges()
+
             if self.includeSplits:
-                self.calcSplits(assign, cols)
+                if settings.enableSplits:
+                    self.calcSplits(assign, cols)
+                else:
+                    self.splits = {}
 
             name = pd.Series(
                 [

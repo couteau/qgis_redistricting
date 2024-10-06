@@ -22,10 +22,13 @@
  *                                                                         *
  ***************************************************************************/
 """
+import json
 import pathlib
 import shutil
 import sys
+from functools import lru_cache
 
+import requests
 from packaging.version import parse as parse_version
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import (
@@ -95,6 +98,25 @@ def python_executable():
         return pathlib.Path(sys.prefix) / 'python3.exe'
 
     return pathlib.Path(sys.prefix) / 'bin' / 'python3'
+
+
+@lru_cache
+def check_new_version(pkg: str):
+    if not pkg in sys.modules:
+        return False
+
+    current_version = sys.modules[pkg].__version__
+
+    # Check pypi for the latest version number
+    try:
+        r = requests.get(f'https://pypi.org/pypi/{pkg}/json', timeout=5)
+        contents = r.content.decode()
+        data = json.loads(contents)
+        latest_version = data['info']['version']
+    except TimeoutError:
+        return False
+
+    return parse_version(latest_version) > parse_version(current_version)
 
 
 def install_addon(pkg: str, *options):

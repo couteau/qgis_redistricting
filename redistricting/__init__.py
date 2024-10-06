@@ -32,11 +32,13 @@ from typing import (
     Union
 )
 
+from qgis.core import QgsSettings
+
 sys.path.insert(0, os.path.dirname(__file__))
 
 __author__ = "Stuart C. Naifeh"
 __contact__ = "stuart@cryptodira.org"
-__copyright__ = "Copyright (c) 2022, Stuart C. Naifeh"
+__copyright__ = "Copyright (c) 2022-2024, Stuart C. Naifeh"
 __license__ = "GPLv3"
 __version__ = "0.0.1"
 
@@ -47,6 +49,28 @@ class CanceledError(Exception):
     ...
 
 
+class Settings:
+    enableCutEdges: bool
+    enableSplits: bool
+
+    def __init__(self):
+        self._settings = QgsSettings()
+        self._settings.beginGroup('redistricting', QgsSettings.Section.Plugins)
+        self.enableCutEdges = self._settings.value("enable_cut_edges", False, bool)
+        self.enableSplits = self._settings.value("enable_split_detail", True, bool)
+        self._settings.endGroup()
+
+    def saveSettings(self):
+        self._settings.beginGroup('redistricting', QgsSettings.Section.Plugins)
+        self._settings.setValue("enable_cut_edges", self.enableCutEdges)
+        self._settings.setValue("enable_split_detail", self.enableSplits)
+        self._settings.endGroup()
+
+
+settings = Settings()
+
+
+# patch typing to maintain compatibility with python 3.9
 if not hasattr(typing, "Self"):
     class Self:
         ...

@@ -27,7 +27,6 @@
  ***************************************************************************/
 """
 import pathlib
-import sys
 from uuid import UUID
 
 from qgis.core import (
@@ -52,11 +51,9 @@ from qgis.PyQt.QtXml import QDomDocument
 
 from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
 
-if pathlib.Path(__file__).with_name("vendor").exists():
-    sys.path.insert(0, str(pathlib.Path(__file__).with_name("vendor")))
-
 # pylint: disable=wrong-import-position
-
+# isort: off
+from .gui.settings import RdsOptionsFactory
 from .controllers import (
     ContextMenuController,
     DistrictController,
@@ -107,6 +104,8 @@ class Redistricting:
             self.translator = QTranslator()
             self.translator.load(str(localePath))
             QCoreApplication.installTranslator(self.translator)
+
+        self.optionsFactory: RdsOptionsFactory
 
         # set up services
         self.planManager = PlanManager()
@@ -220,11 +219,17 @@ class Redistricting:
         self.pendingController.load()
         self.contextConroller.load()
 
+        self.optionsFactory = RdsOptionsFactory()
+        self.optionsFactory.setTitle(self.name)
+        self.iface.registerOptionsWidgetFactory(self.optionsFactory)
+
         self.unloading = False
 
     def unload(self):
         """Removes the plugin menu item and icon from QGIS GUI."""
         self.unloading = True
+
+        self.iface.unregisterOptionsWidgetFactory(self.optionsFactory)
 
         self.project.readProjectWithContext.disconnect(self.onReadProject)
         self.project.writeProject.disconnect(self.onWriteProject)

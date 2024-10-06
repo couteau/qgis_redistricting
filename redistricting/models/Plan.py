@@ -163,7 +163,7 @@ class RdsPlanMetrics(RdsBaseModel):
     def updateMetrics(self, cutEdges: int, splits: dict[str, pd.DataFrame]):
         self.metricsAboutToChange.emit()
 
-        # froce recalculation of cached properties
+        # force recalculation of cached properties
         if hasattr(self, "contiguous"):
             delattr(self, "contiguous")
         if hasattr(self, "complete"):
@@ -173,11 +173,16 @@ class RdsPlanMetrics(RdsBaseModel):
             self.cutEdges = cutEdges
 
         if splits is not None:
+            new_splits: KeyedList[RdsSplits] = KeyedList()
+
             for f, split in splits.items():
                 if f not in self.splits:
-                    self.splits[f] = RdsSplits(f, split)
+                    new_splits[f] = RdsSplits(f, split)
                 else:
-                    self.splits[f].setData(split)
+                    new_splits[f] = self.splits[f]
+                    new_splits[f].setData(split)
+
+            self.splits = new_splits
 
         self.metricsChanged.emit()
 
