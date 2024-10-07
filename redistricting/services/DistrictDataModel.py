@@ -22,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+from dataclasses import dataclass
 from typing import (
     Any,
     Iterable,
@@ -49,6 +50,7 @@ from ..models import (
     BaseDeviationValidator,
     DeviationType,
     DistrictColumns,
+    FieldCategory,
     MaxDeviationValidator,
     MetricsColumns,
     PlusMinusDeviationValidator,
@@ -58,6 +60,13 @@ from ..models import (
 from .PlanColors import getColorForDistrict
 
 
+@dataclass
+class ColData:
+    key: str
+    heading: str
+    category: FieldCategory
+
+
 class RdsDistrictDataModel(QAbstractTableModel):
     RawDataRole = Qt.UserRole + 2
 
@@ -65,8 +74,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
 
     def __init__(self, plan: RdsPlan = None, parent: QObject = None):
         super().__init__(parent)
-        self._keys = []
-        self._headings = []
+        self._columns: list[ColData] = []
         self._plan = None
         self._districts: Sequence[RdsDistrict] = []
         self._validator: BaseDeviationValidator = None
@@ -78,24 +86,21 @@ class RdsDistrictDataModel(QAbstractTableModel):
 
     def updatePlanFields(self):
         self.beginResetModel()
-        self._keys = list(DistrictColumns)
-        self._headings = [s.comment for s in DistrictColumns]
-
-        for field in self._plan.popFields:
-            self._keys.append(field.fieldName)
-            self._headings.append(field.caption)
+        self._columns = [ColData(d, d.comment, FieldCategory.Population)
+                         for d in DistrictColumns
+                         if d != DistrictColumns.DISTRICT]
+        self._columns.extend(ColData(field.fieldName, field.caption, field.category) for field in self._plan.popFields)
 
         for field in self._plan.dataFields:
             fn = field.fieldName
             if field.sumField:
-                self._keys.append(fn)
-                self._headings.append(field.caption)
-            if field.pctBase and (field.pctBase == self._plan.popField or field.pctBase in self._keys):
-                self._keys.append(f"pct_{fn}")
-                self._headings.append(f"%{field.caption}")
+                self._columns.append(ColData(field.fieldName, field.caption, field.category))
+            if field.pctBase is not None:
+                self._columns.append(ColData(f"pct_{fn}", f"%{field.caption}", field.category))
 
-        self._keys.extend(MetricsColumns.CompactnessScores())
-        self._headings.extend([s.comment for s in MetricsColumns.CompactnessScores()])  # pylint: disable=no-member
+        self._columns.extend(ColData(c, c.comment, FieldCategory.Metrics)  # pylint: disable=no-member
+                             for c in MetricsColumns.CompactnessScores())
+
         self.endResetModel()
 
     @plan.setter
@@ -126,9 +131,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             self._plan.districtAdded.connect(self.districtListChanged)
             self._plan.districtRemoved.connect(self.districtListChanged)
         else:
-            self._districts = []
-            self._keys = []
-            self._headings = []
+            self._columns = []
 
         self.endResetModel()
 
@@ -156,22 +159,22 @@ class RdsDistrictDataModel(QAbstractTableModel):
         if parent.isValid() or self._districts is None:
             return 0
 
-        return len(self._keys)
+        return len(self._columns)
 
     def data(self, index, role=Qt.DisplayRole):
         value = None
         try:
             row = index.row()
             col = index.column()
+            key = self._columns[col].key
             district = self._districts[row]
 
             if role in (Qt.DisplayRole, Qt.EditRole, RdsDistrictDataModel.RawDataRole):
-                key = self._keys[col]
                 if key[:3] == 'pct' and key != 'pct_deviation':
                     pctbase = self._plan.dataFields[key[4:]].pctBase
                     if pctbase == self._plan.popField:
                         pctbase = DistrictColumns.POPULATION
-                    if pctbase in self._keys and district[pctbase] != 0:
+                    if district[pctbase] != 0:
                         value = district[key[4:]] / district[pctbase]
                     else:
                         value = None
@@ -182,12 +185,6 @@ class RdsDistrictDataModel(QAbstractTableModel):
                     return None
 
                 if role != RdsDistrictDataModel.RawDataRole:
-                    if district.district == 0:
-                        if key == 'district':
-                            value = district.name
-                        elif key == 'name':
-                            value = None
-
                     if key == 'deviation':
                         value = f'{value:+,}'
                     elif key == 'pct_deviation':
@@ -205,25 +202,23 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 if col == 0 or district.district == 0:
                     color = getColorForDistrict(self._plan, district.district)
                     value = QBrush(color)
-                elif 3 <= col <= 5:
+                elif col in {DistrictColumns.POPULATION, DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}:
                     if self._validator.validateDistrict(district):
                         color = QColor(0x60, 0xbd, 0x63)  # QColor(99, 196, 101)  # 60be63ff
                         value = QBrush(color)
 
             elif role == Qt.FontRole:
-                row = index.row()
-                col = index.column()
-                if row > 0 and col in {0, 4, 5}:
+                if col == 0 or (district.district != 0 and key in {DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}):
                     value = QFont()
                     value.setBold(True)
 
             elif role == Qt.TextAlignmentRole:
-                if index.column() == 0:
+                if col == 0:
                     value = Qt.AlignCenter
+                else:
+                    value = Qt.AlignRight
 
             elif role == Qt.TextColorRole:
-                row = index.row()
-                col = index.column()
                 if col == 0 or district.district == 0:
                     value = QColor(55, 55, 55)
 
@@ -233,23 +228,23 @@ class RdsDistrictDataModel(QAbstractTableModel):
         return value
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
-        if role == Qt.EditRole and index.column() == 1 and index.row() != 0:
+        if role == Qt.EditRole and self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
             dist = self._districts[index.row()]
             dist.name = value
-            self.dataChanged.emit(index, index, {Qt.DisplayRole})
+            self.dataChanged.emit(index, index, {Qt.EditRole})
             return True
 
         return False
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section < len(self._headings):
-            return self._headings[section]
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section < len(self._columns):
+            return self._columns[section].heading
 
         return None
 
     def flags(self, index):
         f = super().flags(index)
-        if index.column() == 1 and index.row() != 0:
+        if self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
             f |= Qt.ItemIsEditable
 
         return f
@@ -274,26 +269,38 @@ class RdsDistrictDataModel(QAbstractTableModel):
 class RdsDistrictFilterFieldsProxyModel(QSortFilterProxyModel):
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._demographics: bool = True
-        self._metrics: bool = True
+        self._filtercats: set[FieldCategory] = set(FieldCategory)
 
     @property
     def districtModel(self) -> RdsDistrictDataModel:
         return self.sourceModel()
 
+    def toggleCategory(self, cat: FieldCategory):
+        if cat in self._filtercats:
+            self._filtercats.remove(cat)
+        else:
+            self._filtercats.add(cat)
+        self.invalidateFilter()
+
+    def showCategory(self, cat: FieldCategory, show: bool = True):
+        if show == (cat in self._filtercats):
+            return
+
+        self.toggleCategory(cat)
+
     def showDemographics(self, show: bool = True):
-        if show != self._demographics:
-            self._demographics = show
-            self.invalidateFilter()
+        self.showCategory(FieldCategory.Demographic, show)
 
     def showMetrics(self, show: bool = True):
-        if show != self._metrics:
-            self._metrics = show
-            self.invalidateFilter()
+        self.showCategory(FieldCategory.Metrics, show)
 
     def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
-        name = self.districtModel._keys[source_column]  # pylint: disable=protected-access
-        return name in DistrictColumns or name in {f.fieldName for f in self.districtModel.plan.popFields} or (self._metrics and name in MetricsColumns) or (self._demographics and name not in MetricsColumns)
+        # pylint: disable=protected-access
+        if self.districtModel._columns[source_column].key == 'members':
+            return self.districtModel._plan.numDistricts != self.districtModel._plan.numDistricts
+
+        cat = self.districtModel._columns[source_column].category
+        return cat in self._filtercats
 
     def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
         """Keep 'Unassigned' row at the top no matter what the sort order is"""
