@@ -44,11 +44,11 @@ class TestDistrictDataModel:
         assert district_model.rowCount() == 6
 
     def test_colcount(self, district_model):
-        assert district_model.columnCount() == 16
+        assert district_model.columnCount() == 15
 
     def test_headerdata(self, district_model):
         assert district_model.headerData(0, Qt.Horizontal, Qt.DisplayRole) == 'District'
-        assert district_model.headerData(15, Qt.Horizontal, Qt.DisplayRole) == 'Convex Hull'
+        assert district_model.headerData(14, Qt.Horizontal, Qt.DisplayRole) == 'Convex Hull'
 
     def test_data(self, district_model: RdsDistrictDataModel):
         data = district_model.data(district_model.createIndex(0, 0), Qt.DisplayRole)
@@ -68,7 +68,7 @@ class TestDistrictDataModel:
             e.updatePlan()
 
         with qtbot.waitSignal(district_model.dataChanged):
-            district_model.setData(district_model.createIndex(3, 1), 'Council District 3', Qt.EditRole)
+            district_model.setData(district_model.createIndex(3, 0), 'Council District 3', Qt.EditRole)
         assert plan.districts[3].name == 'Council District 3'
 
     def test_clear_plan(self, district_model: RdsDistrictDataModel, qtbot: QtBot):

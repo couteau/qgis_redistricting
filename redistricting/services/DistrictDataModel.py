@@ -89,6 +89,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self._columns = [ColData(d, d.comment, FieldCategory.Population)
                          for d in DistrictColumns
                          if d != DistrictColumns.DISTRICT]
+        self._columns[0].heading = DistrictColumns.DISTRICT.comment  # pylint: disable=no-member
         self._columns.extend(ColData(field.fieldName, field.caption, field.category) for field in self._plan.popFields)
 
         for field in self._plan.dataFields:
