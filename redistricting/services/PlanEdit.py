@@ -286,8 +286,6 @@ class PlanEditor(BasePlanBuilder):
         modifiedFields |= {k for k in self._oldvalues if k not in newvalues}
         self._oldvalues = None
         self._modifiedFields = modifiedFields
-        if modifiedFields:
-            QgsProject.instance().setDirty()
 
         if self._updater:
             updateGeometry = updateSplits = updateDemographics = False

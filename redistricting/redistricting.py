@@ -27,12 +27,10 @@
  ***************************************************************************/
 """
 import pathlib
-from uuid import UUID
 
 from qgis.core import (
     Qgis,
     QgsApplication,
-    QgsMapLayer,
     QgsProject,
     QgsProjectDirtyBlocker,
     QgsReadWriteContext
@@ -208,8 +206,6 @@ class Redistricting:
         # project closing
         self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
 
-        self.iface.layerTreeView().clicked.connect(self.layerChanged)
-
         self.iface.addToolBar(self.toolbar)
 
         self.planController.load()
@@ -241,8 +237,6 @@ class Redistricting:
             self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
         self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
 
-        self.iface.layerTreeView().clicked.disconnect(self.layerChanged)
-
         QgsApplication.instance().aboutToQuit.disconnect(self.onQuit)
 
         self.contextConroller.unload()
@@ -265,13 +259,6 @@ class Redistricting:
 
     def onQuit(self):
         self.unloading = True
-
-    def layerChanged(self, layer: QgsMapLayer):  # pylint: disable=unused-argument
-        g = self.iface.layerTreeView().currentGroupNode()
-        if g.isVisible():
-            p = g.customProperty('redistricting-plan-id', None)
-            if p is not None and (self.planManager.activePlan is None or p != str(self.planManager.activePlan.id)):
-                self.planManager.setActivePlan(UUID(p))
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
         dirtyBlocker = QgsProjectDirtyBlocker(self.project)
@@ -324,6 +311,7 @@ class Redistricting:
 
             for plan in deletePlans:
                 self.planManager.removePlan(plan)
+                self.project.setDirty()
 
     # --------------------------------------------------------------------------
 

@@ -61,12 +61,14 @@ class DistrictReader:
         return sorted(result, key=lambda s: s.district)
 
     def loadDistricts(self, plan: RdsPlan):
+        plan.blockSignals(True)
         plan.districts.clear()
         for district in self.readFromLayer():
             if district.district == 0:
                 plan.districts[0].update(district)
             else:
-                plan.districts.append(district)
+                plan.addDistrict(district)
+        plan.blockSignals(False)
 
 
 class DistrictWriter:

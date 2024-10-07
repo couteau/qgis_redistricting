@@ -470,6 +470,7 @@ class EditAssignmentsController(DockWidgetController):
             copier.copyBufferedAssignments(plan)
             self.planManager.activePlan.assignLayer.rollBack(True)
             self.planManager.setActivePlan(plan)
+            self.project.setDirty()
 
     # helper methods
 

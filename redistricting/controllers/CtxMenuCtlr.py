@@ -25,8 +25,10 @@ from typing import (
     TYPE_CHECKING,
     Optional
 )
+from uuid import UUID
 
 from qgis.core import (
+    QgsMapLayer,
     QgsMapLayerType,
     QgsProject
 )
@@ -98,9 +100,19 @@ class ContextMenuController(BaseController):
     def load(self):
         self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.GroupLayer, False)
         self.iface.addCustomActionForLayerType(self.contextAction, None, QgsMapLayerType.VectorLayer, False)
+        self.iface.layerTreeView().clicked.connect(self.layerChangedActivatePlan)
 
     def unload(self):
+        self.iface.layerTreeView().clicked.disconnect(self.layerChangedActivatePlan)
         self.iface.removeCustomActionForLayerType(self.contextAction)
+
+    def layerChangedActivatePlan(self, layer: QgsMapLayer):  # pylint: disable=unused-argument
+        g = self.iface.layerTreeView().currentGroupNode()
+        if g.isVisible():
+            p = g.customProperty('redistricting-plan-id', None)
+            if p is not None and (self.planManager.activePlan is None or p != str(self.planManager.activePlan.id)):
+                self.planManager.setActivePlan(UUID(p))
+                self.project.setDirty()
 
     def contextMenuActivatePlan(self):
         group = self.iface.layerTreeView().currentGroupNode()

@@ -194,36 +194,3 @@ class DlgEditPlan(QWizard):
             if not self.page(pageId).isComplete():
                 return False
         return True
-
-    def updatePlan(self, plan: RdsPlan):
-        if not self.isComplete():
-            return False
-        plan.name = self.field('planName')
-        plan.numDistricts = self.field('numDistricts')
-        plan.numSeats = self.field('numSeats')
-        plan.description = self.field('description')
-        plan.geoLayer = self.field('sourceLayer')
-        plan.geoIdField = self.field('geoIdField')
-        plan.geoIdCaption = self.field('geoCaption')
-        plan.geoFields = self.field('geoFields')
-        plan.popLayer = self.field('popLayer')
-        plan.popField = self.field('popField')
-        plan.deviation = self.field('deviation') / 100
-        plan.dataFields = self.field('dataFields')
-        return True
-
-    def createPlan(self):
-        if not self.isComplete():
-            return None
-        plan = RdsPlan(name=self.field('planName'), numDistricts=self.field('numDistricts'))
-        plan.numSeats = self.field('numSeats')
-        plan.description = self.field('description')
-        plan.geoLayer = self.field('sourceLayer')
-        plan.geoIdField = self.field('geoIdField')
-        plan.geoIdCaption = self.field('geoCaption')
-        plan.popLayer = self.field('popLayer')
-        plan.popField = self.field('popField')
-        plan.deviation = self.field('deviation') / 100
-        plan.dataFields = self.field('dataFields')
-        plan.geoFields = self.field('geoFields')
-        return plan

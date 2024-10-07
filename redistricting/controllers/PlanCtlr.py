@@ -132,18 +132,13 @@ class PlanController(BaseController):
         self.planManager.activePlanChanged.connect(self.enableActivePlanActions)
         self.planManager.planAdded.connect(self.planAdded)
         self.planManager.planRemoved.connect(self.planRemoved)
+        self.planManager.cleared.connect(self.clearPlanMenu)
         self.project.layersAdded.connect(self.enableNewPlan)
         self.project.layersRemoved.connect(self.enableNewPlan)
-        self.project.cleared.connect(self.clearPlanMenu)
         self.updateService.updateComplete.connect(self.planDistrictsUpdated)
         self.importService.importComplete.connect(self.importComplete)
 
         self.planModel = PlanListModel(self.planManager)
-        self.planManager.aboutToChangeActivePlan.connect(self.planModel.updatePlan)
-        self.planManager.activePlanChanged.connect(self.planModel.updatePlan)
-        self.planManager.planAdded.connect(self.planModel.planListUpdated)
-        self.planManager.planRemoved.connect(self.planModel.planListUpdated)
-        self.planManager.cleared.connect(self.planModel.planListUpdated)
 
         self.toolBtnAction: QAction = self.toolbar.addWidget(self.menuButton)
 
@@ -348,6 +343,7 @@ class PlanController(BaseController):
 
     def planAdded(self, plan: RdsPlan):
         self.addPlanToMenu(plan)
+        plan.districtDataChanged.connect(self.project.setDirty)
         self.updateService.watchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
@@ -355,6 +351,7 @@ class PlanController(BaseController):
         self.removePlanFromMenu(plan)
         self.updateService.unwatchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
+        plan.districtDataChanged.disconnect(self.project.setDirty)
 
     # action slots
 

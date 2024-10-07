@@ -9,6 +9,7 @@ from qgis.PyQt.QtGui import (
     QFont
 )
 
+from ..models import RdsPlan
 from ..utils import tr
 from .PlanManager import PlanManager
 
@@ -17,9 +18,11 @@ class PlanListModel(QAbstractTableModel):
     def __init__(self, planList: PlanManager, parent=None):
         super().__init__(parent)
         self.planList = planList
-        self.planList.activePlanChanged.connect(self.planListUpdated)
-        self.planList.planAdded.connect(self.planListUpdated)
-        self.planList.planRemoved.connect(self.planListUpdated)
+        self.planList.aboutToChangeActivePlan.connect(self.activePlanAboutToChange)
+        self.planList.activePlanChanged.connect(self.activePlanChanged)
+        self.planList.planAdded.connect(self.planAdded)
+        self.planList.planRemoved.connect(self.planRemoved)
+        self.planList.cleared.connect(self.planListUpdated)
 
         self.header = [
             tr('Plan'),
@@ -30,7 +33,7 @@ class PlanListModel(QAbstractTableModel):
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self.planList)
 
-    def columnCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument,no-self-use
+    def columnCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return 3
 
     def headerData(self, section, orientation: Qt.Orientation, role):
@@ -66,11 +69,13 @@ class PlanListModel(QAbstractTableModel):
             if index.row() == self.activePlanIndex().row():
                 return QColor(Qt.blue)
 
+        return None
+
     @property
-    def activePlan(self):
+    def activePlan(self) -> RdsPlan:
         return self.planList.activePlan
 
-    def planIndex(self, plan):
+    def indexFromPlan(self, plan: RdsPlan):
         try:
             row = self.planList.index(plan)
             return self.createIndex(row, 0)
@@ -79,23 +84,45 @@ class PlanListModel(QAbstractTableModel):
 
         return QModelIndex()
 
-    def activePlanIndex(self):
+    def activePlanIndex(self) -> QModelIndex:
         if self.activePlan is None:
             return QModelIndex()
 
-        return self.planIndex(self.activePlan)
+        return self.indexFromPlan(self.activePlan)
 
-    def plan(self, index: QModelIndex):
+    def planFromIndex(self, index: QModelIndex) -> RdsPlan:
         if 0 <= index.row() < len(self.planList):
             return self.planList[index.row()]
 
         return None
+
+    def planAdded(self, plan: RdsPlan):
+        plan.nameChanged.connect(self.updatePlan)
+        plan.numDistrictsChanged.connect(self.updatePlan)
+        plan.descriptionChanged.connect(self.updatePlan)
+        self.planListUpdated()
+
+    def planRemoved(self, plan: RdsPlan):
+        plan.nameChanged.disconnect(self.updatePlan)
+        plan.numDistrictsChanged.disconnect(self.updatePlan)
+        plan.descriptionChanged.disconnect(self.updatePlan)
+        self.planListUpdated()
 
     def planListUpdated(self):
         self.beginResetModel()
         self.endResetModel()
 
     def updatePlan(self, plan):
-        idx1 = self.planIndex(plan)
+        idx1 = self.indexFromPlan(plan)
         idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
         self.dataChanged.emit(idx1, idx2)
+
+    def activePlanAboutToChange(self, oldPlan, newPlan):  # pylint: disable=unused-argument
+        idx1 = self.indexFromPlan(oldPlan)
+        idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
+        self.dataChanged.emit(idx1, idx2, [Qt.FontRole, Qt.TextColorRole])
+
+    def activePlanChanged(self, plan):
+        idx1 = self.indexFromPlan(plan)
+        idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
+        self.dataChanged.emit(idx1, idx2, [Qt.FontRole, Qt.TextColorRole])
