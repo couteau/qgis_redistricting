@@ -49,6 +49,8 @@ def patch_iface(qgis_iface,  mocker: MockerFixture):
     qgis_iface.removeDockWidget = mocker.MagicMock()
     qgis_iface.removePluginVectorMenu = mocker.MagicMock()
     qgis_iface.layerTreeView = mocker.MagicMock()
+    qgis_iface.registerOptionsWidgetFactory = mocker.MagicMock()
+    qgis_iface.unregisterOptionsWidgetFactory = mocker.MagicMock()
 
 
 @pytest.fixture
