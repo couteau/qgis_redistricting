@@ -159,16 +159,11 @@ class PlanController(BaseController):
         self.planManager.activePlanChanged.disconnect(self.enableActivePlanActions)
         self.planManager.planAdded.disconnect(self.planAdded)
         self.planManager.planRemoved.disconnect(self.planRemoved)
-
-        self.planManager.aboutToChangeActivePlan.disconnect(self.planModel.updatePlan)
-        self.planManager.activePlanChanged.disconnect(self.planModel.updatePlan)
-        self.planManager.planAdded.disconnect(self.planModel.planListUpdated)
-        self.planManager.planRemoved.disconnect(self.planModel.planListUpdated)
-        self.planManager.cleared.disconnect(self.planModel.planListUpdated)
-
+        self.planManager.cleared.disconnect(self.clearPlanMenu)
         self.project.layersAdded.disconnect(self.enableNewPlan)
         self.project.layersRemoved.disconnect(self.enableNewPlan)
-        self.project.cleared.disconnect(self.clearPlanMenu)
+        self.updateService.updateComplete.disconnect(self.planDistrictsUpdated)
+        self.importService.importComplete.disconnect(self.importComplete)
 
     def createActions(self):
         self.actionShowPlanManager = self.actions.createAction(
