@@ -22,11 +22,20 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
+from ..utils import tr
 from .ui.DlgConfirmDelete import Ui_dlgConfirmDelete
-from ..core import RedistrictingPlan, tr
 
 
 class DlgConfirmDelete(Ui_dlgConfirmDelete, QDialog):

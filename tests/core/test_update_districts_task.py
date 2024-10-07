@@ -16,8 +16,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.Tasks.UpdateDistrictsTask import (
+from redistricting.models.Plan import RedistrictingPlan
+from redistricting.services.Tasks.UpdateDistrictsTask import (
     AggregateDistrictDataTask
 )
 

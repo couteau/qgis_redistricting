@@ -33,12 +33,12 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..core import (
+from ..models import (
     GeoField,
     RedistrictingPlan
 )
-from ..core.PlanSplitsModel import SplitsModel
-from ..core.utils import tr
+from ..utils import tr
+from .PlanSplitsModel import SplitsModel
 from .ui.DlgSplits import Ui_dlgSplits
 
 
@@ -59,6 +59,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
         self.plan = plan
         self.geoField = geoField
+        self.cmbGeography.currentIndexChanged.connect(self.geographyChanged)
 
     @property
     def plan(self) -> RedistrictingPlan:
@@ -66,12 +67,30 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
     @plan.setter
     def plan(self, value: RedistrictingPlan):
+        if self._plan:
+            self.plan.nameChanged.disconnect(self.planNameChanged)
+            self.plan.geoFieldsChanged.disconnect(self.updateGeography)
+
         self._plan = value
-        if self._plan and self._field:
-            self._model = SplitsModel(self._plan.stats.splits[self._field], self)
-        else:
-            self._model = None
+
+        if self._plan:
+            if self._field:
+                self._model = SplitsModel(self._plan.stats.splits[self._field], self)
+            else:
+                self._model = None
+            self.lblPlan.setText(self._plan.name)
+            self.updateGeography()
+            self.plan.nameChanged.connect(self.planNameChanged)
+            self.plan.geoFieldsChanged.connect(self.updateGeography)
+
         self.tvSplits.setModel(self._model)
+
+    def planNameChanged(self):
+        self.lblPlan.setText(self._plan.name)
+
+    def updateGeography(self):
+        self.cmbGeography.clear()
+        self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])
 
     @property
     def geoField(self) -> GeoField:
@@ -89,3 +108,6 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
         if self._field:
             self.setWindowTitle(f"{self._field.caption} {tr('Splits')}")
+
+    def geographyChanged(self, index):
+        self.geoField = self.plan.geoFields[index]

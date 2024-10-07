@@ -57,13 +57,13 @@ from qgis.PyQt.QtWidgets import (
 )
 from qgis.utils import iface
 
-from ..core import (
+from ..exception import RdsException
+from ..models import (
     DataField,
     Field,
-    FieldList,
-    RdsException,
-    tr
+    FieldList
 )
+from ..utils import tr
 
 # TODO: come up with an accessible method for reordering without the mouse
 

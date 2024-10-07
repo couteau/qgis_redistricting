@@ -18,15 +18,17 @@
 """
 import pytest
 from pytest_mock.plugin import MockerFixture
+
 import redistricting
-from redistricting.core import PlanExporter
+import redistricting.services
+from redistricting.services import PlanExporter
 
 
 class TestPlanExport:
     @pytest.fixture
-    def export(self, plan, datadir):
+    def export(self, mock_plan, datadir):
         return PlanExporter(
-            plan,
+            mock_plan,
             datadir / 'test.csv',
             datadir / 'test.shp',
             None,
@@ -36,8 +38,8 @@ class TestPlanExport:
         )
 
     def test_export(self, export: PlanExporter, mocker: MockerFixture):
-        task = mocker.patch('redistricting.core.PlanExport.ExportRedistrictingPlanTask')
-        add = mocker.patch.object(redistricting.core.PlanExport.QgsApplication.taskManager(), 'addTask')
+        task = mocker.patch('redistricting.services.PlanExport.ExportRedistrictingPlanTask')
+        add = mocker.patch.object(redistricting.services.PlanExport.QgsApplication.taskManager(), 'addTask')
         export.export()
         task.assert_called_once()
         add.assert_called_once()

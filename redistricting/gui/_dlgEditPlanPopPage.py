@@ -32,11 +32,9 @@ from qgis.PyQt.QtWidgets import (
     QWizardPage
 )
 
-from ..core import (
-    Field,
-    defaults
-)
-from ..core.utils import getDefaultField
+from ..models import Field
+from ..services import defaults
+from ..utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
 
@@ -49,8 +47,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.registerField('popLayer', self.cmbPopLayer)
         self.registerField('joinField', self.cmbJoinField)
         self.registerField('popField*', self.cmbPopField)
-        self.registerField('deviation', self.sbxMaxDeviation,
-                           'value', self.sbxMaxDeviation.valueChanged)
+        self.registerField('deviation', self.sbxMaxDeviation, 'value', self.sbxMaxDeviation.valueChanged)
         self.registerField('popFields', self.tblAddlPopulation, 'fields', self.tblAddlPopulation.fieldsChanged)
 
         self.fieldsModel = self.tblAddlPopulation.model()
@@ -68,8 +65,8 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.cmbAddlPopField.fieldChanged.connect(self.fieldChanged)
         self.btnAddAddlPopField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
         self.btnAddAddlPopField.clicked.connect(self.addField)
-        
-        self.tblAddlPopulation.setEnableDragRows(True)  
+
+        self.tblAddlPopulation.setEnableDragRows(True)
         self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.tblAddlPopulation.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -124,7 +121,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
                 self.cmbPopField.setField(popField)
             else:
                 self.cmbPopField.setField(getDefaultField(layer, defaults.POP_TOTAL_FIELDS))
-            
+
             self.cmbAddlPopField.setLayer(layer)
             popFields: list[Field] = self.field('popFields')
             for f in popFields:

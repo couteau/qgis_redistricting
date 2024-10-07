@@ -47,28 +47,37 @@ from qgis.PyQt.QtGui import (
 )
 from qgis.PyQt.QtWidgets import QDockWidget
 
-from ..core import (
+from ..models import (
     District,
-    GeoFieldsModel,
-    RedistrictingPlan,
+    RedistrictingPlan
+)
+from ..services import (
+    ActionRegistry,
+    getColorForDistrict
+)
+from ..utils import (
     showHelp,
     tr
 )
+from .FieldListModels import GeoFieldsModel
 from .ui.DistrictTools import Ui_qdwDistrictTools
 
 
 class DistrictSelectModel(QAbstractListModel):
     def __init__(self, plan: RedistrictingPlan, parent: Optional[QObject] = ...):
         super().__init__(parent)
+        self._plan = plan
+        self._plan.districtAdded.connect(self.updateDistricts)
+        self._plan.districtRemoved.connect(self.updateDistricts)
+        self._plan.districtNameChanged.connect(self.districtNameChanged)
         self._districts = plan.districts
-        self._districts.districtChanged.connect(self.districtNameChanged)
         self._offset = 2
 
     def updateDistricts(self):
         self.beginResetModel()
         self.endResetModel()
 
-    def districtNameChanged(self, district: District):  # pylint: disable=unused-argument
+    def districtNameChanged(self, district: District):
         idx = self._districts.index(district)
         index = self.createIndex(idx + self._offset, 0)
         self.dataChanged.emit(index, index, {Qt.DisplayRole})
@@ -79,6 +88,14 @@ class DistrictSelectModel(QAbstractListModel):
             return 1 if i == 0 else i + self._offset
 
         return 0
+
+    def districtFromIndex(self, index: int):
+        if index < self._offset:
+            dist = self._districts[0] if index == 1 else None
+        elif index > self._offset:
+            dist = self._districts.byindex[index-2]
+
+        return dist
 
     def rowCount(self, parent: QModelIndex):  # pylint: disable=unused-argument
         return len(self._districts) + self._offset
@@ -94,7 +111,7 @@ class DistrictSelectModel(QAbstractListModel):
                 return self._districts[0].name
 
             if row > self._offset:
-                return self._districts[row - 2].name
+                return self._districts.byindex[row - self._offset].name
 
         if role == Qt.DecorationRole:
             if row == 0:
@@ -102,16 +119,17 @@ class DistrictSelectModel(QAbstractListModel):
 
             if row == 1 or row > self._offset:
                 dist = 0 if row == 1 else row-self._offset
+                color = getColorForDistrict(self._plan, self._districts.byindex[dist].district)
                 pixmap = QPixmap(64, 64)
                 pixmap.fill(Qt.transparent)
                 p = QPainter()
                 if p.begin(pixmap):
-                    p.setPen(self._districts[dist].color)
-                    p.setBrush(QBrush(self._districts[dist].color))
+                    p.setPen(color)
+                    p.setBrush(QBrush(color))
                     p.drawEllipse(0, 0, 64, 64)
                     p.end()
                 else:
-                    pixmap.fill(self._districts[dist].color)
+                    pixmap.fill(color)
                 return QIcon(pixmap)
 
         if role == Qt.AccessibleDescriptionRole and row == self._offset:
@@ -178,8 +196,37 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
 
     _plan: RedistrictingPlan = None
     geoFieldChanged = pyqtSignal(str)
-    sourceChanged = pyqtSignal(object)
-    targetChanged = pyqtSignal(object)
+    sourceChanged = pyqtSignal("PyQt_PyObject")
+    targetChanged = pyqtSignal("PyQt_PyObject")
+
+    def __init__(self, plan, parent=None):
+        super(DockRedistrictingToolbox, self).__init__(parent)
+        self.setupUi(self)
+
+        self.actionRegistry = ActionRegistry()
+
+        self.cmbGeoSelect.currentIndexChanged.connect(self.cmbGeoFieldChanged)
+        self.cmbTarget.currentIndexChanged.connect(self.cmbTargetChanged)
+        self.cmbSource.currentIndexChanged.connect(self.cmbSourceChanged)
+
+        self.btnUndo.setIcon(QgsApplication.getThemeIcon('/mActionUndo.svg'))
+        self.btnRedo.setIcon(QgsApplication.getThemeIcon('/mActionRedo.svg'))
+        self.btnUndo.setEnabled(False)
+        self.btnRedo.setEnabled(False)
+        self.btnUndo.clicked.connect(self.undo)
+        self.btnRedo.clicked.connect(self.redo)
+
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.clicked.connect(self.btnHelpClicked)
+
+        self.btnAddDistrict.setDefaultAction(self.actionRegistry.actionCreateDistrict)
+        self.btnEditTargetDistrict.setDefaultAction(self.actionRegistry.actionEditTargetDistrict)
+        self.btnEditSourceDistrict.setDefaultAction(self.actionRegistry.actionEditSourceDistrict)
+
+        self.sourceModel: DistrictSelectModel = None
+        self.targetModel: TargetDistrictModel = None
+
+        self.plan = plan
 
     @property
     def plan(self) -> RedistrictingPlan:
@@ -188,7 +235,9 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
     @plan.setter
     def plan(self, value: RedistrictingPlan):
         if self._plan:
-            self._plan.planChanged.disconnect(self.reloadFields)
+            self._plan.nameChanged.disconnect(self.updateName)
+            self._plan.geoFieldsChanged.disconnect(self.updateGeographies)
+            self._plan.geoIdCaptionChanged.disconnect(self.updateGeographies)
             self._plan.assignLayer.undoStack().undoTextChanged.disconnect(self.btnUndo.setToolTip)
             self._plan.assignLayer.undoStack().redoTextChanged.disconnect(self.btnRedo.setToolTip)
             self._plan.assignLayer.undoStack().canUndoChanged.disconnect(self.btnUndo.setEnabled)
@@ -210,16 +259,20 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
             self.cmbGeoSelect.setCurrentIndex(i)
 
             self.cmbSource.blockSignals(True)
-            self.cmbSource.setModel(DistrictSelectModel(self._plan, self))
+            self.sourceModel = DistrictSelectModel(self._plan, self)
+            self.cmbSource.setModel(self.sourceModel)
             self.cmbSource.setCurrentIndex(0)
             self.cmbSource.blockSignals(False)
 
             self.cmbTarget.blockSignals(True)
-            self.cmbTarget.setModel(TargetDistrictModel(self._plan, self))
+            self.targetModel = TargetDistrictModel(self._plan, self)
+            self.cmbTarget.setModel(self.targetModel)
             self.cmbTarget.setCurrentIndex(0)
             self.cmbTarget.blockSignals(False)
 
-            self._plan.planChanged.connect(self.reloadFields)
+            self._plan.nameChanged.connect(self.updateName)
+            self._plan.geoFieldsChanged.connect(self.updateGeographies)
+            self._plan.geoIdCaptionChanged.connect(self.updateGeographies)
             self._plan.assignLayer.undoStack().canUndoChanged.connect(self.btnUndo.setEnabled)
             self._plan.assignLayer.undoStack().canRedoChanged.connect(self.btnRedo.setEnabled)
             self._plan.assignLayer.undoStack().undoTextChanged.connect(self.btnUndo.setToolTip)
@@ -233,26 +286,6 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.cmbSource.setEnabled(self._plan is not None)
         self.cmbTarget.setEnabled(self._plan is not None)
         self.cmbGeoSelect.setEnabled(self._plan is not None)
-
-    def __init__(self, plan, parent=None):
-        super(DockRedistrictingToolbox, self).__init__(parent)
-        self.setupUi(self)
-
-        self.cmbGeoSelect.currentIndexChanged.connect(self.cmbGeoFieldChanged)
-        self.cmbTarget.currentIndexChanged.connect(self.cmbTargetChanged)
-        self.cmbSource.currentIndexChanged.connect(self.cmbSourceChanged)
-
-        self.btnUndo.setIcon(QgsApplication.getThemeIcon('/mActionUndo.svg'))
-        self.btnRedo.setIcon(QgsApplication.getThemeIcon('/mActionRedo.svg'))
-        self.btnUndo.setEnabled(False)
-        self.btnRedo.setEnabled(False)
-        self.btnUndo.clicked.connect(self.undo)
-        self.btnRedo.clicked.connect(self.redo)
-
-        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
-        self.btnHelp.clicked.connect(self.btnHelpClicked)
-
-        self.plan = plan
 
     def undo(self):
         if self._plan and self._plan.assignLayer:
@@ -268,30 +301,24 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         i = self.cmbTarget.model().indexFromDistrict(district)
         self.cmbTarget.setCurrentIndex(i)
 
-    def reloadFields(self, plan, prop):
-        if plan != self._plan:
-            return
+    def updateGeographies(self):
+        index = self.cmbGeoSelect.currentIndex()
+        if self._plan.geoFields:
+            model = GeoFieldsModel(self._plan, self)
+        else:
+            model = QgsFieldModel(self)
+            model.setLayer(self._plan.assignLayer)
 
-        if 'districts' in prop:
-            self.cmbSource.model().updateDistricts()
-            self.cmbTarget.model().updateDistricts()
-        elif 'geo-fields' in prop:
-            index = self.cmbGeoSelect.currentIndex()
-            if self._plan.geoFields:
-                model = GeoFieldsModel(self._plan, self)
-            else:
-                model = QgsFieldModel(self)
-                model.setLayer(self._plan.assignLayer)
+        self.cmbGeoSelect.setModel(model)
+        self.cmbGeoSelect.setCurrentIndex(index)
+        if isinstance(model, QgsFieldModel):
+            field = model.fields().field(index).name()
+        else:
+            field = model.fields[index].fieldName
+        self.geoFieldChanged.emit(field)
 
-            self.cmbGeoSelect.setModel(model)
-            self.cmbGeoSelect.setCurrentIndex(index)
-            if isinstance(model, QgsFieldModel):
-                field = model.fields().field(index).name()
-            else:
-                field = model.fields[index].fieldName
-            self.geoFieldChanged.emit(field)
-        elif 'name' in prop:
-            self.lblPlanName.setText(self._plan.name)
+    def updateName(self):
+        self.lblPlanName.setText(self._plan.name)
 
     def cmbGeoFieldChanged(self, index):
         if index == -1:
@@ -307,18 +334,18 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, QDockWidget):
         self.geoFieldChanged.emit(field)
 
     def cmbTargetChanged(self, index):
-        if index < 2:
-            self.targetChanged.emit(0 if index == 1 else None)
-        elif index >= 3:
-            dist = self._plan.districts[index-2]
-            self.targetChanged.emit(dist.district)
+        if self.targetModel is not None:
+            dist = self.targetModel.districtFromIndex(index)
+        else:
+            dist = None
+        self.targetChanged.emit(dist)
 
     def cmbSourceChanged(self, index):
-        if index < 2:
-            self.sourceChanged.emit(0 if index == 1 else None)
-        elif index >= 3:
-            dist = self._plan.districts[index-2]
-            self.sourceChanged.emit(dist.district)
+        if self.sourceModel is not None:
+            dist = self.sourceModel.districtFromIndex(index)
+        else:
+            dist = None
+        self.sourceChanged.emit(dist)
 
     def btnHelpClicked(self):
         showHelp('usage/toolbox.html')

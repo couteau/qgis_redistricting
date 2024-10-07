@@ -23,10 +23,21 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Tuple
-from qgis.PyQt.QtWidgets import QWidget, QSpinBox
-from qgis.PyQt.QtGui import QValidator, QIntValidator
-from ..core import RedistrictingPlan
+from typing import (
+    Optional,
+    Tuple
+)
+
+from qgis.PyQt.QtGui import (
+    QIntValidator,
+    QValidator
+)
+from qgis.PyQt.QtWidgets import (
+    QSpinBox,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
 
 
 class RdsDistrictSpinBox(QSpinBox):

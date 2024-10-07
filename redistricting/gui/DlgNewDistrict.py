@@ -22,11 +22,20 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Optional, Union
+from typing import (
+    Optional,
+    Union
+)
+
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import QDialog, QWidget, QDialogButtonBox
+from qgis.PyQt.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
+    QWidget
+)
+
+from ..models import RedistrictingPlan
 from .ui.DlgNewDistrict import Ui_dlgNewDistrict
-from ..core import RedistrictingPlan
 
 
 class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
@@ -34,12 +43,14 @@ class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
                  flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
+        self.sbxDistrictNo.setValue(0)
         self.sbxDistrictNo.setPlan(plan)
         self.sbxDistrictNo.setMaximum(plan.numDistricts)
 
         seatsLeft = plan.numSeats - plan.allocatedSeats
         distsLeft = plan.numDistricts - plan.allocatedDistricts
         self.sbxMembers.setMaximum(seatsLeft - distsLeft + 1)
+        self.sbxDistrictNo.valueChanged.connect(self.updateButton)
 
         i = 1
         for dist in plan.districts[1:]:
@@ -50,10 +61,8 @@ class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
         if (i > plan.numDistricts):
             # No more districts in the plan
             self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
-            self.reject()
-            return
-
-        self.sbxDistrictNo.setValue(i)
+        else:
+            self.sbxDistrictNo.setValue(i)
 
     def updateButton(self):
         self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(

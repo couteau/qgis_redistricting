@@ -35,8 +35,8 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..core import RedistrictingPlan
-from ..core.utils import tr
+from ..models import RedistrictingPlan
+from ..utils import tr
 from ._dlgEditPlanImportPage import dlgEditPlanImportPage
 
 

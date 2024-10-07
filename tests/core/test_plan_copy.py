@@ -21,15 +21,10 @@ import sqlite3
 import pytest
 from pytest_mock import MockerFixture
 from pytestqt.plugin import QtBot
-from qgis.core import (
-    Qgis,
-    QgsProject
-)
+from qgis.core import Qgis
 
-from redistricting.core import (
-    PlanCopier,
-    RedistrictingPlan
-)
+from redistricting.models import RedistrictingPlan
+from redistricting.services import PlanCopier
 
 # pylint: disable=protected-access
 
@@ -44,44 +39,30 @@ class TestPlanCopier:
         assert copier._plan is valid_plan
 
     def test_copy_without_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.core.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
-        copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False, False)
+        copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False)
         builder_class.fromPlan.assert_called_once()
         builder.setName.assert_called_once()
-        builder.createPlan.assert_called_once_with(QgsProject.instance(), True)
+        builder.createPlan.assert_called_once_with(True, planParent=None)
 
     def test_copy_with_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture, qtbot: QtBot):
-        builder_class = mocker.patch('redistricting.core.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         with qtbot.wait_signal(copier.copyComplete):
-            copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), True, False)
+            copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), True)
         builder_class.fromPlan.assert_called_once()
         builder.setName.assert_called_once()
-        builder.createPlan.assert_called_once_with(QgsProject.instance(), False)
-
-    def test_copy_with_styles(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.core.PlanCopy.PlanBuilder')
-        builder = builder_class.fromPlan.return_value
-        styler_class = mocker.patch('redistricting.core.PlanCopy.PlanStyler')
-        styler = styler_class.return_value
-
-        plan = copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), True, True)
-        builder_class.fromPlan.assert_called_once()
-        builder.setName.assert_called_once()
-        builder.createPlan.assert_called_once_with(QgsProject.instance(), False)
-
-        styler_class.assert_called_once_with(plan)
-        styler.copyStyles.assert_called_once()
+        builder.createPlan.assert_called_once_with(False, planParent=None)
 
     def test_copy_no_gpkg_raises_error(self, copier: PlanCopier, mocker: MockerFixture):
-        mocker.patch('redistricting.core.PlanCopy.PlanBuilder')
+        mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
         with pytest.raises(ValueError):
             plan = copier.copyPlan('copied', 'copy of plan',  None)
             assert not plan
 
     def test_copy_create_errors_sets_error(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.core.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         builder.createPlan.return_value = None
         builder.errors.return_value = [('create error', Qgis.Critical)]

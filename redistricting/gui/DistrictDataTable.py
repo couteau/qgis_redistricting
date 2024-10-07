@@ -31,7 +31,10 @@ from typing import (
     Optional
 )
 
-from qgis.core import QgsApplication
+from qgis.core import (
+    QgsApplication,
+    QgsProject
+)
 from qgis.PyQt.QtCore import (
     QAbstractTableModel,
     QCoreApplication,
@@ -42,27 +45,37 @@ from qgis.PyQt.QtCore import (
     Qt
 )
 from qgis.PyQt.QtGui import (
+    QColor,
     QContextMenuEvent,
     QFont,
     QKeySequence
 )
 from qgis.PyQt.QtWidgets import (
     QAction,
+    QDialog,
     QDockWidget,
     QMenu,
     QWidget
 )
 
-from ..core import (
-    DistrictDataModel,
+from ..models import (
     Field,
     PlanStats,
-    RedistrictingPlan,
+    RedistrictingPlan
+)
+from ..services import (
+    ActionRegistry,
+    DistrictCopier,
+    DistrictUpdater
+)
+from ..services.clipboard import DistrictClipboardAccess
+from ..utils import (
     showHelp,
     tr
 )
-from .DistrictActions import DistrictActions
+from .DistrictDataModel import DistrictDataModel
 from .DlgEditFields import DlgEditFields
+from .DlgNewDistrict import DlgNewDistrict
 from .DlgSplits import DlgSplitDetail
 from .RdsOverlayWidget import OverlayWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
@@ -71,12 +84,15 @@ from .ui.DistrictDataTable import Ui_qdwDistrictData
 class StatsModel(QAbstractTableModel):
     StatLabels = [
         tr('Population'),
-        tr('Avg. Polsby-Popper'),
-        tr('Avg. Reock'),
-        tr('Avg. Convex-Hull'),
-        tr('Cut Edges'),
+        tr('Continguous'),
+        tr('Compactness'),
+        tr('   Avg. Polsby-Popper'),
+        tr('   Avg. Reock'),
+        tr('   Avg. Convex-Hull'),
+        tr('   Cut Edges'),
         tr('Splits')
     ]
+    SPLITS_OFFSET = 8
 
     def __init__(self, stats: PlanStats, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -104,7 +120,7 @@ class StatsModel(QAbstractTableModel):
         if parent.isValid():
             return 0
 
-        c = 5
+        c = StatsModel.SPLITS_OFFSET - 1
         if self._stats:
             c += 1 + len(self._stats.splits)
         return c
@@ -114,7 +130,9 @@ class StatsModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
         if orientation == Qt.Vertical and role == Qt.DisplayRole:
-            return self.StatLabels[section] if section <= 5 else '   ' + self._stats.splits.headings[section-6]
+            return StatsModel.StatLabels[section] \
+                if section < StatsModel.SPLITS_OFFSET \
+                else '   ' + self._stats.splits.headings[section-StatsModel.SPLITS_OFFSET]
 
         return None
 
@@ -127,25 +145,35 @@ class StatsModel(QAbstractTableModel):
             if row == 0:
                 result = f'{self._stats.totalPopulation:,}'
             elif row == 1:
+                result = tr('Yes') if self._stats.contiguous else tr('No')
+            elif row == 3:
                 avgPP = self._stats.avgPolsbyPopper
                 result = f'{avgPP:.3f}' if avgPP is not None else ''
-            elif row == 2:
+            elif row == 4:
                 avgReock = self._stats.avgReock
                 result = f'{avgReock:.3f}' if avgReock is not None else ''
-            elif row == 3:
+            elif row == 5:
                 avgCH = self._stats.avgConvexHull
                 result = f'{avgCH:.3f}' if avgCH is not None else ''
-            elif row == 4:
+            elif row == 6:
                 result = f'{self._stats.cutEdges:,}' if self._stats.cutEdges else ''
-            elif row == 5:
+            elif row in (2, StatsModel.SPLITS_OFFSET - 1):
                 result = None
-            elif row <= 6 + len(self._stats.splits):
-                result = f'{len(self._stats.splits[row-6]):,}'
+            elif row <= StatsModel.SPLITS_OFFSET + len(self._stats.splits):
+                result = f'{len(self._stats.splits[row-StatsModel.SPLITS_OFFSET]):,}'
             else:
                 result = None
         elif role == Qt.FontRole:
             result = QFont()
             result.setBold(True)
+        elif role == Qt.TextColorRole:
+            if row == 1:
+                if not self._stats.contiguous:
+                    result = QColor(Qt.red)
+                else:
+                    result = QColor(Qt.green)
+            else:
+                result = None
         else:
             result = None
 
@@ -153,46 +181,15 @@ class StatsModel(QAbstractTableModel):
 
 
 class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
-    @property
-    def plan(self) -> RedistrictingPlan:
-        return self._plan
-
-    @plan.setter
-    def plan(self, value: RedistrictingPlan):
-        if self._plan:
-            self._plan.planChanged.disconnect(self.planChanged)
-            self._plan.districtsUpdating.disconnect(self.lblWaiting.start)
-            self._plan.districtsUpdated.disconnect(self.lblWaiting.stop)
-            self._plan.districtUpdateTerminated.disconnect(self.lblWaiting.stop)
-
-        if self._dlgSplits:
-            self._dlgSplits.close()
-            self._dlgSplits = None
-
-        self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
-        self._plan = value
-        self._model.plan = value
-
-        if self._plan is None:
-            self.btnAddFields.setEnabled(False)
-            self.btnRecalculate.setEnabled(False)
-            self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
-            self._statsModel.setStats(None)
-        else:
-            self._plan.planChanged.connect(self.planChanged)
-            self._plan.districtsUpdating.connect(self.lblWaiting.start)
-            self._plan.districtsUpdated.connect(self.lblWaiting.stop)
-            self._plan.districtUpdateTerminated.connect(self.lblWaiting.stop)
-            self.btnAddFields.setEnabled(True)
-            self.btnRecalculate.setEnabled(True)
-            self.lblPlanName.setText(self._plan.name)
-            self._statsModel.setStats(self._plan.stats)
-
-    def __init__(self, plan: RedistrictingPlan, districtCopier: DistrictActions, parent: QObject = None):
+    def __init__(self, updateService: DistrictUpdater, districtCopier: DistrictCopier, parent: QObject = None):
         super().__init__(parent)
         self.setupUi(self)
 
         self.districtCopier = districtCopier
+        self.updateService = updateService
+        self.updateService.updateStarted.connect(self.updateStarted)
+        self.updateService.updateComplete.connect(self.updateComplete)
+        self.updateService.updateTerminated.connect(self.updateTerminated)
 
         self.fieldStats: Dict[Field, QWidget] = {}
 
@@ -224,7 +221,8 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         self._dlgSplits: DlgSplitDetail = None
 
         self._plan: RedistrictingPlan = None
-        self.plan = plan
+
+        self.actionRegistry = ActionRegistry()
 
         self.actionCopy = QAction(
             QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
@@ -238,27 +236,65 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
 
         self.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tblDataTable.customContextMenuRequested.connect(self.createDataTableConextMenu)
+        self.tblDataTable.doubleClicked.connect(self.editDistrict)
 
-    def planChanged(self, plan: RedistrictingPlan, props: set[str]):  # pylint: disable=unused-argument
-        if plan != self._plan:
-            return
+    @property
+    def plan(self) -> RedistrictingPlan:
+        return self._plan
 
-        if "name" in props:
-            self.lblPlanName.setText(plan.name)
+    @plan.setter
+    def plan(self, value: RedistrictingPlan):
+        if self._dlgSplits:
+            self._dlgSplits.close()
+            self._dlgSplits = None
+
+        self.gbxPlanStats.setContentsMargins(0, 20, 0, 0)
+        self._plan = value
+        self._model.plan = value
+
+        if self._plan is None:
+            self.btnAddFields.setEnabled(False)
+            self.btnRecalculate.setEnabled(False)
+            self.lblPlanName.setText(QCoreApplication.translate('Redistricting', 'No plan selected'))
+            self._statsModel.setStats(None)
+        else:
+            self._plan.nameChanged.connect(self.planChanged)
+            self.btnAddFields.setEnabled(True)
+            self.btnRecalculate.setEnabled(True)
+            self.lblPlanName.setText(self._plan.name)
+            self._statsModel.setStats(self._plan.stats)
+
+    def planChanged(self, name):
+        self.lblPlanName.setText(name)
+
+    def updateStarted(self, plan: RedistrictingPlan):
+        if plan == self._plan:
+            self.lblWaiting.start()
+
+    def updateComplete(self, plan: RedistrictingPlan, districts: Optional[set[int]] = None):
+        if plan == self._plan:
+            self.lblWaiting.stop()
+            self._model.districtsUpdated(districts)
+
+    def updateTerminated(self, plan: RedistrictingPlan):
+        if plan == self._plan:
+            self.lblWaiting.stop()
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)
         dlg.exec_()
 
     def recalculate(self):
-        self._plan.updateDistricts(False)
+        self.updateService.updateDistricts(self._plan, needDemographics=True, needSplits=True)
 
     def copyMimeDataToClipboard(self, selection: Optional[list[QModelIndex]] = None):
         """Copy district data to clipboard in html table format"""
         if selection:
             selection = ((s.row(), s.column()) for s in selection)
-        html = self._plan.districts.getAsHtml(selection)
-        text = self._plan.districts.getAsCsv(selection)
+
+        clipboard = DistrictClipboardAccess()
+        html = clipboard.getAsHtml(self._plan, selection)
+        text = clipboard.getAsCsv(self._plan, selection)
         mime = QMimeData()
         mime.setHtml(html)
         mime.setData("application/csv", text.encode())
@@ -296,17 +332,17 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
         idx = self.tblDataTable.indexAt(pos)
         district = self._plan.districts[idx.row()]
 
-        menu.addAction(self.districtCopier.actionCopyDistrict)
-        self.districtCopier.actionCopyDistrict.setData(district.district)
-        self.districtCopier.actionCopyDistrict.setEnabled(district.district != 0)
-        menu.addAction(self.districtCopier.actionPasteDistrict)
-        self.districtCopier.actionPasteDistrict.setData(district.district)
-        self.districtCopier.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self._plan))
-        menu.addAction(self.districtCopier.actionZoomToDistrict)
-        self.districtCopier.actionZoomToDistrict.setData(district.district)
-        menu.addAction(self.districtCopier.actionFlashDistrict)
-        self.districtCopier.actionFlashDistrict.setData(district.district)
-        self.districtCopier.actionFlashDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.actionRegistry.actionCopyDistrict)
+        self.actionRegistry.actionCopyDistrict.setData(district.district)
+        self.actionRegistry.actionCopyDistrict.setEnabled(district.district != 0)
+        menu.addAction(self.actionRegistry.actionPasteDistrict)
+        self.actionRegistry.actionPasteDistrict.setData(district.district)
+        self.actionRegistry.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self._plan))
+        menu.addAction(self.actionRegistry.actionZoomToDistrict)
+        self.actionRegistry.actionZoomToDistrict.setData(district.district)
+        menu.addAction(self.actionRegistry.actionFlashDistrict)
+        self.actionRegistry.actionFlashDistrict.setData(district.district)
+        self.actionRegistry.actionFlashDistrict.setEnabled(district.district != 0)
         menu.exec(self.tblDataTable.mapToGlobal(pos))
 
     def btnHelpClicked(self):
@@ -321,3 +357,21 @@ class DockDistrictDataTable(Ui_qdwDistrictData, QDockWidget):
             else:
                 self._dlgSplits = DlgSplitDetail(self._plan, field, self.parent())
             self._dlgSplits.show()
+
+    def editDistrict(self, index: QModelIndex):
+        if index.row() == 0:
+            return
+
+        district = self._plan.districts[index.row()]
+        dlg = DlgNewDistrict(self.plan, self.parent())
+        dlg.setWindowTitle(tr("Edit District"))
+        dlg.sbxDistrictNo.setValue(district.district)
+        dlg.sbxDistrictNo.setReadOnly(True)
+        dlg.inpName.setText(district.name)
+        dlg.sbxMembers.setValue(district.members)
+        dlg.txtDescription.setPlainText(district.description)
+        if dlg.exec() == QDialog.Accepted:
+            district.name = dlg.districtName
+            district.members = dlg.members
+            district.description = dlg.description
+            QgsProject.instance().setDirty()

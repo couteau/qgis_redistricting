@@ -23,8 +23,8 @@ from pytestqt.plugin import QtBot
 from qgis.core import QgsProject
 from qgis.PyQt.QtXml import QDomDocument
 
-from redistricting.core.Plan import RedistrictingPlan
-from redistricting.core.storage import ProjectStorage
+from redistricting.models import RedistrictingPlan
+from redistricting.services import ProjectStorage
 
 
 class TestStorage:
@@ -38,7 +38,7 @@ class TestStorage:
         project = QgsProject.instance()
         doc = QDomDocument()
         with qtbot.waitSignal(project.readProject, check_params_cb=check_params):
-            project.read(str((datadir / 'test_project.qgs').resolve()))
+            project.read(str((datadir / 'test_project.qgz').resolve()))
         return ProjectStorage(project, doc)
 
     @pytest.fixture
@@ -46,34 +46,34 @@ class TestStorage:
         return ProjectStorage(QgsProject.instance(), QDomDocument('plan'))
 
     def test_read_plans(self, storage: ProjectStorage):
-        block_layer = QgsProject.instance().mapLayersByName('tuscaloosa_blocks — plans')[0]
-        assign_layer = QgsProject.instance().mapLayersByName('test_assignments')[0]
-        dist_layer = QgsProject.instance().mapLayersByName('test_districts')[0]
+        block_layer = QgsProject.instance().mapLayersByName('tuscaloosa — block20')[0]
+        assign_layer = QgsProject.instance().mapLayersByName('Test Plan_assignments')[0]
+        dist_layer = QgsProject.instance().mapLayersByName('Test Plan_districts')[0]
         plans = storage.readRedistrictingPlans()
         assert len(plans) == 1
         plan = plans[0]
-        assert plan.name == 'test'
+        assert plan.name == 'Test Plan'
         assert plan.numDistricts == 5
         assert plan.numSeats == 5
         assert plan.popLayer == block_layer
         assert plan.assignLayer == assign_layer
         assert plan.distLayer == dist_layer
         assert len(plan.districts) == 6
-        assert len(plan.dataFields) == 3 and plan.dataFields[0].layer == block_layer
-        assert len(plan.geoFields) == 1 and plan.geoFields[0].layer == block_layer
+        assert len(plan.dataFields) == 11 and plan.dataFields[0].layer == block_layer
+        assert len(plan.geoFields) == 2 and plan.geoFields[0].layer == block_layer
 
     def test_read_active_plan(self, storage: ProjectStorage):
         u = storage.readActivePlan()
-        assert str(u) == '65a4a8c5-0fbe-4bfb-ae7f-3a5e7562f1aa'
+        assert str(u) == 'b63a8bbe-124d-4be2-953e-0a5b0d70fb91'
 
     def test_write_plan(
         self,
         empty_storage: ProjectStorage,
-        plan: RedistrictingPlan,
+        mock_plan: RedistrictingPlan,
         dist_layer,
         block_layer
     ):
-        empty_storage.writeRedistrictingPlans([plan])
+        empty_storage.writeRedistrictingPlans([mock_plan])
         l, result = QgsProject.instance().readListEntry('redistricting', 'redistricting-plans')
         assert result
         assert len(l) == 1
@@ -83,7 +83,7 @@ class TestStorage:
         assert j['geo-layer'] == block_layer.id()
         assert j['dist-layer'] == dist_layer.id()
 
-    def test_write_active_plan(self, empty_storage: ProjectStorage, plan):
-        empty_storage.writeActivePlan(plan)
+    def test_write_active_plan(self, empty_storage: ProjectStorage, mock_plan):
+        empty_storage.writeActivePlan(mock_plan)
         planid, _ = QgsProject.instance().readEntry('redistricting', 'active-plan')
-        assert planid == str(plan.id)
+        assert planid == str(mock_plan.id)

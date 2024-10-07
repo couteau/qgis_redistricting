@@ -23,14 +23,29 @@
  ***************************************************************************/
 """
 from qgis.PyQt.QtWidgets import QDockWidget
-from .ui.PendingChanges import Ui_qdwPendingChanges
+
+from ..models import RedistrictingPlan
+from ..services import DeltaUpdateService
+from .DeltaListModel import DeltaListModel
 from .RdsOverlayWidget import OverlayWidget
-from ..core import RedistrictingPlan, DeltaListModel
+from .ui.PendingChanges import Ui_qdwPendingChanges
 
 
 class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
+    def __init__(self, deltaService: DeltaUpdateService, parent=None):
+        super().__init__(parent)
+        self.setupUi(self)
+        self.lblWaiting = OverlayWidget(self.tblPending)
+        self.lblWaiting.setVisible(False)
 
-    _plan: RedistrictingPlan = None
+        self._model = DeltaListModel(self)
+        self.tblPending.setModel(self._model)
+        self._plan = None
+
+        self.deltaService = deltaService
+        self.deltaService.updateStarted.connect(self.showOverlay)
+        self.deltaService.updateCompleted.connect(self.hideOverlay)
+        self.deltaService.updateTerminated.connect(self.hideOverlay)
 
     @property
     def plan(self) -> RedistrictingPlan:
@@ -38,26 +53,18 @@ class DockPendingChanges(Ui_qdwPendingChanges, QDockWidget):
 
     @plan.setter
     def plan(self, value: RedistrictingPlan):
-        self._plan = value
-        self._model.setPlan(value)
-        if not value and self.lblWaiting.isVisible():
+        if self._plan != value:
+            if self.lblWaiting.isVisible():
+                self.lblWaiting.stop()
+            self._plan = value
+            self._model.setPlan(value)
+            if self.deltaService.isUpdating(self._plan):
+                self.lblWaiting.start()
+
+    def showOverlay(self, plan: RedistrictingPlan):
+        if plan == self._plan:
+            self.lblWaiting.start()
+
+    def hideOverlay(self, plan):
+        if plan == self._plan:
             self.lblWaiting.stop()
-
-    def __init__(self, plan, parent=None):
-        super().__init__(parent)
-        self.setupUi(self)
-        self.lblWaiting = OverlayWidget(self.tblPending)
-        self.lblWaiting.setVisible(False)
-
-        self._model = DeltaListModel(None, self)
-        self.tblPending.setModel(self._model)
-        self.plan = plan
-
-        self._model.modelAboutToBeReset.connect(self.showOverlay)
-        self._model.modelReset.connect(self.hideOverlay)
-
-    def showOverlay(self):
-        self.lblWaiting.start()
-
-    def hideOverlay(self):
-        self.lblWaiting.stop()
