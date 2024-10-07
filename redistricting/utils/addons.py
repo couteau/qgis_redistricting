@@ -151,7 +151,3 @@ def install_pyogrio():
 
 def install_pyarrow():
     return install_addon('pyarrow')
-
-
-def install_gerrychain():
-    return install_addon('gerrychain==0.3.1')

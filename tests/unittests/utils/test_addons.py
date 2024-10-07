@@ -1,8 +1,8 @@
 import pathlib
 import shutil
-import sys
 
 import pytest
+from qgis.PyQt.QtCore import QStandardPaths
 
 import redistricting
 
@@ -22,31 +22,24 @@ class TestAddons:
 
         assert not vendor_dir.exists()
 
-        addons.install_pyogrio()
+        process = addons.install_pyogrio()
+        process.waitForFinished()
 
         assert (vendor_dir / 'geopandas').exists()
         assert (vendor_dir / 'pyogrio').exists()
-        assert 'geopandas' in sys.modules
-        assert sys.modules['geopandas'].__spec__.origin == str(vendor_dir / 'geopandas' / '__init__.py')
+        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0])
+                / 'startup.py').exists()
+        (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0]) / 'startup.py').unlink()
 
     def test_install_pyarrow(self, vendor_dir):
         from redistricting.utils import addons
 
         assert not vendor_dir.exists()
 
-        addons.install_pyarrow()
+        process = addons.install_pyarrow()
+        process.waitForFinished()
 
         assert (vendor_dir / 'pyarrow').exists()
-        assert 'pyarrow' in sys.modules
-        assert sys.modules['pyarrow'].__spec__.origin == str(vendor_dir / 'pyarrow' / '__init__.py')
-
-    def test_install_gerrychain(self, vendor_dir):
-        from redistricting.utils import addons
-
-        assert not vendor_dir.exists()
-
-        addons.install_gerrychain()
-
-        assert (vendor_dir / 'gerrychain').exists()
-        assert 'gerrychain' in sys.modules
-        assert sys.modules['gerrychain'].__spec__.origin == str(vendor_dir / 'gerrychain' / '__init__.py')
+        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0])
+                / 'startup.py').exists()
+        (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0]) / 'startup.py').unlink()
