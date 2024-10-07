@@ -30,6 +30,7 @@ from typing import (
 
 from qgis.PyQt.QtCore import (
     QAbstractItemModel,
+    QEvent,
     QModelIndex,
     Qt,
     pyqtProperty
@@ -52,6 +53,7 @@ class RdsTableView(QTableView):
         self.init()
 
         self.horizontalHeader().sectionResized.connect(self.updateSectionWidth)
+        self.horizontalHeader().sortIndicatorChanged.connect(self.updateSortIndicator)
         self.verticalHeader().sectionResized.connect(self.updateSectionHeight)
         self._frozenColumnsView.verticalScrollBar().valueChanged.connect(self.verticalScrollBar().setValue)
         self.verticalScrollBar().valueChanged.connect(self._frozenColumnsView.verticalScrollBar().setValue)
@@ -85,6 +87,17 @@ class RdsTableView(QTableView):
         self.setHorizontalScrollMode(QTableView.ScrollPerPixel)
         self.setVerticalScrollMode(QTableView.ScrollPerPixel)
         self._frozenColumnsView.setVerticalScrollMode(QTableView.ScrollPerPixel)
+
+    def edit(self, index: QModelIndex, trigger: QAbstractItemView.EditTrigger, event: QEvent) -> bool:
+        if index.column() < self._frozenColumnCount:
+            return self._frozenColumnsView.edit(index, trigger, event)
+
+        return super().edit(index, trigger, event)
+
+    def updateSortIndicator(self):
+        self._frozenColumnsView.horizontalHeader().setSortIndicator(
+            self.horizontalHeader().sortIndicatorSection(), self.horizontalHeader().sortIndicatorOrder())
+        self._frozenColumnsView.horizontalHeader().setSortIndicatorShown(self.horizontalHeader().isSortIndicatorShown())
 
     def resizeEvent(self, e: QResizeEvent):
         super().resizeEvent(e)
