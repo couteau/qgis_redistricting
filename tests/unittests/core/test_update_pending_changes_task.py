@@ -16,8 +16,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from redistricting.models.Plan import RdsPlan
-from redistricting.services.Tasks.UpdatePendingTask import (
+from redistricting.models.plan import RdsPlan
+from redistricting.services.tasks.updatepending import (
     AggregatePendingChangesTask
 )
 

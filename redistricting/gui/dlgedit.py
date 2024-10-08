@@ -38,15 +38,15 @@ from ..models import (
     RdsPlan
 )
 from ..utils import tr
-from ._dlgEditPlanDetailsPage import dlgEditPlanDetailsPage
-from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
-from ._dlgEditPlanGeoPage import dlgEditPlanGeoPage
-from ._dlgEditPlanImportPage import dlgEditPlanImportPage
-from ._dlgEditPlanPopPage import dlgEditPlanPopPage
 from .help import showHelp
-from .RdsFieldComboBox import RdsFieldComboBox
-from .RdsFieldTableView import RdsFieldTableView
-from .RdsMapLayerComboBox import RdsMapLayerComboBox
+from .rdsfieldcombobox import RdsFieldComboBox
+from .rdsfieldtableview import RdsFieldTableView
+from .rdsmaplayercombobox import RdsMapLayerComboBox
+from .wzpeditplandatafields import dlgEditPlanFieldPage
+from .wzpeditplandetails import dlgEditPlanDetailsPage
+from .wzpeditplangeofields import dlgEditPlanGeoPage
+from .wzpeditplanimport import dlgEditPlanImportPage
+from .wzpeditplanpopfields import dlgEditPlanPopPage
 
 iface: QgisInterface
 

@@ -23,7 +23,7 @@ from pytestqt.plugin import QtBot
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon
 
-from redistricting.gui.RdsFieldTableView import (
+from redistricting.gui.rdsfieldtableview import (
     FieldListModel,
     RdsFieldTableView
 )

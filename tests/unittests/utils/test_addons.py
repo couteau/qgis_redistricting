@@ -12,11 +12,13 @@ class TestAddons:
     @pytest.fixture
     def vendor_dir(self):
         d = pathlib.Path(redistricting.__file__).parent / "vendor"
+
         yield d
 
         if d.exists():
             shutil.rmtree(d)
 
+    @pytest.mark.xdist_group("addons")
     def test_install_pyogrio(self, vendor_dir):
         from redistricting.utils import addons
 
@@ -31,6 +33,7 @@ class TestAddons:
                 / 'startup.py').exists()
         (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0]) / 'startup.py').unlink()
 
+    @pytest.mark.xdist_group("addons")
     def test_install_pyarrow(self, vendor_dir):
         from redistricting.utils import addons
 

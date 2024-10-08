@@ -19,7 +19,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  ***************************************************************************/
 """
 from redistricting.models import RdsDistrict
-from redistricting.services.DistrictIO import DistrictReader
+from redistricting.services.districtio import DistrictReader
 
 
 class TestDistrictReader:

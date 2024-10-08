@@ -43,8 +43,8 @@ from qgis.PyQt.QtWidgets import (
 from ..models import RdsPlan
 from ..services import PlanManager
 from ..utils import tr
-from .BaseCtlr import BaseController
-from .PlanCtlr import PlanController
+from .base import BaseController
+from .plan import PlanController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction

@@ -37,11 +37,13 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .base import (
+from .base.lists import (
+    KeyedList,
+    KeyedListFactory
+)
+from .base.model import (
     MISSING,
     Factory,
-    KeyedList,
-    KeyedListFactory,
     RdsBaseModel,
     in_range,
     not_empty,
@@ -51,18 +53,18 @@ from .columns import (
     DistrictColumns,
     MetricsColumns
 )
-from .District import (
+from .district import (
     DistrictList,
     RdsDistrict,
     RdsUnassigned
 )
-from .DistrictValid import BaseDeviationValidator
-from .Field import (
+from .field import (
     RdsDataField,
     RdsField,
     RdsGeoField
 )
-from .Splits import RdsSplits
+from .splits import RdsSplits
+from .validators import BaseDeviationValidator
 
 
 class DeviationType(IntEnum):
@@ -70,7 +72,7 @@ class DeviationType(IntEnum):
     TopToBottom = 1
 
 
-class RdsPlanMetrics(RdsBaseModel):
+class RdsMetrics(RdsBaseModel):
     metricsAboutToChange = pyqtSignal()
     metricsChanged = pyqtSignal()
 
@@ -222,7 +224,7 @@ class RdsPlan(RdsBaseModel):
     districts: DistrictList = rds_property(
         private=True, serialize=False, factory=DistrictList
     )
-    metrics: RdsPlanMetrics = Factory[RdsPlanMetrics](RdsPlanMetrics)
+    metrics: RdsMetrics = Factory[RdsMetrics](RdsMetrics)
     totalPopulation: int = 0
 
     geoLayer: QgsVectorLayer = rds_property(private=True, fvalid=_validLayer, default=None)

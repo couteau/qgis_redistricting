@@ -70,12 +70,17 @@ class ConstStr(str):
 
 class ConstantsMeta(type):
     """Simplified Enum type class where members are strings, not instances of the Enum"""
-    _member_names: dict[str, ConstStr]
+    _members: dict[str, ConstStr]
 
     def __new__(cls, name, bases, classdict: dict[str, Any]):
         ignore = classdict.get('_ignore', [])
 
-        member_names = {}
+        members = {}
+        for c in bases:
+            # TODO: check for conflicts if multiple bases are ConstantsMeta instances
+            if isinstance(c, ConstantsMeta):
+                members.update(c._members)
+
         for f, v in classdict.items():
             if f.startswith("_") or f in ignore or isinstance(v, type):
                 continue
@@ -83,8 +88,8 @@ class ConstantsMeta(type):
             if hasattr(v, '__qualname__') and v.__qualname__.startswith(f'{name}.'):
                 continue
 
-            if f in member_names:
-                raise TypeError(f'{f!r} already defined as {member_names[f]!r}')
+            if f in members:
+                raise TypeError(f'{f!r} already defined as {members[f]!r}')
 
             if isinstance(v, tuple):
                 v, comment = v
@@ -93,26 +98,26 @@ class ConstantsMeta(type):
 
             if isinstance(v, str):
                 if not isinstance(v, ConstStr):
-                    classdict[f] = ConstStr(v, len(member_names), comment)
-                    member_names[f] = classdict[f]
+                    classdict[f] = ConstStr(v, len(members), comment)
+                    members[f] = classdict[f]
                 else:
-                    member_names[f] = v
+                    members[f] = v
 
-        classdict['_member_names'] = member_names
+        classdict['_members'] = members
         return super().__new__(cls, name, bases, classdict)
 
     def __iter__(cls):
-        for v in cls._member_names.values():
+        for v in cls._members.values():
             yield v
 
     def items(cls):
-        return cls._member_names.items()
+        return cls._members.items()
 
     def keys(cls):
-        return cls._member_names.keys()
+        return cls._members.keys()
 
     def values(cls):
-        return cls._member_names.values()
+        return cls._members.values()
 
 
 class DistrictColumns(metaclass=ConstantsMeta):

@@ -51,9 +51,9 @@ from ..models import (
     serialize
 )
 from ..utils import tr
-from .BasePlanBuilder import BasePlanBuilder
-from .DistrictUpdate import DistrictUpdater
-from .Tasks.AddGeoFieldTask import AddGeoFieldToAssignmentLayerTask
+from .basebuilder import BasePlanBuilder
+from .district import DistrictUpdater
+from .tasks.addgeofield import AddGeoFieldToAssignmentLayerTask
 
 # pylint: disable=protected-access
 

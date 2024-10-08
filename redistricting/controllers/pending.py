@@ -31,15 +31,17 @@ from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 
 from ..gui import DockPendingChanges
-from ..models import RdsPlan
-from ..services import (
+from ..models import (
     DeltaFieldFilterProxy,
     DeltaListModel,
+    RdsPlan
+)
+from ..services import (
     DeltaUpdateService,
     PlanManager
 )
 from ..utils import tr
-from .BaseCtlr import DockWidgetController
+from .base import DockWidgetController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction

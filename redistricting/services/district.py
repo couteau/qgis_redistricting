@@ -42,10 +42,10 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from .Tasks import AggregateDistrictDataTask
+from .tasks.updatedistricts import AggregateDistrictDataTask
 
 if TYPE_CHECKING:
-    from ..models.Plan import RdsPlan
+    from ..models import RdsPlan
 
 
 class DistrictUpdater(QObject):

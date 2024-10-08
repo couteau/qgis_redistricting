@@ -26,19 +26,21 @@ from typing import (
 import pytest
 from qgis.PyQt.QtCore import QObject
 
-from redistricting.models.base import (
+from redistricting.models.base.model import (
     Factory,
     PrivateVar,
     RdsBaseModel,
-    deserialize,
     field,
+    get_real_type,
     in_range,
     not_empty,
     rds_property,
-    serialize,
     set_list
 )
-from redistricting.models.base.model import get_real_type
+from redistricting.models.base.serialization import (
+    deserialize,
+    serialize
+)
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 

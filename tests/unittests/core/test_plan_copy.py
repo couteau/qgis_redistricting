@@ -39,7 +39,7 @@ class TestPlanCopier:
         assert copier._plan is valid_plan
 
     def test_copy_without_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False)
         builder_class.fromPlan.assert_called_once()
@@ -47,7 +47,7 @@ class TestPlanCopier:
         builder.createPlan.assert_called_once_with(True, planParent=None)
 
     def test_copy_with_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture, qtbot: QtBot):
-        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         with qtbot.wait_signal(copier.copyComplete):
             copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), True)
@@ -56,13 +56,13 @@ class TestPlanCopier:
         builder.createPlan.assert_called_once_with(False, planParent=None)
 
     def test_copy_no_gpkg_raises_error(self, copier: PlanCopier, mocker: MockerFixture):
-        mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
+        mocker.patch('redistricting.services.copy.PlanBuilder')
         with pytest.raises(ValueError):
             plan = copier.copyPlan('copied', 'copy of plan',  None)
             assert not plan
 
     def test_copy_create_errors_sets_error(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.services.PlanCopy.PlanBuilder')
+        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         builder.createPlan.return_value = None
         builder.errors.return_value = [('create error', Qgis.Critical)]

@@ -53,7 +53,7 @@ from qgis.PyQt.QtGui import (
     QFont
 )
 
-from .PlanManager import PlanManager
+from .planmgr import PlanManager
 
 if TYPE_CHECKING:
     from ..models import RdsPlan

@@ -38,8 +38,8 @@ from ..models import (
     RdsPlan
 )
 from ..utils import tr
-from .ErrorList import ErrorListMixin
-from .Tasks import ExportRedistrictingPlanTask
+from .errormixin import ErrorListMixin
+from .tasks.exportplan import ExportRedistrictingPlanTask
 
 
 class PlanExporter(ErrorListMixin, QObject):

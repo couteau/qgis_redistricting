@@ -54,10 +54,12 @@ from ..gui import (
     DlgImportShape,
     DlgSelectPlan
 )
-from ..models import RdsPlan
+from ..models import (
+    GeoFieldsModel,
+    RdsPlan
+)
 from ..services import (  # ShapefileImporter
     DistrictUpdater,
-    GeoFieldsModel,
     LayerTreeManager,
     PlanBuilder,
     PlanCopier,
@@ -71,7 +73,7 @@ from ..services import (  # ShapefileImporter
 )
 from ..services.actions import PlanAction
 from ..utils import tr
-from .BaseCtlr import BaseController
+from .base import BaseController
 
 # annoyingly, Anaconda QGIS 3.36 converts QAction to a variable type reference instead of a type
 if TYPE_CHECKING:
@@ -164,6 +166,16 @@ class PlanController(BaseController):
         self.project.layersRemoved.disconnect(self.enableNewPlan)
         self.updateService.updateComplete.disconnect(self.planDistrictsUpdated)
         self.importService.importComplete.disconnect(self.importComplete)
+
+        self.planModel = None
+        self.toolbar.removeAction(self.toolBtnAction)
+        self.toolBtnAction = None
+        self.planActions.setParent(None)
+        self.planActions = None
+        self.planMenu.setParent(None)
+        self.planMenu = None
+        self.vectorSubMenu.setParent(None)
+        self.vectorSubMenu = None
 
     def createActions(self):
         self.actionShowPlanManager = self.actions.createAction(

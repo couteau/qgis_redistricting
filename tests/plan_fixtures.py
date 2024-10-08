@@ -29,10 +29,10 @@ from qgis.core import (
 )
 from qgis.PyQt.QtCore import pyqtBoundSignal
 
-from redistricting.models.base.serialize import deserialize
-from redistricting.models.Plan import RdsPlan
-from redistricting.services.DistrictIO import DistrictReader
-from redistricting.services.PlanBldr import PlanBuilder
+from redistricting.models.base.serialization import deserialize
+from redistricting.models.plan import RdsPlan
+from redistricting.services.districtio import DistrictReader
+from redistricting.services.planbuilder import PlanBuilder
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 
@@ -136,7 +136,7 @@ class PlanFixtures:
 
     @pytest.fixture
     def mock_plan(self, mocker: MockerFixture) -> RdsPlan:
-        mocker.patch('redistricting.models.Plan.pyqtSignal', spec=pyqtBoundSignal)
+        mocker.patch('redistricting.models.plan.pyqtSignal', spec=pyqtBoundSignal)
         plan = mocker.create_autospec(
             spec=RdsPlan('mock_plan', 5),
             spec_set=True

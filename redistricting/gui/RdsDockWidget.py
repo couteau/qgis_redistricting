@@ -28,7 +28,7 @@ from qgis.PyQt.QtWidgets import QLabel
 from ..models import RdsPlan
 from ..utils import tr
 from .help import showHelp
-from .RdsOverlayWidget import OverlayWidget
+from .rdsoverlaywidget import OverlayWidget
 
 
 class RdsDockWidget(QgsDockWidget):

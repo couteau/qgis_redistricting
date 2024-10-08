@@ -24,8 +24,8 @@ from redistricting.models import (
     RdsDistrict,
     RdsPlan
 )
-from redistricting.models.District import RdsUnassigned
-from redistricting.models.DistrictValid import (
+from redistricting.models.district import RdsUnassigned
+from redistricting.models.validators import (
     MaxDeviationValidator,
     PlusMinusDeviationValidator
 )

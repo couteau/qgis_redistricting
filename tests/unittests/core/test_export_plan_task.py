@@ -18,9 +18,7 @@
 """
 import pathlib
 
-from redistricting.services.Tasks.ExportPlanTask import (
-    ExportRedistrictingPlanTask
-)
+from redistricting.services.tasks.exportplan import ExportRedistrictingPlanTask
 
 
 class TestExportPlanTask:

@@ -46,7 +46,7 @@ from redistricting.resources import *  # pylint: disable=wildcard-import, unused
 class TestPlanController:
     @pytest.fixture
     def mock_builder(self, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.controllers.PlanCtlr.PlanBuilder', spec=services.PlanBuilder)
+        builder_class = mocker.patch('redistricting.controllers.plan.PlanBuilder', spec=services.PlanBuilder)
         builder = builder_class.return_value
         builder.setName.return_value = builder
         builder.setNumDistricts.return_value = builder
@@ -69,7 +69,7 @@ class TestPlanController:
 
     @pytest.fixture
     def mock_editor(self, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.controllers.PlanCtlr.PlanEditor', spec=services.PlanEditor)
+        builder_class = mocker.patch('redistricting.controllers.plan.PlanEditor', spec=services.PlanEditor)
 
         builder = builder_class.fromPlan.return_value
         builder.setName.return_value = builder
@@ -91,7 +91,7 @@ class TestPlanController:
 
     @pytest.fixture
     def mock_edit_dlg(self, mocker: MockerFixture, datadir):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgEditPlan', spec=gui.DlgEditPlan)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgEditPlan', spec=gui.DlgEditPlan)
         dlg = dlg_class.return_value
         dlg.planName.return_value = 'mocked'
         dlg.numDistricts.return_value = 5
@@ -269,7 +269,7 @@ class TestPlanController:
         delete_gpkg,
         mocker: MockerFixture
     ):
-        dlg = mocker.patch('redistricting.controllers.PlanCtlr.DlgConfirmDelete')
+        dlg = mocker.patch('redistricting.controllers.plan.DlgConfirmDelete')
         dlg.return_value.exec.return_value = QDialog.Accepted
         dlg.return_value.removeLayers.return_value = remove_layers
         dlg.return_value.deleteGeoPackage.return_value = delete_gpkg
@@ -390,7 +390,7 @@ class TestPlanController:
         mocker: MockerFixture,
         qgis_iface
     ):
-        dlg = mocker.patch('redistricting.controllers.PlanCtlr.DlgCopyPlan', spec=gui.DlgCopyPlan)
+        dlg = mocker.patch('redistricting.controllers.plan.DlgCopyPlan', spec=gui.dlgcopy)
 
         controller.copyPlan()
         dlg.assert_not_called()
@@ -405,14 +405,14 @@ class TestPlanController:
         datadir,
         mocker: MockerFixture
     ):
-        dlg = mocker.patch('redistricting.controllers.PlanCtlr.DlgCopyPlan', spec=gui.DlgCopyPlan)
+        dlg = mocker.patch('redistricting.controllers.plan.DlgCopyPlan', spec=gui.DlgCopyPlan)
         dlg.return_value.planName = 'copied'
         dlg.return_value.description = 'copy of plan'
         dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
         dlg.return_value.copyAssignments = copy_assignments
         dlg.return_value.exec.return_value = QDialog.Accepted
 
-        cpy = mocker.patch('redistricting.controllers.PlanCtlr.PlanCopier', spec=services.PlanCopier)
+        cpy = mocker.patch('redistricting.controllers.plan.PlanCopier', spec=services.PlanCopier)
 
         controller_with_active_plan.copyPlan()
         dlg.assert_called_once()
@@ -427,7 +427,7 @@ class TestPlanController:
         mocker: MockerFixture,
         qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgImportPlan', spec=gui.DlgImportPlan)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportPlan', spec=gui.dlgimportequivalency)
 
         controller.importPlan()
         dlg_class.assert_not_called()
@@ -440,7 +440,7 @@ class TestPlanController:
         datadir,
         mocker: MockerFixture
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgImportPlan', spec=gui.DlgImportPlan)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportPlan', spec=gui.DlgImportPlan)
         dlgImportPlan = dlg_class.return_value
         dlgImportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
         dlgImportPlan.joinField = 'geoid20'
@@ -464,7 +464,7 @@ class TestPlanController:
         mocker: MockerFixture,
         qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgImportShape', spec=gui.DlgImportShape)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportShape', spec=gui.DlgImportShape)
 
         controller.importShapefile()
         dlg_class.assert_not_called()
@@ -477,7 +477,7 @@ class TestPlanController:
         datadir,
         mocker: MockerFixture
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgImportShape', spec=gui.DlgImportShape)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportShape', spec=gui.DlgImportShape)
         dlgImportPlan = dlg_class.return_value
         dlgImportPlan.shapefileFileName = str(datadir / 'tuscaloosa.shp')
         dlgImportPlan.distField = 'GEOID20'
@@ -498,7 +498,7 @@ class TestPlanController:
         mocker: MockerFixture,
         qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan', spec=gui.DlgExportPlan)
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgExportPlan', spec=gui.dlgexport)
 
         controller.exportPlan()
         dlg_class.assert_not_called()
@@ -511,8 +511,8 @@ class TestPlanController:
         datadir,
         mocker: MockerFixture
     ):
-        mocker.patch('redistricting.controllers.PlanCtlr.GeoFieldsModel')
-        dlg_class = mocker.patch('redistricting.controllers.PlanCtlr.DlgExportPlan')
+        mocker.patch('redistricting.controllers.plan.GeoFieldsModel')
+        dlg_class = mocker.patch('redistricting.controllers.plan.DlgExportPlan')
         dlgExportPlan = dlg_class.return_value
 
         dlgExportPlan.exportEquivalency = True
@@ -525,7 +525,7 @@ class TestPlanController:
         dlgExportPlan.includeMetrics = True
         dlgExportPlan.exec.return_value = QDialog.Accepted
 
-        exporter_class = mocker.patch('redistricting.controllers.PlanCtlr.PlanExporter',
+        exporter_class = mocker.patch('redistricting.controllers.plan.PlanExporter',
                                       spec=services.PlanExporter)
 
         controller_with_active_plan.exportPlan()

@@ -34,10 +34,8 @@ from typing import (
 from qgis.PyQt.QtCore import QObject
 
 if TYPE_CHECKING:
-    from . import (
-        RdsDistrict,
-        RdsPlan
-    )
+    from .district import RdsDistrict
+    from .plan import RdsPlan
 
 
 class BaseDeviationValidator(QObject):

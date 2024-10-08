@@ -23,7 +23,7 @@ from pytest_mock import MockerFixture
 from qgis.core import QgsLayerTreeGroup
 from qgis.gui import QgisInterface
 
-from redistricting.services.LayerTreeMgr import LayerTreeManager
+from redistricting.services.layertree import LayerTreeManager
 
 # pylint: disable=unused-argument
 
@@ -35,8 +35,8 @@ class TestLayerTreeManager:
 
     @pytest.fixture
     def manager(self, mocker: MockerFixture):
-        mocker.patch("redistricting.services.LayerTreeMgr.QgsLayerTreeGroup")
-        mocker.patch("redistricting.services.LayerTreeMgr.QgsProject")
+        mocker.patch("redistricting.services.layertree.QgsLayerTreeGroup")
+        mocker.patch("redistricting.services.layertree.QgsProject")
         manager = LayerTreeManager()
         return manager
 

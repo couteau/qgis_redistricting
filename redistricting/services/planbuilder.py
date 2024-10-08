@@ -46,9 +46,9 @@ from ..models import (
     serialize
 )
 from ..utils import tr
-from .BasePlanBuilder import BasePlanBuilder
-from .DistrictIO import DistrictReader
-from .Tasks import CreatePlanLayersTask
+from .basebuilder import BasePlanBuilder
+from .districtio import DistrictReader
+from .tasks.createlayers import CreatePlanLayersTask
 
 
 class PlanBuilder(BasePlanBuilder):

@@ -37,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
 
 from ..models import RdsPlan
 from ..utils import tr
-from ._dlgEditPlanImportPage import dlgEditPlanImportPage
+from .wzpeditplanimport import dlgEditPlanImportPage
 
 
 class DlgImportPlan(QDialog):

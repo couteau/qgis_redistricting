@@ -29,14 +29,14 @@ from redistricting.controllers import PendingChangesController
 from redistricting.gui import DockPendingChanges
 from redistricting.models import (
     DeltaList,
+    DeltaListModel,
     RdsPlan
 )
 from redistricting.services import (
-    DeltaListModel,
     DeltaUpdateService,
     PlanManager
 )
-from redistricting.services.DeltaUpdate import DeltaUpdate
+from redistricting.services.delta import DeltaUpdate
 
 # pylint: disable=unused-argument, protected-access
 

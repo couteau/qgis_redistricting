@@ -24,8 +24,8 @@ from uuid import uuid4
 import pytest
 from pytest_mock import MockerFixture
 
-from redistricting.models.Plan import RdsPlan
-from redistricting.services.PlanManager import PlanManager
+from redistricting.models.plan import RdsPlan
+from redistricting.services.planmgr import PlanManager
 
 
 class TestPlanManager:

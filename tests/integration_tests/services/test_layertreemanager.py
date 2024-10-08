@@ -26,7 +26,7 @@ from redistricting.models import (
     deserialize
 )
 from redistricting.services import LayerTreeManager
-from redistricting.services.DistrictIO import DistrictReader
+from redistricting.services.districtio import DistrictReader
 
 # pylint: disable=unused-argument,protected-access
 

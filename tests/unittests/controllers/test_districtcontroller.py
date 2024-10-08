@@ -48,7 +48,7 @@ from redistricting.services import DistrictCopier
 class TestDistrictController:
     @pytest.fixture(autouse=True)
     def dockwidget(self, mocker: MockerFixture):
-        widget_class = mocker.patch('redistricting.controllers.DistrictCtlr.DockDistrictDataTable')
+        widget_class = mocker.patch('redistricting.controllers.district.DockDistrictDataTable')
         return widget_class
 
     @pytest.fixture
@@ -141,7 +141,7 @@ class TestDistrictController:
         canvas.flashFeatureIds.assert_called_once()
 
     def test_context_menu_event(self, controller: DistrictController, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.DistrictCtlr.QMenu')
+        mocker.patch('redistricting.controllers.district.QMenu')
         event = QContextMenuEvent(QContextMenuEvent.Mouse, QPoint(0, 0), QPoint(0, 0), Qt.NoModifier)
         assert controller.eventFilter(controller.dockwidget, event)
 
@@ -149,14 +149,14 @@ class TestDistrictController:
         assert not controller.eventFilter(controller.dockwidget, event)
 
     def test_data_table_context_menu(self, controller: DistrictController, mocker: MockerFixture):
-        menu = mocker.patch('redistricting.controllers.DistrictCtlr.QMenu')
+        menu = mocker.patch('redistricting.controllers.district.QMenu')
         controller.load()
         assert menu.return_value.addAction.call_count == 5
         menu.return_value.addAction.assert_any_call(controller.actionCopyDistrict)
 
     def test_copy_data_to_clipboard(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):
-        clipboard = mocker.patch('redistricting.controllers.DistrictCtlr.DistrictClipboardAccess')
-        mime = mocker.patch('redistricting.controllers.DistrictCtlr.QMimeData')
+        clipboard = mocker.patch('redistricting.controllers.district.DistrictClipboardAccess')
+        mime = mocker.patch('redistricting.controllers.district.QMimeData')
         set_mime = mocker.patch.object(QgsApplication.instance().clipboard(), 'setMimeData')
         controller_with_active_plan.copyToClipboard()
         clipboard.assert_called_once()
@@ -166,8 +166,8 @@ class TestDistrictController:
         set_mime.assert_called_once()
 
     def test_copy_data_to_clipboard_with_selection(self, controller_with_active_plan: DistrictController, dockwidget, mocker: MockerFixture):
-        clipboard = mocker.patch('redistricting.controllers.DistrictCtlr.DistrictClipboardAccess')
-        mime = mocker.patch('redistricting.controllers.DistrictCtlr.QMimeData')
+        clipboard = mocker.patch('redistricting.controllers.district.DistrictClipboardAccess')
+        mime = mocker.patch('redistricting.controllers.district.QMimeData')
         set_mime = mocker.patch.object(QgsApplication.instance().clipboard(), 'setMimeData')
         index = mocker.create_autospec(spec=QModelIndex, instance=True)
         index.row.return_value = 1
@@ -187,7 +187,7 @@ class TestDistrictController:
         mock_updater.updateDistricts.assert_called_once()
 
     def test_edit_district(self, controller_with_active_plan: DistrictController, qgis_iface, mock_project, mock_planmanager, mock_toolbar, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.controllers.EditCtlr.DlgNewDistrict')
+        dlg = mocker.patch('redistricting.controllers.edit.DlgNewDistrict')
         # pylint: disable-next=unused-variable
         editctlr = EditAssignmentsController(
             qgis_iface, mock_project, mock_planmanager, mock_toolbar, mocker.MagicMock())

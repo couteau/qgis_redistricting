@@ -36,7 +36,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..models import RdsPlan
-from ._dlgEditPlanFieldPage import dlgEditPlanFieldPage
+from .wzpeditplandatafields import dlgEditPlanFieldPage
 
 
 class DlgEditFields(QDialog):

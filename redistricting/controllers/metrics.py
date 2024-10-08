@@ -71,17 +71,17 @@ from ..gui import (
 from ..models import (
     DistrictColumns,
     RdsGeoField,
-    RdsPlan
+    RdsMetricsModel,
+    RdsPlan,
+    RdsSplitsModel
 )
 from ..services import (
     ActionRegistry,
     DistrictUpdater,
-    PlanManager,
-    RdsPlanMetricsModel,
-    RdsSplitsModel
+    PlanManager
 )
 from ..utils import tr
-from .BaseCtlr import DockWidgetController
+from .base import DockWidgetController
 
 
 class RdsNullsAsBlanksDelegate(QStyledItemDelegate):
@@ -99,7 +99,7 @@ class MetricsController(DockWidgetController):
 
         self.dockwidget: DockPlanMetrics
 
-        self.metricsModel = RdsPlanMetricsModel(None)
+        self.metricsModel = RdsMetricsModel(None)
         self.dlgSplits: DlgSplitDetail = None
         self.dlgSplitDistricts: QDialog = None
         self.splitDistrictsModel: QgsAttributeTableFilterModel = None
@@ -282,7 +282,10 @@ class MetricsController(DockWidgetController):
         if isinstance(field, int):
             field: RdsGeoField = self.activePlan.geoFields[field]
         self.dlgSplits.setWindowTitle(f"{field.caption} {tr('Splits')}")
-        model = RdsSplitsModel(self.activePlan, self.activePlan.metrics.splits[field.field])
+        model = RdsSplitsModel(
+            self.activePlan.metrics.splits[field.field],
+            (*self.activePlan.popFields, *self.activePlan.dataFields)
+        )
         self.dlgSplits.setModel(model)
         self.dlgSplits.cmbGeography.setCurrentText(field.caption)
 

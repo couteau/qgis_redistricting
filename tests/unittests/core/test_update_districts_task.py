@@ -19,8 +19,8 @@
 import pytest
 from pytest_mock import MockerFixture
 
-from redistricting.models.Plan import RdsPlan
-from redistricting.services.Tasks.UpdateDistrictsTask import (
+from redistricting.models.plan import RdsPlan
+from redistricting.services.tasks.updatedistricts import (
     AggregateDistrictDataTask
 )
 

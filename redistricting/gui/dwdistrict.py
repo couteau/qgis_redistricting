@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - QDockWidget showing pending district changes
+"""QGIS Redistricting Plugin - A QDockWidget that shows selected demographic
+        data for the active Redistricting Plan
 
-        begin                : 2024-09-20
+        begin                : 2022-01-15
         git sha              : $Format:%H$
-        copyright            : (C) 2024 by Cryptodira
+        copyright            : (C) 2022 by Cryptodira
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -22,34 +23,43 @@
  *                                                                         *
  ***************************************************************************/
 """
+from typing import Optional
+
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QTransposeProxyModel
-)
+from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtWidgets import QWidget
 
-from .RdsDockWidget import RdsDockWidget
-from .ui.PendingChanges import Ui_qdwPendingChanges
+from ..models import (
+    RdsField,
+    RdsPlan
+)
+from .dlgeditdatafields import DlgEditFields
+from .rdsdockwidget import RdsDockWidget
+from .ui.DistrictDataTable import Ui_qdwDistrictData
 
 
-class DockPendingChanges(Ui_qdwPendingChanges, RdsDockWidget):
-    def __init__(self, parent=None):
+class DockDistrictDataTable(Ui_qdwDistrictData, RdsDockWidget):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self.setupUi(self)
-        self.lblWaiting.setParent(self.tblPending)
+        self.helpContext = 'usage/data_table.html'
+        self.fieldStats: dict[RdsField, QWidget] = {}
 
-        self._model = QTransposeProxyModel(self)
-        self.tblPending.setModel(self._model)
+        self.lblWaiting.setParent(self.tblDataTable)
 
-        self.helpContext = 'usage/preview.html'
+        self.btnAddFields.setIcon(
+            QgsApplication.getThemeIcon('/mActionAddManualTable.svg'))
+        self.btnAddFields.clicked.connect(self.addFieldDlg)
+
         self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
 
         self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))
+        self.btnMetrics.setIcon(QgsApplication.getThemeIcon('/mActionMeasureArea.svg'))
 
-    def model(self):
-        return self._model.sourceModel()
+        self._plan: RdsPlan = None
 
-    def setModel(self, model: QAbstractItemModel):
-        self._model.setSourceModel(model)
+    def addFieldDlg(self):
+        dlg = DlgEditFields(self._plan)
+        dlg.exec_()

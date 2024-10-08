@@ -45,7 +45,7 @@ from ..utils import (
     defaults,
     getDefaultField
 )
-from .RdsFieldTableView import FieldListModel
+from .rdsfieldtableview import FieldListModel
 from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 
 

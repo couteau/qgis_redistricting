@@ -22,10 +22,10 @@ import pytest
 from pytest_mock.plugin import MockerFixture
 from qgis.core import QgsVectorLayer
 
-from redistricting.models.Plan import RdsPlan
+from redistricting.models.plan import RdsPlan
 from redistricting.services import PlanBuilder
-from redistricting.services.PlanBldr import QgsApplication
-from redistricting.services.Tasks import CreatePlanLayersTask
+from redistricting.services.planbuilder import QgsApplication
+from redistricting.services.tasks.createlayers import CreatePlanLayersTask
 
 # pylint: disable=protected-access
 
@@ -65,10 +65,10 @@ class TestPlanCreator:
         mocker: MockerFixture
     ):
         mock = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
-        mocker.patch('redistricting.services.PlanBldr.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBldr.deserialize')
+        mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
-        task_class = mocker.patch('redistricting.services.PlanBldr.CreatePlanLayersTask', spec=CreatePlanLayersTask)
+        task_class = mocker.patch('redistricting.services.planbuilder.CreatePlanLayersTask', spec=CreatePlanLayersTask)
         task_class.return_value = mocker.create_autospec(spec=CreatePlanLayersTask, instance=True)
         task_class.return_value.taskCompleted = mocker.MagicMock()
         task_class.return_value.taskTerminated = mocker.MagicMock()
@@ -91,8 +91,8 @@ class TestPlanCreator:
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        mocker.patch('redistricting.services.PlanBldr.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBldr.deserialize')
+        mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         builder = PlanBuilder() \
@@ -114,8 +114,8 @@ class TestPlanCreator:
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        mocker.patch('redistricting.services.PlanBldr.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.PlanBldr.deserialize')
+        mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
+        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
         deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
 
         # no name

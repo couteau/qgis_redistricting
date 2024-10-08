@@ -42,7 +42,7 @@ from ..utils import (
     defaults,
     tr
 )
-from .ErrorList import ErrorListMixin
+from .errormixin import ErrorListMixin
 
 
 class PlanValidator(ErrorListMixin, QObject):

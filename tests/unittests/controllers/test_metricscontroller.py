@@ -70,7 +70,7 @@ class TestMetricsController:
         assert controller_with_active_plan.dlgSplits is None
 
     def test_show_splits_dialog(self, controller_with_active_plan: MetricsController, mock_plan, qgis_iface, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.MetricsCtlr.DlgSplitDetail", autospec=DlgSplitDetail)
+        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
         dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.cmbGeography = mocker.MagicMock()
@@ -79,14 +79,14 @@ class TestMetricsController:
         dlgClass.assert_called_once_with(mock_plan, qgis_iface.mainWindow())
 
     def test_show_splits_dialog_no_geofield_returns(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.MetricsCtlr.DlgSplitDetail", autospec=DlgSplitDetail)
+        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
         sender = mocker.patch.object(controller_with_active_plan, "sender")
         sender.return_value = controller_with_active_plan.actionShowSplitsDialog
         controller_with_active_plan.showSplits()
         dlgClass.assert_not_called()
 
     def test_show_splits_dialog_geofield_on_sender_runs_dialog(self, controller_with_active_plan: MetricsController, mock_plan, qgis_iface, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.MetricsCtlr.DlgSplitDetail", autospec=DlgSplitDetail)
+        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
         dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.cmbGeography = mocker.MagicMock()
@@ -98,7 +98,7 @@ class TestMetricsController:
         dlgClass.assert_called_once_with(mock_plan, qgis_iface.mainWindow())
 
     def test_show_splits_dialog_existing_dialog(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.MetricsCtlr.DlgSplitDetail", autospec=DlgSplitDetail)
+        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
         dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
         dlgClass.return_value.cmbGeography = mocker.MagicMock()

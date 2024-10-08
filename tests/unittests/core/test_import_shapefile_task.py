@@ -18,7 +18,7 @@
 """
 import pathlib
 
-from redistricting.services.Tasks.ImportShapeTask import ImportShapeFileTask
+from redistricting.services.tasks.importshape import ImportShapeFileTask
 
 
 class TestImportShapeFileTask:

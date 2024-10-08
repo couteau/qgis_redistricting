@@ -25,13 +25,13 @@ from qgis.core import (
     QgsMessageLog
 )
 
-from redistricting.services.ErrorList import ErrorListMixin
+from redistricting.services.errormixin import ErrorListMixin
 
 
 class TestErrorListMixin:
     @pytest.fixture(autouse=True)
     def log(self, mocker: MockerFixture):
-        mock = mocker.patch("redistricting.services.ErrorList.QgsMessageLog", spec=QgsMessageLog)
+        mock = mocker.patch("redistricting.services.errormixin.QgsMessageLog", spec=QgsMessageLog)
         return mock
 
     def test_push_error_exception_logs_message(self, log: QgsMessageLog):

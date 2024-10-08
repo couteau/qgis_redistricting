@@ -23,7 +23,6 @@
  ***************************************************************************/
 """
 from typing import (
-    TYPE_CHECKING,
     Optional,
     Union,
     overload
@@ -34,12 +33,6 @@ from qgis.PyQt.QtCore import (
     QObject,
     pyqtSignal
 )
-
-if TYPE_CHECKING:
-    from .Plan import (
-        RdsDistrict,
-        RdsPlan
-    )
 
 
 class Delta:

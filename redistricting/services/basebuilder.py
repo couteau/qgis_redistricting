@@ -46,7 +46,7 @@ from ..utils import (
     matchField,
     tr
 )
-from .PlanValidate import PlanValidator
+from .planvalidator import PlanValidator
 
 
 class BasePlanBuilder(PlanValidator):

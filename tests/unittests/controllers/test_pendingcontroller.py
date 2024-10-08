@@ -25,14 +25,12 @@ from qgis.PyQt.QtCore import pyqtBoundSignal
 
 from redistricting.controllers import PendingChangesController
 from redistricting.models import (
+    DeltaFieldFilterProxy,
     DeltaList,
+    DeltaListModel,
     RdsPlan
 )
-from redistricting.services import (
-    DeltaFieldFilterProxy,
-    DeltaListModel,
-    DeltaUpdateService
-)
+from redistricting.services import DeltaUpdateService
 
 # pylint: disable=unused-argument, protected-access
 
@@ -76,19 +74,19 @@ class TestPendingChangesController:
 
     @pytest.fixture
     def mock_model(self, mocker: MockerFixture) -> type[DeltaListModel]:
-        mocker.patch('redistricting.controllers.PendingCtlr.DeltaFieldFilterProxy', spec=DeltaFieldFilterProxy)
-        cls = mocker.patch('redistricting.controllers.PendingCtlr.DeltaListModel', spec=DeltaListModel)
+        mocker.patch('redistricting.controllers.pending.DeltaFieldFilterProxy', spec=DeltaFieldFilterProxy)
+        cls = mocker.patch('redistricting.controllers.pending.DeltaListModel', spec=DeltaListModel)
         cls.return_value = mocker.create_autospec(spec=DeltaListModel())
         return cls
 
     @pytest.fixture
     def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_model, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.PendingCtlr.DockPendingChanges')
+        mocker.patch('redistricting.controllers.pending.DockPendingChanges')
         return PendingChangesController(qgis_iface, mock_project, mock_planmanager, mock_toolbar, mock_update_service)
 
     @pytest.fixture
     def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_model, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.PendingCtlr.DockPendingChanges')
+        mocker.patch('redistricting.controllers.pending.DockPendingChanges')
         return PendingChangesController(qgis_iface, mock_project, mock_planmanager_with_active_plan, mock_toolbar, mock_update_service)
 
     def test_create(self, controller: PendingChangesController, mock_model):

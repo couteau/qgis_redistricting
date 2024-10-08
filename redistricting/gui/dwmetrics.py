@@ -24,7 +24,7 @@
  """
 from qgis.core import QgsApplication
 
-from .RdsDockWidget import RdsDockWidget
+from .rdsdockwidget import RdsDockWidget
 from .ui.PlanMetrics import Ui_qdwPlanMetrics
 
 

@@ -43,7 +43,7 @@ from ..models import (
     deserialize,
     serialize
 )
-from .DistrictIO import (
+from .districtio import (
     DistrictReader,
     DistrictWriter
 )

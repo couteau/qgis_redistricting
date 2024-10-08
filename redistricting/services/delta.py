@@ -40,9 +40,9 @@ from ..models import (
     DeltaList,
     RdsPlan
 )
-from ..services import PlanManager
-from .ErrorList import ErrorListMixin
-from .Tasks import AggregatePendingChangesTask
+from .errormixin import ErrorListMixin
+from .planmgr import PlanManager
+from .tasks.updatepending import AggregatePendingChangesTask
 
 
 @dataclass

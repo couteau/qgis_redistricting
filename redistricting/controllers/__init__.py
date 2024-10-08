@@ -21,12 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-from .CtxMenuCtlr import ContextMenuController
-from .DistrictCtlr import DistrictController
-from .EditCtlr import EditAssignmentsController
-from .MetricsCtlr import MetricsController
-from .PendingCtlr import PendingChangesController
-from .PlanCtlr import PlanController
+from .ctxmenu import ContextMenuController
+from .district import DistrictController
+from .edit import EditAssignmentsController
+from .metrics import MetricsController
+from .pending import PendingChangesController
+from .plan import PlanController
 
 __all__ = (
     'ContextMenuController', 'DistrictController', 'EditAssignmentsController',

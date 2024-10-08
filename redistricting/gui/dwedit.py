@@ -27,7 +27,7 @@ from qgis.PyQt.QtCore import pyqtSignal
 from qgis.PyQt.QtWidgets import QUndoStack
 
 from ..models import RdsPlan
-from .RdsDockWidget import RdsDockWidget
+from .rdsdockwidget import RdsDockWidget
 from .ui.DistrictTools import Ui_qdwDistrictTools
 
 

@@ -24,9 +24,9 @@ from qgis.PyQt.QtCore import QModelIndex
 
 from redistricting.models import (
     RdsGeoField,
-    RdsSplits
+    RdsSplits,
+    RdsSplitsModel
 )
-from redistricting.services import RdsSplitsModel
 
 
 class TestSplitsModel:
@@ -124,15 +124,15 @@ class TestSplitsModel:
         )
 
     def test_create(self, plan, qtmodeltester):
-        s = RdsSplitsModel(plan, plan.metrics.splits['vtdid'])
+        s = RdsSplitsModel(plan.metrics.splits['vtdid'], (*plan.popFields, *plan.dataFields))
         assert s.rowCount(QModelIndex()) == 0
         assert s.columnCount(QModelIndex()) == 2
         qtmodeltester.check(s)
 
-    def test_create_with_data(self, splits_data, mock_plan, block_layer, qtmodeltester):
+    def test_create_with_data(self, splits_data, block_layer, qtmodeltester):
         field = RdsGeoField(block_layer, 'vtdid', 'VTD')
         split = RdsSplits(field, splits_data)
-        model = RdsSplitsModel(mock_plan, split)
+        model = RdsSplitsModel(split, [])
         assert model.rowCount(QModelIndex()) == 4
         assert model.columnCount(QModelIndex()) == 16
         qtmodeltester.check(model)

@@ -37,13 +37,13 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
-from .base import (
+from .base.model import (
     MISSING,
     Factory,
     RdsBaseModel,
     rds_property
 )
-from .Field import RdsGeoField
+from .field import RdsGeoField
 
 
 class RdsSplitBase:

@@ -45,12 +45,10 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .ErrorList import ErrorListMixin
+from .errormixin import ErrorListMixin
 from .feedback import Feedback
-from .Tasks import (
-    ImportAssignmentFileTask,
-    ImportShapeFileTask
-)
+from .tasks.importequivalency import ImportAssignmentFileTask
+from .tasks.importshape import ImportShapeFileTask
 
 if TYPE_CHECKING:
     from ..models import RdsPlan

@@ -23,50 +23,30 @@
  ***************************************************************************/
 """
 from .actions import ActionRegistry
-from .clipboard import DistrictClipboardAccess
-from .DeltaListModel import (
-    DeltaFieldFilterProxy,
-    DeltaListModel
-)
-from .DeltaUpdate import DeltaUpdateService
-from .DistrictCopy import DistrictCopier
-from .DistrictDataModel import (
-    RdsDistrictDataModel,
-    RdsDistrictFilterFieldsProxyModel
-)
-from .DistrictModels import (
-    DistrictSelectModel,
-    SourceDistrictModel,
-    TargetDistrictModel
-)
-from .DistrictUpdate import DistrictUpdater
-from .ErrorList import ErrorListMixin
-from .FieldListModels import (
-    GeoFieldsModel,
-    PopFieldsModel
-)
-from .LayerTreeMgr import LayerTreeManager
-from .MetricsModel import RdsPlanMetricsModel
-from .PlanAssignments import (
+from .assignments import (
     AssignmentsService,
     PlanAssignmentEditor
 )
-from .PlanBldr import PlanBuilder
-from .PlanColors import getColorForDistrict
-from .PlanCopy import PlanCopier
-from .PlanEdit import PlanEditor
-from .PlanExport import PlanExporter
-from .PlanImport import (
+from .clipboard import DistrictClipboardAccess
+from .copy import PlanCopier
+from .delta import DeltaUpdateService
+from .district import DistrictUpdater
+from .districtcopy import DistrictCopier
+from .errormixin import ErrorListMixin
+from .layertree import LayerTreeManager
+from .planbuilder import PlanBuilder
+from .planeditor import PlanEditor
+from .planexport import PlanExporter
+from .planimport import (
     AssignmentImporter,
     PlanImporter,
     PlanImportService,
     ShapefileImporter
 )
-from .PlanListModel import PlanListModel
-from .PlanManager import PlanManager
-from .PlanStyle import PlanStylerService
-from .SplitsModel import RdsSplitsModel
+from .planlistmodel import PlanListModel
+from .planmgr import PlanManager
 from .storage import ProjectStorage
+from .style import PlanStylerService
 
 __all__ = (
     'ActionRegistry', 'PlanManager', 'LayerTreeManager', 'DistrictClipboardAccess',
@@ -74,8 +54,5 @@ __all__ = (
     'DistrictUpdater', 'DeltaUpdateService',
     'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
     'PlanExporter', 'PlanImporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
-    'ProjectStorage', 'ErrorListMixin', 'getColorForDistrict',
-    'GeoFieldsModel', 'PopFieldsModel', 'RdsPlanMetricsModel', 'RdsDistrictDataModel', 'RdsDistrictFilterFieldsProxyModel',
-    'DeltaListModel', 'DeltaFieldFilterProxy', 'RdsSplitsModel',
-    'DistrictSelectModel', 'TargetDistrictModel', 'SourceDistrictModel', 'PlanListModel'
+    'ProjectStorage', 'ErrorListMixin', 'PlanListModel'
 )

@@ -30,24 +30,24 @@ from qgis.PyQt.QtCore import (
 from qgis.PyQt.QtGui import QKeyEvent
 from qgis.PyQt.QtWidgets import QTableView
 
-from .DistrictDataTable import DockDistrictDataTable
-from .DistrictTools import DockRedistrictingToolbox
-from .DlgConfirmDelete import DlgConfirmDelete
-from .DlgCopyPlan import DlgCopyPlan
+from .dlgcopy import DlgCopyPlan
+from .dlgdelete import DlgConfirmDelete
 # Dialogs and Dock Widgets
-from .DlgEditPlan import DlgEditPlan
-from .DlgExportPlan import DlgExportPlan
-from .DlgImportPlan import DlgImportPlan
-from .DlgImportShape import DlgImportShape
-from .DlgNewDistrict import DlgNewDistrict
-from .DlgSelectPlan import DlgSelectPlan
-from .DlgSplits import DlgSplitDetail
-from .PaintTool import (
+from .dlgedit import DlgEditPlan
+from .dlgeditdistrict import DlgNewDistrict
+from .dlgexport import DlgExportPlan
+from .dlgimportequivalency import DlgImportPlan
+from .dlgimportshape import DlgImportShape
+from .dlgplanmgr import DlgSelectPlan
+from .dlgsplits import DlgSplitDetail
+from .dwdistrict import DockDistrictDataTable
+from .dwedit import DockRedistrictingToolbox
+from .dwmetrics import DockPlanMetrics
+from .dwpending import DockPendingChanges
+from .painttool import (
     PaintDistrictsTool,
     PaintMode
 )
-from .PendingChanges import DockPendingChanges
-from .PlanMetrics import DockPlanMetrics
 
 
 class TableViewKeyEventFilter(QObject):

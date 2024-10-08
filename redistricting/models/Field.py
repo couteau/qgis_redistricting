@@ -47,7 +47,7 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QIcon
 
-from .base import (
+from .base.model import (
     Factory,
     RdsBaseModel,
     rds_property

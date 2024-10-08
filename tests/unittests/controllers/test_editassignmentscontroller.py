@@ -43,7 +43,7 @@ from redistricting.gui import (
     DlgCopyPlan,
     DlgNewDistrict,
     DockRedistrictingToolbox,
-    PaintTool
+    painttool
 )
 from redistricting.models import RdsDistrict
 from redistricting.services import (
@@ -70,18 +70,18 @@ class MockDlgCopyPlan(DlgCopyPlan):
 class TestEditAssignmentsController:
     @pytest.fixture
     def mock_dockwidget(self, mocker: MockerFixture):
-        widget = mocker.patch('redistricting.controllers.EditCtlr.DockRedistrictingToolbox',
+        widget = mocker.patch('redistricting.controllers.edit.DockRedistrictingToolbox',
                               spec=DockRedistrictingToolbox)
         return widget
 
     @pytest.fixture
     def mock_copy_dlg(self, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.controllers.EditCtlr.DlgCopyPlan', spec=MockDlgCopyPlan)
+        dlg = mocker.patch('redistricting.controllers.edit.DlgCopyPlan', spec=MockDlgCopyPlan)
         return dlg
 
     @pytest.fixture
     def mock_newdistrict_dlg(self, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.controllers.EditCtlr.DlgNewDistrict', spec=MockDlgNewDistrict)
+        dlg = mocker.patch('redistricting.controllers.edit.DlgNewDistrict', spec=MockDlgNewDistrict)
         dlg.return_value.districtNumber = 1
         dlg.return_value.districtName = "District 1"
         dlg.return_value.members = 1
@@ -103,9 +103,9 @@ class TestEditAssignmentsController:
 
     @pytest.fixture
     def patch_districttools_dockwidget(self, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.EditCtlr.QgsFieldModel')
+        mocker.patch('redistricting.controllers.edit.QgsFieldModel')
 
-        registry = mocker.patch('redistricting.controllers.BaseCtlr.ActionRegistry')
+        registry = mocker.patch('redistricting.controllers.base.ActionRegistry')
         mocker.patch.object(registry.return_value, 'createAction', new=lambda *args, **kwargs: QAction())
         # registry.return_value.createAction.return_value = QAction()
         registry.return_value.actionSaveAsNew = QAction()
@@ -130,7 +130,7 @@ class TestEditAssignmentsController:
         return controller
 
     def test_create_controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_assignments_service, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.BaseCtlr.ActionRegistry')
+        mocker.patch('redistricting.controllers.base.ActionRegistry')
         controller = EditAssignmentsController(
             qgis_iface, mock_project, mock_planmanager,
             mock_toolbar, mock_assignments_service
@@ -217,7 +217,7 @@ class TestEditAssignmentsController:
         assert controller_with_plan.targetDistrict is None
         assert controller_with_plan.sourceDistrict is None
         with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
-            controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
+            controller_with_plan.activateMapTool(painttool.PaintMode.PaintByGeography)
 
     def test_geoid_not_set_geoid_not_set_cannot_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
         district = RdsDistrict(2)
@@ -225,7 +225,7 @@ class TestEditAssignmentsController:
         assert controller_with_plan.sourceDistrict is None
         assert controller_with_plan.geoField is None
         with qtbot.assertNotEmitted(qgis_canvas.mapToolSet):
-            controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
+            controller_with_plan.activateMapTool(painttool.PaintMode.PaintByGeography)
 
     def test_target_set_geoid_set_can_activate(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot):
         district = RdsDistrict(2)
@@ -234,11 +234,11 @@ class TestEditAssignmentsController:
         assert controller_with_plan.sourceDistrict is None
         assert controller_with_plan.geoField == 'geoid'
         with qtbot.waitSignal(qgis_canvas.mapToolSet):
-            controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
+            controller_with_plan.activateMapTool(painttool.PaintMode.PaintByGeography)
 
     def test_activate_with_invisible_layer_sets_error_and_returns_none(self, controller_with_plan: EditAssignmentsController, qgis_canvas: QgsMapCanvas, qtbot: QtBot,  qgis_iface, mock_project):
         mock_project.layerTreeRoot.return_value.findLayer.return_value.isVisible.return_value = False
-        controller_with_plan.activateMapTool(PaintTool.PaintMode.PaintByGeography)
+        controller_with_plan.activateMapTool(painttool.PaintMode.PaintByGeography)
         qtbot.assertNotEmitted(qgis_canvas.mapToolSet)
         assert "Oops!:Cannot paint districts for a plan that is not visible. Please toggle the visibility of plan test's assignment layer." in qgis_iface.messageBar().get_messages(Qgis.Warning)
 
@@ -384,7 +384,7 @@ class TestEditAssignmentsController:
             in qgis_iface.messageBar().get_messages(Qgis.Warning)
 
     def test_save_as_new(self, controller_with_plan: EditAssignmentsController, mock_copy_dlg, mock_plan, qgis_iface: QgisInterface, mocker: MockerFixture):
-        copier = mocker.patch('redistricting.controllers.EditCtlr.PlanCopier', spec=PlanCopier)
+        copier = mocker.patch('redistricting.controllers.edit.PlanCopier', spec=PlanCopier)
         mock_plan.assignLayer.isEditable.return_value = True
         mock_copy_dlg.return_value.exec.return_value = QDialog.Accepted
         controller_with_plan.saveChangesAsNewPlan()
@@ -395,7 +395,7 @@ class TestEditAssignmentsController:
         copier.return_value.copyBufferedAssignments.assert_called_once()
 
     def test_save_as_new_cancel_returns(self, controller_with_plan: EditAssignmentsController, mock_copy_dlg, mock_plan, qgis_iface: QgisInterface, mocker: MockerFixture):
-        copier = mocker.patch('redistricting.controllers.EditCtlr.PlanCopier', spec=PlanCopier)
+        copier = mocker.patch('redistricting.controllers.edit.PlanCopier', spec=PlanCopier)
         mock_plan.assignLayer.isEditable.return_value = True
         mock_copy_dlg.return_value.exec.return_value = QDialog.Rejected
         controller_with_plan.saveChangesAsNewPlan()

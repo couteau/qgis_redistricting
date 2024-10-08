@@ -48,18 +48,18 @@ from ..gui import (
     PaintMode
 )
 from ..models import (
+    DistrictSelectModel,
+    GeoFieldsModel,
     RdsDistrict,
-    RdsPlan
+    RdsPlan,
+    TargetDistrictModel
 )
 from ..services import (
     AssignmentsService,
-    DistrictSelectModel,
-    GeoFieldsModel,
-    PlanCopier,
-    TargetDistrictModel
+    PlanCopier
 )
 from ..utils import tr
-from .BaseCtlr import DockWidgetController
+from .base import DockWidgetController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction

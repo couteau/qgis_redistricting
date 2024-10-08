@@ -23,11 +23,11 @@ from pytestqt.plugin import QtBot
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QBrush
 
-from redistricting.models import RdsPlan
-from redistricting.services import (
-    PlanEditor,
-    RdsDistrictDataModel
+from redistricting.models import (
+    RdsDistrictDataModel,
+    RdsPlan
 )
+from redistricting.services import PlanEditor
 
 # pylint: disable=no-self-use
 

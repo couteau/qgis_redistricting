@@ -23,8 +23,8 @@ from ..utils import (
     LayerReader,
     tr
 )
-from .PlanAssignments import AssignmentsService
-from .PlanManager import PlanManager
+from .assignments import AssignmentsService
+from .planmgr import PlanManager
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction

@@ -32,9 +32,11 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QBrush
 
-from ..models import RdsPlan
+from ..models import (
+    RdsDistrictDataModel,
+    RdsPlan
+)
 from ..utils import tr
-from .DistrictDataModel import RdsDistrictDataModel
 
 
 class DistrictClipboardAccess:

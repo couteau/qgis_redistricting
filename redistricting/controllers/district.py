@@ -53,19 +53,21 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from ..gui import DockDistrictDataTable
-from ..models import RdsPlan
+from ..models import (
+    RdsDistrictDataModel,
+    RdsDistrictFilterFieldsProxyModel,
+    RdsPlan
+)
 from ..services import (
     ActionRegistry,
     AssignmentsService,
     DistrictClipboardAccess,
     DistrictCopier,
     DistrictUpdater,
-    PlanManager,
-    RdsDistrictDataModel,
-    RdsDistrictFilterFieldsProxyModel
+    PlanManager
 )
 from ..utils import tr
-from .BaseCtlr import DockWidgetController
+from .base import DockWidgetController
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QAction

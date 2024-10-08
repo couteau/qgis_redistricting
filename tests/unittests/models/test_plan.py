@@ -29,7 +29,7 @@ from redistricting.models import (
     RdsField,
     RdsPlan
 )
-from redistricting.models.base.serialize import (
+from redistricting.models.base.serialization import (
     deserialize,
     serialize
 )

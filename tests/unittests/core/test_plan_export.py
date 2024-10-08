@@ -38,8 +38,8 @@ class TestPlanExport:
         )
 
     def test_export(self, export: PlanExporter, mocker: MockerFixture):
-        task = mocker.patch('redistricting.services.PlanExport.ExportRedistrictingPlanTask')
-        add = mocker.patch.object(redistricting.services.PlanExport.QgsApplication.taskManager(), 'addTask')
+        task = mocker.patch('redistricting.services.planexport.ExportRedistrictingPlanTask')
+        add = mocker.patch.object(redistricting.services.planexport.QgsApplication.taskManager(), 'addTask')
         export.export()
         task.assert_called_once()
         add.assert_called_once()

@@ -25,10 +25,12 @@ from typing import (
 
 import pytest
 
-from redistricting.models.base import (
+from redistricting.models.base.lists import (
     KeyedList,
-    RdsBaseModel,
-    SortedKeyedList,
+    SortedKeyedList
+)
+from redistricting.models.base.model import RdsBaseModel
+from redistricting.models.base.serialization import (
     deserialize,
     serialize
 )

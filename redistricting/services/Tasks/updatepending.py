@@ -33,7 +33,7 @@ from ... import CanceledError
 from ...models import DistrictColumns
 from ...utils import tr
 from ._debug import debug_thread
-from .UpdateTask import AggregateDataTask
+from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
     from ...models import RdsPlan

@@ -24,12 +24,10 @@ from qgis.PyQt.QtCore import Qt
 
 from redistricting.models import (
     DeltaList,
+    DeltaListModel,
     RdsPlan
 )
-from redistricting.services import (
-    DeltaListModel,
-    PlanEditor
-)
+from redistricting.services import PlanEditor
 
 # pylint: disable=unused-argument,protected-access
 

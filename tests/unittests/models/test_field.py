@@ -27,7 +27,7 @@ from redistricting.models import (
     RdsGeoField,
     RdsRelatedField
 )
-from redistricting.models.base.serialize import (
+from redistricting.models.base.serialization import (
     deserialize,
     serialize
 )

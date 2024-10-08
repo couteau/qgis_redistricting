@@ -39,8 +39,8 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..utils import tr
-from .base import (
-    SortedKeyedList,
+from .base.lists import SortedKeyedList
+from .base.model import (
     in_range,
     not_empty,
     rds_property

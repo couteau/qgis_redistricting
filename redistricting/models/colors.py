@@ -4,7 +4,7 @@ from qgis.PyQt.QtGui import (
     QPalette
 )
 
-from ..models import RdsPlan
+from .plan import RdsPlan
 
 
 def getColorForDistrict(plan: RdsPlan, district: int):

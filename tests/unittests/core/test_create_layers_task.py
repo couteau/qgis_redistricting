@@ -31,7 +31,7 @@ from redistricting.models import (
     RdsField,
     RdsPlan
 )
-from redistricting.services.Tasks.CreateLayersTask import CreatePlanLayersTask
+from redistricting.services.tasks.createlayers import CreatePlanLayersTask
 
 # pylint: disable=protected-access
 

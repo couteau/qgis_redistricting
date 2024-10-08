@@ -44,12 +44,12 @@ from qgis.utils import spatialite_connect
 
 from ..models import RdsSplits
 from ..utils import tr
-from .DistrictIO import DistrictReader
-from .ErrorList import ErrorListMixin
-from .PlanBldr import PlanBuilder
+from .districtio import DistrictReader
+from .errormixin import ErrorListMixin
+from .planbuilder import PlanBuilder
 
 if TYPE_CHECKING:
-    from ..models.Plan import RdsPlan
+    from ..models import RdsPlan
 
 
 class PlanCopier(ErrorListMixin, QObject):
