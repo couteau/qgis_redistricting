@@ -24,17 +24,20 @@
 """
 import os
 import pathlib
+import tempfile
+import zipfile
 
 import geopandas as gpd
 import pandas as pd
 import psycopg2
 from osgeo import (
     gdal,
-    ogr,
-    osr
+    ogr
 )
 from packaging.version import parse as parse_version
 from shapely import wkb
+from shapely.geometry import shape
+from shapely.geometry.base import BaseGeometry
 
 from .gpkg import spatialite_connect
 
@@ -48,6 +51,29 @@ DEC2FLOAT = psycopg2.extensions.new_type(
 )
 
 psycopg2.extensions.register_type(DEC2FLOAT)
+
+
+def ogr_type_to_dtype(ogr_type):
+    if ogr_type in (ogr.OFTString, ogr.OFTWideString):
+        t = str
+    elif ogr_type == ogr.OFTReal:
+        t = float
+    elif ogr_type in (ogr.OFTInteger, ogr.OFTInteger64):
+        t = int
+    else:
+        t = object
+
+    return t
+
+
+def is_shapezip(path: pathlib.Path):
+    with zipfile.ZipFile(path, "r") as z:
+        for f in z.namelist():
+            if f.endswith('.shp'):
+                return True
+
+    return False
+
 
 try:
     # pylint: disable-next=unused-import
@@ -95,7 +121,7 @@ except ImportError:
         4: 72
     }
 
-    def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+    def _read_sqlite(path: pathlib.Path, bbox=None, mask=None, rows=None, **kwargs):
         def sql_to_wkb(geom: bytes):
             if geom[:2] == b'GP':
                 s = HeaderSize[geom[3] >> 1 & 0b111]
@@ -104,98 +130,136 @@ except ImportError:
                 ofs = slice(38, -1)
             return wkb.loads(geom[ofs])
 
+        with spatialite_connect(path) as db:
+            table = kwargs["layer"]
+            cols = kwargs.get("columns")
+
+            c = db.execute("SELECT name FROM sqlite_schema WHERE type = 'table'")
+            c.row_factory = lambda cursor, row: row[0]
+            l = c.fetchall()
+            if 'gpkg_geometry_columns' in l:
+                fmt = "gpkg"
+                geom_tbl = "gpkg_geometry_columns"
+                tbl_col = "table_name"
+                geom_col = "column_name"
+                srsid_col = "srs_id"
+            elif 'geometry_columns' in l:
+                fmt = "spatialite"
+                geom_tbl = "geometry_columns"
+                tbl_col = "f_table_name"
+                geom_col = "f_geometry_column"
+                srsid_col = "srid"
+            else:
+                fmt = None
+
+            if fmt:
+                table = kwargs["layer"]
+
+                # pylint: disable-next=possibly-used-before-assignment
+                c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))
+                geometry_column, srs_id = c.fetchone()
+
+                if cols is None:
+                    cols = ["*"]  # doesn't work with mask
+                else:
+                    cols = [*cols, geometry_column]
+
+                sql = f"SELECT {','.join(cols)} FROM {table}"
+
+                # NOTE: no support for GeoSeries or GeoDataFrame bbox constraints
+                bbox_where = mask_where = ""
+                if isinstance(mask, gpd.GeoDataFrame):
+                    mask: gpd.GeoSeries = mask.geometry
+
+                if isinstance(mask, gpd.GeoSeries):
+                    if parse_version(gpd.__version__) >= parse_version("1.0"):
+                        mask = mask.union_all()
+                    else:
+                        mask = mask.unary_union
+
+                if isinstance(mask, dict):
+                    mask = shape(mask)
+
+                if isinstance(mask, BaseGeometry):
+                    mask_where = f"ST_Intersects({geometry_column}, ST_GeomFromWKB(x'{wkb.dumps(mask, hex=True)}'))"
+                    bbox = mask.bounds
+                elif isinstance(mask, (gpd.GeoSeries, gpd.GeoDataFrame)):
+                    if parse_version(gpd.__version__) >= parse_version("1.0"):
+                        mask = mask.union_all()
+                    else:
+                        mask = mask.unary_union
+                    mask_where = f"ST_Intersects({geometry_column}, ST_GeomFromWKB(x'{wkb.dumps(mask, hex=True)}'))"
+                    bbox = mask.total_bounds.tolist()
+
+                if isinstance(bbox, (gpd.GeoSeries, gpd.GeoDataFrame)):
+                    bbox = bbox.total_bounds.tolist()
+                elif isinstance(bbox, BaseGeometry):
+                    bbox = bbox.bounds
+
+                if isinstance(bbox, (list, tuple)):
+                    if fmt == "gpkg":
+                        idx = f"rtree_{table}_{geometry_column}"
+                        c = db.execute(f"PRAGMA table_info({table})").fetchall()
+                        for r in c:
+                            if r[-1] == 1:
+                                pkey = r[1]
+                                break
+                        else:
+                            pkey = None
+
+                        idx_id = "id"
+                    else:
+                        pkey = "ROWID"
+                        idx_id = "pkid"
+                        idx = f"idx_{table}_{geometry_column}"
+
+                    if pkey:
+                        minx, miny, maxx, maxy = bbox
+                        bbox_where = f"{pkey} IN (SELECT {idx_id} FROM {idx} r " \
+                            f"WHERE r.minx < {maxx} and r.maxx >= {minx} " \
+                            f"AND r.miny < {maxy} and r.maxy >= {miny}"
+
+                if mask_where and bbox_where:
+                    where = f"{bbox_where} AND {mask_where}"
+                else:
+                    where = mask_where or bbox_where
+
+                if where:
+                    sql = f"{sql} WHERE {where}"
+
+                if isinstance(rows, slice):
+                    sql = f"{sql} LIMIT {rows.start}, {rows.stop - rows.start}"
+                elif isinstance(rows, int):
+                    sql = f"{sql} LIMIT {rows}"
+
+                df = pd.read_sql(sql, db)
+                df[geometry_column] = df[geometry_column].apply(sql_to_wkb)
+                df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
+            else:
+                # plain sqlite database
+                if cols is None:
+                    cols = ["*"]
+
+                sql = f"SELECT {','.join(cols)} FROM {table}"
+                df = pd.read_sql(sql, db)
+
+        return df
+
+    def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
+        if bbox is not None and mask is not None:
+            raise ValueError("bbox and mask cannot both be provided")
+
         path = pathlib.Path(filename)
         if path.suffix in ('.gpkg', '.sqlite', '.db') and "layer" in kwargs:
-            with spatialite_connect(path) as db:
-                table = kwargs["layer"]
-                c = db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
-                c.row_factory = lambda cursor, row: row[0]
-                l = c.fetchall()
-                if 'gpkg_geometry_columns' in l:
-                    fmt = "gpkg"
-                    geom_tbl = "gpkg_geometry_columns"
-                    tbl_col = "table_name"
-                    geom_col = "column_name"
-                    srsid_col = "srs_id"
-                elif 'geometry_columns' in l:
-                    fmt = "spatialite"
-                    geom_tbl = "geometry_columns"
-                    tbl_col = "f_table_name"
-                    geom_col = "f_geometry_column"
-                    srsid_col = "srid"
-                else:
-                    fmt = None
+            return _read_sqlite(path, bbox, mask, rows, **kwargs)
 
-                if fmt:
-                    table = kwargs["layer"]
+        if path.suffix == ".zip" and is_shapezip(path):
+            with tempfile.TemporaryDirectory() as d:
+                with zipfile.ZipFile(path) as z:
+                    z.extractall(d)
+                return gpd_read_file(d, bbox, mask, rows, **kwargs)
 
-                    c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))
-                    geometry_column, srs_id = c.fetchone()
-
-                    cols = kwargs.get("columns")
-                    if cols is None:
-                        cols = ["*"]
-                    else:
-                        cols = [*cols, geometry_column]
-
-                    sql = f"SELECT {','.join(cols)} FROM {table}"
-                    if isinstance(rows, slice):
-                        sql = f"{sql} LIMIT {rows.start}, {rows.stop - rows.start}"
-                    elif isinstance(rows, int):
-                        sql = f"{sql} LIMIT {rows}"
-
-                    df = pd.read_sql(sql, db)
-                    df[geometry_column] = df[geometry_column].apply(sql_to_wkb)
-                    df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
-                    return df
-
-        if path.suffix == ".shp":
-            ds: ogr.DataSource = ogr.Open(str(path))
-            lyr: ogr.Layer = ds.GetLayer()
-            crs: osr.SpatialReference = lyr.GetSpatialRef().GetAuthorityCode(None)
-            ldef: ogr.FeatureDefn = lyr.GetLayerDefn()
-            cols = kwargs.get("columns")
-            if cols is None:
-                cols = []
-                for fi in range(ldef.GetFieldCount()):
-                    fld: ogr.FieldDefn = ldef.GetFieldDefn(fi)
-                    cols.append(fld.name)
-
-            data = []
-            index = []
-            geom = []
-            f: ogr.Feature
-            if mask is not None and bbox is not None:
-                raise ValueError()
-
-            if bbox is not None:
-                if isinstance(bbox, tuple):
-                    lyr.SetSpatialFilterRect(*bbox)
-                else:
-                    lyr.SetSpatialFilter(bbox)
-
-            if mask is not None:
-                lyr.SetSpatialFilter(mask)
-
-            if isinstance(rows, slice):
-                lyr.SetNextByIndex(rows.start)
-                count = rows.stop - rows.start
-            elif isinstance(rows, int):
-                count = rows
-            else:
-                count = -1
-            for f in lyr:
-                index.append(f.GetFID())
-                data.append(tuple(f[c] for c in cols))
-                geom.append(wkb.loads(bytes(f.geometry().ExportToWkb())))
-                count -= 1
-                if count == 0:
-                    break
-
-            df = pd.DataFrame.from_records(data, index=index, columns=cols)
-            return gpd.GeoDataFrame(df, geometry=geom, crs=crs)
-
-        return gpd_read_file(filename, bbox, mask, rows, engine, **kwargs)
+        return gpd_read_file(filename, bbox, mask, rows, engine=engine, **kwargs)
 
     gpd.read_file = read_file_no_fiona
 
