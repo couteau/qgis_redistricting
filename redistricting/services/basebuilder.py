@@ -312,8 +312,8 @@ class BasePlanBuilder(PlanValidator):
         self,
         field: str,
         caption: str = None,
-        sumfield=None,
-        pctbase=None
+        sumField: bool = True,
+        pctBase: Optional[str] = None
     ) -> Self:
         ...
 
