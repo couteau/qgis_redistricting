@@ -40,10 +40,4 @@
     "qtForPython.qmlls.enabled": false,
     "python.testing.unittestEnabled": false,
     "python.analysis.inlayHints.pytestParameters": true,
-    "python.testing.pytestArgs": [
-        "--cov=redistricting",
-        "--cov-report=xml",
-        "-p",
-        "pytest_qgis"
-    ],
 }
