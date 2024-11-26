@@ -2,6 +2,10 @@
 
 Copyright 2022-2024, Stuart C. Naifeh
 
+QGIS app fixtures, Copyright (C) 2021-2023 pytest-qgis Contributors, used
+and modified under GNU General Public License version 3
+
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -545,7 +549,7 @@ class MockQgisInterface(QgisInterface):
     actionAbout = unittest.mock.MagicMock(spec=QtWidgets.QAction)
 
 
-def _start_and_configure_qgis_app():
+def _init_qgis():
     global _APP, _CANVAS, _IFACE, _PARENT, _QGIS_CONFIG_PATH  # noqa: PLW0603 # pylint: disable=global-statement
 
     # Use temporary path for QGIS config
@@ -561,28 +565,24 @@ def _start_and_configure_qgis_app():
     _CANVAS = QgsMapCanvas(_PARENT)
     _PARENT.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
     _CANVAS.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
-
-    # QgisInterface is a stub implementation of the QGIS plugin interface
     _IFACE = MockQgisInterface(_CANVAS, _PARENT)
 
     if _QGIS_VERSION >= 31800:
-        from qgis.utils import \
-            iface  # noqa: F401 # pylint: disable=unused-import, import-outside-toplevel # This import is required
+        # noqa: F401 # pylint: disable=unused-import, import-outside-toplevel
+        from qgis.utils import (  # This import is required
+            iface,
+            plugins
+        )
 
         unittest.mock.patch("qgis.utils.iface", _IFACE).start()
-
-    if _APP is not None:
-        # QGIS zooms to the layer's extent if it
-        # is the first layer added to the map.
-        # If the qgis_show_map marker is used, this zooming might occur
-        # at some later time when events are processed (e.g. at qtbot.wait call)
-        # and this might change the extent unexpectedly.
-        # It is better to process events right after adding the
-        # layer to avoid these kind of problems.
-        QgsProject.instance().legendLayersAdded.connect(_APP.processEvents)
+        unittest.mock.patch("qgis.utils.plugins", {}).start()
 
 
-_start_and_configure_qgis_app()
+# inititalize the QGIS application on loading module --
+# waiting until plugin initialization may result in
+# application modules loading with an uninitialized
+# and unpatched QGIS application
+_init_qgis()
 
 
 @pytest.fixture(autouse=True, scope="session")

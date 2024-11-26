@@ -225,11 +225,11 @@ class BasePlanBuilder(PlanValidator):
     def _isCVAP(self, fieldName):
         return matchField(fieldName, self._popLayer, defaults.CVAP_TOTAL_FIELDS)
 
-    @ overload
+    @overload
     def appendPopField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
         ...
 
-    @ overload
+    @overload
     def appendPopField(self, field: RdsField) -> Self:
         ...
 
@@ -256,15 +256,15 @@ class BasePlanBuilder(PlanValidator):
 
         return self
 
-    @ overload
+    @overload
     def removePopField(self, field: RdsField) -> Self:
         ...
 
-    @ overload
+    @overload
     def removePopField(self, field: str) -> Self:
         ...
 
-    @ overload
+    @overload
     def removePopField(self, field: int) -> Self:
         ...
 

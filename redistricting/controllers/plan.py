@@ -560,7 +560,7 @@ class PlanController(BaseController):
                 "Success", f"Export of {plan.name} complete!", level=Qgis.Success)
 
         def exportError():
-            for msg, level in export.errors():
+            for msg, level in export.errors():  # pylint: disable=used-before-assignment
                 self.iface.messageBar().pushMessage("Error", msg, level=level)
 
         if not isinstance(plan, RdsPlan):
@@ -617,7 +617,7 @@ class PlanController(BaseController):
                 self.planManager.removePlan(plan)
                 del plan
                 if dlg.removeLayers() and dlg.deleteGeoPackage():
-                    d = pathlib.Path(path).parent
+                    d = pathlib.Path(path).parent  # pylint: disable=used-before-assignment
                     g = str(pathlib.Path(path).name) + '*'
                     for f in d.glob(g):
                         f.unlink()
