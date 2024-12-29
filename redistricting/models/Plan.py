@@ -87,13 +87,13 @@ class RdsMetrics(RdsBaseModel):
     def __init__(self, cutEdges: Union[int, None] = None, splits: KeyedList[RdsSplits] = None):
         ...
 
-    def __init__(self, planOrCutEdges: Union[int, 'RdsPlan'] = None, splits: KeyedList[RdsSplits] = MISSING, parent: Optional[QObject] = None):
-        if isinstance(planOrCutEdges, RdsPlan):
+    def __init__(self, cutEdges: Union[int, 'RdsPlan'] = None, splits: KeyedList[RdsSplits] = MISSING, parent: Optional[QObject] = None):
+        if isinstance(cutEdges, RdsPlan):
             super().__init__(parent=parent)
-            self.plan = planOrCutEdges
+            self.plan = cutEdges
             self.updateGeoFields(self.plan.geoFields)
         else:
-            super().__init__(cutEdges=planOrCutEdges, splits=splits, parent=parent)
+            super().__init__(cutEdges=cutEdges, splits=splits, parent=parent)
 
     def __pre_init__(self):
         self.plan: 'RdsPlan' = None

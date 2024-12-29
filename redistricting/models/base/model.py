@@ -732,7 +732,7 @@ class RdsBaseModel(QObject):
         sig = inspect.signature(type(self).__init__)
 
         # remove any passed in missing params
-        args = (a for a in args if a is not MISSING)
+        args = tuple(a for a in args if a is not MISSING)
         kwargs = {k: v for k, v in kwargs.items() if v is not MISSING}
 
         bound_args = sig.bind(*args, **kwargs)

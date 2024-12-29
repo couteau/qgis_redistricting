@@ -16,16 +16,25 @@
  *                                                                         *
  ***************************************************************************/
 """
+import pytest
 from pytest_mock import MockerFixture
 
+from redistricting.models.base.lists import KeyedList
 from redistricting.models.columns import MetricsColumns
 from redistricting.models.field import RdsGeoField
 from redistricting.models.plan import RdsMetrics
+from redistricting.models.splits import RdsSplits
 
 # pylint: disable=protected-access
 
 
 class TestPlanStats:
+
+    @pytest.fixture
+    def mock_splits(self, mocker: MockerFixture):
+        l = mocker.create_autospec(spec=KeyedList[RdsSplits])
+        l.__len__.return_value = 1
+        l.__getitem__.return_value = mocker.create_autospec(spec=RdsSplits)
 
     def test_create(self, mock_plan, mocker: MockerFixture):
         districts = type(mock_plan).districts
@@ -37,3 +46,7 @@ class TestPlanStats:
         for f in MetricsColumns.CompactnessScores():
             assert getattr(stats, f) == 0.5
         assert len(stats.splits) == 1
+
+    def test_create_with_cutedges_and_splits(self, mock_splits):
+        stats = RdsMetrics(2013, mock_splits)
+        assert stats.cutEdges == 2013
