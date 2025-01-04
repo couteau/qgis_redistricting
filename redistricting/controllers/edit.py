@@ -29,12 +29,12 @@ from typing import (
 )
 
 from qgis.core import (
+    Qgis,
     QgsApplication,
     QgsFeature,
     QgsFieldModel,
     QgsVectorLayer
 )
-from qgis.gui import Qgis
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon

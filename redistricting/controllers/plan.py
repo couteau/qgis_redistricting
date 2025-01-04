@@ -29,13 +29,11 @@ from typing import (
 )
 
 from qgis.core import (
+    Qgis,
     QgsProject,
     QgsVectorLayer
 )
-from qgis.gui import (
-    Qgis,
-    QgisInterface
-)
+from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import (
