@@ -18,6 +18,7 @@
 """
 from uuid import UUID
 
+import pandas as pd
 import pytest
 from pytestqt.plugin import QtBot
 
@@ -210,7 +211,16 @@ class TestPlan:
                           'category': FieldCategory.Geography}
             },
             'total-population': 227036,
-            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}}
+            'metrics': {'splits': {
+                'vtdid': {'field': 'vtdid', 'data': {
+                    "schema": {
+                        "fields": [{"name": "index", "type": "integer"}], 
+                        "primaryKey": ["index"], 
+                        "pandas_version": "1.4.0" if pd.__version__ >= "1.4" else "0.20.0"
+                    }, 
+                    "data": []
+                }}
+            }}
         }
 
     def test_deserialize(self, block_layer, assign_layer, dist_layer):

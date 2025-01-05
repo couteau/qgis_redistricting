@@ -32,7 +32,7 @@ class TestPlanStats:
 
     @pytest.fixture
     def mock_splits(self, mocker: MockerFixture):
-        l = mocker.create_autospec(spec=KeyedList[RdsSplits])
+        l = mocker.create_autospec(spec=KeyedList)
         l.__len__.return_value = 1
         l.__getitem__.return_value = mocker.create_autospec(spec=RdsSplits)
 
