@@ -22,9 +22,11 @@ import pytest
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot
 from qgis._gui import QgisInterface
-from qgis.core import QgsFeature
-from qgis.gui import (
+from qgis.core import (
     Qgis,
+    QgsFeature
+)
+from qgis.gui import (
     QgsFieldComboBox,
     QgsMapCanvas
 )

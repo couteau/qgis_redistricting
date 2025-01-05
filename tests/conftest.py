@@ -41,6 +41,7 @@ from uuid import uuid4
 import pytest
 from pytest_mock import MockerFixture
 from qgis.core import (
+    Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsLayerTree,
@@ -50,7 +51,6 @@ from qgis.core import (
     QgsVectorLayer
 )
 from qgis.gui import (
-    Qgis,
     QgisInterface,
     QgsGui,
     QgsLayerTreeView,

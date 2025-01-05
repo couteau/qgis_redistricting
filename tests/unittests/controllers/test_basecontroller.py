@@ -21,8 +21,10 @@ Copyright 2022-2024, Stuart C. Naifeh
 import pytest
 from pytest_mock import MockerFixture
 from pytestqt.qtbot import QtBot
-from qgis.core import QgsProject
-from qgis.gui import Qgis
+from qgis.core import (
+    Qgis,
+    QgsProject
+)
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
     QProgressDialog,

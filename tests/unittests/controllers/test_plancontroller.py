@@ -24,10 +24,10 @@ from uuid import uuid4
 import pytest
 from pytest_mock import MockerFixture
 from qgis.core import (
+    Qgis,
     QgsRasterLayer,
     QgsVectorLayer
 )
-from qgis.gui import Qgis
 from qgis.PyQt.QtCore import pyqtBoundSignal
 from qgis.PyQt.QtWidgets import (
     QAction,
