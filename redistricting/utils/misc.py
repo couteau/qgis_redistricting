@@ -24,9 +24,22 @@
 """
 import re
 from random import choice
-from typing import Union
+from typing import (
+    Optional,
+    Union
+)
 
 from qgis.core import QgsVectorLayer
+
+
+def makeFieldName(expr: str, caption: Optional[str]):
+    if expr.isidentifier():
+        return expr
+
+    if caption and caption.isidentifier():
+        return caption.lower()
+
+    return re.sub(r'[^\w]+', '_', (caption or expr).lower())
 
 
 def getDefaultField(layer: QgsVectorLayer, fieldList: list[Union[str, re.Pattern]]):

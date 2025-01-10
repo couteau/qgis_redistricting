@@ -1,3 +1,27 @@
+# -*- coding: utf-8 -*-
+"""QGIS Redistricting Plugin - redistricting schema management
+
+        begin                : 2022-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 from numbers import Number
 from typing import (
     Any,
@@ -16,6 +40,7 @@ from qgis.core import (
 
 from ..models import DistrictColumns
 from ..utils import (
+    makeFieldName,
     spatialite_connect,
     tr
 )
@@ -280,10 +305,19 @@ def migrateSchema1_0_0_to_1_0_1(data: dict):
         else:
             field['pctbase'] = None
 
+    splits = data["plan-stats"].get("splits")
+    split_data: dict[str, list] = {}
+    if splits:
+        for f, s in splits.items():
+            split_data[f] = [
+                {f: g[0], "districts": {}, "splits": g[1]} for g in s
+            ]
+    data["plan-stats"]["splits"] = split_data
+
     return data, version.parse('1.0.1')
 
 
-def _updateDistLayer(data: dict[str, Any]):
+def _updateDistLayer1_0_1_to_1_0_2(data: dict[str, Any]):
     distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
     if distLayer is None:
         return
@@ -315,36 +349,44 @@ def _updateDistLayer(data: dict[str, Any]):
 
 
 def migrateSchema1_0_1_to_1_0_2(data: dict[str, Any]):
-    _updateDistLayer(data)
+    _updateDistLayer1_0_1_to_1_0_2(data)
 
-    splits = data["plan-stats"]["splits"]
     plan_splits = {}
-    for f, s in splits.items():
-        if len(s) == 0:
-            continue
-        index = []
-        split_data = []
-        columns = None
-        for g in s:
-            if 'districts' not in g or len(g['districts']) == 0:
+    splits = data["plan-stats"].get("splits")
+    if splits:
+        for f, s in splits.items():
+            if len(s) == 0:
                 continue
-            geoid = g[f]
-            if 'name' in g:
-                name = g['name']
-            else:
-                name = None
-            for d, p in g['districts'].items():
+            index = []
+            split_data = []
+            columns = None
+            for g in s:
+                geoid = g[f]
+                if 'name' in g:
+                    name = g['name']
+                else:
+                    name = None
+
                 if columns is None:
-                    columns = list(p.keys())
+                    columns = [data['pop-field']] + \
+                        [makeFieldName(f["field"], f["caption"]) for f in data.get('pop-fields', [])] + \
+                        [makeFieldName(f["field"], f["caption"]) for f in data.get('data-fields', [])]
                     if name:
                         columns.append('__name')
-                index.append([geoid, int(d)])
-                row = list(p.values())
-                if name:
-                    row.append(name)
-                split_data.append(row)
 
-        plan_splits[f] = {"index": index, "columns": columns, "data": split_data}
+                if 'districts' not in g or len(g['districts']) == 0:
+                    continue
+
+                for d, p in g['districts'].items():
+                    index.append([geoid, int(d)])
+                    row = list(p.values())
+                    if name:
+                        row.append(name)
+                    split_data.append(row)
+
+            plan_splits[f] = {"index": index, "columns": columns, "data": split_data}
+
+        del data['plan-stats']['splits']
 
     data["plan-stats"]["plan-splits"] = plan_splits
 

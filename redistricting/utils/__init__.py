@@ -33,6 +33,7 @@ from .intl import tr
 from .layer import LayerReader
 from .misc import (
     getDefaultField,
+    makeFieldName,
     matchField,
     random_id
 )
@@ -44,6 +45,7 @@ __all__ = (
     'getDefaultField',
     'getTableName',
     'LayerReader',
+    'makeFieldName',
     'matchField',
     'random_id',
     'spatialite_connect',

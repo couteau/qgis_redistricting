@@ -22,7 +22,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-import re
 from typing import (
     Optional,
     Union,
@@ -47,6 +46,7 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QIcon
 
+from ..utils import makeFieldName
 from .base.model import (
     Factory,
     RdsBaseModel,
@@ -89,13 +89,7 @@ class RdsField(RdsBaseModel):
 
     @property
     def fieldName(self):
-        if self.field.isidentifier():
-            return self.field
-
-        if self._caption and self._caption.isidentifier():
-            return self._caption.lower()
-
-        return re.sub(r'[^\w]+', '_', (self._caption or self._field).lower())
+        return makeFieldName(self.field, self._caption)
 
     @property
     def expression(self):
@@ -308,7 +302,9 @@ class RdsDataField(RdsField):
     pctBaseChanged = pyqtSignal()
 
     def isNumeric(self):
-        return self.fieldType() in (QMetaType.Double, QMetaType.Int, QMetaType.LongLong, QMetaType.UInt, QMetaType.ULongLong)
+        return self.fieldType() in (
+            QMetaType.Double, QMetaType.Int, QMetaType.LongLong, QMetaType.UInt, QMetaType.ULongLong
+        )
 
     category: int = FieldCategory.Demographic
     sumField: bool = rds_property(
