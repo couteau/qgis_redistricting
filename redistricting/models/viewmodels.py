@@ -89,7 +89,7 @@ from .validators import (
 )
 
 
-@ dataclass
+@dataclass
 class DistrictColumnData:
     key: str
     heading: str
@@ -380,6 +380,8 @@ class DistrictSelectModel(QAbstractListModel):
             dist = self._districts[0] if index == 1 else None
         elif index > self._offset:
             dist = self._districts[index-2]
+        else:
+            dist = None
 
         return dist
 

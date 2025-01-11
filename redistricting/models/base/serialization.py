@@ -22,7 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
+import datetime
+import inspect
 import json
+import logging
 import re
 from functools import (
     partial,
@@ -32,21 +35,18 @@ from functools import (
 from io import StringIO
 from types import GenericAlias
 from typing import (
-    Annotated,
     Any,
     Callable,
-    Generic,
     Iterable,
     Mapping,
-    Optional,
     Type,
     TypeVar,
     Union,
     _GenericAlias,
+    _strip_annotations,
     _UnionGenericAlias,
     get_args,
-    get_origin,
-    get_type_hints
+    get_origin
 )
 from uuid import UUID
 
@@ -55,12 +55,28 @@ from qgis.core import (
     QgsProject,
     QgsVectorLayer
 )
-from qgis.PyQt.QtCore import QObject
 
-from .model import (
-    RdsBaseModel,
-    fields
-)
+_ST = TypeVar("_ST")
+
+ScalarType = Union[str, bytes, int, float, bool, None]
+JSONableType = Union[ScalarType, dict[str, "JSONableType"], list["JSONableType"], tuple["JSONableType"]]
+SimpleSerializeFunction = Callable[[_ST], JSONableType]
+SerializerFunction = Callable[[_ST, dict[int, Any], bool], JSONableType]
+SimpleDeserializeFunction = Callable[[JSONableType], _ST]
+DeserializerFunction = Callable[[type, JSONableType, Any], _ST]
+
+
+def wrap_simple_serializer(f):
+    def wrapper(value: Any, memo: dict[int, Any] = None, exclude_none: bool = True):  # pylint: disable=unused-argument
+        return f(value)
+
+    return wrapper
+
+
+def wrap_simple_deserializer(f):
+    def wrapper(cls, data: Any, **kw):  # pylint: disable=unused-argument
+        return f(data)
+    return wrapper
 
 
 def compose(f, *fns):
@@ -75,25 +91,39 @@ serialize_dataframe = compose(partial(pd.DataFrame.to_json, orient="table"), jso
 deserialize_dataframe = compose(json.dumps, StringIO, partial(pd.read_json, orient="table"))
 
 
-serializers = {
-    UUID: str,
-    QgsVectorLayer: QgsVectorLayer.id,
-    pd.DataFrame: serialize_dataframe
+serializers: dict[type, SerializerFunction] = {
+    datetime.datetime: wrap_simple_serializer(datetime.datetime.isoformat),
+    datetime.date: wrap_simple_serializer(datetime.date.isoformat),
+    datetime.time: wrap_simple_serializer(datetime.time.isoformat),
+    UUID: wrap_simple_serializer(str),
+    QgsVectorLayer: wrap_simple_serializer(QgsVectorLayer.id),
+    pd.DataFrame: wrap_simple_serializer(serialize_dataframe)
 }
 
-deserializers = {
-    UUID: UUID,
-    QgsVectorLayer: QgsProject.instance().mapLayer,
-    pd.DataFrame: deserialize_dataframe
+deserializers: dict[type, DeserializerFunction] = {
+    datetime.datetime: wrap_simple_deserializer(datetime.datetime.fromisoformat),
+    datetime.date: wrap_simple_deserializer(datetime.date.fromisoformat),
+    datetime.time: wrap_simple_deserializer(datetime.time.fromisoformat),
+    UUID: wrap_simple_deserializer(UUID),
+    QgsVectorLayer: wrap_simple_deserializer(QgsProject.instance().mapLayer),
+    pd.DataFrame: wrap_simple_deserializer(deserialize_dataframe)
 }
 
 
-_ST = TypeVar("_ST")
+def register_serializer(
+    dtype: Type[_ST],
+    serializer: Union[SimpleSerializeFunction[_ST], SerializerFunction[_ST]],
+    deserializer: Union[SimpleDeserializeFunction[_ST], DeserializerFunction[_ST]]
+):
+    if len(inspect.signature(serializer).parameters) == 1:
+        serializers[dtype] = wrap_simple_serializer(serializer)
+    else:
+        serializers[dtype] = serializer
 
-
-def register_serializer(dtype: Type[_ST], serializer: Callable[[_ST], Any], deserializer: Callable[[Any], _ST]):
-    serializers[dtype] = serializer
-    deserializers[dtype] = deserializer
+    if len(inspect.signature(deserializer).parameters) == 1:
+        deserializers[dtype] = wrap_simple_deserializer(deserializer)
+    else:
+        deserializers[dtype] = deserializer
 
 
 def to_kebabcase(s: str):
@@ -112,39 +142,22 @@ def kebab_dict(kw: Iterable[tuple[str, Any]]):
 _memo = object()
 
 
-def serialize_model(obj, memo=None, exclude_none=True):
-    """Right now we just ignore already memo objects to avoid recursion.
-    TODO: come up with a way to cross-reference
-    """
-
-    d = {}
-    for prop in fields(obj):
-        if not prop.serialize:
-            continue
-
-        if callable(prop.serialize):
-            value = prop.serialize(value, memo)
-        else:
-            value = serialize_value(getattr(obj, prop.name), memo)
-
-        if value is not _memo and (value is not None or not exclude_none):
-            d[prop.name] = value
-
-    return kebab_dict(d.items())
-
-
 def serialize_value(value, memo: dict[int, Any], exclude_none=True):
     if not id(value) in memo:
         if type(value) in serializers:
-            memo[id(value)] = serializers[type(value)](value)
-        elif isinstance(value, RdsBaseModel):
-            memo[id(value)] = serialize_model(value, memo, exclude_none)
-        elif isinstance(value, Mapping):
-            memo[id(value)] = {k: serialize_value(v, memo) for k, v in value.items()}
-        elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
-            memo[id(value)] = [serialize_value(v, memo) for v in value]
+            memo[id(value)] = serializers[type(value)](value, memo, exclude_none)
         else:
-            memo[id(value)] = value
+            for t, serializer in serializers.items():
+                if issubclass(type(value), t):
+                    memo[id(value)] = serializer(value, memo, exclude_none)
+                    break
+            else:
+                if isinstance(value, Mapping):
+                    memo[id(value)] = {k: serialize_value(v, memo) for k, v in value.items()}
+                elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
+                    memo[id(value)] = [serialize_value(v, memo) for v in value]
+                else:
+                    memo[id(value)] = value
 
     return memo[id(value)]
 
@@ -189,64 +202,44 @@ def deserialize_iterable(value: Iterable, *args):
     return value
 
 
-_ModelType = TypeVar("_ModelType", bound=RdsBaseModel)
-
-
-def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
-    kw = {}
-
-    flds = get_type_hints(cls)
-
-    for k, v in data.items():
-        f = to_camelcase(k)
-        if f in flds:
-            t = flds[f]
-        else:
-            continue
-
-        if t is not None:
-            v = deserialize_value(t, v)
-
-        kw[f] = v
-
-    return cls(**kw, parent=parent)
-
-
-def deserialize_value(t: type, value: Any, **kw):
+def deserialize_value(dtype: type, value: Any, **kw):
     if value is None:
         return None
 
-    if isinstance(t, (_GenericAlias, GenericAlias)):
+    # find base type
+    args = ()
+    dtype = t = _strip_annotations(dtype)
+    while isinstance(t, (_GenericAlias, GenericAlias)):
+        args = get_args(t)
         if isinstance(t, _UnionGenericAlias):
             # type is Optional or Union
-            t = get_args(t)[0]
-            args = ()
-        else:
-            args = get_args(t)
-            t = get_origin(t)
-            if t is Annotated:
+            if type(value) in args:
+                t = type(value)
+            else:
                 t = args[0]
-                args = ()
-    else:
-        args = ()
-        cls_anns = {}
+            args = ()
+            dtype = t
+        else:
+            t = get_origin(t)
 
     if t in deserializers:
-        try:
-            value = deserializers[t](value)
-        except Exception:  # pylint: disable=broad-except
-            value = None
-    elif issubclass(t, RdsBaseModel):
-        if issubclass(t, Generic) and args:
-            cls_anns = dict(zip(t.__parameters__, args))
-            args = tuple(cls_anns[a] if a in cls_anns else a for a in args)
-            value = deserialize_model(t[args], value, **kw)
+        # if the exact type is in the deserializers dict, use the deserializer for that type
+        value = deserializers[t](dtype, value, **kw)
+    else:
+        # search for a superclass of the type
+        for s, deserializer in deserializers.items():
+            if issubclass(t, s):
+                try:
+                    value = deserializer(dtype, value, **kw)
+                except Exception as e:  # pylint: disable=broad-except
+                    logging.error(e)
+                    value = None
+                break
         else:
-            value = deserialize_model(t, value, **kw)
-    elif issubclass(t, Mapping):
-        value = t(deserialize_iterable(value, *args))
-    elif issubclass(t, Iterable) and t not in (str, bytes):
-        value = t(deserialize_iterable(value, *args))
+            if issubclass(t, Mapping):
+                value = dtype(deserialize_iterable(value, *args))
+            elif issubclass(t, Iterable) and t not in (str, bytes):
+                value = dtype(deserialize_iterable(value, *args))
 
     return value
 

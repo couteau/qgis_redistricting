@@ -42,10 +42,12 @@ from typing import (  # pylint: disable=no-name-in-module
     MutableSequence,
     Optional,
     Self,
+    Type,
     TypeVar,
     Union,
     _BaseGenericAlias,
     _GenericAlias,
+    _strip_annotations,
     _UnionGenericAlias,
     dataclass_transform,
     get_args,
@@ -57,6 +59,15 @@ from typing import (  # pylint: disable=no-name-in-module
 from qgis.PyQt.QtCore import (
     QObject,
     pyqtSignal
+)
+
+from .serialization import (
+    _memo,
+    deserialize_value,
+    kebab_dict,
+    register_serializer,
+    serialize_value,
+    to_camelcase
 )
 
 # pylint: disable=redefined-builtin
@@ -79,13 +90,11 @@ def _is_classvar(a_type):
 
 def get_real_type(t: type):
     v = None
+    t = _strip_annotations(t)
     if isinstance(t, (_GenericAlias, GenericAlias)) and not isinstance(t, _UnionGenericAlias):
         args = get_args(t)
         t = get_origin(t)
-        if t is Annotated:
-            t = args[0]
-            v = args[1]
-        elif t is Literal:
+        if t is Literal:
             t = type(args[0])
 
     return t, v
@@ -141,13 +150,20 @@ class Factory(Generic[_T]):
     """Factory class for wrapping default factory functions that take the instance as a parameter
     """
 
-    def __init__(self, factory: Union[Callable[[], _T], Callable[[Any], _T]], with_owner: bool = True, defer: bool = False):
+    def __init__(
+        self,
+        factory: Union[Callable[[], _T], Callable[[Any], _T]],
+        with_owner: bool = True,
+        defer: bool = False
+    ):
         """Constructor for Factory class for initializing model attributes
 
         Args:
             factory (Callable): The factory function wrapped by this Factory instance.
-            with_owner (bool, optional): Whether the factory function takes the instance as an argument. Defaults to True.
-            defer (bool, optional): Whether the factory should be called after all other instance attributes have been set. Defaults to False.
+            with_owner (bool, optional): Whether the factory function takes the instance 
+                                         as an argument. Defaults to True.
+            defer (bool, optional): Whether the factory should be called after all other 
+                                    instance attributes have been set. Defaults to False.
         """
         self.factory = factory
         self.with_owner = with_owner
@@ -791,6 +807,9 @@ class RdsBaseModel(QObject):
 
         self.__post_init__(**post_init_args)
 
+    def __deepcopy__(self, memo):
+        return deserialize_model(self.__class__, serialize_model(self, memo, False), self.parent())
+
     @recursive_repr()
     def __repr__(self):
         return f"{self.__class__.__name__}({', '.join(f'{f.name}={getattr(self, f.name)!r}' for f in self.__fields__ if f._field_type == FieldType.FIELD and f.repr)})"
@@ -801,3 +820,50 @@ def fields(cls: Union[RdsBaseModel, type[RdsBaseModel]]) -> list[Field]:
         raise TypeError(f"{cls!r} is not an instance or subclass of RdsBaseModel")
 
     return [f for f in cls.__fields__ if f._field_type == FieldType.FIELD]  # pylint: disable=protected-access
+
+
+def serialize_model(obj, memo=None, exclude_none=True):
+    """Right now we just ignore already memo objects to avoid recursion.
+    TODO: come up with a way to cross-reference
+    """
+
+    d = {}
+    for prop in fields(obj):
+        if not prop.serialize:
+            continue
+
+        if callable(prop.serialize):
+            value = prop.serialize(value, memo)
+        else:
+            value = serialize_value(getattr(obj, prop.name), memo)
+
+        if value is not _memo and (value is not None or not exclude_none):
+            d[prop.name] = value
+
+    return kebab_dict(d.items())
+
+
+_ModelType = TypeVar("_ModelType", bound=RdsBaseModel)
+
+
+def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
+    kw = {}
+
+    flds = get_type_hints(cls)
+
+    for k, v in data.items():
+        f = to_camelcase(k)
+        if f in flds:
+            t = flds[f]
+        else:
+            continue
+
+        if t is not None:
+            v = deserialize_value(t, v)
+
+        kw[f] = v
+
+    return cls(**kw, parent=parent)
+
+
+register_serializer(RdsBaseModel, serialize_model, deserialize_model)
