@@ -9,3 +9,4 @@ Usage
     usage/toolbox
     usage/preview
     usage/data_table
+    usage/metrics_table

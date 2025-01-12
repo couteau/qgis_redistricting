@@ -10,7 +10,7 @@ QGIS Redistricting Plugin documentation
 =======================================
 
 The QGIS redistiting plugin enables the creation of political
-districting maps in QGIS. 
+districting maps in QGIS.
 
 .. toctree::
    :maxdepth: 2

@@ -18,12 +18,12 @@
 # -- Project information -----------------------------------------------------
 
 project = 'QGIS Redistricting Plugin'
-project_copyright = '2022, Stuart C. Naifeh'
+project_copyright = '2025, Stuart C. Naifeh'
 author = 'Stuart C. Naifeh'
 
-version = '0.0.1'
+version = '0.0.4'
 
-release = '0.0.1-alpha'
+release = '0.0.4-alpha'
 
 
 # -- General configuration ---------------------------------------------------
@@ -51,7 +51,7 @@ exclude_patterns = []
 html_theme = 'cloud'
 html_scaled_image_link = False
 html_favicon = 'images/icon.png'
-html_css_files = 'help.css'
+html_css_files = ['help.css']
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
