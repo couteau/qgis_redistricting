@@ -14,4 +14,4 @@ among which the geographic unit is split, and the population assigned to each
 of the split piece.
 
 .. image:: /images/splits_tree.png
-    :scale: 80%
+    :scale: 70%

@@ -7,3 +7,4 @@ redistricting/vendor
 coverage.xml
 .coverage
 .env
+docs/build/*

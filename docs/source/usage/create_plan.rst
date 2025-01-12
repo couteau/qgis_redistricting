@@ -99,7 +99,7 @@ the smallest district to the specified maximum.
 ``Additional Population Totals`` - Here, you may optionally define additional
 population totals that will be reported for your districts. For example,
 voting age population or total registered voters. These units may be used as
-the base for calculating percentages for the data fields. See :ref:<_page-4>
+the base for calculating percentages for the data fields. See :ref:`page-4`.
 You may define additional population totals using individual attributes or
 QGIS expressions. Once the addtional unit is added, a more descriptive caption
 or label can be provided.
