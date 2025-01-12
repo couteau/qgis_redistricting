@@ -25,7 +25,6 @@
 """
 from typing import (
     Iterable,
-    List,
     Type,
     Union
 )
@@ -93,7 +92,7 @@ class FieldListModel(QAbstractTableModel):
     def fields(self, value: list[RdsField]):
         if len(value) == 0 and len(self._data) == 0:
             return
-        if len(self._data):
+        if len(self._data) > 0:
             self.beginRemoveRows(QModelIndex(), 0, len(self._data))
             self._data.clear()
             self.endRemoveRows()
@@ -119,7 +118,7 @@ class FieldListModel(QAbstractTableModel):
     @popFields.setter
     def popFields(self, value: list[RdsField]):
         if value is None:
-            self._popFields: dict[str, RdsField] = []
+            self._popFields: dict[str, RdsField] = {}
         else:
             self._popFields = {fld.field: fld for fld in value}
 
@@ -240,7 +239,7 @@ class FieldListModel(QAbstractTableModel):
 
             if index.column() == 3:
                 if 0 <= value < len(self._popFields):
-                    field.pctBase = self._popFields[value].fieldName
+                    field.pctBase = list(self._popFields.values())[value].fieldName
                     return True
 
         if role == Qt.CheckStateRole:
@@ -383,7 +382,7 @@ class RdsFieldTableView(QTableView):
         return super().mouseReleaseEvent(e)
 
     @pyqtProperty(list, notify=fieldsChanged)
-    def fields(self) -> List[RdsField]:
+    def fields(self) -> list[RdsField]:
         m = self.model()
         if not isinstance(m, FieldListModel):
             return []

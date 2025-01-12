@@ -55,6 +55,9 @@ class BaseDeviationValidator(QObject):
         return ideal, floor(ideal), ceil(ideal)
 
     def districtPctDeviation(self, district: 'RdsDistrict'):
+        if self._perMemberIdeal == 0:
+            return 0
+
         return (district.population - (district.members * self._perMemberIdeal)) / (district.members * self._perMemberIdeal)
 
     def totalDeviation(self):

@@ -28,7 +28,6 @@ from typing import (
     Optional,
     Union
 )
-from uuid import uuid4
 
 from qgis.core import (
     Qgis,
@@ -41,10 +40,14 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
+    RdsDataField,
+    RdsField,
+    RdsGeoField,
+    RdsMetrics,
     RdsPlan,
-    deserialize,
-    serialize
+    RdsSplits
 )
+from ..models.base.lists import KeyedList
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
 from .districtio import DistrictReader
@@ -94,7 +97,7 @@ class PlanBuilder(BasePlanBuilder):
 
     def createLayers(self, plan: RdsPlan):
         def taskCompleted():
-            plan.metrics.updateMetrics(self._createLayersTask.totalPop, 0, None)
+            plan.metrics.updateMetrics(0, None)
             self._createLayersTask = None
 
             plan.addLayersFromGeoPackage(self._geoPackagePath)
@@ -182,27 +185,31 @@ class PlanBuilder(BasePlanBuilder):
         if not self.validate():
             return None
 
-        data = {
-            'id': str(uuid4()),
-            'name': self._name,
-            'description': self._description,
-            'num-districts': self._numDistricts,
-            'num-seats': self._numSeats if self._numSeats > self._numDistricts else None,
-            'deviation': self._deviation,
-            'deviation-type': self._deviationType,
-            'geo-id-field': self._geoIdField,
-            'geo-id-caption': self._geoIdCaption,
-            'dist-field': self._distField,
-            'pop-layer': self._popLayer.id() if self._geoLayer != self._popLayer else None,
-            'pop-join-field': self._popJoinField if self._popJoinField != self._geoIdField else None,
-            'pop-field': self._popField,
-            'geo-layer': self._geoLayer.id(),
-            'geo-join-field': self._geoJoinField if self._geoJoinField != self._geoIdField else None,
-            'pop-fields': [serialize(field) for field in self._popFields],
-            'data-fields': [serialize(field) for field in self._dataFields],
-            'geo-fields': [serialize(field) for field in self._geoFields],
-        }
-        plan = deserialize(RdsPlan, {k: v for k, v in data.items() if v is not None}, parent=planParent)
+        plan = RdsPlan(
+            name=self._name,
+            numDistricts=self._numDistricts,
+            numSeats=self._numSeats if self._numSeats > self._numDistricts else None,
+            deviation=self._deviation,
+            deviationType=self._deviationType,
+            totalPopulation=self._totalPopulation,
+            geoLayer=self._geoLayer,
+            geoJoinField=self._geoJoinField if self._geoJoinField != self._geoIdField else None,
+            popLayer=self._popLayer if self._geoLayer != self._popLayer else None,
+            popJoinField=self._popJoinField if self._popJoinField != self._geoIdField else None,
+            popField=self._popField,
+            popFields=KeyedList[RdsField](self._popFields),
+            dataFields=KeyedList[RdsDataField](self._dataFields),
+            geoIdField=self._geoIdField,
+            distField=self._distField,
+            geoIdCaption=self._geoIdCaption,
+            geoFields=KeyedList[RdsGeoField](self._geoFields),
+            metrics=RdsMetrics(
+                self._cutEdges,
+                KeyedList[RdsSplits]([RdsSplits(fld, self._splits.get(fld)) for fld in self._geoFields])
+            ),
+            description=self._description,
+            parent=planParent
+        )
 
         self.createAttributeIndices()
 

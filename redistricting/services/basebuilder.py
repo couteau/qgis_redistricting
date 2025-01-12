@@ -226,14 +226,14 @@ class BasePlanBuilder(PlanValidator):
         return matchField(fieldName, self._popLayer, defaults.CVAP_TOTAL_FIELDS)
 
     @overload
-    def appendPopField(self, field: str, isExpression: bool = False, caption: str = None) -> Self:
+    def appendPopField(self, field: str, caption: str = None) -> Self:
         ...
 
     @overload
     def appendPopField(self, field: RdsField) -> Self:
         ...
 
-    def appendPopField(self, field, caption=None) -> Self:
+    def appendPopField(self, field, caption=None):
         if isinstance(field, str):
             field = RdsField(self._popLayer, field, caption)
         elif not isinstance(field, RdsField):
@@ -405,7 +405,7 @@ class BasePlanBuilder(PlanValidator):
     def appendGeoField(self, field: RdsField) -> Self:
         ...
 
-    def appendGeoField(self, field, caption=None) -> Self:
+    def appendGeoField(self, field, caption=None):
         if isinstance(field, str):
             field = RdsField(self._geoLayer, field, caption)
         elif not isinstance(field, RdsField):

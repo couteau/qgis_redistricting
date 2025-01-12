@@ -29,7 +29,8 @@ from qgis.PyQt.QtCore import (
     QAbstractListModel,
     QModelIndex,
     QObject,
-    Qt
+    Qt,
+    QVariant
 )
 from qgis.PyQt.QtWidgets import (
     QComboBox,
@@ -59,9 +60,10 @@ class PopFieldDelegate(QStyledItemDelegate):
     def createEditor(self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex) -> QWidget:
         if index.column() == 3:
             editor = QComboBox(parent)
+            editor.setAutoFillBackground(True)
+            editor.setGeometry(option.rect)
+            editor.setLayoutDirection(option.direction)
             editor.setFrame(False)
-            rect = option.rect
-            editor.setGeometry(rect)
             editor.setEditable(False)
             editor.addItems([f.caption for f in self.popFields])
             return editor
@@ -70,7 +72,10 @@ class PopFieldDelegate(QStyledItemDelegate):
     def setEditorData(self, editor: QComboBox, index: QModelIndex):
         if index.column() == 3:
             text = index.model().data(index, Qt.EditRole)
-            editor.setCurrentText(text)
+            if text is not None and text != QVariant():
+                editor.setCurrentText(text)
+            else:
+                editor.setCurrentText("")
         else:
             super().setEditorData(editor, index)
 

@@ -25,6 +25,7 @@
 from numbers import Number
 from typing import Optional
 
+import pandas as pd
 from qgis.core import (
     Qgis,
     QgsVectorLayer
@@ -56,6 +57,9 @@ class PlanValidator(ErrorListMixin, QObject):
         self._numSeats = 0
         self._deviation = 0.0
         self._deviationType = DeviationType.OverUnder
+        self._totalPopulation = 0
+        self._cutEdges = 0
+        self._splits: dict[str, pd.DataFrame] = {}
 
         self._geoIdField = None
         self._geoIdCaption = ''
@@ -98,6 +102,10 @@ class PlanValidator(ErrorListMixin, QObject):
         instance._popField = plan.popField
         instance._popFields = plan.popFields[:]
         instance._dataFields = plan.dataFields[:]
+
+        instance._totalPopulation = plan.totalPopulation
+        instance._cutEdges = plan.metrics.cutEdges
+        instance._splits = {s.field: s.data for s in plan.metrics.splits}
 
         instance._assignLayer = plan.assignLayer
         instance._distLayer = plan.distLayer

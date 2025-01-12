@@ -42,7 +42,6 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.utils import spatialite_connect
 
-from ..models import RdsSplits
 from ..utils import tr
 from .districtio import DistrictReader
 from .errormixin import ErrorListMixin
@@ -103,11 +102,6 @@ class PlanCopier(ErrorListMixin, QObject):
         if copyAssignments:
             shutil.copyfile(self._plan.geoPackagePath, destGpkgPath)
             plan.addLayersFromGeoPackage(destGpkgPath)
-
-            for f in plan.geoFields:
-                split = RdsSplits(plan, f, plan.metrics)
-                split.setData(self._plan.metrics.splits[f.fieldName].data.copy())
-                plan.metrics.splits[f.fieldName] = split
 
             reader = DistrictReader(
                 plan.distLayer,

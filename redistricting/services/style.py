@@ -147,7 +147,7 @@ class PlanStylerService(QObject):
 
         for dist in range(0, numDistricts+1):
             sym = symbol.clone()
-            sym.setColor(QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist))
+            sym.setColor(QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist/(self._numDistricts + 1)))
             category = QgsRendererCategory(
                 None if dist == 0 else dist,
                 sym,
@@ -167,7 +167,9 @@ class PlanStylerService(QObject):
         distRenderer = QgsCategorizedSymbolRenderer(self._attrName)
         for dist in range(0, numDistricts+1):
             sym = symbol.clone()
-            sym.symbolLayer(0).setFillColor(QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist))
+            sym.symbolLayer(0).setFillColor(
+                QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist/(self._numDistricts + 1))
+            )
             category = QgsRendererCategory(
                 None if dist == 0 else dist,
                 sym,

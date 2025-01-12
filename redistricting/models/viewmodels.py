@@ -801,9 +801,12 @@ class RdsMetricsModel(QAbstractTableModel):
                 result = f'{self._metrics.totalPopulation:,}'
             elif row == Metrics.Deviation:
                 minDeviation, maxDeviation, _valid = self._metrics.deviation
-                result = f'{maxDeviation:+.2%}, {minDeviation:+.2%}' \
-                    if self._metrics.devationType == DeviationType.OverUnder \
-                    else f'{maxDeviation-minDeviation:.2%}'
+                if minDeviation is None or maxDeviation is None:
+                    result = None
+                else:
+                    result = f'{maxDeviation:+.2%}, {minDeviation:+.2%}' \
+                        if self._metrics.devationType == DeviationType.OverUnder \
+                        else f'{maxDeviation-minDeviation:.2%}'
             elif row == Metrics.Contiguity:
                 result = tr('Yes') if self._metrics.contiguous else tr('No')
             elif row == Metrics.Completeness:
