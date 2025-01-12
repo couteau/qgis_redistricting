@@ -302,8 +302,9 @@ class OverlayWidget(QWidget):
         return super().event(evt)
 
     def start(self):
-        self.updatePosition()
-        self._isSpinning = True
+        if not self.isVisible():
+            self.updatePosition()
+            self._isSpinning = True
 
         if not self._timer.isActive():
             self._timer.start()
@@ -312,7 +313,7 @@ class OverlayWidget(QWidget):
         self.show()
 
     def stop(self, animate=True):
-        if animate:
+        if animate and self.isVisible():
             self._oldOpacity = self.opacity
             self._anim = QPropertyAnimation(
                 self, b"opacity")

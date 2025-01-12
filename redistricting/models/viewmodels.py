@@ -235,7 +235,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 if col == 0 or district.district == 0:
                     color = getColorForDistrict(self._plan, district.district)
                     value = QBrush(color)
-                elif col in {DistrictColumns.POPULATION, DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}:
+                elif col in {int(DistrictColumns.POPULATION), int(DistrictColumns.DEVIATION), int(DistrictColumns.PCT_DEVIATION)}:
                     if self._validator.validateDistrict(district):
                         color = QColor(0x60, 0xbd, 0x63)  # QColor(99, 196, 101)  # 60be63ff
                         value = QBrush(color)

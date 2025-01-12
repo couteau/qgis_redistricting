@@ -23,6 +23,7 @@
  ***************************************************************************/
  """
 from qgis.gui import QgsDockWidget
+from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QLabel
 
 from ..models import RdsPlan
@@ -39,6 +40,7 @@ class RdsDockWidget(QgsDockWidget):
         self.lblWaiting = OverlayWidget()
         self.lblWaiting.setVisible(False)
         self.helpContext: str = 'index.html'
+        self.dockLocationChanged.connect(self.dockChanged)
 
     @property
     def plan(self) -> RdsPlan:
@@ -68,7 +70,13 @@ class RdsDockWidget(QgsDockWidget):
         if self.lblWaiting.parent() is None:
             return
 
-        if on and not self.lblWaiting.isVisible():
+        if on:
             self.lblWaiting.start()
-        elif self.lblWaiting.isVisible():
+        else:
             self.lblWaiting.stop()
+
+    def dockChanged(self, area: Qt.DockWidgetArea):
+        if area == Qt.NoDockWidgetArea:
+            self.layout().setContentsMargins(8, 4, 8, 4)
+        else:
+            self.layout().setContentsMargins(0, 4, 0, 4)
