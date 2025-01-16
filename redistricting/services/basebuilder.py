@@ -39,6 +39,7 @@ from ..models import (
     DeviationType,
     RdsDataField,
     RdsField,
+    RdsGeoField,
     RdsPlan
 )
 from ..utils import (
@@ -402,13 +403,13 @@ class BasePlanBuilder(PlanValidator):
         ...
 
     @overload
-    def appendGeoField(self, field: RdsField) -> Self:
+    def appendGeoField(self, field: RdsGeoField) -> Self:
         ...
 
     def appendGeoField(self, field, caption=None):
         if isinstance(field, str):
-            field = RdsField(self._geoLayer, field, caption)
-        elif not isinstance(field, RdsField):
+            field = RdsGeoField(self._geoLayer, field, caption)
+        elif not isinstance(field, RdsGeoField):
             raise ValueError(
                 tr('Attempt to add invalid field {field!r} to plan {plan}').
                 format(field=field, plan=self._name)
@@ -425,7 +426,7 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def removeGeoField(self, field: RdsField) -> Self:
+    def removeGeoField(self, field: RdsGeoField) -> Self:
         ...
 
     @overload
@@ -440,7 +441,7 @@ class BasePlanBuilder(PlanValidator):
         if isinstance(field, RdsField):
             if not field in self._geoFields:
                 raise ValueError(
-                    tr('Could not remove field {field}. RdsField not found in plan {plan}.').
+                    tr('Could not remove field {field}. Field object not found in plan {plan}.').
                     format(field=field.field, plan=self._name)
                 )
         elif isinstance(field, str):
