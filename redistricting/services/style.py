@@ -129,14 +129,15 @@ class PlanStylerService(QObject):
         self._labeling = QgsVectorLayerSimpleLabeling(layerSettings)
 
     def createRenderers(self, numDistricts):
+        self._numDistricts = max(self._numDistricts, numDistricts)
         if self._ramp:
-            self._ramp.setCount(numDistricts+1)
+            if self._numDistricts >= self._ramp.count():
+                self._ramp.setCount(self._numDistricts+1)
         else:
-            self._ramp = QgsLimitedRandomColorRamp(count=numDistricts+1, satMin=50, satMax=100)
+            self._ramp = QgsLimitedRandomColorRamp(count=self._numDistricts+1, satMin=50, satMax=100)
 
         self.createAssignmentRenderer(numDistricts)
         self.createDistrictRenderer(numDistricts)
-        self._numDistricts = numDistricts
 
     def createAssignmentRenderer(self, numDistricts: int):
         symbol: QgsFillSymbol = QgsSymbol.defaultSymbol(DISTRICT_GEOMETRY_TYPE)

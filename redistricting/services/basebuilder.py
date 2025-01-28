@@ -297,7 +297,7 @@ class BasePlanBuilder(PlanValidator):
         self._popFields.remove(field)
         return self
 
-    def setDataFields(self, dataFields: list[RdsDataField]):
+    def setDataFields(self, dataFields: list[RdsDataField]) -> Self:
         l = []
         for f in dataFields:
             if not self._checkNotDuplicate(f, l):

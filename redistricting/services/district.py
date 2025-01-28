@@ -64,7 +64,7 @@ class DistrictUpdater(QObject):
 
     def updateDistrictData(self, plan: "RdsPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
         for district, row in data.to_dict(orient="index").items():
-            plan.districts[district].update(row)
+            plan.districts[f"{district:04}"].update(row)
 
     def updateMetrics(self, plan: "RdsPlan", totalPopulation: int, cutEdges: int, splitsData: dict[str, pd.DataFrame]):
         plan.updateMetrics(totalPopulation, cutEdges, splitsData)

@@ -118,7 +118,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
             new = pd.DataFrame(0, index=data.index.difference(dist.index), columns=dist.columns)
             if len(new) > 0:
                 dist = pd.concat([dist, new])
-            members = [self.districts[d].members for d in dist.index]
+            members = [self.districts[f"{d:04}"].members for d in dist.index]
             dist["members"] = members
 
             data[f"new_{DistrictColumns.POPULATION}"] = dist[DistrictColumns.POPULATION] + \
