@@ -63,8 +63,10 @@ class SqlAccess:
         provider = layer.dataProvider()
         if provider.name() == 'ogr':
             if provider.storageType() in ('GPKG', 'SQLite'):
-                _, params = provider.dataSourceUri().split('|', 1)
-                lexer = shlex.shlex(params)
+                uri_parts = provider.dataSourceUri().split('|')
+                if len(uri_parts) <= 1:
+                    raise ValueError("Could not determine table name from URI")
+                lexer = shlex.shlex(uri_parts[1])
                 lexer.whitespace_split = True
                 lexer.whitespace = '&'
                 params = dict(pair.split('=', 1) for pair in lexer)

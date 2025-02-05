@@ -217,9 +217,14 @@ class LayerReader(SqlAccess):
                 if read_geometry and (g := self.getGeometryColumn(self._layer)):
                     cols += f",{g}"
             sql = f"SELECT {cols} from {self.getTableName(self._layer)}"
-            if filt:
-                filt = {f: f"{f'{v}' if isinstance(v, str) else v}" for f, v in filt.items()}
-                sql = f"{sql} WHERE {' AND '.join(f'{f} = {v}' for f,v in filt.items())}"
+            if filt or self._layer.subsetString():
+                filters = []
+                if filt:
+                    filters.extend(f'{f} = {v!r}' for f, v in filt.items())
+                if self._layer.subsetString():
+                    filters.append(self._layer.subsetString())
+
+                sql = f"{sql} WHERE {' AND '.join(filters)}"
             if order:
                 sql = f"{sql} ORDER BY {order}"
             return sql
@@ -243,8 +248,11 @@ class LayerReader(SqlAccess):
 
         if self._layer.storageType() in ("GPKG", "OpenFileGDB"):
             if read_geometry:
-                database, params = self._layer.dataProvider().dataSourceUri().split('|', 1)
-                lexer = shlex.shlex(params)
+                uri_parts = self._layer.dataProvider().dataSourceUri().split('|')
+                if len(uri_parts) <= 1:
+                    raise ValueError("Could not determine table name from URI")
+                database = uri_parts[0]
+                lexer = shlex.shlex(uri_parts[1])
                 lexer.whitespace_split = True
                 lexer.whitespace = '&'
                 params = dict(pair.split('=', 1) for pair in lexer)

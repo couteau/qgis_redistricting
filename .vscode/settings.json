@@ -35,4 +35,9 @@
     "qtForPython.qmlls.enabled": false,
     "python.testing.unittestEnabled": false,
     "python.analysis.inlayHints.pytestParameters": true,
+    "isort.args": [
+        "-m3",
+        "--force-grid-wrap",
+        "2"
+    ]
 }

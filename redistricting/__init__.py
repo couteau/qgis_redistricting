@@ -101,6 +101,9 @@ if not hasattr(typing, "dataclass_transform"):
 
     setattr(typing, "dataclass_transform", dataclass_transform)
 
+if not hasattr(typing, "TypeAlias"):
+    setattr(typing, "TypeAlias", type)
+
 
 def classFactory(iface):  # pylint: disable=invalid-name
     """Create an instance of the Redistricting plugin.

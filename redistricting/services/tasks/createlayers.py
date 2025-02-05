@@ -135,6 +135,13 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
 
         sql += f' FROM {table}'
 
+        if self.geoLayer.subsetString():
+            if self.popLayer == self.geoLayer:
+                sql += f" WHERE {self.geoLayer.subsetString()}"
+            else:
+                geoids = [f[self.geoJoinField] for f in self.geoLayer.getFeatures()]
+                sql += f""" WHERE {self.popJoinField} in ('{"','".join(geoids)}')"""
+
         return sql
 
     def getPopFieldTotals(self, popLayer: QgsVectorLayer):
@@ -306,6 +313,8 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
                         if f.fieldName in self.assignFields:
                             sql += f'{f.field} as {f.fieldName}, '
                     sql += f'ST_AsText({geocol}) as geometry FROM {table}'
+                    if self.geoLayer.subsetString():
+                        sql += f" WHERE {self.geoLayer.subsetString()}"
                     gen = self.executeSql(self.geoLayer, sql, False)
 
             if not gen:
