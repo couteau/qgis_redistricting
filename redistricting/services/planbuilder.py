@@ -215,5 +215,7 @@ class PlanBuilder(BasePlanBuilder):
 
         if createLayers:
             self.createLayers(plan)
+        elif self._geoPackagePath and self._geoPackagePath.exists():
+            plan.addLayersFromGeoPackage(self._geoPackagePath)
 
         return plan

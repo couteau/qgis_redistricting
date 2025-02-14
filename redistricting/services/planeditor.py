@@ -25,7 +25,6 @@
 from typing import (
     Iterable,
     Optional,
-    Set,
     overload
 )
 
@@ -70,7 +69,7 @@ class PlanEditor(BasePlanBuilder):
         self._modifiedFields = set()
 
     @property
-    def modifiedFields(self) -> Set[str]:
+    def modifiedFields(self) -> set[str]:
         return self._modifiedFields
 
     def setProgress(self, progress: float):
@@ -150,7 +149,7 @@ class PlanEditor(BasePlanBuilder):
     def _updatePopFields(self):
         if self._plan.distLayer:
             layer = self._plan.distLayer
-            addedFields: Set[RdsField] = set(self._popFields) - set(self._plan.popFields)
+            addedFields: list[RdsField] = [f for f in self._popFields if f not in self._plan.popFields]
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -160,11 +159,11 @@ class PlanEditor(BasePlanBuilder):
         if self._plan.distLayer:
             layer = self._plan.distLayer
 
-            addedFields: Set[RdsDataField] = set(self._dataFields) - set(self._plan.dataFields)
+            addedFields: list[RdsDataField] = [f for f in self._dataFields if f not in self._plan.dataFields]
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
-            removedFields: Set[RdsDataField] = set(self._plan.dataFields) - set(self._dataFields)
+            removedFields: list[RdsDataField] = [f for f in self._plan.dataFields if f not in self._dataFields]
             if removedFields:
                 provider = layer.dataProvider()
                 for f in removedFields:
@@ -177,7 +176,7 @@ class PlanEditor(BasePlanBuilder):
 
     def _updateGeoFields(self):
         def removeFields():
-            removedFields: Set[RdsField] = set(self._plan.geoFields) - set(self._geoFields)
+            removedFields: list[RdsField] = [f for f in self._plan.geoFields if f not in self._geoFields]
             if removedFields:
                 provider = self._assignLayer.dataProvider()
                 fields = self._assignLayer.fields()
@@ -217,7 +216,7 @@ class PlanEditor(BasePlanBuilder):
 
         saveFields = self._plan.geoFields
         layer = self._plan.assignLayer
-        addedFields: Set[RdsField] = set(self._geoFields) - set(self._plan.geoFields)
+        addedFields: list[RdsField] = [f for f in self._geoFields if f not in self._plan.geoFields]
         if addedFields:
             self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 

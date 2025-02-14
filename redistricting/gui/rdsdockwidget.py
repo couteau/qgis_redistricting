@@ -60,8 +60,9 @@ class RdsDockWidget(QgsDockWidget):
                 self._plan.nameChanged.connect(self.planNameChanged)
                 self.lblPlanName.setText(self._plan.name)
 
-    def planNameChanged(self, name):
-        self.lblPlanName.setText(name)
+    def planNameChanged(self):
+        if self.sender() == self.plan:
+            self.lblPlanName.setText(self.plan.name)
 
     def btnHelpClicked(self):
         showHelp(self.helpContext)

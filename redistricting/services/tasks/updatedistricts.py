@@ -130,15 +130,17 @@ class AggregateDistrictDataTask(AggregateDataTask):
             # select count of unit pairs where
             #   1) assigned districts are different (also takes care of excluding unassigned units from count),
             #   2) combination is unique (count a,b but not b,a),
-            #   3) bounding boxes overlap (using spatial index to minimize more intensive adjacency checks)
+            #   3) bounding boxes touch or overlap (using spatial index to minimize more intensive adjacency checks)
             #   4) units are adjacent at more than a point
-            sql = "SELECT count(*) " \
-                "FROM assignments a JOIN assignments b " \
-                f"ON b.{self.distField} != a.{self.distField} AND b.{self.geoIdField} > a.{self.geoIdField} " \
-                "AND b.fid IN(SELECT id FROM rtree_assignments_geometry r " \
-                "WHERE r.minx < st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry) " \
-                "AND r.miny < st_maxy(a.geometry) and r.maxy >= st_miny(a.geometry)) " \
-                "AND st_length(st_intersection(a.geometry, b.geometry)) > 0 "
+            sql = f""""SELECT count(*)
+                FROM assignments a JOIN assignments b
+                ON b.{self.distField} != a.{self.distField} AND b.{self.geoIdField} > a.{self.geoIdField}
+                AND b.fid IN (
+                    SELECT id FROM rtree_assignments_geometry r
+                    WHERE r.minx <= st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry)
+                    AND r.miny <= st_maxy(a.geometry) and r.maxy >= st_miny(a.geometry)
+                )
+                AND st_relate(a.geometry, b.geometry, 'F***1****')"""
 
             c = db.execute(sql)
             return c.fetchone()[0]

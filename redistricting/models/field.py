@@ -279,6 +279,9 @@ class RdsGeoField(RdsField):
 
     def makeJoin(self):
         rel = self.getRelation()
+        if rel is None:
+            return None
+
         pair = rel.fieldPairs()
         if len(pair) > 1:
             return None

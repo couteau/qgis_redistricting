@@ -151,9 +151,9 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
             not self.cmbAddlGeoField.isExpression() or self.cmbAddlGeoField.isValidExpression()))
 
     def addField(self):
-        field, isExpression, isValid = self.cmbAddlGeoField.currentField()
+        field, _, isValid = self.cmbAddlGeoField.currentField()
         if not isValid:
             return
 
         layer = self.field('sourceLayer')
-        self.fieldsModel.appendField(layer, field, isExpression)
+        self.fieldsModel.appendField(layer, field)

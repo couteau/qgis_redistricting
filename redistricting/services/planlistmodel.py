@@ -136,7 +136,8 @@ class PlanListModel(QAbstractTableModel):
         self.beginResetModel()
         self.endResetModel()
 
-    def updatePlan(self, plan):
+    def updatePlan(self):
+        plan = self.sender()
         idx1 = self.indexFromPlan(plan)
         idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
         self.dataChanged.emit(idx1, idx2)
