@@ -1,0 +1,280 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Create a New Redistricting Plan &#8212; QGIS Redistricting Plugin 0.0.4-alpha documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/cloud.css?v=f9ae72be" />
+    <link rel="stylesheet" type="text/css" href="../_static/help.css?v=93d7a9f1" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noticia+Text:400,i,b,bi|Open+Sans:400,i,b,bi|Roboto+Mono:400,i,b,bi&amp;display=swap" type="text/css" />
+    
+    <script src="../_static/documentation_options.js?v=cf230d1f"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+
+    
+    
+     
+        <script src="../_static/jquery.cookie.js"></script>
+    
+
+    
+     
+        <script src="../_static/cloud.base.js"></script>
+    
+
+    
+     
+        <script src="../_static/cloud.js"></script>
+    
+
+    <link rel="icon" href="../_static/icon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Creating Your Districts" href="toolbox.html" />
+    <link rel="prev" title="Getting Started with Redistricting" href="getting_started.html" /> 
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head><body>
+    <div class="relbar-top">
+        
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="toolbox.html" title="Creating Your Districts"
+             accesskey="N">next</a> &nbsp; &nbsp;</li>
+        <li class="right" >
+          <a href="getting_started.html" title="Getting Started with Redistricting"
+             accesskey="P">previous</a> &nbsp; &nbsp;</li>
+    <li><a href="../index.html">QGIS Redistricting Plugin 0.0.4-alpha documentation</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../usage.html" accesskey="U">Usage</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Create a New Redistricting Plan</a></li> 
+      </ul>
+    </div>
+    </div>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="create-a-new-redistricting-plan">
+<h1>Create a New Redistricting Plan<a class="headerlink" href="#create-a-new-redistricting-plan" title="Link to this heading">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Before you can create a plan, you must create a QGIS project that
+includes the layer or layers containing the geographic units and
+demographic data from which your redistricting plan will be built.</p>
+</div>
+<section id="the-create-new-plan-dialog">
+<h2>The &quot;Create New Plan&quot; dialog<a class="headerlink" href="#the-create-new-plan-dialog" title="Link to this heading">¶</a></h2>
+<p>When New Redistricting Plan is selected from the QGIS redistricting plugin
+toolbar or menu, the “Create New Plan” dialog guides you through creating
+a redistricting plan.</p>
+<section id="page-1-plan-details">
+<span id="page-1"></span><h3>Page 1 - Plan Details<a class="headerlink" href="#page-1-plan-details" title="Link to this heading">¶</a></h3>
+<p>The first page of the “Create New Plan” dialog allows you to select a name for
+your plan, provide the path to a new GeoPackage file that will contain your
+plan layers, and specify the number of districts in your plan and the number
+of members who will represent those districts. You may also provide an
+optional description. The following constraints apply.</p>
+<ul class="simple">
+<li><p>The plan name must be unique among redistricting plans for your project</p></li>
+<li><p>There must be two or more districts in your plan</p></li>
+<li><p>The number of members must be equal to or greater than the number</p></li>
+</ul>
+<img alt="../_images/create_plan_page1.png" src="../_images/create_plan_page1.png" />
+</section>
+<section id="page-2-geography">
+<span id="page-2"></span><h3>Page 2 - Geography<a class="headerlink" href="#page-2-geography" title="Link to this heading">¶</a></h3>
+<p>The second page of the “Create New Plan” dialog allows you to define the
+geography from which your plan will be built.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Import</span> <span class="pre">Geography</span> <span class="pre">from</span> <span class="pre">Layer</span></code> - Specify the layer containing the smallest
+units of geography you will use to create your plan (e.g., census blocks).
+QGIS Redistrictin Plugin can use geography from any vector layer format
+supported by QGIS. However, formats such as PostGIS or GeoPackage, which
+allow for indexes on attribute fields, provide better performance than
+formats such as ESRI Shapefile or GeoJson.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Primary</span> <span class="pre">Geography</span> <span class="pre">ID</span> <span class="pre">Field</span></code> - Specify the layer attribute that uniquely
+identifies the geographic units. This field will be used to join the layer
+containing the demographic data (if it is different from the geography layer).</p>
+<p><code class="docutils literal notranslate"><span class="pre">Geography</span> <span class="pre">Name</span></code> - You may also provide a more descriptive label for your
+geographic units here.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Additional</span> <span class="pre">Geography</span></code> - Here, you may define additional units of geography
+that may be used to build your districts. Geography is defined using fields
+from the primary geography layer. For example, if your primary layer is U.S.
+Census Bureau census blocks, and each block contains an identifier for the
+county or census tract in which it falls, you can add that field to the list
+of additional geography to allow building districts from counties or census
+tracts. You may define additional geography using individual attributes or
+QGIS expressions. Once the addtional unit is added, a more descriptive caption
+or label can be provided.</p>
+<img alt="../_images/create_plan_page2.png" src="../_images/create_plan_page2.png" />
+</section>
+<section id="page-3-population">
+<span id="page-3"></span><h3>Page 3 - Population<a class="headerlink" href="#page-3-population" title="Link to this heading">¶</a></h3>
+<p>The third page of the “Create New Plan” dialog allows you to specify the layer
+containing the population data your plan will use.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Population</span> <span class="pre">Layer</span></code> - If your population data is contained in a separate
+layer from your geographical building blocks, specify the population layer
+here. Population data must be provided at the same level of geography as the
+geographic units. If not using a separate population layer, specify “Use the
+geography layer” here.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Join</span> <span class="pre">Field</span></code> - If using a separate population layer from the geography layer,
+specify the field in the population layer that will be used to join the
+population data to the geographic units. This field must contain the same
+geographic identifier as the Geo ID Field used to uniquely identify the
+geography.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Total</span> <span class="pre">Population</span> <span class="pre">Field</span></code> - Specify the name of the attribute containing the
+total population for each geographic unit. This field is used to validate that
+each district falls within the maximum deviation allowed for the plan.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Maximum</span> <span class="pre">Deviation</span></code> - Specify the maximum population deviation above or below
+the ideal population for each district that is permitted for your plan.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Deviation</span> <span class="pre">Measure</span></code> - Select how deviation will be measured for your plan.
+<cite>Over/Under</cite> limits the deviation of each district to plus or minus the
+specified maximum. <cite>Top-to-Bottom</cite> limits the deviation from the largest to
+the smallest district to the specified maximum.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Additional</span> <span class="pre">Population</span> <span class="pre">Totals</span></code> - Here, you may optionally define additional
+population totals that will be reported for your districts. For example,
+voting age population or total registered voters. These units may be used as
+the base for calculating percentages for the data fields. See <a class="reference internal" href="#page-4"><span class="std std-ref">Page 4 - Additional Demographic Data</span></a>.
+You may define additional population totals using individual attributes or
+QGIS expressions. Once the addtional unit is added, a more descriptive caption
+or label can be provided.</p>
+<img alt="../_images/create_plan_page3.png" src="../_images/create_plan_page3.png" />
+</section>
+<section id="page-4-additional-demographic-data">
+<span id="page-4"></span><h3>Page 4 - Additional Demographic Data<a class="headerlink" href="#page-4-additional-demographic-data" title="Link to this heading">¶</a></h3>
+<p>The fourth page of the “Create New Plan” dialog allows you to specify
+additional demographic data that will be tracked for each district in your
+plan.</p>
+<p>Demographic data is defined using fields from the population layer. You may
+define demographic using individual attributes from the population layer or
+QGIS expressions. Once the addtional demographic data field is added, a more
+descriptive caption or label can be provided, and you can specify whether to
+track the total population for the demographic group and/or the population of
+the deographic group as a percentage of total population or one of the
+<a class="reference internal" href="#page-3"><span class="std std-ref">additional population fields</span></a> defined in your plan.</p>
+<img alt="../_images/create_plan_page4.png" src="../_images/create_plan_page4.png" />
+</section>
+<section id="page-5-import-assignments">
+<span id="page-5"></span><h3>Page 5 - Import Assignments<a class="headerlink" href="#page-5-import-assignments" title="Link to this heading">¶</a></h3>
+<p>The fifth and final page of the “Create New Plan” dialog allows you to optional
+import district assignments for your plan from a CSV or Microsoft Excel file.
+You may also import assignments at a later point using the “Import Assignments”
+option available on the QGIS redistricting plugin menu.</p>
+<img alt="../_images/create_plan_page5.png" src="../_images/create_plan_page5.png" />
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper"><div class="sphinx-toc sphinxlocaltoc">
+    <h3><a href="../index.html">Page contents</a></h3>
+    <ul>
+<li><a class="reference internal" href="#">Create a New Redistricting Plan</a><ul>
+<li><a class="reference internal" href="#the-create-new-plan-dialog">The &quot;Create New Plan&quot; dialog</a><ul>
+<li><a class="reference internal" href="#page-1-plan-details">Page 1 - Plan Details</a></li>
+<li><a class="reference internal" href="#page-2-geography">Page 2 - Geography</a></li>
+<li><a class="reference internal" href="#page-3-population">Page 3 - Population</a></li>
+<li><a class="reference internal" href="#page-4-additional-demographic-data">Page 4 - Additional Demographic Data</a></li>
+<li><a class="reference internal" href="#page-5-import-assignments">Page 5 - Import Assignments</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+  </div>
+  <div class="sphinxprev">
+    <h4>Previous page</h4>
+    <p class="topless"><a href="getting_started.html"
+                          title="Previous page">&larr; Getting Started with Redistricting</a></p>
+  </div>
+  <div class="sphinxnext">
+    <h4>Next page</h4>
+    <p class="topless"><a href="toolbox.html"
+                          title="Next page">&rarr; Creating Your Districts</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/usage/create_plan.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+    
+    
+        <div class="sidebar-toggle-group no-js">
+            
+            <button class="sidebar-toggle" id="sidebar-hide" title="Hide the sidebar menu">
+                 «
+                <span class="show-for-small">hide menu</span>
+                
+            </button>
+            <button class="sidebar-toggle" id="sidebar-show" title="Show the sidebar menu">
+                
+                <span class="show-for-small">menu</span>
+                <span class="hide-for-small">sidebar</span>
+                 »
+            </button>
+        </div>
+    
+      <div class="clearer"></div>
+    </div>
+    <div class="relbar-bottom">
+        
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="toolbox.html" title="Creating Your Districts"
+             >next</a> &nbsp; &nbsp;</li>
+        <li class="right" >
+          <a href="getting_started.html" title="Getting Started with Redistricting"
+             >previous</a> &nbsp; &nbsp;</li>
+    <li><a href="../index.html">QGIS Redistricting Plugin 0.0.4-alpha documentation</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../usage.html" >Usage</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Create a New Redistricting Plan</a></li> 
+      </ul>
+    </div>
+    </div>
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Stuart C. Naifeh.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+    </div>
+    <!-- cloud_sptheme 1.4 -->
+  </body>
+</html>
