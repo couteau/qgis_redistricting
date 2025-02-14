@@ -30,6 +30,7 @@ from typing import (
 
 from qgis.core import (
     Qgis,
+    QgsApplication,
     QgsProject,
     QgsVectorLayer
 )
@@ -70,6 +71,7 @@ from ..services import (  # ShapefileImporter
     PlanStylerService
 )
 from ..services.actions import PlanAction
+from ..services.tasks.autoassign import AutoAssignUnassignedUnits
 from ..utils import tr
 from .base import BaseController
 
@@ -121,7 +123,7 @@ class PlanController(BaseController):
 
         self.planMenu: QMenu = None
         self.planActions: QActionGroup = None
-        self.vectorSubMenu: QMenu = None
+        self.vectorSubMenu: QAction = None
 
         self.planManagerDlg: DlgSelectPlan = None
         self.planModel: PlanListModel = None
@@ -145,12 +147,9 @@ class PlanController(BaseController):
         self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
         self.planActions = QActionGroup(self.iface.mainWindow())
 
-        self.vectorSubMenu: QMenu = self.iface.vectorMenu().addMenu(self.menuName)
-        self.vectorSubMenu.addMenu(self.menuButton.menu())
+        self.vectorSubMenu: QAction = self.iface.vectorMenu().addMenu(self.menuButton.menu())
 
     def unload(self):
-        self.toolbar.removeAction(self.toolBtnAction)
-        self.iface.vectorMenu().removeAction(self.vectorSubMenu.menuAction())
         if self.planManagerDlg is not None:
             self.planManagerDlg.close()
             self.planManagerDlg.deleteLater()
@@ -168,12 +167,12 @@ class PlanController(BaseController):
         self.planModel = None
         self.toolbar.removeAction(self.toolBtnAction)
         self.toolBtnAction = None
+        self.iface.vectorMenu().removeAction(self.vectorSubMenu)
+        self.vectorSubMenu = None
         self.planActions.setParent(None)
         self.planActions = None
         self.planMenu.setParent(None)
         self.planMenu = None
-        self.vectorSubMenu.setParent(None)
-        self.vectorSubMenu = None
 
     def createActions(self):
         self.actionShowPlanManager = self.actions.createAction(
@@ -280,6 +279,17 @@ class PlanController(BaseController):
         )
         self.actionDeletePlan.setEnabled(False)
 
+        self.actionAutoAssign = self.actions.createAction(
+            "actionAutoAssign",
+            QgsApplication.getThemeIcon('/algorithms/mAlgorithmVoronoi.svg'),
+            tr('Auto-assign Units'),
+            tooltip=tr('Attempt to automatically assign unassigned units to districts in the active plan'),
+            callback=self.autoassign,
+            parent=self.iface.mainWindow()
+        )
+        self.actionAutoAssign.setEnabled(False)
+        self.menu.addAction(self.actionAutoAssign)
+
     # slots
 
     def planDistrictsUpdated(self, plan: RdsPlan, districts: Iterable[int]):  # pylint: disable=unused-argument
@@ -298,6 +308,10 @@ class PlanController(BaseController):
             plan is not None and plan.assignLayer is not None and plan.distLayer is not None
         )
         self.actionExportPlan.setTarget(plan)
+        self.actionAutoAssign.setEnabled(
+            plan is not None and plan.assignLayer is not None and plan.distField is not None
+            and not plan.metrics.complete and len(plan.districts) > 1
+        )
 
         if plan is not None:
             action = self.planActions.findChild(QAction, plan.name)
@@ -668,3 +682,22 @@ class PlanController(BaseController):
     def triggerUpdate(self, plan: RdsPlan):
         self.endProgress()
         self.updateService.updateDistricts(plan, needDemographics=True, needGeometry=True, needSplits=True)
+
+    def autoassign(self):
+        def assignComplete():
+            self.iface.messageBar().pushInfo(
+                "Success!", f"Auto-assign completed succesfully: {len(task.update)} units were assigned to districts; {len(task.indeterminate)} units could not be assigned."
+            )
+
+        def assignError():
+            if task.isCanceled():
+                return
+
+            self.iface.messageBar().pushWarning(
+                "Error assigning units to districts", str(task.exception)
+            )
+
+        task = AutoAssignUnassignedUnits(self.activePlan.assignLayer, self.activePlan.distField)
+        task.taskCompleted.connect(assignComplete)
+        task.taskTerminated.connect(assignError)
+        QgsApplication.taskManager().addTask(task)
