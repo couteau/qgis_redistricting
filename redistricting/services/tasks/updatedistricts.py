@@ -132,7 +132,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
             #   2) combination is unique (count a,b but not b,a),
             #   3) bounding boxes touch or overlap (using spatial index to minimize more intensive adjacency checks)
             #   4) units are adjacent at more than a point
-            sql = f""""SELECT count(*)
+            sql = f"""SELECT count(*)
                 FROM assignments a JOIN assignments b
                 ON b.{self.distField} != a.{self.distField} AND b.{self.geoIdField} > a.{self.geoIdField}
                 AND b.fid IN (

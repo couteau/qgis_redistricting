@@ -197,14 +197,15 @@ class Redistricting:
         else:
             self.project.aboutToBeCleared.connect(self.onProjectClosing)
 
-        # layersWillBeRemoved signal is triggered when a project is
+        self.project.cleared.connect(self.onProjectClosed)
+
+        # layerWillBeRemoved signal is triggered when a project is
         # closed or when the user removes a layer, and there seems
         # to be no way to disinguish. We use a flag set in the
-        # signal handler for the project cleared signal (the closest
-        # thing to a 'project closed' signal QGIS seems to have) to
-        # ignore this signal when triggered in the context of a
-        # project closing
-        self.project.layersWillBeRemoved.connect(self.onLayersWillBeRemoved)
+        # signal handler for the project aboutToBeCleared (or, in
+        # versions before 3.34, removeAll) signal to ignore this
+        # signal when triggered in the context of a project closing
+        self.project.layerWillBeRemoved.connect(self.onLayerWillBeRemoved)
 
         self.iface.addToolBar(self.toolbar)
 
@@ -234,8 +235,10 @@ class Redistricting:
             # before a project is closed, but removeAll comes close
             self.project.removeAll.disconnect(self.onProjectClosing)
         else:
-            self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
-        self.project.layersWillBeRemoved.disconnect(self.onLayersWillBeRemoved)
+            self.project.cleared.disconnect(self.onProjectClosed)
+
+        self.project.aboutToBeCleared.disconnect(self.onProjectClosing)
+        self.project.layerWillBeRemoved.disconnect(self.onLayerWillBeRemoved)
 
         QgsApplication.instance().aboutToQuit.disconnect(self.onQuit)
 
@@ -300,18 +303,23 @@ class Redistricting:
         self.projectClosing = True
         self.clear()
 
-    def onLayersWillBeRemoved(self, layerIds):
-        if self.projectClosing or self.unloading:
-            self.projectClosing = False
-        else:
-            deletePlans = {
-                plan for plan in self.planManager for layer in layerIds
-                if layer in {plan.geoLayer.id(), plan.popLayer.id(), plan.assignLayer.id(), plan.distLayer.id()}
-            }
+    def onProjectClosed(self):
+        self.projectClosing = False
 
-            for plan in deletePlans:
-                self.planManager.removePlan(plan)
-                self.project.setDirty()
+    def onLayerWillBeRemoved(self, layerid):
+        # TODO: move to PlanManager?
+        if self.projectClosing or self.unloading:
+            return
+
+        layer = self.project.mapLayer(layerid)
+        deletePlans = {
+            plan for plan in self.planManager
+            if layer in (plan.geoLayer, plan.popLayer, plan.assignLayer, plan.distLayer)
+        }
+
+        for plan in deletePlans:
+            self.planManager.removePlan(plan)
+            self.project.setDirty()
 
     # --------------------------------------------------------------------------
 
