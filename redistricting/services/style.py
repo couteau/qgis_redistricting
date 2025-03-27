@@ -32,15 +32,17 @@ from typing import (
 from qgis.core import (
     Qgis,
     QgsCategorizedSymbolRenderer,
+    QgsColorRamp,
     QgsFillSymbol,
-    QgsLimitedRandomColorRamp,
     QgsPalLayerSettings,
+    QgsPresetSchemeColorRamp,
     QgsProject,
     QgsRendererCategory,
     QgsSimpleLineSymbolLayer,
     QgsSymbol,
     QgsTextBufferSettings,
     QgsTextFormat,
+    QgsVectorLayer,
     QgsVectorLayerSimpleLabeling,
     QgsWkbTypes
 )
@@ -53,6 +55,7 @@ from qgis.PyQt.QtGui import (
     QFont
 )
 
+from ..models import colors
 from .planmgr import PlanManager
 
 if TYPE_CHECKING:
@@ -70,13 +73,12 @@ class PlanStylerService(QObject):
         self._planManager = planManager
         self._planManager.planAdded.connect(self.copyStyles)
         QgsProject.instance().cleared.connect(self.clear)
-        self._ramp: QgsLimitedRandomColorRamp = None
+        self._ramp: QgsColorRamp = None
         self._assignRenderer: QgsCategorizedSymbolRenderer = None
         self._distRenderer: QgsCategorizedSymbolRenderer = None
         self._labelsEnabled = False
         self._labeling: QgsVectorLayerSimpleLabeling = None
         self._numDistricts = 0
-        self._attrName = "district"
 
     def clear(self):
         self._assignRenderer: QgsCategorizedSymbolRenderer = None
@@ -84,31 +86,44 @@ class PlanStylerService(QObject):
         self._labelsEnabled = False
         self._labeling = None
         self._numDistricts = 0
-        self._attrName = "district"
 
-    def stylePlan(self, plan: 'RdsPlan'):
+    def checkRenderers(self, numDistricts):
         if not self._assignRenderer:
-            self.createRenderers(plan.numDistricts)
+            self.createRenderers(numDistricts)
             self.createLabels()
-        elif self._numDistricts < plan.numDistricts:
-            self.createRenderers(plan.numDistricts)
+        elif self._numDistricts < numDistricts:
+            self.createRenderers(numDistricts)
 
         if self._labeling is None:
             self.createLabels()
 
+    def styleAssignLayer(self, layer: QgsVectorLayer, numDistricts: int, distField: str):
+        self.checkRenderers(numDistricts)
         assignRenderer = self._assignRenderer.clone()
-        distRenderer = self._distRenderer.clone()
-        if plan.numDistricts < self._numDistricts:
-            for c in range(plan.numDistricts, self._numDistricts+2):
+        if numDistricts < self._numDistricts:
+            for c in range(numDistricts, self._numDistricts+2):
                 assignRenderer.deleteCategory(c)
-                distRenderer.deleteCategory(c)
-        assignRenderer.setClassAttribute(plan.distField)
-        distRenderer.setClassAttribute(plan.distField)
+        assignRenderer.setClassAttribute(distField)
+        layer.setRenderer(assignRenderer)
 
-        plan.assignLayer.setRenderer(assignRenderer)
-        plan.distLayer.setRenderer(distRenderer)
-        plan.distLayer.setLabelsEnabled(True)
-        plan.distLayer.setLabeling(self._labeling.clone())
+    def styleDistLayer(self, layer: QgsVectorLayer, numDistricts: int, distField: str):
+        self.checkRenderers(numDistricts)
+        distRenderer = self._distRenderer.clone()
+        if numDistricts < self._numDistricts:
+            for c in range(numDistricts, self._numDistricts+2):
+                distRenderer.deleteCategory(c)
+        distRenderer.setClassAttribute(distField)
+        layer.setRenderer(distRenderer)
+        layer.setLabelsEnabled(True)
+        layer.setLabeling(self._labeling.clone())
+
+    def stylePlan(self, plan: 'RdsPlan'):
+        self.styleAssignLayer(plan.assignLayer, plan.numDistricts, plan.distField)
+        self.styleDistLayer(plan.distLayer, plan.numDistricts, plan.distField)
+
+    def createRamp(self, numDistricts) -> QgsColorRamp:
+        ramp = QgsPresetSchemeColorRamp(colors.colors[:numDistricts+1])
+        return ramp
 
     def createLabels(self):
         bufferSettings = QgsTextBufferSettings()
@@ -130,11 +145,8 @@ class PlanStylerService(QObject):
 
     def createRenderers(self, numDistricts):
         self._numDistricts = max(self._numDistricts, numDistricts)
-        if self._ramp:
-            if self._numDistricts >= self._ramp.count():
-                self._ramp.setCount(self._numDistricts+1)
-        else:
-            self._ramp = QgsLimitedRandomColorRamp(count=self._numDistricts+1, satMin=50, satMax=100)
+        if not self._ramp or self._numDistricts >= self._ramp.count():
+            self._ramp = self.createRamp(numDistricts)
 
         self.createAssignmentRenderer(numDistricts)
         self.createDistrictRenderer(numDistricts)
@@ -144,11 +156,11 @@ class PlanStylerService(QObject):
         symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.NoPen))
         symbol.symbolLayer(0).setStrokeWidth(0)
 
-        assignRenderer = QgsCategorizedSymbolRenderer(self._attrName)
+        assignRenderer = QgsCategorizedSymbolRenderer("district")
 
         for dist in range(0, numDistricts+1):
             sym = symbol.clone()
-            sym.setColor(QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist/(self._numDistricts + 1)))
+            sym.setColor(self._ramp.color(dist/self._numDistricts))
             category = QgsRendererCategory(
                 None if dist == 0 else dist,
                 sym,
@@ -165,12 +177,10 @@ class PlanStylerService(QObject):
         symbol.symbolLayer(0).setStrokeWidth(2)
         symbol.appendSymbolLayer(QgsSimpleLineSymbolLayer(QColor('#384450'), 1.0, Qt.SolidLine))
 
-        distRenderer = QgsCategorizedSymbolRenderer(self._attrName)
+        distRenderer = QgsCategorizedSymbolRenderer("district")
         for dist in range(0, numDistricts+1):
             sym = symbol.clone()
-            sym.symbolLayer(0).setFillColor(
-                QColor('#c8cfc9') if dist == 0 else self._ramp.color(dist/(self._numDistricts + 1))
-            )
+            sym.symbolLayer(0).setFillColor(self._ramp.color(dist/self._numDistricts))
             category = QgsRendererCategory(
                 None if dist == 0 else dist,
                 sym,
@@ -186,7 +196,6 @@ class PlanStylerService(QObject):
             return
 
         self._numDistricts = plan.numDistricts
-        self._attrName = plan.distField
         self._assignRenderer = plan.assignLayer.renderer().clone()
         self._distRenderer = plan.distLayer.renderer().clone()
 
