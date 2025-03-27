@@ -31,8 +31,7 @@ from qgis.PyQt.QtCore import (
     QAbstractItemModel,
     QModelIndex,
     QObject,
-    Qt,
-    pyqtSignal
+    Qt
 )
 from qgis.PyQt.QtWidgets import (
     QDialog,
@@ -42,7 +41,13 @@ from qgis.PyQt.QtWidgets import (
     QWidget
 )
 
-from ..models import RdsPlan
+from ..models import (
+    RdsPlan,
+    RdsSplits,
+    RdsSplitsModel
+)
+from ..models.base.lists import KeyedList
+from ..utils import tr
 from .ui.DlgSplits import Ui_dlgSplits
 
 
@@ -68,25 +73,53 @@ class RdsSplitDistrictsDelegate(QStyledItemDelegate):
 
 
 class DlgSplitDetail(Ui_dlgSplits, QDialog):
-    geographyChanged = pyqtSignal(int)
-
     def __init__(
             self,
             plan: RdsPlan,
+
             parent: Optional[QWidget] = None,
             flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
     ):
         super().__init__(parent, flags)
         self.setupUi(self)
 
-        self._plan: RdsPlan = plan
+        self._plan = plan
+        self._splits: KeyedList[RdsSplits] = plan.metrics.splits
+        self._field: str = None
         self._plan.nameChanged.connect(self.planNameChanged)
         self._plan.geoFieldsChanged.connect(self.updateGeography)
         self.updateGeography()
 
         self.lblPlan.setText(self._plan.name)
-        self.cmbGeography.currentIndexChanged.connect(self.geographyChanged)
+        self.cmbGeography.currentIndexChanged.connect(self.changeGeography)
         self.tvSplits.setItemDelegateForColumn(1, RdsSplitDistrictsDelegate(self.tvSplits))
+
+    @property
+    def plan(self):
+        return self._plan
+
+    @property
+    def field(self) -> str:
+        return self._field
+
+    @field.setter
+    def field(self, value: str):
+        if value not in self._splits.keys():
+            raise ValueError("No splits data for field")
+
+        if self._field == value:
+            return
+
+        self._field = value
+        geoField = self._plan.geoFields[value]
+        self.setWindowTitle(f"{geoField.caption} {tr('Splits')}")
+        self.cmbGeography.setCurrentText(geoField.caption)
+
+        model = RdsSplitsModel(
+            self._splits[self._field],
+            (*self._plan.popFields, *self._plan.dataFields)
+        )
+        self.setModel(model)
 
     def model(self):
         return self.tvSplits.model()
@@ -100,3 +133,6 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
     def updateGeography(self):
         self.cmbGeography.clear()
         self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])
+
+    def changeGeography(self, idx: int):
+        self.field = self._splits.get_key(idx)

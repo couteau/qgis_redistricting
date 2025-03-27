@@ -40,15 +40,15 @@ class TestUpdateDistrictsTask:
         t = AggregateDistrictDataTask(plan)
         t.run()
         assert t.exception is None
-        assert t.data is not None
+        assert t.districtData is not None
 
     def test_run_subset(self, plan: RdsPlan):
         t = AggregateDistrictDataTask(plan, [2, 3])
         result = t.run()
         assert result
-        assert t.data is not None
+        assert t.districtData is not None
         assert t.exception is None
-        assert len(t.data.index) == 2
+        assert len(t.districtData.index) == 2
         assert t.totalPopulation == 227036
 
     def test_finished(self, plan: RdsPlan):

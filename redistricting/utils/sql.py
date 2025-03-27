@@ -29,7 +29,10 @@ from typing import (
     Any,
     Dict,
     Iterable,
-    Union
+    Literal,
+    Sequence,
+    Union,
+    overload
 )
 
 import psycopg2
@@ -37,9 +40,11 @@ from osgeo import (
     gdal,
     ogr
 )
+from psycopg2.extensions import cursor
 from psycopg2.extras import RealDictConnection
 from qgis.core import (
     QgsCredentials,
+    QgsFeature,
     QgsMapLayerUtils,
     QgsProject,
     QgsVectorDataProvider,
@@ -232,7 +237,7 @@ class SqlAccess:
                 QgsProject.instance().removeMapLayer(lyr.id())
 
     def _executeSqlVirtualLayer(self, layer: QgsVectorLayer, sql: str,
-                                as_dict: bool, table=None) -> Iterable[Dict[str, Any]]:
+                                as_dict: bool, table=None) -> Iterable[Union[dict[str, Any], QgsFeature]]:
         # virtual layer only supports SELECT statements
         vl = self.createVirtualLayer(layer, sql, table)
         if as_dict:
@@ -250,6 +255,19 @@ class SqlAccess:
             return self._connectSqlPostgres(provider)
 
         return None
+
+    @overload
+    def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict: Literal[True]) -> Iterable[dict[str, Any]]:
+        ...
+
+    @overload
+    def executeSql(
+        self,
+        layer: QgsVectorLayer,
+        sql: str,
+        as_dict: Literal[False]
+    ) -> Union[cursor, Iterable[Sequence], Iterable[sqlite3.Row], Iterable[QgsFeature]]:
+        ...
 
     def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
         provider = layer.dataProvider()

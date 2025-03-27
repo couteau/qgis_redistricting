@@ -24,21 +24,19 @@
 """
 from __future__ import annotations
 
+import sqlite3
 from contextlib import closing
 from itertools import islice
 from typing import (
     TYPE_CHECKING,
-    List
+    Any
 )
 
+import geopandas as gpd
 from qgis.core import (
-    Qgis,
-    QgsAggregateCalculator,
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsField,
-    QgsMessageLog,
-    QgsTask,
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import QVariant
@@ -48,26 +46,26 @@ from ...models import (
     DistrictColumns,
     MetricsColumns
 )
+from ...models.metricslist import MetricTriggers
 from ...utils import (
-    SqlAccess,
     createGeoPackage,
     createGpkgTable,
     spatialite_connect,
     tr
 )
 from ._debug import debug_thread
+from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
     from ...models import (
-        RdsDataField,
-        RdsField,
+        RdsGeoField,
         RdsPlan
     )
 
 
-class CreatePlanLayersTask(SqlAccess, QgsTask):
+class CreatePlanLayersTask(AggregateDataTask):
     def __init__(self, plan: RdsPlan, gpkgPath, geoLayer: QgsVectorLayer, geoJoinField: str):
-        super().__init__(tr('Create assignments layer'), QgsTask.AllFlags)
+        super().__init__(plan, tr('Create assignments layer'))
         self.path = gpkgPath
 
         self.assignFields = []
@@ -76,25 +74,14 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         self.geoLayer: QgsVectorLayer = geoLayer  # None
         self.geoField: QgsField = None
         self.geoJoinField = geoJoinField
-        self.geoFields: List[RdsField] = list(plan.geoFields)
+        self.geoFields: list[RdsGeoField] = list(plan.geoFields)
 
         authid = geoLayer.sourceCrs().authid()
         _, srid = authid.split(':', 1)
         self.srid = int(srid)
 
-        self.popLayer: QgsVectorLayer = plan.popLayer
-        self.popJoinField = plan.popJoinField
-        self.popFields: List[RdsField] = list(plan.popFields)
-        self.dataFields: List[RdsDataField] = list(plan.dataFields)
-        self.popField = plan.popField
-
-        self.geoIdField = plan.geoIdField
-        self.distField = plan.distField
-
-        self.exception = None
         self.popTotals = {}
-        self.totalPop = 0
-        # self.getPopFieldTotals(plan.popLayer)
+
         self.setDependentLayers(l for l in (self.geoLayer, self.popLayer) if l is not None)
 
     def validatePopFields(self, popLayer: QgsVectorLayer):
@@ -110,60 +97,17 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             if not field.validate():
                 raise ValueError(*field.errors())
 
-    def getPopFieldTotalsAggregate(self, popLayer: QgsVectorLayer):
-        context = QgsExpressionContext()
-        context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-
-        d = {DistrictColumns.DISTRICT: 0, DistrictColumns.NAME: 'Unassigned'}
-        d[DistrictColumns.POPULATION], _ = \
-            popLayer.aggregate(QgsAggregateCalculator.Sum, self.popField, context=context)
-        for field in self.popFields:
-            d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
-        for field in self.dataFields:
-            d[field.fieldName], _ = popLayer.aggregate(QgsAggregateCalculator.Sum, field.field, context=context)
-
-        return d
-
-    def makePopTotalsSqlSelect(self, table):
-        sql = f'SELECT 0 as {DistrictColumns.DISTRICT}, \'{tr("Unassigned")}\' as {DistrictColumns.NAME}, SUM({self.popField}) as {DistrictColumns.POPULATION}'
-
-        for field in self.popFields:
-            sql += f', SUM({field.field}) as {field.fieldName}'
-
-        for field in self.dataFields:
-            sql += f', SUM({field.field}) as {field.fieldName}'
-
-        sql += f' FROM {table}'
-
-        if self.geoLayer.subsetString():
-            if self.popLayer == self.geoLayer:
-                sql += f" WHERE {self.geoLayer.subsetString()}"
-            else:
-                geoids = [f[self.geoJoinField] for f in self.geoLayer.getFeatures()]
-                sql += f""" WHERE {self.popJoinField} in ('{"','".join(geoids)}')"""
-
-        return sql
-
-    def getPopFieldTotals(self, popLayer: QgsVectorLayer):
-
-        if self.isSQLCapable(popLayer):
-            table = self.getTableName(popLayer)
-            if table:
-                sql = self.makePopTotalsSqlSelect(table)
-                r = self.executeSql(popLayer, sql)
-                if r:
-                    return dict(next(r))
-
-        return self.getPopFieldTotalsAggregate(popLayer)
-
-    def makeSourceLayers(self):
+    def validateSourceLayers(self):
         self.geoField = self.geoLayer.fields().field(self.geoJoinField)
         if not self.geoField:
             raise ValueError(f'Source ID Field not found: {self.geoField}')
 
         self.validatePopFields(self.popLayer)
 
-    def createDistLayer(self):
+    def getPopFieldTotals(self):
+        return self.populationData.sum().to_dict()
+
+    def createDistLayer(self, db: sqlite3.Connection):
         fld = self.popLayer.fields()[self.popField]
         if fld.type() in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
                           QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
@@ -229,28 +173,25 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             f'{MetricsColumns.REOCK} REAL,' \
             f'{MetricsColumns.CONVEXHULL} REAL)'
 
-        success, error = createGpkgTable(self.path, 'districts', sql, srid=self.srid)
+        success, error = createGpkgTable(db, 'districts', sql, srid=self.srid)
         if success:
-            with closing(spatialite_connect(self.path)) as db:
-                db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
+            db.execute(f'CREATE INDEX idx_districts_district ON districts ({self.distField})')
         else:
             return False, error
 
         return True, None
 
-    def createDistricts(self):
-        self.popTotals = self.getPopFieldTotals(self.popLayer)
-        self.totalPop = self.popTotals[DistrictColumns.POPULATION]
-
-        with spatialite_connect(self.path) as db:
-            sql = f"INSERT INTO districts ({', '.join(self.popTotals)}) VALUES ({','.join('?'*len(self.popTotals))})"
-            db.execute(sql, list(self.popTotals.values()))
-            # sql = f"INSERT INTO districts ({self.distField}) VALUES (?)"
-            # db.executemany(sql, ((d+1,) for d in range(self.numDistricts)))
+    def createDistricts(self, db: sqlite3.Connection):
+        self.popTotals: dict[str, Any] = self.getPopFieldTotals()
+        self.totalPopulation = self.popTotals[DistrictColumns.POPULATION]
+        sql = f"INSERT INTO districts ({self.distField}, {', '.join(self.popTotals)}, geometry) " \
+            f"VALUES (0, {', '.join('?'*len(self.popTotals))}, (SELECT ST_union(geometry) FROM assignments))"
+        db.execute(sql, list(self.popTotals.values()))
+        db.commit()
 
         return True
 
-    def createAssignLayer(self):
+    def createAssignLayer(self, db: sqlite3.Connection):
         t = QgsField(self.geoField).type()
         if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong):
             tp = 'INTEGER'
@@ -262,7 +203,7 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         sql = 'CREATE TABLE assignments (' \
             'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
             f'{self.geoIdField} {tp} UNIQUE NOT NULL,' \
-            f'{self.distField} INTEGER NOT NULL'
+            f'{self.distField} INTEGER NOT NULL DEFAULT 0'
 
         fieldNames = [self.geoIdField, self.distField]
 
@@ -286,62 +227,61 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             fieldNames.append(f.fieldName)
 
         sql += ')'
-        success, error = createGpkgTable(self.path, 'assignments', sql, srid=self.srid)
+        success, error = createGpkgTable(db, 'assignments', sql, srid=self.srid)
         if success:
-            with closing(spatialite_connect(self.path)) as db:
-                db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
-                for field in self.geoFields:
-                    db.execute(f'CREATE INDEX idx_assignments_{field.fieldName} ON assignments ({field.fieldName})')
-                db.commit()
+            db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
+            for field in self.geoFields:
+                db.execute(f'CREATE INDEX idx_assignments_{field.fieldName} ON assignments ({field.fieldName})')
+            db.commit()
         else:
             return False, error
 
         self.assignFields = fieldNames
         return True, None
 
-    def importSourceData(self):
+    def importSourceData(self, db: sqlite3.Connection):
         total = self.geoLayer.featureCount()
         count = 0
-        with spatialite_connect(self.path) as db:
-            gen = None
-            if self.isSQLCapable(self.geoLayer):
-                table = self.getTableName(self.geoLayer)
-                geocol = self.getGeometryColumn(self.geoLayer, table)
-                if table and geocol:
-                    sql = f'SELECT {self.geoJoinField}, 0 as district, '
-                    for f in self.geoFields:
-                        if f.fieldName in self.assignFields:
-                            sql += f'{f.field} as {f.fieldName}, '
-                    sql += f'ST_AsText({geocol}) as geometry FROM {table}'
-                    if self.geoLayer.subsetString():
-                        sql += f" WHERE {self.geoLayer.subsetString()}"
-                    gen = self.executeSql(self.geoLayer, sql, False)
+        gen = None
+        if self.isSQLCapable(self.geoLayer):
+            table = self.getTableName(self.geoLayer)
+            geocol = self.getGeometryColumn(self.geoLayer, table)
+            if table and geocol:
+                sql = f'SELECT {self.geoJoinField}, 0 as district, '
+                for f in self.geoFields:
+                    if f.fieldName in self.assignFields:
+                        sql += f'{f.field} as {f.fieldName}, '
+                sql += f'ST_AsText({geocol}) as geometry FROM {table}'
+                if self.geoLayer.subsetString():
+                    sql += f" WHERE {self.geoLayer.subsetString()}"
+                gen = self.executeSql(self.geoLayer, sql, False)
 
-            if not gen:
-                context = QgsExpressionContext()
-                context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.geoLayer))
-                gen = (
-                    [f[self.geoJoinField], 0] +
-                    [field.getValue(f, context) for field in self.geoFields] +
-                    [f.geometry().asWkt()]
-                    for f in self.geoLayer.getFeatures()
-                )
-
-            sql = f'INSERT INTO assignments ({",".join(self.assignFields)}, geometry) ' \
-                f'VALUES({",".join("?" * len(self.assignFields))}, GeomFromText(?))'
-            chunkSize = max(1, total if total < 100 else total // 100)
-
-            while count < total:
-                s = islice(gen, chunkSize)
-                if self.isCanceled():
-                    raise CanceledError()
-                db.executemany(sql, s)
-                count = min(total, count + chunkSize)
-                self.setProgress(2 + 97 * count/total)
-            db.commit()
-            db.execute(
-                "UPDATE gpkg_ogr_contents SET feature_count = (SELECT COUNT(*) FROM assignments)"
+        if not gen:
+            context = QgsExpressionContext()
+            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.geoLayer))
+            gen = (
+                [f[self.geoJoinField], 0] +
+                [field.getValue(f, context) for field in self.geoFields] +
+                [f.geometry().asWkt()]
+                for f in self.geoLayer.getFeatures()
             )
+
+        sql = f'INSERT INTO assignments ({",".join(self.assignFields)}, geometry) ' \
+            f'VALUES({",".join("?" * len(self.assignFields))}, GeomFromText(?))'
+        chunkSize = max(1, total if total < 100 else total // 100)
+
+        while count < total:
+            s = islice(gen, chunkSize)
+            if self.isCanceled():
+                raise CanceledError()
+            db.executemany(sql, s)
+            count = min(total, count + chunkSize)
+            self.setProgress(2 + 97 * count/total)
+        db.commit()
+        db.execute(
+            "UPDATE gpkg_ogr_contents SET feature_count = (SELECT COUNT(*) FROM assignments)"
+        )
+        db.commit()
 
         return True
 
@@ -349,28 +289,35 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
         debug_thread()
 
         try:
-            self.makeSourceLayers()
+            self.validateSourceLayers()
             self.setProgress(1)
+
+            self.populationData = self.loadPopData()
 
             success, error = createGeoPackage(self.path)
             if not success:
                 self.exception = error
                 return False
 
-            success, error = self.createDistLayer()
-            if success:
-                self.createDistricts()
+            with closing(spatialite_connect(self.path)) as db:
+                success, error = self.createDistLayer(db)
+                if not success:
+                    self.exception = error
+                    return False
                 self.setProgress(2)
-            else:
-                self.exception = error
-                return False
 
-            success, error = self.createAssignLayer()
-            if success:
-                self.importSourceData()
-            else:
-                self.exception = error
-                return False
+                success, error = self.createAssignLayer(db)
+                if success:
+                    self.importSourceData(db)
+                else:
+                    self.exception = error
+                    return False
+
+                self.createDistricts(db)
+
+            self.populationData[self.distField] = 0  # add assignments column
+            self.geometry = gpd.read_file(self.path, layer="districts").geometry
+            self.updateMetrics(MetricTriggers.ON_CREATE_PLAN)
         except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
@@ -380,11 +327,10 @@ class CreatePlanLayersTask(SqlAccess, QgsTask):
             self.popLayer = None
             self.geoLayer = None
 
-        self.setProgress(100)
+            self.setProgress(100)
+
         return True
 
-    def finished(self, result: bool):
-        if not result:
-            if self.exception is not None:
-                QgsMessageLog.logMessage(
-                    f'{self.exception!r}', 'Redistricting', Qgis.Critical)
+    def finished(self, result):
+        super().finished(result)
+        self.finishMetrics(MetricTriggers.ON_CREATE_PLAN)

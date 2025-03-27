@@ -317,7 +317,7 @@ class DistrictController(DockWidgetController):
             self.copyMimeDataToClipboard(selection)
 
     def recalculate(self):
-        self.updateService.updateDistricts(self.planManager.activePlan, needDemographics=True, needSplits=True)
+        self.updateService.updateDistricts(self.planManager.activePlan, needDemographics=True)
 
     def editDistrict(self, index: QModelIndex):
         if not self.actions.actionEditDistrict.isEnabled():

@@ -22,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+import json
 from numbers import Number
 from typing import (
     Any,
@@ -31,6 +32,7 @@ from typing import (
     Union
 )
 
+import pandas as pd
 from packaging import version
 from qgis.core import (
     QgsExpression,
@@ -38,14 +40,21 @@ from qgis.core import (
     QgsVectorLayer
 )
 
+from redistricting.models.columns import MetricsColumns
+
 from ..models import DistrictColumns
+from ..models.base.serialization import to_kebabcase
+from ..models.metricslist import (
+    Level,
+    metrics_classes
+)
 from ..utils import (
     makeFieldName,
     spatialite_connect,
     tr
 )
 
-schemaVersion = version.parse('1.0.4')
+schemaVersion = version.parse('1.0.5')
 
 
 class fieldSchema1_0_0(TypedDict):
@@ -195,8 +204,8 @@ class splitSchema(TypedDict):
     data: list[list[Union[int, float]]]
 
 
-statsSchema = TypedDict(
-    'statsSchema',
+statsSchema1_0_4 = TypedDict(
+    'statsSchema1_0_4',
     {
         'cut-edges': int,
         'splits': dict[str, splitSchema],
@@ -220,6 +229,54 @@ dataFieldSchema = TypedDict(
         'pct-base': Optional[str]
     }
 )
+dataFieldSchema = TypedDict(
+    'dataFieldSchema',
+    {
+        'layer': str,
+        'field': str,
+        'caption': str,
+        'sum-field': bool,
+        'pct-base': Optional[str]
+    }
+)
+
+planSchema1_0_4 = TypedDict(
+    'planSchema1_0_4',
+    {
+        'id': str,
+        'name': str,
+        'description': str,
+        'total-population': Number,
+        'num-districts': int,
+        'num-seats': int,
+        'deviation': float,
+
+        'pop-layer': str,
+        'pop-join-field': str,
+
+        'geo-layer': str,
+        'geo-join-field': str,
+
+        'assign-layer': str,
+        'geo-id-field': str,
+        'geo-id-caption': str,
+        'geo-fields': list[fieldSchema],
+        'dist-field': str,
+
+        'dist-layer': str,
+        'pop-field': str,
+        'pop-fields': list[fieldSchema],
+        'data-fields': list[dataFieldSchema],
+
+        'metrics': statsSchema1_0_4
+    }
+)
+
+
+class statsSchema(TypedDict):
+    metrics: dict[str, Any]
+
+
 planSchema = TypedDict(
     'planSchema',
     {
@@ -259,7 +316,7 @@ def _renameField(data: dict, old_name: str, new_name: str):
         del data[old_name]
 
 
-def migrateSchema1_0_0_to_1_0_1(data: dict):
+def migrateSchema1_0_0_to_1_0_1(data: planSchema1_0_0):
     _renameField(data, 'join-field', 'pop-join-field')
     _renameField(data, 'geo-id-display', 'geo-id-caption')
     _renameField(data, 'src-layer', 'geo-layer')
@@ -317,7 +374,7 @@ def migrateSchema1_0_0_to_1_0_1(data: dict):
     return data, version.parse('1.0.1')
 
 
-def _updateDistLayer1_0_1_to_1_0_2(data: dict[str, Any]):
+def _updateDistLayer1_0_1_to_1_0_2(data: planSchema1_0_1):
     distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
     if distLayer is None:
         return
@@ -348,7 +405,7 @@ def _updateDistLayer1_0_1_to_1_0_2(data: dict[str, Any]):
         distLayer.reload()
 
 
-def migrateSchema1_0_1_to_1_0_2(data: dict[str, Any]):
+def migrateSchema1_0_1_to_1_0_2(data: planSchema1_0_1):
     _updateDistLayer1_0_1_to_1_0_2(data)
 
     plan_splits = {}
@@ -394,10 +451,10 @@ def migrateSchema1_0_1_to_1_0_2(data: dict[str, Any]):
     return data, version.parse('1.0.2')
 
 
-def migrateSchema1_0_2_to_1_0_3(data: dict[str, Any]):
+def migrateSchema1_0_2_to_1_0_3(data: planSchema1_0_2):
     distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
     if distLayer is None:
-        return
+        return data, version.parse('1.0.3')
 
     geoPackagePath, _ = distLayer.source().split('|', 1)
 
@@ -410,7 +467,7 @@ def migrateSchema1_0_2_to_1_0_3(data: dict[str, Any]):
     return data, version.parse('1.0.3')
 
 
-def migrateSchema1_0_3_to_1_0_4(data: dict[str, Any]):
+def migrateSchema1_0_3_to_1_0_4(data: planSchema1_0_2):
     def addKeyField(fld: dict[str, Any]):
         l: QgsVectorLayer = QgsProject.instance().mapLayer(fld.get('layer'))
         if l is None:
@@ -449,7 +506,70 @@ def migrateSchema1_0_3_to_1_0_4(data: dict[str, Any]):
         _renameField(field, 'sum', 'sum-field')
         _renameField(field, 'pctbase', 'pct-base')
 
+    splits: dict[str, dict] = data['plan-stats'].pop('plan-splits', {})
+    for k, v in splits.items():
+        v = json.loads(
+            pd.DataFrame(
+                v['data'],
+                columns=v['columns'],
+                index=pd.MultiIndex.from_tuples(v['index'], names=[k, data['dist-field']])
+            )
+            .to_json(orient='table')
+        )
+        split = {'field': k, 'data': v}
+        splits[k] = split
+    data['plan-stats']['splits'] = splits
+    _renameField(data, 'plan-stats', 'metrics')
+
     return data, version.parse('1.0.4')
+
+
+def migrateSchema1_0_4_to_1_0_5(data: planSchema1_0_4):
+    metrics: dict[str, Any] = {
+        to_kebabcase(n): None for n, m in metrics_classes.items()
+        if m.level() != Level.DISTRICT
+    }
+    metrics['total-population'] = data['total-population']
+
+    distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
+    if distLayer is not None:
+        geoPackagePath, _ = distLayer.source().split('|', 1)
+        with spatialite_connect(geoPackagePath) as db:
+            ideal = data['total-population'] / data.get('num-seats', data['num-districts'])
+
+            cur = db.execute(
+                f"SELECT min(({DistrictColumns.POPULATION}-members*{ideal})/(members*{ideal})) AS min_deviation, "
+                f"max(({DistrictColumns.POPULATION}-members*{ideal})/(members*{ideal})) AS max_deviation, "
+                f"min({MetricsColumns.POLSBYPOPPER}) AS minpolsbypopper, "
+                f"max({MetricsColumns.POLSBYPOPPER}) AS maxpolsbypopper, "
+                f"avg({MetricsColumns.POLSBYPOPPER}) AS meanpolsbypopper, "
+                f"min({MetricsColumns.REOCK}) AS minreock, "
+                f"max({MetricsColumns.REOCK}) AS maxreock, "
+                f"avg({MetricsColumns.REOCK}) AS meanreock, "
+                f"min({MetricsColumns.CONVEXHULL}) AS minconvexhull, "
+                f"max({MetricsColumns.CONVEXHULL}) AS maxconvexhull, "
+                f"avg({MetricsColumns.CONVEXHULL}) AS meanconvexhull "
+                "FROM districts"
+            )
+            mindev, maxdev, \
+                metrics['min-polsbypopper'], metrics['max-polsbypopper'], metrics['mean-polsbypopper'], \
+                metrics['min-reock'], metrics['max-reock'], metrics['mean-reock'], \
+                metrics['min-convexhull'], metrics['max-convexhull'], metrics['mean-convexhull'] \
+                = cur.fetchone()
+            metrics['plan-deviation'] = [mindev, maxdev]
+
+            cur = db.execute("SELECT count(*) FROM districts HAVING NumGeometries(geometry) > 1")
+            metrics['contiguity'] = not bool(cur.fetchall())
+
+            cur = db.execute(
+                f"SELECT count(*) FROM assignments WHERE {data['dist-field']} = 0 OR {data['dist-field']} IS NULL")
+            metrics['complete'] = cur.fetchone()[0] == 0
+
+    metrics['cut-edges'] = data['metrics'].pop('cut-edges', 0)
+    metrics['splits'] = data['metrics'].pop('splits', {})
+    data['metrics']['metrics'] = metrics
+
+    return data, version.parse('1.0.5')
 
 
 migrations: dict[version.Version, Callable[[dict], tuple[dict, version.Version]]] = {
@@ -457,6 +577,7 @@ migrations: dict[version.Version, Callable[[dict], tuple[dict, version.Version]]
     version.parse('1.0.1'): migrateSchema1_0_1_to_1_0_2,
     version.parse('1.0.2'): migrateSchema1_0_2_to_1_0_3,
     version.parse('1.0.3'): migrateSchema1_0_3_to_1_0_4,
+    version.parse('1.0.4'): migrateSchema1_0_4_to_1_0_5,
 }
 
 schemas = {
@@ -464,6 +585,7 @@ schemas = {
     version.parse('1.0.1'): planSchema1_0_1,
     version.parse('1.0.2'): planSchema1_0_2,
     version.parse('1.0.3'): planSchema1_0_2,
+    version.parse('1.0.4'): planSchema1_0_4,
     schemaVersion: planSchema
 }
 

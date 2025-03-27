@@ -303,7 +303,6 @@ class PlanEditor(BasePlanBuilder):
                     self._plan,
                     needDemographics=updateDemographics,
                     needGeometry=updateGeometry,
-                    needSplits=updateSplits,
                     force=True
                 )
 

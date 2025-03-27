@@ -55,17 +55,17 @@ FieldColors = {
 
 
 class ConstStr(str):
-    _index_: int
+    _index: int
     comment: str
 
-    def __new__(cls, value, index, comment):
+    def __new__(cls, value, comment=None, index=None):
         inst = super().__new__(cls, value)
-        inst._index_ = index
         inst.comment = comment
+        inst._index = index
         return inst
 
     def __int__(self):
-        return self._index_
+        return self._index
 
 
 class ConstantsMeta(type):
@@ -74,6 +74,7 @@ class ConstantsMeta(type):
 
     def __new__(cls, name, bases, classdict: dict[str, Any]):
         ignore = classdict.get('_ignore', [])
+        cls._nextindex_ = 0
 
         members = {}
         for c in bases:
@@ -98,10 +99,17 @@ class ConstantsMeta(type):
 
             if isinstance(v, str):
                 if not isinstance(v, ConstStr):
-                    classdict[f] = ConstStr(v, len(members), comment)
+                    classdict[f] = ConstStr(v, comment, cls._nextindex_)
                     members[f] = classdict[f]
                 else:
+                    if v._index is None:
+                        v._index = cls._nextindex_
+                    else:
+                        cls._nextindex_ = v._index
+
                     members[f] = v
+
+                cls._nextindex_ += 1
 
         classdict['_members'] = members
         return super().__new__(cls, name, bases, classdict)
@@ -121,20 +129,20 @@ class ConstantsMeta(type):
 
 
 class DistrictColumns(metaclass=ConstantsMeta):
-    DISTRICT = "district", tr("District")
-    NAME = "name", tr("Name")
-    MEMBERS = "members", tr("Members")
-    POPULATION = "population", tr("Population")
-    DEVIATION = "deviation", tr("Deviation")
-    PCT_DEVIATION = "pct_deviation", tr("%Deviation")
+    DISTRICT = ConstStr("district", tr("District"))
+    NAME = ConstStr("name", tr("Name"))
+    MEMBERS = ConstStr("members", tr("Members"))
+    POPULATION = ConstStr("population", tr("Population"))
+    DEVIATION = ConstStr("deviation", tr("Deviation"))
+    PCT_DEVIATION = ConstStr("pct_deviation", tr("%Deviation"))
 
 
 class MetricsColumns(metaclass=ConstantsMeta):
-    POLSBYPOPPER = "polsbypopper", tr("Polsby-Popper")
-    REOCK = "reock", tr("Reock")
-    CONVEXHULL = "convexhull", tr("Convex Hull")
-    PIECES = "pieces", tr("Pieces")
+    POLSBYPOPPER = ConstStr("polsbypopper", tr("Polsby-Popper"))
+    REOCK = ConstStr("reock", tr("Reock"))
+    CONVEXHULL = ConstStr("convexhull", tr("Convex Hull"))
+    PIECES = ConstStr("pieces", tr("Pieces"))
 
-    @classmethod
+    @ classmethod
     def CompactnessScores(cls) -> Iterable[ConstStr]:
         return MetricsColumns.POLSBYPOPPER, MetricsColumns.REOCK, MetricsColumns.CONVEXHULL

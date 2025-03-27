@@ -74,5 +74,5 @@ def district_update_service():
 def import_service(district_update_service: services.DistrictUpdater):
     svc = services.PlanImportService()
     svc.importComplete.connect(lambda plan: district_update_service.updateDistricts(
-        plan, needDemographics=True, needGeometry=True, needSplits=True, force=True
+        plan, needDemographics=True, needGeometry=True, force=True
     ))

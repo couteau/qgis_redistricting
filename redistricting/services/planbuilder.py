@@ -43,9 +43,7 @@ from ..models import (
     RdsDataField,
     RdsField,
     RdsGeoField,
-    RdsMetrics,
-    RdsPlan,
-    RdsSplits
+    RdsPlan
 )
 from ..models.base.lists import KeyedList
 from ..utils import tr
@@ -97,7 +95,6 @@ class PlanBuilder(BasePlanBuilder):
 
     def createLayers(self, plan: RdsPlan):
         def taskCompleted():
-            plan.metrics.updateMetrics(0, None)
             self._createLayersTask = None
 
             plan.addLayersFromGeoPackage(self._geoPackagePath)
@@ -203,10 +200,6 @@ class PlanBuilder(BasePlanBuilder):
             distField=self._distField,
             geoIdCaption=self._geoIdCaption,
             geoFields=KeyedList[RdsGeoField](self._geoFields),
-            metrics=RdsMetrics(
-                self._cutEdges,
-                KeyedList[RdsSplits]([RdsSplits(fld, self._splits.get(fld)) for fld in self._geoFields])
-            ),
             description=self._description,
             parent=planParent
         )

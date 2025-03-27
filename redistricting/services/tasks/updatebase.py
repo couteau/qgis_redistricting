@@ -43,6 +43,7 @@ from qgis.core import (
 
 from ...models import (
     DistrictColumns,
+    MetricTriggers,
     RdsDataField,
     RdsField,
     RdsPlan
@@ -76,6 +77,8 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.exception = None
         self._prog_start = 0
         self._prog_stop = 100
+        self.populationData: pd.DataFrame = None
+        self.geometry: gpd.GeoSeries = None
 
     def setProgressIncrement(self, start: int, stop: int):
         super().setProgress(start)
@@ -139,8 +142,8 @@ class AggregateDataTask(SqlAccess, QgsTask):
             columns=cols,
             order=self.popJoinField,
             read_geometry=False
-        )
-        df.rename(columns={self.popField: str(DistrictColumns.POPULATION)}, inplace=True)
+        ).rename(columns={self.popField: str(DistrictColumns.POPULATION)})
+
         for f in self.popFields:
             if f.isExpression():
                 df.loc[:, f.fieldName] = df.query(f.field)
@@ -149,6 +152,12 @@ class AggregateDataTask(SqlAccess, QgsTask):
                 df.loc[:, f.fieldName] = df.query(f.field)
 
         return df
+
+    def updateMetrics(self, trigger: MetricTriggers):
+        self.plan.metrics.updateMetrics(trigger, self.populationData, self.geometry)
+
+    def finishMetrics(self, trigger: MetricTriggers):
+        self.plan.metrics.updateFinished(trigger)
 
     def finished(self, result: bool):
         super().finished(result)

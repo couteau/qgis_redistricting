@@ -22,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+from .base import lists
 from .base.serialization import (
     deserialize,
     serialize
@@ -48,9 +49,16 @@ from .field import (
     RdsGeoField,
     RdsRelatedField
 )
+from .metricslist import (
+    MetricTriggers,
+    RdsMetric,
+    RdsMetrics,
+    base_metrics,
+    metrics_classes,
+    register_metrics
+)
 from .plan import (
     DeviationType,
-    RdsMetrics,
     RdsPlan
 )
 from .splits import (
@@ -106,6 +114,7 @@ __all__ = (
     'DistrictSelectModel',
     'SourceDistrictModel',
     'TargetDistrictModel',
+    'RdsMetric',
     'RdsMetrics',
     'RdsMetricsModel',
     'RdsSplits',
@@ -115,5 +124,9 @@ __all__ = (
     'RdsSplitsModel',
     'RdsPlan',
     "serialize",
-    "deserialize"
+    "deserialize",
+    "base_metrics",
+    "metrics_classes",
+    "register_metrics",
+    "MetricTriggers",
 )

@@ -59,6 +59,19 @@ class AggregatePendingChangesTask(AggregateDataTask):
         debug_thread()
 
         try:
+            if self.assignments is None:
+                with self._connectSqlOgrSqlite(self.assignLayer.dataProvider()) as db:
+                    self.assignments: pd.DataFrame = pd.read_sql(
+                        f"SELECT fid, {self.geoIdField}, {self.distField} as old_{self.distField} FROM assignments",
+                        db,
+                        index_col="fid"
+                    )
+                checkCanceled()
+
+            if self.popData is None:
+                self.popData = self.loadPopData()
+                checkCanceled()
+
             dindex = self.assignLayer.fields().lookupField(self.distField)
             if dindex == -1:
                 return False
@@ -76,22 +89,10 @@ class AggregatePendingChangesTask(AggregateDataTask):
 
             checkCanceled()
 
-            if self.assignments is None:
-                with self._connectSqlOgrSqlite(self.assignLayer.dataProvider()) as db:
-                    self.assignments: pd.DataFrame = pd.read_sql(
-                        f"SELECT fid, {self.geoIdField}, {self.distField} as old_{self.distField} FROM assignments",
-                        db,
-                        index_col="fid"
-                    )
-                checkCanceled()
-
             pending = self.assignments.loc[index].join(df_new)
             pending = pending[pending[f'new_{self.distField}'] != pending[f'old_{self.distField}']]
             if len(pending) == 0:
                 return True
-
-            if self.popData is None:
-                self.popData = self.loadPopData()
 
             pending = pending.join(self.popData, on=self.geoIdField, how="inner")
 

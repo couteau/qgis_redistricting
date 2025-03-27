@@ -33,16 +33,7 @@ from typing import (
 
 import geopandas as gpd
 import pandas as pd
-import pyproj
 import shapely.ops
-from qgis.core import (
-    QgsAggregateCalculator,
-    QgsExpression,
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
-    QgsFeature,
-    QgsFeatureRequest
-)
 from qgis.PyQt.QtCore import (
     QRunnable,
     QThreadPool
@@ -53,14 +44,13 @@ from shapely.geometry import (
     Polygon
 )
 
-from ... import settings
 from ...models import DistrictColumns
+from ...models.metricslist import MetricTriggers
 from ...utils import (
     spatialite_connect,
     tr
 )
 from ..districtio import DistrictReader
-from ..scores import MetricsFunctions
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
@@ -100,8 +90,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         plan: 'RdsPlan',
         updateDistricts: Iterable[int] = None,
         includeDemographics=True,
-        includeGeometry=True,
-        includSplits=True
+        includeGeometry=True
     ):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
         self.distList = plan.districts[:]
@@ -119,111 +108,13 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
-        self.includeSplits = includSplits
+        self.trigger: MetricTriggers = 0
+        if self.includeDemographics:
+            self.trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+        if self.includeGeometry:
+            self.trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
 
-        self.data: Union[pd.DataFrame, gpd.GeoDataFrame] = None
-        self.splits = {}
-        self.cutEdges = None
-
-    def calcCutEdges(self) -> Union[int, None]:
-        with spatialite_connect(self.geoPackagePath) as db:
-            # select count of unit pairs where
-            #   1) assigned districts are different (also takes care of excluding unassigned units from count),
-            #   2) combination is unique (count a,b but not b,a),
-            #   3) bounding boxes touch or overlap (using spatial index to minimize more intensive adjacency checks)
-            #   4) units are adjacent at more than a point
-            sql = f"""SELECT count(*)
-                FROM assignments a JOIN assignments b
-                ON b.{self.distField} != a.{self.distField} AND b.{self.geoIdField} > a.{self.geoIdField}
-                AND b.fid IN (
-                    SELECT id FROM rtree_assignments_geometry r
-                    WHERE r.minx <= st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry)
-                    AND r.miny <= st_maxy(a.geometry) and r.maxy >= st_miny(a.geometry)
-                )
-                AND st_relate(a.geometry, b.geometry, 'F***1****')"""
-
-            c = db.execute(sql)
-            return c.fetchone()[0]
-
-    def getSplitNames(self, field: 'RdsGeoField', geoids: Iterable[str]):
-        return {g: field.getName(g) for g in geoids}
-
-    def calcFracks(self, field: 'RdsGeoField', splitpop: pd.DataFrame):
-        if not isinstance(self.data, gpd.GeoDataFrame):
-            return
-
-        ref = field.layer.referencingRelations(field.index)[0]
-        geog_layer = ref.referencedLayer()
-        geog_join_field = ref.resolveReferencedField(field.field)
-
-        ctx = QgsExpressionContext()
-        ctx.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(geog_layer))
-
-        expr = QgsExpression(
-            f"""{geog_join_field} in ({','.join(f"'{i}'" for i in  splitpop.index.get_level_values(0).unique())})"""
-        )
-
-        request = QgsFeatureRequest(expr, ctx)
-
-        fracks = {}
-
-        f: QgsFeature
-        for f in geog_layer.getFeatures(request):
-            geom = shapely.from_wkb(f.geometry().asWkb())
-            i: gpd.GeoSeries
-            i = self.data.intersection(geom)
-            fracks[f[geog_join_field]] = i.apply(lambda g: len(g.geoms)).sum()
-
-        return fracks
-
-    def calcSplits(self, data: pd.DataFrame, cols: list[str]):
-        total = len(self.geoFields) + 1
-        self.splits = {}
-        for field in self.geoFields:
-            g = data.dropna(subset=[field.fieldName])[[field.fieldName] + cols].groupby([field.fieldName])
-            splits_data = g.filter(lambda x: x[self.distField].nunique() > 1)
-
-            splitpop = splits_data[[field.fieldName] + cols] \
-                .groupby([field.fieldName, self.distField]) \
-                .sum()
-
-            if field.nameField and field.getRelation() is not None:
-                name_map = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
-                names = pd.Series(name_map.values(), index=name_map.keys(), name="__name", dtype=str)
-
-                splitpop = splitpop \
-                    .reset_index(level=1) \
-                    .join(names) \
-                    .set_index('district', append=True) \
-                    .sort_values(by="__name")
-            else:
-                splitpop = splitpop.sort_index()
-
-            # fracks = self.calcFracks(field, splitpop)
-
-            self.splits[field.fieldName] = splitpop
-            self.updateProgress(total, len(self.splits))
-
-        self.updateProgress(total, total)
-
-    def calcDistrictMetrics(self, data: gpd.GeoDataFrame):
-        cea_crs = pyproj.CRS('+proj=cea')
-        cea: gpd.GeoSeries = data.geometry.to_crs(cea_crs)
-        area = cea.area
-
-        for m, f in MetricsFunctions.items():
-            data[m] = f(cea, area)
-
-    def calcTotalPopulation(self, data: pd.DataFrame, cols: list[str]):
-        if DistrictColumns.POPULATION in cols:
-            self.totalPopulation = data[DistrictColumns.POPULATION].sum()
-        else:
-            context = QgsExpressionContext()
-            context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
-            agg = QgsAggregateCalculator(self.popLayer)
-            totalPop, success = agg.calculate(QgsAggregateCalculator.Sum, self.popField, context)
-            if success:
-                self.totalPopulation = int(totalPop)
+        self.districtData: Union[pd.DataFrame, gpd.GeoDataFrame] = None
 
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         def dissolve_progress():
@@ -235,23 +126,24 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         try:
             self.setProgressIncrement(0, 20)
-            assign = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry)
-            assign.set_index(self.geoIdField, inplace=True)
+            self.populationData = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry)
+            self.populationData.set_index(self.geoIdField, inplace=True)
 
             cols = [self.distField]
             if self.includeDemographics:
                 self.setProgressIncrement(20, 40)
                 popdf = self.loadPopData()
-                assign: gpd.GeoDataFrame = assign.join(popdf)
+                self.populationData: gpd.GeoDataFrame = self.populationData.join(popdf)
                 cols += [DistrictColumns.POPULATION] + [f.fieldName for f in self.popFields] + \
                     [f.fieldName for f in self.dataFields]
-                self.totalPopulation = int(assign[DistrictColumns.POPULATION].sum())
+                self.totalPopulation = int(self.populationData[DistrictColumns.POPULATION].sum())
 
             self.setProgressIncrement(40, 90)
             if self.updateDistricts is not None:
-                update = assign[assign[self.distField].isin(self.updateDistricts)]
+                update = self.populationData[self.populationData[self.distField].isin(self.updateDistricts)]
             else:
-                update = assign
+                update = self.populationData
+
             if self.includeGeometry:
                 data = update[cols].groupby(by=self.distField).sum()
                 g_geom = update[[self.distField, "geometry"]].groupby(self.distField)
@@ -275,53 +167,45 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 geoms |= {t.dist: t.merged for t in tasks}
 
                 data["geometry"] = pd.Series(geoms)
-                data = gpd.GeoDataFrame(data, geometry="geometry", crs=assign.crs)
+                data = gpd.GeoDataFrame(data, geometry="geometry", crs=self.populationData.crs)
 
-                self.calcDistrictMetrics(data)
                 count += 1
                 self.updateProgress(total, count)
 
                 # self.data = data.to_wkt()
+                self.geometry = data["geometry"]
                 data["wkt_geom"] = data["geometry"].apply(wkt.dumps)
                 data = data.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
-                self.data = data
+                self.districtData = data
             else:
                 update.drop(columns="geometry", inplace=True)
                 total = len(update)
-                self.data = update[cols].groupby(by=self.distField).sum()
+                self.districtData = update[cols].groupby(by=self.distField).sum()
 
                 self.updateProgress(total, total)
 
             self.setProgressIncrement(90, 100)
-            if settings.enableCutEdges:
-                self.cutEdges = self.calcCutEdges()
-
-            if self.includeSplits:
-                if settings.enableSplits:
-                    self.calcSplits(assign, cols)
-                else:
-                    self.splits = {}
 
             name = pd.Series(
                 [
                     self.distList[d].name if d in self.distList else str(d)
-                    for d in self.data.index
+                    for d in self.districtData.index
                 ],
-                index=self.data.index
+                index=self.districtData.index
             )
             members = pd.Series(
                 [
                     None if d == 0
                     else self.distList[d].members if d in self.distList
                     else 1
-                    for d in self.data.index
+                    for d in self.districtData.index
                 ],
-                index=self.data.index
+                index=self.districtData.index
             )
 
             if self.includeDemographics:
                 ideal = round(self.totalPopulation / self.numSeats)
-                deviation = self.data[DistrictColumns.POPULATION].sub(members * ideal)
+                deviation = self.districtData[DistrictColumns.POPULATION].sub(members * ideal)
                 pct_dev = deviation.div(members * ideal)
                 df = pd.DataFrame(
                     {DistrictColumns.NAME: name,
@@ -332,7 +216,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
             else:
                 df = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
 
-            self.data = self.data.join(df)
+            self.districtData = self.districtData.join(df)
+
+            self.updateMetrics(self.trigger)
 
             return True
         except Exception as e:  # pylint: disable=broad-except
@@ -345,22 +231,24 @@ class AggregateDistrictDataTask(AggregateDataTask):
         if not result:
             return
 
+        self.finishMetrics(self.trigger)
+
         with spatialite_connect(self.geoPackagePath) as db:
-            fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.data.columns)}
+            fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districtData.columns)}
 
             # Account for districts with no assignments --
             # otherwise, they will never be updated in the database
             if self.updateDistricts is None:
-                zero = set(range(0, self.numDistricts+1)) - set(self.data.index)
+                zero = set(range(0, self.numDistricts+1)) - set(self.districtData.index)
             else:
-                zero = self.updateDistricts - set(self.data.index)
+                zero = self.updateDistricts - set(self.districtData.index)
 
             if zero:
                 sql = f"DELETE FROM districts WHERE {self.distField} IN ({','.join(str(d) for d in zero)})"
                 db.execute(sql)
                 db.commit()
 
-            data = [d._asdict() for d in self.data.itertuples()]
+            data = [d._asdict() for d in self.districtData.itertuples()]
             sql = "UPDATE districts " \
                 f"SET {','.join([f'{field} = {param}' for field, param in fields.items()])} " \
                 f"WHERE {self.distField} = :Index"

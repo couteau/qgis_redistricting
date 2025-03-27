@@ -25,9 +25,12 @@
 import pathlib
 import re
 import sqlite3
+from contextlib import closing
+from os import PathLike
 from typing import (
     Type,
-    Union
+    Union,
+    overload
 )
 
 from osgeo import gdal
@@ -170,7 +173,7 @@ def createGeoPackage(gpkg):
             for f in gpkg.parent.glob(pattern):
                 f.unlink()
 
-        with spatialite_connect(gpkg, isolation_level="EXCLUSIVE") as db:
+        with closing(spatialite_connect(gpkg, isolation_level="EXCLUSIVE")) as db:
             db.execute("BEGIN EXCLUSIVE")
             db.executescript(CREATE_GPKG_SQL)
     except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
@@ -179,20 +182,34 @@ def createGeoPackage(gpkg):
     return True, None
 
 
-def createGpkgTable(gpkg, table, create_table_sql, geom_column_name='geometry',
+@overload
+def createGpkgTable(gpkg: PathLike, table: str, create_table_sql: str, geom_column_name='geometry',
+                    geom_type='MULTIPOLYGON', srid=-1, create_spatial_index=True):
+    ...
+
+
+@overload
+def createGpkgTable(db: sqlite3.Connection, table: str, create_table_sql: str, geom_column_name='geometry',
+                    geom_type='MULTIPOLYGON', srid=-1, create_spatial_index=True):
+    ...
+
+
+def createGpkgTable(db, table, create_table_sql, geom_column_name='geometry',
                     geom_type='MULTIPOLYGON', srid=-1, create_spatial_index=True):
     try:
-        with spatialite_connect(gpkg) as db:
-            db.execute(create_table_sql)
-            if srid not in (-1, 0):
-                if db.execute(f'SELECT count(*) FROM gpkg_spatial_ref_sys WHERE srs_id={srid}').fetchone()[0] == 0:
-                    db.execute(f'SELECT gpkgInsertEpsgSRID({srid})')
-            db.execute(f'SELECT gpkgAddGeometryColumn("{table}", "{geom_column_name}" , "{geom_type}", 0 , 0, {srid} )')
-            db.execute(f'SELECT gpkgAddGeometryTriggers("{table}", "{geom_column_name}")')
-            if create_spatial_index:
-                db.execute(f'SELECT gpkgAddSpatialIndex("{table}", "{geom_column_name}")')
-            db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
-            db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
+        if not isinstance(db, sqlite3.Connection):
+            db = spatialite_connect(db)
+
+        db.execute(create_table_sql)
+        if srid not in (-1, 0):
+            if db.execute(f'SELECT count(*) FROM gpkg_spatial_ref_sys WHERE srs_id={srid}').fetchone()[0] == 0:
+                db.execute(f'SELECT gpkgInsertEpsgSRID({srid})')
+        db.execute(f'SELECT gpkgAddGeometryColumn("{table}", "{geom_column_name}" , "{geom_type}", 0 , 0, {srid} )')
+        db.execute(f'SELECT gpkgAddGeometryTriggers("{table}", "{geom_column_name}")')
+        if create_spatial_index:
+            db.execute(f'SELECT gpkgAddSpatialIndex("{table}", "{geom_column_name}")')
+        db.execute(CREATE_GPKG_OGR_CONTENTS_INSERT_TRIGGER_SQL.format(table=table))
+        db.execute(CREATE_GPKG_OGR_CONTENTS_DELETE_TRIGGER_SQL.format(table=table))
     except (sqlite3.Error, sqlite3.DatabaseError, sqlite3.OperationalError) as e:
         return False, e
 

@@ -107,7 +107,7 @@ try:
                 **kwargs
             )
 
-        gpd.read_file = read_file_pygrio
+        setattr(gpd, "read_file",  read_file_pygrio)
 
 except ImportError:
     gpd_io_engine = "fiona"
@@ -261,7 +261,7 @@ except ImportError:
 
         return gpd_read_file(filename, bbox, mask, rows, engine=engine, **kwargs)
 
-    gpd.read_file = read_file_no_fiona
+    setattr(gpd, "read_file", read_file_no_fiona)
 
 if parse_version(gdal.__version__) > parse_version("3.6"):
     try:

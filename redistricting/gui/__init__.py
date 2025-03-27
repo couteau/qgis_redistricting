@@ -44,6 +44,11 @@ from .dwdistrict import DockDistrictDataTable
 from .dwedit import DockRedistrictingToolbox
 from .dwmetrics import DockPlanMetrics
 from .dwpending import DockPendingChanges
+from .metrics_gui import (
+    RdsMetricGuiHandler,
+    get_metric_handler,
+    register_metric_handler
+)
 from .painttool import (
     PaintDistrictsTool,
     PaintMode
@@ -78,4 +83,7 @@ __all__ = [
     'DockPlanMetrics',
     'PaintDistrictsTool',
     'PaintMode',
+    'RdsMetricGuiHandler',
+    'get_metric_handler',
+    'register_metric_handler'
 ]

@@ -60,7 +60,7 @@ class TestCreateLayersTask:
         result = task.run()
         assert task.exception is None
         assert result
-        assert task.totalPop == 227036
+        assert task.totalPopulation == 227036
         assert gpkg.exists()
 
     @pytest.mark.parametrize(('datafields', 'geofields'), [
@@ -83,7 +83,7 @@ class TestCreateLayersTask:
         result = task.run()
         assert task.exception is None
         assert result
-        assert task.totalPop == 227036
+        assert task.totalPopulation == 227036
         assert gpkg.exists()
         try:
             a = QgsVectorLayer(f'{str(gpkg)}|layername=assignments')

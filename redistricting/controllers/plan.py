@@ -496,9 +496,6 @@ class PlanController(BaseController):
         if plan != self.activePlan:
             return
 
-        # self.updateService.updateDistricts(
-        #     self.activePlan, needDemographics=True, needGeometry=True, needSplits=True
-        # )
         self.activePlan.assignLayer.triggerRepaint()
 
     def importPlan(self, plan=None):
@@ -508,15 +505,6 @@ class PlanController(BaseController):
 
         dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.Accepted:
-            # importer = AssignmentImporter(self.iface) \
-            #     .setSourceFile(dlgImportPlan.equivalencyFileName) \
-            #     .setJoinField(dlgImportPlan.joinField) \
-            #     .setHeaderRow(dlgImportPlan.headerRow) \
-            #     .setGeoColumn(dlgImportPlan.geoColumn) \
-            #     .setDistColumn(dlgImportPlan.distColumn) \
-            #     .setDelimiter(dlgImportPlan.delimiter) \
-            #     .setQuoteChar(dlgImportPlan.quotechar)
-
             progress = self.startProgress(tr('Importing assignments...'))
             importer = self.importService.importEquivalencyFile(
                 self.activePlan,
@@ -529,10 +517,6 @@ class PlanController(BaseController):
                 dlgImportPlan.quotechar,
                 progress,
             )
-            # importer.progressChanged.connect(progress.setValue)
-            # progress.canceled.connect(importer.cancel)
-            # importer.importComplete.connect(importComplete)
-            # if not importer.importPlan(self.activePlan):
             if importer is None or not importer.isValid():
                 self.endProgress(progress)
 
@@ -681,7 +665,7 @@ class PlanController(BaseController):
 
     def triggerUpdate(self, plan: RdsPlan):
         self.endProgress()
-        self.updateService.updateDistricts(plan, needDemographics=True, needGeometry=True, needSplits=True)
+        self.updateService.updateDistricts(plan, needDemographics=True, needGeometry=True)
 
     def autoassign(self):
         def assignComplete():

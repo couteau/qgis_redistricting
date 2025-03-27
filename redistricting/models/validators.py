@@ -22,6 +22,7 @@
  ***************************************************************************/
 """
 from abc import abstractmethod
+from enum import IntEnum
 from math import (
     ceil,
     floor
@@ -36,6 +37,11 @@ from qgis.PyQt.QtCore import QObject
 if TYPE_CHECKING:
     from .district import RdsDistrict
     from .plan import RdsPlan
+
+
+class DeviationType(IntEnum):
+    OverUnder = 0
+    TopToBottom = 1
 
 
 class BaseDeviationValidator(QObject):
@@ -54,15 +60,15 @@ class BaseDeviationValidator(QObject):
         ideal = self.districtIdeal(district)
         return ideal, floor(ideal), ceil(ideal)
 
-    def districtPctDeviation(self, district: 'RdsDistrict'):
+    def districtPctDeviation(self, district: 'RdsDistrict') -> float:
         if self._perMemberIdeal == 0:
             return 0
 
         return (district.population - (district.members * self._perMemberIdeal)) / (district.members * self._perMemberIdeal)
 
-    def totalDeviation(self):
+    def totalDeviation(self) -> float:
         deviations = [self.districtPctDeviation(d) for d in self._plan.districts if d.district != 0]
-        return max(*deviations) - min(deviations)
+        return max(*deviations) - min(*deviations)
 
     def minmaxDeviations(self):
         deviations = [self.districtPctDeviation(d) for d in self._plan.districts if d.district != 0]
@@ -72,8 +78,11 @@ class BaseDeviationValidator(QObject):
         return min(deviations, default=0), max(deviations, default=0)
 
     @abstractmethod
-    def validateDistrict(self, district: 'RdsDistrict'):
+    def validateDistrict(self, district: 'RdsDistrict') -> bool:
         """Validate whether district population is within allowable deviation"""
+
+    def validatePlan(self) -> bool:
+        return all(self.validateDistrict(d) for d in self._plan.districts[1:])
 
 
 class PlusMinusDeviationValidator(BaseDeviationValidator):
@@ -115,3 +124,12 @@ class MaxDeviationValidator(BaseDeviationValidator):
         planMin = min(deviations, default=maxPctUnder)
         return planMin <= pctDeviation <= max(planMin + self._plan.deviation, maxPctIdeal) \
             or min(planMax - self._plan.deviation, minPctIdeal) <= pctDeviation <= planMax
+
+    def validatePlan(self) -> bool:
+        return self.totalDeviation() <= self._plan.deviation
+
+
+validators: dict[DeviationType, type[BaseDeviationValidator]] = {
+    DeviationType.OverUnder: PlusMinusDeviationValidator,
+    DeviationType.TopToBottom: MaxDeviationValidator
+}

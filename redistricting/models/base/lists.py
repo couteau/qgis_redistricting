@@ -119,6 +119,9 @@ class KeyedListItemsView(KeyedListView[T]):
         return f"KeyedListItemsView([{', '.join(f'({k}, {repr(self._list._items[k])})' for k in self._list._keys)}])"
 
 
+KeyedListT = TypeVar('KeyedListT', bound='KeyedList')
+
+
 class KeyedList(Generic[T]):
     """Sequence-Mapping hybrid, indexible by string or integer"""
 
@@ -317,6 +320,12 @@ class KeyedList(Generic[T]):
         for k in self._keys:
             yield self._items[k]
 
+    def get_key(self, item: Union[T, int]) -> str:
+        if isinstance(item, int):
+            return self._keys[item]
+
+        return self._key(item)
+
     def keys(self) -> KeyedListKeyView[T]:
         return KeyedListKeyView(self)
 
@@ -396,6 +405,10 @@ class KeyedList(Generic[T]):
 
         index = slice(len(self._keys), len(self._keys))
         self._setitems(index, values)
+
+    def update(self, values: Mapping[str, T]):
+        self._items.update(values)
+        self._keys.extend([k for k in values.keys() if k not in self._keys])
 
     def insert(self, index: int, item: T):
         item_key = self._key(item)
@@ -497,6 +510,10 @@ class SortedKeyedList(KeyedList[T]):
 
     def move(self, idx1, idx2):
         self._raise_not_impl_error("Move item")
+
+    def update(self, values):
+        super().update(values)
+        self._keys = sorted(self._keys)
 
 
 KeyedListFactory = Factory(KeyedList, False)

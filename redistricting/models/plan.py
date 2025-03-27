@@ -1,20 +1,13 @@
 
 import pathlib
 from contextlib import contextmanager
-from enum import IntEnum
-from functools import cached_property
 from itertools import repeat
 from math import (
     ceil,
     floor
 )
-from statistics import (
-    StatisticsError,
-    mean
-)
 from typing import (
     Annotated,
-    Any,
     Iterable,
     Optional,
     Union,
@@ -25,24 +18,12 @@ from uuid import (
     uuid4
 )
 
-import pandas as pd
-from qgis.core import (
-    QgsFeature,
-    QgsVectorLayer,
-    QgsVectorLayerCache
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.core import QgsVectorLayer
+from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
-from .base.lists import (
-    KeyedList,
-    KeyedListFactory
-)
+from .base.lists import KeyedList
 from .base.model import (
-    MISSING,
     Factory,
     RdsBaseModel,
     in_range,
@@ -63,130 +44,8 @@ from .field import (
     RdsField,
     RdsGeoField
 )
-from .splits import RdsSplits
-from .validators import BaseDeviationValidator
-
-
-class DeviationType(IntEnum):
-    OverUnder = 0
-    TopToBottom = 1
-
-
-class RdsMetrics(RdsBaseModel):
-    metricsAboutToChange = pyqtSignal()
-    metricsChanged = pyqtSignal()
-
-    cutEdges: Union[int, None] = None
-    splits: KeyedList[RdsSplits] = KeyedListFactory
-
-    @overload
-    def __init__(self, plan: 'RdsPlan'):
-        ...
-
-    @overload
-    def __init__(self, cutEdges: Union[int, None] = None, splits: KeyedList[RdsSplits] = None):
-        ...
-
-    def __init__(self, cutEdges: Union[int, 'RdsPlan'] = None, splits: KeyedList[RdsSplits] = MISSING, parent: Optional[QObject] = None):
-        if isinstance(cutEdges, RdsPlan):
-            super().__init__(parent=parent)
-            self.plan = cutEdges
-            self.updateGeoFields(self.plan.geoFields)
-        else:
-            super().__init__(cutEdges=cutEdges, splits=splits, parent=parent)
-
-    def __pre_init__(self):
-        self.plan: 'RdsPlan' = None
-        self.cache: QgsVectorLayerCache = None
-
-    @property
-    def totalPopulation(self) -> int:
-        return self.plan.totalPopulation
-
-    @property
-    def deviation(self) -> tuple[float, float, bool]:
-        validator = BaseDeviationValidator(self.plan)
-        minDev, maxDev = validator.minmaxDeviations()
-        if minDev is None or maxDev is None:
-            valid = True
-        else:
-            valid = (minDev >= -self.plan.deviation and maxDev < self.plan.deviation) \
-                if self.plan.deviationType == DeviationType.OverUnder \
-                else (maxDev - minDev <= self.plan.deviation)
-        return minDev, maxDev, valid
-
-    @property
-    def devationType(self):
-        return self.plan.deviationType
-
-    @cached_property
-    def contiguous(self):
-        if len(self.plan.districts) == 1:
-            return None
-
-        f: QgsFeature
-        for f in self.plan.distLayer.getFeatures():
-            if f.hasGeometry() and len(list(f.geometry().constParts())) > 1:
-                return False
-
-        return True
-
-    @cached_property
-    def complete(self):
-        fiter = self.plan.assignLayer.getFeatures(f"{self.plan.distField} IS NULL OR {self.plan.distField} = 0")
-        return next(fiter, None) is None
-
-    # stats
-
-    def _meanScore(self, score: str) -> Union[float, None]:
-        values = self.plan.districts[1:, score]
-        try:
-            return mean(v for v in values if v is not None)  # pylint: disable=not-an-iterable
-        except StatisticsError:
-            return 0
-
-    def __getattr__(self, name: str) -> Any:
-        if name in MetricsColumns.CompactnessScores():
-            return self._meanScore(name)
-
-        return super().__getattr__(name)
-
-    def updateGeoFields(self, geoFields: list[RdsGeoField]):
-        self.metricsAboutToChange.emit()
-        splits: KeyedList[RdsSplits] = KeyedList()
-        for f in geoFields:
-            split = RdsSplits(f)
-            if f.field in self.splits:
-                split.setData(self.splits[f.field].data)
-            splits.append(split)
-        self.splits = splits
-        self.metricsChanged.emit()
-
-    def updateMetrics(self, cutEdges: int, splits: dict[str, pd.DataFrame]):
-        self.metricsAboutToChange.emit()
-
-        # force recalculation of cached properties
-        if hasattr(self, "contiguous"):
-            delattr(self, "contiguous")
-        if hasattr(self, "complete"):
-            delattr(self, "complete")
-
-        if cutEdges is not None:
-            self.cutEdges = cutEdges
-
-        if splits is not None:
-            new_splits: KeyedList[RdsSplits] = KeyedList()
-
-            for f, split in splits.items():
-                if f not in self.splits:
-                    new_splits[f] = RdsSplits(f, split)
-                else:
-                    new_splits[f] = self.splits[f]
-                    new_splits[f].setData(split)
-
-            self.splits = new_splits
-
-        self.metricsChanged.emit()
+from .metricslist import RdsMetrics
+from .validators import DeviationType
 
 
 class RdsPlan(RdsBaseModel):

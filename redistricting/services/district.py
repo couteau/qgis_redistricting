@@ -66,17 +66,12 @@ class DistrictUpdater(QObject):
         for district, row in data.to_dict(orient="index").items():
             plan.districts[f"{district:04}"].update(row)
 
-    def updateMetrics(self, plan: "RdsPlan", totalPopulation: int, cutEdges: int, splitsData: dict[str, pd.DataFrame]):
-        plan.updateMetrics(totalPopulation, cutEdges, splitsData)
-
     def updateTaskCompleted(self):
         updateTask: AggregateDistrictDataTask = self.sender()
         del self._updateTasks[updateTask.plan]
 
-        if updateTask.data is not None:
-            self.updateDistrictData(updateTask.plan, updateTask.data)
-        if updateTask.totalPopulation != 0 or updateTask.cutEdges != 0 or updateTask.splits is not None:
-            self.updateMetrics(updateTask.plan, updateTask.totalPopulation, updateTask.cutEdges, updateTask.splits)
+        if updateTask.districtData is not None:
+            self.updateDistrictData(updateTask.plan, updateTask.districtData)
 
         updated = list(updateTask.updateDistricts) if updateTask.updateDistricts else None
         self.updateComplete.emit(updateTask.plan, updated)
@@ -102,7 +97,6 @@ class DistrictUpdater(QObject):
             districts: Optional[Iterable[int]] = None,
             needDemographics=False,
             needGeometry=False,
-            needSplits=False,
             force=False
     ):
         """ update aggregate district data from assignments, including geometry where requested
@@ -119,13 +113,10 @@ class DistrictUpdater(QObject):
         :param needGeometry: Plan needs district geometry and related metrics updated
         :type needGeometry: bool
 
-        :param needSplits: Plan needs subdivision splits updated
-        :type needSplits: bool
-
         :param force: Cancel any pending update and begin a new update
         :type force: bool
         """
-        if not (needDemographics or needGeometry or needSplits):
+        if not (needDemographics or needGeometry):
             return
 
         if force and self.planIsUpdating(plan):
@@ -139,7 +130,6 @@ class DistrictUpdater(QObject):
                 updateDistricts=districts,
                 includeGeometry=needGeometry,
                 includeDemographics=needDemographics,
-                includSplits=needSplits
             )
             updateTask.taskCompleted.connect(self.updateTaskCompleted)
             updateTask.taskTerminated.connect(self.updateTaskTerminated)

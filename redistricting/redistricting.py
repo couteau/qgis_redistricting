@@ -60,6 +60,8 @@ from .controllers import (
     PendingChangesController,
     PlanController
 )
+from .gui import metrics_handlers  # pylint: disable=unused-import
+from .models import metrics  # pylint: disable=unused-import
 from .services import (
     ActionRegistry,
     AssignmentsService,
@@ -114,7 +116,7 @@ class Redistricting:
         self.importService = PlanImportService()
         self.importService.importComplete.connect(
             lambda plan: self.updaterService.updateDistricts(
-                plan, needDemographics=True, needGeometry=True, needSplits=True, force=True
+                plan, needDemographics=True, needGeometry=True, force=True
             )
         )
         self.assignmentsService = AssignmentsService()
