@@ -179,7 +179,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
     def deviationTypeChanged(self):
         self._validator = PlusMinusDeviationValidator(self._plan) \
             if self._plan.deviationType == DeviationType.OverUnder \
-            else MaxDeviationValidator()
+            else MaxDeviationValidator(self._plan)
         self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
             self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
 
@@ -823,7 +823,7 @@ class RdsMetricsModel(QAbstractTableModel):
                 return header
             if role == Qt.ItemDataRole.SizeHintRole:
                 fm = QFontMetrics(QFont())
-                return QSize(fm.width(header), 24)
+                return QSize(fm.horizontalAdvance(header), 24)
 
         return None
 
@@ -841,8 +841,10 @@ class RdsMetricsModel(QAbstractTableModel):
         elif role == Qt.ItemDataRole.FontRole:
             result = QFont()
             result.setBold(True)
-        elif role == Qt.ItemDataRole.TextColorRole:
-            result = metric.color()
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            result = metric.forgroundColor()
+        elif role == Qt.ItemDataRole.BackgroundRole:
+            result = metric.backgroundColor()
         elif role == Qt.ItemDataRole.ToolTipRole:
             result = metric.tooltip()
         else:

@@ -161,7 +161,10 @@ class RdsMetric(Generic[T], ABC):
         except:  # pylint: disable=bare-except
             return ""
 
-    def color(self, idx=None) -> QColor:  # pylint: disable=unused-argument
+    def forgroundColor(self, idx=None) -> QColor:  # pylint: disable=unused-argument
+        return None
+
+    def backgroundColor(self, idx=None) -> QColor:  # pylint: disable=unused-argument
         return None
 
     def tooltip(self, idx=None) -> str:  # pylint: disable=unused-argument

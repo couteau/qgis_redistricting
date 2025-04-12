@@ -188,8 +188,8 @@ class RdsPlanDeviationMetric(RdsAggregateMetric[tuple[float, float]],
         validator = validators[self.plan.deviationType](self.plan)
         return validator.validatePlan()
 
-    def color(self, idx=None):
-        return QColor(Qt.red) if not self.isValid() else QColor(Qt.green)
+    def forgroundColor(self, idx=None):
+        return QColor(Qt.GlobalColor.red) if not self.isValid() else QColor(Qt.GlobalColor.green)
 
 
 class CeaProjMetric(RdsMetric[gpd.GeoSeries],
@@ -589,7 +589,7 @@ class RdsBoolMetric(RdsMetric[bool], mname="__boolmetric"):
 
         return tr("YES") if self._value else "NO"
 
-    def color(self, idx=None) -> QColor:
+    def forgroundColor(self, idx=None) -> QColor:
         return QColor(Qt.green) if self._value else QColor(Qt.red)
 
 

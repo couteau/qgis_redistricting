@@ -48,49 +48,53 @@ class QResizableHeaderView(QHeaderView):
         self.old_size = 0
 
     def mousePressEvent(self, e: QMouseEvent):
-        atEdge = e.x() > self.rect().right() - 10 if self.orientation() == Qt.Vertical else e.y() > self.rect().bottom() - 10
+        atEdge = e.pos().x() > self.rect().right() - 10 \
+            if self.orientation() == Qt.Orientation.Vertical \
+            else e.pos().y() > self.rect().bottom() - 10
         if atEdge:
-            self.resize_offset = self.rect().right() - e.pos().x() if self.orientation() == Qt.Vertical else self.rect().bottom() - e.pos().y()
-            self.old_size = self.width() if self.orientation() == Qt.Vertical else self.height()
+            self.resize_offset = self.rect().right(
+            ) - e.pos().x() if self.orientation() == Qt.Orientation.Vertical else self.rect().bottom() - e.pos().y()
+            self.old_size = self.width() if self.orientation() == Qt.Orientation.Vertical else self.height()
             self.resizing = True
 
         return super().mousePressEvent(e)
 
     def mouseMoveEvent(self, e: QMouseEvent):
         if self.resizing:
-            if self.orientation() == Qt.Vertical:
-                self.setFixedWidth(e.x() - self.rect().left() + self.resize_offset)
+            if self.orientation() == Qt.Orientation.Vertical:
+                self.setFixedWidth(e.pos().x() - self.rect().left() + self.resize_offset)
             else:
-                self.setFixedHeight(e.y() - self.rect().top() + self.resize_offset)
+                self.setFixedHeight(e.pos().y() - self.rect().top() + self.resize_offset)
         else:
             super().mouseMoveEvent(e)
 
-        if not self.testAttribute(Qt.WA_SetCursor):
-            pos = e.x() if self.orientation() == Qt.Vertical else e.y()
+        if not self.testAttribute(Qt.WidgetAttribute.WA_SetCursor):
+            pos = e.pos().x() if self.orientation() == Qt.Orientation.Vertical else e.pos().y()
             atEdge = pos > self.rect().right() - 10 \
-                if self.orientation() == Qt.Vertical \
+                if self.orientation() == Qt.Orientation.Vertical \
                 else pos > self.rect().bottom() - 10
 
             if atEdge:
-                self.setCursor(Qt.SplitHCursor if self.orientation() == Qt.Vertical else Qt.SplitVCursor)
+                self.setCursor(Qt.CursorShape.SplitHCursor if self.orientation() ==
+                               Qt.Orientation.Vertical else Qt.CursorShape.SplitVCursor)
             else:
                 self.unsetCursor()
 
     def mouseReleaseEvent(self, e: QMouseEvent):
         if self.resizing:
-            if self.orientation() == Qt.Vertical:
-                self.setFixedWidth(e.x() - self.rect().left() + self.resize_offset)
+            if self.orientation() == Qt.Orientation.Vertical:
+                self.setFixedWidth(e.pos().x() - self.rect().left() + self.resize_offset)
             else:
-                self.setFixedHeight(e.y() - self.rect().top() + self.resize_offset)
+                self.setFixedHeight(e.pos().y() - self.rect().top() + self.resize_offset)
             self.resizing = False
             self.resized.emit()
 
         return super().mouseReleaseEvent(e)
 
     def keyPressEvent(self, e):
-        if e.key() == Qt.Key_Escape and self.resizing:
+        if e.key() == Qt.Key.Key_Escape and self.resizing:
             self.resizing = False
-            if self.orientation() == Qt.Vertical:
+            if self.orientation() == Qt.Orientation.Vertical:
                 self.setFixedWidth(self.old_size)
             else:
                 self.setFixedHeight(self.old_size)
@@ -102,7 +106,7 @@ class DockPlanMetrics(Ui_qdwPlanMetrics, RdsDockWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
-        self.header = QResizableHeaderView(Qt.Vertical, self.tblPlanMetrics)
+        self.header = QResizableHeaderView(Qt.Orientation.Vertical, self.tblPlanMetrics)
         self.header.resized.connect(self.tblPlanMetrics.updateGeometries)
         self.tblPlanMetrics.setVerticalHeader(self.header)
 
