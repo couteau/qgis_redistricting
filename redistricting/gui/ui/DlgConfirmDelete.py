@@ -27,7 +27,7 @@ class Ui_dlgConfirmDelete(object):
         font.setBold(True)
         font.setWeight(75)
         self.lblConfirm.setFont(font)
-        self.lblConfirm.setAlignment(QtCore.Qt.AlignCenter)
+        self.lblConfirm.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.lblConfirm.setObjectName("lblConfirm")
         self.verticalLayout.addWidget(self.lblConfirm)
         self.cbxRemoveLayers = QtWidgets.QCheckBox(dlgConfirmDelete)
