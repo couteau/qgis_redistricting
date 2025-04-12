@@ -630,7 +630,7 @@ class DeltaListModel(QAbstractTableModel):
                 else:
                     return self._fields[section]['caption']
             if role == Qt.ItemDataRole.TextAlignmentRole:
-                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignCenter)
+                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignmentFlag.AlignCenter)
 
             if role == Qt.ItemDataRole.BackgroundRole and orientation == Qt.Orientation.Horizontal:
                 ft = self._fields[section]['field-type']
