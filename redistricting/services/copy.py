@@ -139,7 +139,7 @@ class PlanCopier(ErrorListMixin, QObject):
             self.setError(
                 tr('Copy assignments: Target plan {name} has no assignment layer to copy into').format(
                     name=target.name),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
             return
 
@@ -147,7 +147,7 @@ class PlanCopier(ErrorListMixin, QObject):
             self.setError(
                 tr('Copy assignments: Source plan {name} has no assignment layer to copy from').format(
                     name=self._plan.name),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
             return
 

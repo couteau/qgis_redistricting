@@ -103,7 +103,7 @@ class TestDeltaModel:
         qtmodeltester.check(delta_model)
         assert delta_model.rowCount() == 3
         assert delta_model.columnCount() == 15
-        assert delta_model.data(delta_model.createIndex(2, 0), Qt.DisplayRole) == '-7'
+        assert delta_model.data(delta_model.createIndex(2, 0), Qt.ItemDataRole.DisplayRole) == '-7'
 
     def test_update_fields(self, delta_model: DeltaListModel, plan: RdsPlan, block_layer):
         assert delta_model.columnCount() == 15

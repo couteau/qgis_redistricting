@@ -29,10 +29,9 @@ from typing import (
 )
 
 from qgis.core import (
+    Qgis,
     QgsFeature,
-    QgsGeometry,
-    QgsVectorLayer,
-    QgsWkbTypes
+    QgsGeometry
 )
 from qgis.gui import (
     QgsMapCanvas,
@@ -87,7 +86,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._plan = None
         self._layer = None
 
-        self.buttonsPressed = Qt.NoButton
+        self.buttonsPressed = Qt.MouseButton.NoButton
 
     @property
     def plan(self):
@@ -101,14 +100,14 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._distTarget = None
             self._distSource = None
 
-    def targetDistrict(self, buttons=Qt.LeftButton):
-        if buttons & Qt.RightButton != Qt.NoButton:
+    def targetDistrict(self, buttons=Qt.MouseButton.LeftButton):
+        if buttons & Qt.MouseButton.RightButton != Qt.MouseButton.NoButton:
             return self._distSource
 
         return self._distTarget
 
-    def sourceDistrict(self, buttons=Qt.LeftButton):
-        if buttons & Qt.RightButton != Qt.NoButton:
+    def sourceDistrict(self, buttons=Qt.MouseButton.LeftButton):
+        if buttons & Qt.MouseButton.RightButton != Qt.MouseButton.NoButton:
             return self._distTarget
 
         return self._distSource
@@ -135,7 +134,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         features: Iterable[QgsFeature],
         target,
         source,
-        behavior: QgsVectorLayer.SelectBehavior = QgsVectorLayer.SetSelection,
+        behavior: Qgis.SelectBehavior = Qgis.SelectBehavior.SetSelection,
     ):
         self.selectFeatures.emit(features, target, source, behavior)
 
@@ -144,7 +143,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         if self._layer is None or self.targetDistrict(self.buttonsPressed) is None:
             return
 
-        if self.buttonsPressed & (Qt.LeftButton | Qt.RightButton) == Qt.NoButton:
+        if self.buttonsPressed & (Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) == Qt.MouseButton.NoButton:
             return
 
         if self._paintMode == PaintMode.PaintByGeography:
@@ -155,16 +154,16 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 self.sourceDistrict(self.buttonsPressed)
             )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
-            self._selectRect.setRect(e.x(), e.y(), e.x()+1, e.y()+1)
+            self._selectRect.setRect(e.pos().x(), e.pos().y(), e.pos().x()+1, e.pos().y()+1)
 
     def canvasReleaseEvent(self, e: QgsMapMouseEvent):
         if self._layer is None:
             return
 
-        if e.buttons() & self.buttonsPressed != Qt.NoButton:
+        if e.buttons() & self.buttonsPressed != Qt.MouseButton.NoButton:
             return
 
-        if self.buttonsPressed & (Qt.LeftButton | Qt.RightButton) == Qt.NoButton:
+        if self.buttonsPressed & (Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) == Qt.MouseButton.NoButton:
             return
 
         if self.targetDistrict(self.buttonsPressed) is None:
@@ -174,7 +173,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
         if self._paintMode == PaintMode.PaintByGeography:
             results: list[QgsMapToolIdentify.IdentifyResult] = \
-                self.identify(e.x(), e.y(), [self._layer])
+                self.identify(e.pos().x(), e.pos().y(), [self._layer])
             if not results:
                 if self._dragging:
                     self._dragging = False
@@ -220,19 +219,19 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                         self.sourceDistrict(self.buttonsPressed)
                     )
 
-        self.buttonsPressed = Qt.NoButton
+        self.buttonsPressed = Qt.MouseButton.NoButton
 
     def canvasMoveEvent(self, e: QgsMapMouseEvent):
         buttons = e.buttons()
         if self._layer is None or self.targetDistrict(buttons) is None:
             return
 
-        if buttons & (Qt.LeftButton | Qt.RightButton) == Qt.NoButton:
+        if buttons & (Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) == Qt.MouseButton.NoButton:
             return
 
         if self._paintMode == PaintMode.PaintByGeography:
             results: List[QgsMapToolIdentify.IdentifyResult] = \
-                self.identify(e.x(), e.y(), [self._layer])
+                self.identify(e.pos().x(), e.pos().y(), [self._layer])
 
             if not results:
                 return
@@ -247,10 +246,10 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if not self._dragging:
                 self._dragging = True
-                self._rubberBand = QgsRubberBand(self.canvas(), QgsWkbTypes.PolygonGeometry)
-                color = QColor(Qt.blue) \
+                self._rubberBand = QgsRubberBand(self.canvas(), Qgis.GeometryType.Polygon)
+                color = QColor(Qt.GlobalColor.blue) \
                     if self._paintMode == PaintMode.PaintRectangle \
-                    else QColor(Qt.lightGray)
+                    else QColor(Qt.GlobalColor.lightGray)
                 color.setAlpha(63)
                 self._rubberBand.setColor(color)
                 self._selectRect.setTopLeft(e.pos())
@@ -260,5 +259,5 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 self._rubberBand.show()
 
     def keyPressEvent(self, e: QKeyEvent):
-        if e.key() == Qt.Key_Escape:
+        if e.key() == Qt.Key.Key_Escape:
             self.canvas().unsetMapTool(self)

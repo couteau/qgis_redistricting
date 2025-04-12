@@ -44,10 +44,8 @@ from qgis.core import (
     Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
-    QgsLayerTree,
     QgsMapLayer,
     QgsProject,
-    QgsRelationManager,
     QgsVectorLayer
 )
 from qgis.gui import (
@@ -310,12 +308,13 @@ class MockQgisInterface(QgisInterface):
         """Create new project."""
         # noinspection PyArgumentList
         instance = QgsProject.instance()
-        instance.removeAllMapLayers()
-        root: QgsLayerTree = instance.layerTreeRoot()
-        root.removeAllChildren()
-        relation_manager: QgsRelationManager = instance.relationManager()
-        for relation in relation_manager.relations():
-            relation_manager.removeRelation(relation)
+        instance.clear()
+        # instance.removeAllMapLayers()
+        # root: QgsLayerTree = instance.layerTreeRoot()
+        # root.removeAllChildren()
+        # relation_manager: QgsRelationManager = instance.relationManager()
+        # for relation in relation_manager.relations():
+        #     relation_manager.removeRelation(relation)
         self._layers = []
         self.newProjectCreated.emit()
         return True

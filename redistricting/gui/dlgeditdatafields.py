@@ -44,13 +44,13 @@ class DlgEditFields(QDialog):
         self,
         plan: RdsPlan,
         parent: Optional[QWidget] = None,
-        flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
+        flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog
     ):
         super().__init__(parent, flags)
         self.plan = plan
         self.page = dlgEditPlanFieldPage(self)
         self.buttonBox = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.page.setField('dataFields', plan.dataFields)

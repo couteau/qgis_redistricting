@@ -70,23 +70,23 @@ class RdsTableView(QTableView):
         self.updateFrozenTableGeometry()
 
     def init(self):
-        self._frozenColumnsView.setFocusPolicy(Qt.NoFocus)
-        self._frozenColumnsView.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self._frozenColumnsView.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._frozenColumnsView.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         self._frozenColumnsView.verticalHeader().hide()
-        self._frozenColumnsView.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self._frozenColumnsView.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
 
         self.viewport().stackUnder(self._frozenColumnsView)
 
         self._frozenColumnsView.setStyleSheet("QTableView { border: none;}")
-        self._frozenColumnsView.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self._frozenColumnsView.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._frozenColumnsView.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._frozenColumnsView.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._frozenColumnsView.show()
 
         self.updateFrozenTableModel()
 
-        self.setHorizontalScrollMode(QTableView.ScrollPerPixel)
-        self.setVerticalScrollMode(QTableView.ScrollPerPixel)
-        self._frozenColumnsView.setVerticalScrollMode(QTableView.ScrollPerPixel)
+        self.setHorizontalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
+        self.setVerticalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
+        self._frozenColumnsView.setVerticalScrollMode(QTableView.ScrollMode.ScrollPerPixel)
 
     def edit(self, index: QModelIndex, trigger: QAbstractItemView.EditTrigger, event: QEvent) -> bool:
         if index.column() < self._frozenColumnCount:
@@ -105,16 +105,13 @@ class RdsTableView(QTableView):
 
     def moveCursor(self, cursorAction: QAbstractItemView.CursorAction, modifiers: Union[Qt.KeyboardModifiers, Qt.KeyboardModifier]) -> QModelIndex:
         current = super().moveCursor(cursorAction, modifiers)
-        if cursorAction == QTableView.MoveLeft and current.column() >= self._frozenColumnCount \
+        if cursorAction == QTableView.CursorAction.MoveLeft and current.column() >= self._frozenColumnCount \
                 and self.visualRect(current).topLeft().x() < self._frozenColumnsView.columnWidth(0):
             newValue = self.horizontalScrollBar().value() + self.visualRect(current).topLeft().x() - \
                 self._frozenColumnsView.columnWidth(0)
             self.horizontalScrollBar().setValue(newValue)
 
         return current
-
-    def scrollTo(self, index: QModelIndex, hint: QAbstractItemView.ScrollHint = QAbstractItemView.EnsureVisible):
-        super().scrollTo(index, hint)
 
     def updateFrozenTableGeometry(self):
         width = sum(self.columnWidth(i) for i in range(self._frozenColumnCount)) - 2

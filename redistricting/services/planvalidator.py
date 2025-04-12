@@ -118,21 +118,21 @@ class PlanValidator(ErrorListMixin, QObject):
                 self.pushError(
                     tr('{layer} layer is invalid').
                     format(layer=layerName.capitalize()),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
             elif geometryRequired and not layer.isSpatial():
                 self.pushError(
                     tr('{layer} layer must be a spatial layer').
                     format(layer=layerName.capitalize()),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
         elif required:
             self.pushError(
                 tr('{layer} layer is required').
                 format(layer=layerName.capitalize()),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
             result = False
 
@@ -172,7 +172,7 @@ class PlanValidator(ErrorListMixin, QObject):
                     layertype=tr('population'),
                     layername=self._popLayer.name()
                 ),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
             return False
 
@@ -183,7 +183,7 @@ class PlanValidator(ErrorListMixin, QObject):
                     fieldname=fieldname,
                     field=field
                 ),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
             return False
 
@@ -199,7 +199,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('population'),
                         layername=self._popLayer.name()
                     ),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
 
@@ -231,7 +231,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('assignments'),
                         layername=self._assignLayer.name()
                     ),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
 
@@ -243,7 +243,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('assignment'),
                         layername=self._assignLayer.name()
                     ),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
 
@@ -256,7 +256,7 @@ class PlanValidator(ErrorListMixin, QObject):
                             layertype=tr('assignment'),
                             layername=self._assignLayer.name()
                         ),
-                        Qgis.Critical if strict else Qgis.Warning
+                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning
                     )
                     if strict:
                         result = False
@@ -274,7 +274,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('district'),
                         layername=self._distLayer.name()
                     ),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 result = False
 
@@ -287,7 +287,7 @@ class PlanValidator(ErrorListMixin, QObject):
                             layertype=tr('district'),
                             layername=self._distLayer.name()
                         ),
-                        Qgis.Critical if strict else Qgis.Warning
+                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning
                     )
                     if strict:
                         result = False
@@ -300,7 +300,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('district'),
                         layername=self._distLayer.name()
                     ),
-                    Qgis.Warning
+                    Qgis.MessageLevel.Warning
                 )
 
             if self._distLayer.fields().lookupField('reock') == -1:
@@ -311,7 +311,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('district'),
                         layername=self._distLayer.name()
                     ),
-                    Qgis.Warning
+                    Qgis.MessageLevel.Warning
                 )
 
             if self._distLayer.fields().lookupField('convexhull') == -1:
@@ -322,7 +322,7 @@ class PlanValidator(ErrorListMixin, QObject):
                         layertype=tr('district'),
                         layername=self._distLayer.name()
                     ),
-                    Qgis.Warning
+                    Qgis.MessageLevel.Warning
                 )
 
         return result
@@ -343,13 +343,13 @@ class PlanValidator(ErrorListMixin, QObject):
 
         if self._numDistricts < 2 or self._numDistricts > defaults.MAX_DISTRICTS:
             self.pushError(tr('Invalid number of districts for plan: {value}').format(
-                value=self._numDistricts), Qgis.Critical)
+                value=self._numDistricts), Qgis.MessageLevel.Critical)
 
         if self._numSeats < self._numDistricts:
             self.pushError(
                 tr('Number of seats ({seats}) must equal or exceed number of districts ({districts})').
                 format(seats=self._numSeats, districts=self._numDistricts),
-                Qgis.Critical
+                Qgis.MessageLevel.Critical
             )
 
         if not isinstance(self._deviation, Number) or self._deviation < 0:
@@ -357,22 +357,24 @@ class PlanValidator(ErrorListMixin, QObject):
             result = False
 
         if not self._name:
-            self.pushError(tr('Plan name must be set'), Qgis.Critical)
+            self.pushError(tr('Plan name must be set'), Qgis.MessageLevel.Critical)
 
         if not self._geoIdField:
-            self.pushError(tr('{field} field is required').format(field=tr('Geography ID')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(field=tr('Geography ID')), Qgis.MessageLevel.Critical)
 
         if not self._distField:
-            self.pushError(tr('{field} field is required').format(field=tr('District')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(field=tr('District')), Qgis.MessageLevel.Critical)
 
         if not self._geoJoinField:
-            self.pushError(tr('{field} field is required').format(field=tr('Geograph Join')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(
+                field=tr('Geograph Join')), Qgis.MessageLevel.Critical)
 
         if not self._popJoinField:
-            self.pushError(tr('{field} field is required').format(field=tr('Population Join')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(
+                field=tr('Population Join')), Qgis.MessageLevel.Critical)
 
         if not self._popField:
-            self.pushError(tr('{field} field is required').format(field=tr('Population')), Qgis.Critical)
+            self.pushError(tr('{field} field is required').format(field=tr('Population')), Qgis.MessageLevel.Critical)
 
         result = result \
             and self._validateGeoLayer() \

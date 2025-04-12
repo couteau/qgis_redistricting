@@ -95,7 +95,7 @@ class TestStyler:
         sym = assignCats[0].symbol()
         assert sym.symbolLayer(0).fillColor() == QColor('#c8cfc9')
         sym = assignCats[1].symbol()
-        assert sym.symbolLayer(0).fillColor() == styler._ramp.color(1)
+        assert sym.symbolLayer(0).fillColor() == styler._ramp.color(1/6)
 
         sym = distCats[1].symbol()
         assert sym.symbolLayerCount() == 2
@@ -106,12 +106,15 @@ class TestStyler:
         styler = PlanStylerService(mock_planmanager)
         styler.createRenderers(5)
         ramp0 = styler._ramp
-        color1 = styler._ramp.color(1)
-        assert styler._ramp.count() == 6
+        assert ramp0.count() == 6
         styler.createRenderers(6)
-        assert styler._ramp.count() == 7
-        assert styler._ramp is ramp0
-        assert styler._ramp.color(1) == color1
+        ramp1 = styler._ramp
+        assert ramp1.count() == 7
+        assert ramp1.color(1/6) == ramp0.color(1/5)
+        assert ramp1.color(2/6) == ramp0.color(2/5)
+        assert ramp1.color(3/6) == ramp0.color(3/5)
+        assert ramp1.color(4/6) == ramp0.color(4/5)
+        assert ramp1.color(5/6) == ramp0.color(1)
 
     def test_create_labels(self, mock_planmanager):
         styler = PlanStylerService(mock_planmanager)

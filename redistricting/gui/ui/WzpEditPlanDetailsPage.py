@@ -7,14 +7,21 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qgis import gui
+from qgis.PyQt import (
+    QtCore,
+    QtGui,
+    QtWidgets
+)
+
+from .RedistrictingWidgets import RdsFileWidget
 
 
 class Ui_wzpPlanDetails(object):
     def setupUi(self, wzpPlanDetails):
         wzpPlanDetails.setObjectName("wzpPlanDetails")
         wzpPlanDetails.resize(605, 406)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(wzpPlanDetails.sizePolicy().hasHeightForWidth())
@@ -75,16 +82,18 @@ class Ui_wzpPlanDetails(object):
         _translate = QtCore.QCoreApplication.translate
         wzpPlanDetails.setWindowTitle(_translate("wzpPlanDetails", "Plan Details"))
         wzpPlanDetails.setTitle(_translate("wzpPlanDetails", "Plan Details"))
-        wzpPlanDetails.setSubTitle(_translate("wzpPlanDetails", "Configure plan name, GeoPackage, number of districts, number of members, and description"))
+        wzpPlanDetails.setSubTitle(_translate(
+            "wzpPlanDetails", "Configure plan name, GeoPackage, number of districts, number of members, and description"))
         self.inpPlanName.setToolTip(_translate("wzpPlanDetails", "Enter a name for your districting plan"))
         self.lblNumDistricts.setText(_translate("wzpPlanDetails", "&Number of Districts"))
         self.lblNumSeats.setText(_translate("wzpPlanDetails", "Number of &Seats"))
-        self.sbxNumDistricts.setToolTip(_translate("wzpPlanDetails", "Enter the total number of districts in your plan"))
+        self.sbxNumDistricts.setToolTip(_translate(
+            "wzpPlanDetails", "Enter the total number of districts in your plan"))
         self.lblDescription.setText(_translate("wzpPlanDetails", "Plan &Description"))
-        self.sbxNumSeats.setToolTip(_translate("wzpPlanDetails", "Enter the number of seats that are elected from the districts in this plan"))
+        self.sbxNumSeats.setToolTip(_translate(
+            "wzpPlanDetails", "Enter the number of seats that are elected from the districts in this plan"))
         self.lblPlanName.setText(_translate("wzpPlanDetails", "Plan Na&me"))
-        self.fileGpkg.setToolTip(_translate("wzpPlanDetails", "Enter the path to a new GeoPackage in which to store geography assignments and district summary"))
+        self.fileGpkg.setToolTip(_translate(
+            "wzpPlanDetails", "Enter the path to a new GeoPackage in which to store geography assignments and district summary"))
         self.fileGpkg.setDialogTitle(_translate("wzpPlanDetails", "Plan GeoPackage File"))
         self.lblGpkg.setText(_translate("wzpPlanDetails", "GeoPackage &Path"))
-from qgis import gui
-from .RedistrictingWidgets import RdsFileWidget

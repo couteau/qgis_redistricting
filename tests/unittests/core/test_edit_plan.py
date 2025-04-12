@@ -22,7 +22,7 @@ from qgis.core import Qgis
 
 from redistricting.models import (
     RdsDataField,
-    RdsField,
+    RdsGeoField,
     RdsPlan
 )
 from redistricting.services import PlanEditor
@@ -101,18 +101,18 @@ class TestPlanEditor:
 
         editor.appendDataField(request.getfixturevalue(field))
         assert editor.error() == \
-            ('Attempt to add duplicate field vap_nh_black to plan minimal', Qgis.Warning)
+            ('Attempt to add duplicate field vap_nh_black to plan minimal', Qgis.MessageLevel.Warning)
         editor.updatePlan()
         assert len(valid_plan.dataFields) == 1
 
-    def test_datafields_throw_exception_when_invalid_field_added(self, editor):
+    def test_datafields_throw_exception_when_invalid_field_added(self, editor: PlanEditor):
         with pytest.raises(TypeError):
             editor.appendDataField(1)
 
     def test_datafields_throw_exception_when_non_existent_field_removed(
         self,
         editor: PlanEditor,
-        bvap_field_fld
+        bvap_field_fld: RdsDataField
     ):
         with pytest.raises(ValueError):
             editor.removeDataField('vap_nh_black')
@@ -150,7 +150,7 @@ class TestPlanEditor:
 
     @pytest.fixture
     def vtd_field_fld(self, block_layer):
-        return RdsField(block_layer, 'vtdid')
+        return RdsGeoField(block_layer, 'vtdid')
 
     @pytest.fixture
     def vtd_field_str(self):
@@ -168,12 +168,12 @@ class TestPlanEditor:
             editor.appendGeoField('vtdid', 'VTD')
             editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
-        assert isinstance(valid_plan.geoFields[0], RdsField)
+        assert isinstance(valid_plan.geoFields[0], RdsGeoField)
         assert valid_plan.geoFields[0].layer == block_layer
         assert valid_plan.geoFields[0].field == 'vtdid'
         assert valid_plan.geoFields[0].caption == 'VTD'
 
-        f1 = RdsField(block_layer, 'statefp || countyfp || vtd', 'VTD')
+        f1 = RdsGeoField(block_layer, 'statefp || countyfp || vtd', 'VTD')
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             editor.appendGeoField(f1)
             editor.updatePlan()
@@ -196,7 +196,7 @@ class TestPlanEditor:
         editor.updatePlan()
 
         editor.appendGeoField(request.getfixturevalue(field))
-        assert editor.error() == ('Attempt to add duplicate field vtdid to plan minimal', Qgis.Warning)
+        assert editor.error() == ('Attempt to add duplicate field vtdid to plan minimal', Qgis.MessageLevel.Warning)
         editor.updatePlan()
         assert len(valid_plan.geoFields) == 1
 

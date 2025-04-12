@@ -85,7 +85,7 @@ class MetricsController(DockWidgetController):
             text=self.tr("Copy Metrics"),
             tooltip=self.tr("Copy selected metrics to clipboard"),
             callback=self.copySelection,
-            shortcut=QKeySequence.Copy,
+            shortcut=QKeySequence.StandardKey.Copy,
             parent=self.iface.mainWindow()
         )
 
@@ -168,7 +168,7 @@ class MetricsController(DockWidgetController):
             table = []
             for idx in selection:
                 table.append([self.metricsModel.headerData(
-                    idx.row(), Qt.Vertical, Qt.DisplayRole), idx.data()])
+                    idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole), idx.data()])
             stream = io.StringIO()
             csv.writer(stream, delimiter='\t').writerows(table)
             QgsApplication.instance().clipboard().setText(stream.getvalue())

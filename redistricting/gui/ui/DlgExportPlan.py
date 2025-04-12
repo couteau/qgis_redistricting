@@ -2,12 +2,17 @@
 
 # Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/DlgExportPlan.ui'
 #
-# Created by: PyQt5 UI code generator 5.12.3
+# Created by: qgis.PyQt UI code generator 5.12.3
 #
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qgis import gui
+from qgis.PyQt import (
+    QtCore,
+    QtGui,
+    QtWidgets
+)
 
 
 class Ui_dlgExportPlan(object):
@@ -23,7 +28,7 @@ class Ui_dlgExportPlan(object):
         self.gridLayout.setObjectName("gridLayout")
         self.cmbGeography = QtWidgets.QComboBox(self.gbxEquivalency)
         self.cmbGeography.setEnabled(False)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbGeography.sizePolicy().hasHeightForWidth())
@@ -32,7 +37,7 @@ class Ui_dlgExportPlan(object):
         self.gridLayout.addWidget(self.cmbGeography, 2, 1, 1, 1)
         self.lblGeography = QtWidgets.QLabel(self.gbxEquivalency)
         self.lblGeography.setEnabled(False)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lblGeography.sizePolicy().hasHeightForWidth())
@@ -78,12 +83,14 @@ class Ui_dlgExportPlan(object):
         self.cbxMetrics.setObjectName("cbxMetrics")
         self.verticalLayout_3.addWidget(self.cbxMetrics)
         self.verticalLayout.addWidget(self.gbxShape)
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
+                                           QtWidgets.QSizePolicy.Policy.Expanding)
         self.verticalLayout.addItem(spacerItem)
         self.buttonBox = QtWidgets.QDialogButtonBox(dlgExportPlan)
         self.buttonBox.setEnabled(True)
-        self.buttonBox.setOrientation(QtCore.Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel |
+                                          QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.verticalLayout.addWidget(self.buttonBox)
         self.lblGeography.setBuddy(self.cmbGeography)
@@ -111,4 +118,3 @@ class Ui_dlgExportPlan(object):
         self.cbxIncludeUnassigned.setText(_translate("dlgExportPlan", "Include unassigned geography"))
         self.cbxDemographics.setText(_translate("dlgExportPlan", "Include demographics"))
         self.cbxMetrics.setText(_translate("dlgExportPlan", "Include metrics"))
-from qgis import gui

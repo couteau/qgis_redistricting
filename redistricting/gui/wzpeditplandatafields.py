@@ -71,7 +71,7 @@ class PopFieldDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor: QComboBox, index: QModelIndex):
         if index.column() == 3:
-            text = index.model().data(index, Qt.EditRole)
+            text = index.model().data(index, Qt.ItemDataRole.EditRole)
             if text is not None and text != QVariant():
                 editor.setCurrentText(text)
             else:
@@ -82,7 +82,7 @@ class PopFieldDelegate(QStyledItemDelegate):
     def setModelData(self, editor: QComboBox, model: QAbstractListModel, index: QModelIndex):
         if index.column() == 3:
             idx = editor.currentIndex()
-            model.setData(index, idx, Qt.EditRole)
+            model.setData(index, idx, Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 

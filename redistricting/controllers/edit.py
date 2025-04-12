@@ -397,11 +397,11 @@ class EditAssignmentsController(DockWidgetController):
 
         if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
             self.iface.messageBar().pushMessage(
-                self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.Warning)
+                self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.MessageLevel.Warning)
             return None
 
         dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
-        if dlg.exec() == QDialog.Rejected:
+        if dlg.exec() == QDialog.DialogCode.Rejected:
             return None
 
         dist = self.activePlan.addDistrict(
@@ -434,7 +434,7 @@ class EditAssignmentsController(DockWidgetController):
         dlg.sbxMembers.setValue(district.members)
         dlg.txtDescription.setPlainText(district.description)
         dlg.buttonBox.button(dlg.buttonBox.Ok).setEnabled(True)
-        if dlg.exec() == QDialog.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             district.name = dlg.districtName
             district.members = dlg.members
             district.description = dlg.description
@@ -454,14 +454,14 @@ class EditAssignmentsController(DockWidgetController):
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"),
                 self.tr("Cannot save changes to no plan: active plan has no unsaved changes."),
-                Qgis.Warning
+                Qgis.MessageLevel.Warning
             )
             return
 
         dlgCopyPlan = DlgCopyPlan(self.activePlan, self.iface.mainWindow())
         dlgCopyPlan.cbxCopyAssignments.hide()
 
-        if dlgCopyPlan.exec() == QDialog.Accepted:
+        if dlgCopyPlan.exec() == QDialog.DialogCode.Accepted:
             copier = PlanCopier(self.planManager.activePlan)
             plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
                                    dlgCopyPlan.geoPackagePath, copyAssignments=True)
@@ -482,7 +482,7 @@ class EditAssignmentsController(DockWidgetController):
                     "Cannot paint districts for a plan that is not visible. "
                     "Please toggle the visibility of plan {name}'s assignment layer."
                 ).format(name=self.planManager.activePlan.name),
-                level=Qgis.Warning,
+                level=Qgis.MessageLevel.Warning,
                 duration=5)
             return
 

@@ -22,10 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional
 
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import Qt
@@ -39,12 +36,12 @@ from .ui.DlgImportShapefile import Ui_dlgImportShapefile
 
 
 class DlgImportShape(Ui_dlgImportShapefile, QDialog):
-    def __init__(self, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, parent: Optional[QWidget] = None, flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
         self.layer = None
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         self.fwShapefile.fileChanged.connect(self.fileChanged)
         self.cmbDistField.fieldChanged.connect(self.updateButton)
 
@@ -56,7 +53,7 @@ class DlgImportShape(Ui_dlgImportShapefile, QDialog):
         self.updateButton()
 
     def updateButton(self):
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
             bool(self.shapefileFileName) and bool(self.distField)
         )
 

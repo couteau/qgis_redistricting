@@ -7,7 +7,18 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qgis import gui
+from qgis.PyQt import (
+    QtCore,
+    QtGui,
+    QtWidgets
+)
+
+from .RedistrictingWidgets import (
+    RdsFieldComboBox,
+    RdsFieldTableView,
+    RdsMapLayerComboBox
+)
 
 
 class Ui_wzpAddlGeography(object):
@@ -44,7 +55,7 @@ class Ui_wzpAddlGeography(object):
         self.lblGeoLayer.setObjectName("lblGeoLayer")
         self.gridLayout.addWidget(self.lblGeoLayer, 0, 0, 1, 1)
         self.cmbSourceLayer = RdsMapLayerComboBox(wzpAddlGeography)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbSourceLayer.sizePolicy().hasHeightForWidth())
@@ -58,7 +69,7 @@ class Ui_wzpAddlGeography(object):
         self.lblGeoIDField.setObjectName("lblGeoIDField")
         self.gridLayout.addWidget(self.lblGeoIDField, 1, 0, 1, 1)
         self.cmbGeoIDField = RdsFieldComboBox(wzpAddlGeography)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbGeoIDField.sizePolicy().hasHeightForWidth())
@@ -75,14 +86,16 @@ class Ui_wzpAddlGeography(object):
         _translate = QtCore.QCoreApplication.translate
         wzpAddlGeography.setWindowTitle(_translate("wzpAddlGeography", "Geography"))
         wzpAddlGeography.setTitle(_translate("wzpAddlGeography", "Geography"))
-        wzpAddlGeography.setSubTitle(_translate("wzpAddlGeography", "Define units of geography from which the districting plan will be built"))
-        self.groupBox.setToolTip(_translate("wzpAddlGeography", "Add additional levels of geography from which districts can be built"))
+        wzpAddlGeography.setSubTitle(_translate(
+            "wzpAddlGeography", "Define units of geography from which the districting plan will be built"))
+        self.groupBox.setToolTip(_translate(
+            "wzpAddlGeography", "Add additional levels of geography from which districts can be built"))
         self.groupBox.setTitle(_translate("wzpAddlGeography", "Additional Geography"))
         self.btnAddAddlGeoField.setText(_translate("wzpAddlGeography", "..."))
         self.lblGeoLayer.setText(_translate("wzpAddlGeography", "Import Geography from Layer"))
-        self.cmbSourceLayer.setToolTip(_translate("wzpAddlGeography", "Select layer from which geography will be imported (e.g., census blocks, vtds)"))
+        self.cmbSourceLayer.setToolTip(_translate(
+            "wzpAddlGeography", "Select layer from which geography will be imported (e.g., census blocks, vtds)"))
         self.lblGeoCaption.setText(_translate("wzpAddlGeography", "Geography Name"))
         self.lblGeoIDField.setText(_translate("wzpAddlGeography", "Primary Geography ID Field"))
-        self.cmbGeoIDField.setToolTip(_translate("wzpAddlGeography", "Field containing unique identifier for smallest unit of geography"))
-from qgis import gui
-from .RedistrictingWidgets import RdsFieldComboBox, RdsFieldTableView, RdsMapLayerComboBox
+        self.cmbGeoIDField.setToolTip(_translate(
+            "wzpAddlGeography", "Field containing unique identifier for smallest unit of geography"))

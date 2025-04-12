@@ -75,7 +75,7 @@ class TestDistrictController:
 
     def test_add_canvas_context_menu_items(self, controller_with_active_plan: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictCopier):
         menu = QMenu("test")
-        event = QgsMapMouseEvent(qgis_canvas, QEvent.MouseButtonPress, QPoint(0, 0), Qt.RightButton)
+        event = QgsMapMouseEvent(qgis_canvas, QEvent.Type.MouseButtonPress, QPoint(0, 0), Qt.MouseButton.RightButton)
         controller_with_active_plan.addCanvasContextMenuItems(menu, event)
         mock_copier.canCopyAssignments.assert_called_once()
         mock_copier.canPasteAssignments.assert_called_once()
@@ -83,7 +83,7 @@ class TestDistrictController:
     def test_add_canvas_context_menu_items_no_active_plan_returns(self, controller: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictCopier):
         assert controller.planManager.activePlan is None
         menu = QMenu("test")
-        event = QgsMapMouseEvent(qgis_canvas, QEvent.MouseButtonPress, QPoint(0, 0), Qt.RightButton)
+        event = QgsMapMouseEvent(qgis_canvas, QEvent.Type.MouseButtonPress, QPoint(0, 0), Qt.MouseButton.RightButton)
         controller.addCanvasContextMenuItems(menu, event)
         mock_copier.canCopyAssignments.assert_not_called()
         mock_copier.canPasteAssignments.assert_not_called()
@@ -142,10 +142,11 @@ class TestDistrictController:
 
     def test_context_menu_event(self, controller: DistrictController, mocker: MockerFixture):
         mocker.patch('redistricting.controllers.district.QMenu')
-        event = QContextMenuEvent(QContextMenuEvent.Mouse, QPoint(0, 0), QPoint(0, 0), Qt.NoModifier)
+        event = QContextMenuEvent(QContextMenuEvent.Reason.Mouse, QPoint(0, 0),
+                                  QPoint(0, 0), Qt.KeyboardModifier.NoModifier)
         assert controller.eventFilter(controller.dockwidget, event)
 
-        event = QEvent(QEvent.MouseButtonPress)
+        event = QEvent(QEvent.Type.MouseButtonPress)
         assert not controller.eventFilter(controller.dockwidget, event)
 
     def test_data_table_context_menu(self, controller: DistrictController, mocker: MockerFixture):

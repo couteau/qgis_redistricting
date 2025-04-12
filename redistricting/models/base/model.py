@@ -45,6 +45,7 @@ from typing import (  # pylint: disable=no-name-in-module
     Type,
     TypeVar,
     Union,
+    _AnnotatedAlias,
     _BaseGenericAlias,
     _GenericAlias,
     _strip_annotations,
@@ -89,7 +90,11 @@ def _is_classvar(a_type):
 
 
 def get_real_type(t: type):
-    v = None
+    if isinstance(t, _AnnotatedAlias):
+        v = get_args(t)[1]
+    else:
+        v = None
+
     t = _strip_annotations(t)
     if isinstance(t, (_GenericAlias, GenericAlias)) and not isinstance(t, _UnionGenericAlias):
         args = get_args(t)

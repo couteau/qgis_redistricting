@@ -66,8 +66,6 @@ class TestPlanCreator:
     ):
         mock = mocker.patch.object(QgsApplication.taskManager(), 'addTask')
         mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
-        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
         task_class = mocker.patch('redistricting.services.planbuilder.CreatePlanLayersTask', spec=CreatePlanLayersTask)
         task_class.return_value = mocker.create_autospec(spec=CreatePlanLayersTask, instance=True)
         task_class.return_value.taskCompleted = mocker.MagicMock()
@@ -91,9 +89,7 @@ class TestPlanCreator:
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
-        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
+        plan_cls = mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
 
         builder = PlanBuilder() \
             .setName('test') \
@@ -103,20 +99,14 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_called_once()
-        json = deserialize.call_args[0][1]
-        assert {'name': 'test', 'description': '', 'deviation': 0.0, 'num-districts': 5,
-                'geo-layer': layer.id(), 'geo-id-field': 'geoid20', 'pop-field': 'pop_total',
-                'geo-fields': [], 'data-fields': [], 'pop-fields': []}.items() <= json.items()
+        plan_cls.assert_called_once()
         assert builder._createLayersTask is None
 
     def test_create_plan_invalid_builder_no_plan(self, mocker: MockerFixture):
         layer = mocker.create_autospec(spec=QgsVectorLayer, instance=True)
         layer.id.return_value = uuid4()
         layer.isValid.return_value = True
-        mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
-        deserialize = mocker.patch('redistricting.services.planbuilder.deserialize')
-        deserialize.return_value = mocker.create_autospec(spec=RdsPlan, instance=True)
+        plan_cls = mocker.patch('redistricting.services.planbuilder.RdsPlan', spec=RdsPlan)
 
         # no name
         builder = PlanBuilder() \
@@ -126,7 +116,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_not_called()
+        plan_cls.assert_not_called()
 
         # no num districts
         builder = PlanBuilder() \
@@ -136,7 +126,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_not_called()
+        plan_cls.assert_not_called()
 
         # no geo layer
         builder = PlanBuilder() \
@@ -146,7 +136,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_not_called()
+        plan_cls.assert_not_called()
 
         # no geo field
         builder = PlanBuilder() \
@@ -156,7 +146,7 @@ class TestPlanCreator:
             .setPopField('pop_total')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_not_called()
+        plan_cls.assert_not_called()
 
         # no pop field
         builder = PlanBuilder() \
@@ -166,7 +156,7 @@ class TestPlanCreator:
             .setGeoIdField('geoid20')
 
         builder.createPlan(createLayers=False)
-        deserialize.assert_not_called()
+        plan_cls.assert_not_called()
 
     def test_set_num_seats(self, creator: PlanBuilder):
         creator.setNumDistricts(45)

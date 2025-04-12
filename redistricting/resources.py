@@ -6,7 +6,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore
+from qgis.PyQt import QtCore
 
 qt_resource_data = b"\
 \x00\x00\x10\xc7\
@@ -4007,10 +4007,13 @@ else:
     rcc_version = 2
     qt_resource_struct = qt_resource_struct_v2
 
+
 def qInitResources():
     QtCore.qRegisterResourceData(rcc_version, qt_resource_struct, qt_resource_name, qt_resource_data)
 
+
 def qCleanupResources():
     QtCore.qUnregisterResourceData(rcc_version, qt_resource_struct, qt_resource_name, qt_resource_data)
+
 
 qInitResources()

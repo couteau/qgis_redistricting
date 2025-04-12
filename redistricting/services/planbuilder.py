@@ -111,7 +111,7 @@ class PlanBuilder(BasePlanBuilder):
                 self.pushError(
                     tr('Error creating new {} layer: {}').format(
                         tr('assignment'), self._createLayersTask.exception),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
             self._createLayersTask = None
             self.builderError.emit(self)
@@ -152,7 +152,7 @@ class PlanBuilder(BasePlanBuilder):
             if not self._geoPackagePath:
                 self.pushError(
                     tr('GeoPackage path must be specified to create plan layers'),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 return None
 
@@ -161,21 +161,21 @@ class PlanBuilder(BasePlanBuilder):
             except FileExistsError:
                 self.pushError(
                     tr('GeoPackage {path} already exists').format(path=self._geoPackagePath),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 return None
             except PermissionError:
                 self.pushError(
                     tr('Cannot create GeoPackage at {path}: insufficient permissions').format(
                         path=self._geoPackagePath),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 return None
             except OSError as e:
                 self.pushError(
                     tr('Cannot create GeoPackage at {path}: {error}')
                     .format(path=self._geoPackagePath, error=e),
-                    Qgis.Critical
+                    Qgis.MessageLevel.Critical
                 )
                 return None
 

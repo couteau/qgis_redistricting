@@ -43,7 +43,7 @@ class TestMetricsModel:
         assert metrics_model.rowCount() == 11
 
     def test_headerdata(self, metrics_model: RdsMetricsModel):
-        assert metrics_model.headerData(0, Qt.Vertical, Qt.DisplayRole) == 'Population'
+        assert metrics_model.headerData(0, Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole) == 'Population'
 
     @pytest.mark.parametrize("row,value", [
         (0, '227,036'),
@@ -54,7 +54,7 @@ class TestMetricsModel:
         (7, '0.811'),
     ])
     def test_data(self, metrics_model: RdsMetricsModel, row, value):
-        data = metrics_model.data(metrics_model.createIndex(row, 0), Qt.DisplayRole)
+        data = metrics_model.data(metrics_model.createIndex(row, 0), Qt.ItemDataRole.DisplayRole)
         assert data == value
 
     # pylint: disable=unused-argument

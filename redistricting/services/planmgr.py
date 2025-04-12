@@ -87,25 +87,25 @@ class PlanManager(QObject):
                 plan = UUID(plan)
             except ValueError:
                 QgsMessageLog.logMessage(
-                    self.tr('Plan id {uuid} not found').format(uuid=plan), 'Redistricting', Qgis.Warning)
+                    self.tr('Plan id {uuid} not found').format(uuid=plan), 'Redistricting', Qgis.MessageLevel.Warning)
                 return
 
         if isinstance(plan, UUID):
             p = self._plansById.get(plan)
             if not p:
                 QgsMessageLog.logMessage(
-                    self.tr('Plan id {uuid} not found').format(uuid=str(plan)), 'Redistricting', Qgis.Warning)
+                    self.tr('Plan id {uuid} not found').format(uuid=str(plan)), 'Redistricting', Qgis.MessageLevel.Warning)
                 return
             plan = p
 
         if plan is not None and not isinstance(plan, RdsPlan):
             QgsMessageLog.logMessage(
-                self.tr('Invalid plan: {plan}').format(plan=repr(plan)), 'Redistricting', Qgis.Critical)
+                self.tr('Invalid plan: {plan}').format(plan=repr(plan)), 'Redistricting', Qgis.MessageLevel.Critical)
             return
 
         if plan is not None and not plan.isValid():
             QgsMessageLog.logMessage(
-                self.tr('Cannot activate incomplete plan {plan}').format(plan=plan.name), 'Redistricting', Qgis.Critical)
+                self.tr('Cannot activate incomplete plan {plan}').format(plan=plan.name), 'Redistricting', Qgis.MessageLevel.Critical)
             return
 
         if self._activePlan != plan:

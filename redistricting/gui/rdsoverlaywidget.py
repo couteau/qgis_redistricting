@@ -83,7 +83,7 @@ class OverlayWidget(QWidget):
         self._timer = QTimer(self)
         self._timer.timeout.connect(self.rotate)
 
-        self._color = Qt.black
+        self._color = Qt.GlobalColor.black
         self._roundness = 100.0
         self._minimumTrailOpacity = 3.14159265358979323846
         self._trailFadePercentage = 80.0
@@ -287,17 +287,17 @@ class OverlayWidget(QWidget):
 
     def eventFilter(self, obj: QObject, evt: QEvent) -> bool:
         if obj == self.parent():
-            if evt.type() == QEvent.Resize:
+            if evt.type() == QEvent.Type.Resize:
                 self.resize(evt.size())
-            elif evt.type() == QEvent.ChildAdded:
+            elif evt.type() == QEvent.Type.ChildAdded:
                 self.raise_()
         return super().eventFilter(obj, evt)
 
     def event(self, evt: QEvent) -> bool:
-        if evt.type() == QEvent.ParentAboutToChange:
+        if evt.type() == QEvent.Type.ParentAboutToChange:
             if self.parent():
                 self.parent().removeEventFilter(self)
-        elif evt.type() == QEvent.ParentChange:
+        elif evt.type() == QEvent.Type.ParentChange:
             self.newParent()
         return super().event(evt)
 

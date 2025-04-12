@@ -142,7 +142,7 @@ class TestPendingChangesController:
 
         assert controller_with_active_plan.model._delta is not None
         assert controller_with_active_plan.model.data(
-            controller_with_active_plan.model.createIndex(0, 1), Qt.DisplayRole) == '+600'
+            controller_with_active_plan.model.createIndex(0, 1), Qt.ItemDataRole.DisplayRole) == '+600'
         plan.assignLayer.rollBack(True)
 
     def test_signals(self, controller_with_active_plan: PendingChangesController, plan: RdsPlan, qtbot):

@@ -22,10 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
@@ -41,13 +38,13 @@ from .wzpeditplanimport import dlgEditPlanImportPage
 
 
 class DlgImportPlan(QDialog):
-    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setWindowTitle(tr("Import Equivalency File"))
         self.page = dlgEditPlanImportPage(self)
         self.buttonBox = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.page.fileImportFrom.fileChanged.connect(self.updateButton)
@@ -62,7 +59,7 @@ class DlgImportPlan(QDialog):
         self.page.cmbJoinField.setField(plan.geoIdField)
 
     def updateButton(self):
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
             bool(self.equivalencyFileName)
         )
 

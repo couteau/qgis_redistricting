@@ -40,7 +40,6 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 from qgis.PyQt.QtGui import (
-    QDragMoveEvent,
     QDropEvent,
     QMouseEvent
 )
@@ -145,7 +144,7 @@ class FieldListModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
 
-        if role in {Qt.DisplayRole, Qt.EditRole}:
+        if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
             if col == self._colCount - 1:
                 value = QVariant
             elif col == 0:
@@ -160,27 +159,27 @@ class FieldListModel(QAbstractTableModel):
                     value = QVariant()
             else:
                 value = QVariant()
-        elif role == Qt.DecorationRole:
+        elif role == Qt.ItemDataRole.DecorationRole:
             if col == self._colCount - 1:
                 value = QgsApplication.getThemeIcon("/mActionDeleteSelected.svg")
             elif col == 0:
                 value = self._data[row].icon
             else:
                 value = QVariant()
-        elif role == Qt.CheckStateRole:
+        elif role == Qt.ItemDataRole.CheckStateRole:
             field = self._data[row]
             if col == self._colCount - 1:
                 value = QVariant()
             elif col == 2:
-                value = Qt.Checked if field.sumField else Qt.Unchecked
+                value = Qt.CheckState.Checked if field.sumField else Qt.CheckState.Unchecked
             else:
                 value = QVariant()
-        elif role == Qt.TextAlignmentRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in {2, 4}:
-                value = Qt.AlignCenter
+                value = Qt.AlignmentFlag.AlignCenter
             else:
                 value = QVariant()
-        elif role == Qt.AccessibleDescriptionRole:
+        elif role == Qt.ItemDataRole.AccessibleDescriptionRole:
             field = self._data[row]
             if col == self._colCount - 1:
                 value = QCoreApplication.translate(
@@ -212,14 +211,14 @@ class FieldListModel(QAbstractTableModel):
         return value
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if role == Qt.DisplayRole and section != self._colCount - 1:
-            if orientation == Qt.Horizontal:
+        if role == Qt.ItemDataRole.DisplayRole and section != self._colCount - 1:
+            if orientation == Qt.Orientation.Horizontal:
                 value = self._headings[section]
             else:
                 value = str(section+1)
-        elif role == Qt.TextAlignmentRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
             if section in range(2, 4):
-                value = Qt.AlignCenter
+                value = Qt.AlignmentFlag.AlignCenter
             else:
                 value = QVariant()
         else:
@@ -232,7 +231,7 @@ class FieldListModel(QAbstractTableModel):
             return False
 
         field = self._data[index.row()]
-        if role == Qt.EditRole:
+        if role == Qt.ItemDataRole.EditRole:
             if index.column() == 1:
                 field.caption = value
                 return True
@@ -242,7 +241,7 @@ class FieldListModel(QAbstractTableModel):
                     field.pctBase = list(self._popFields.values())[value].fieldName
                     return True
 
-        if role == Qt.CheckStateRole:
+        if role == Qt.ItemDataRole.CheckStateRole:
             if index.column() == 2:
                 field.sumField = bool(value)
                 return True
@@ -252,21 +251,21 @@ class FieldListModel(QAbstractTableModel):
     def flags(self, index):
         f = super().flags(index)
         if not index.isValid():
-            return f | Qt.ItemIsDropEnabled
+            return f | Qt.ItemFlag.ItemIsDropEnabled
 
         if index.row() < len(self._data):
-            f = f | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled
+            f = f | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
 
         if index.row() >= len(self._data) or index.column() == 0 or index.column() == self._colCount - 1:
             return f
 
         if index.column() == 1:
-            f = f | Qt.ItemIsEditable
+            f = f | Qt.ItemFlag.ItemIsEditable
         elif self._data[index.row()].isNumeric:
             if index.column() == 2:
-                f = f | Qt.ItemIsUserCheckable
+                f = f | Qt.ItemFlag.ItemIsUserCheckable
             elif index.column() == 3:
-                f = f | Qt.ItemIsEditable
+                f = f | Qt.ItemFlag.ItemIsEditable
 
         return f
 
@@ -288,7 +287,7 @@ class FieldListModel(QAbstractTableModel):
         self.endRemoveRows()
 
     def supportedDropActions(self):
-        return Qt.MoveAction | Qt.CopyAction
+        return Qt.DropAction.MoveAction | Qt.DropAction.CopyAction
 
     def moveField(self, row_source, row_target):
         if 0 <= row_source < len(self._data) and 0 <= row_target < len(self._data):
@@ -334,16 +333,16 @@ class RdsFieldTableView(QTableView):
     def setEnableDragRows(self, enable: bool):
         if enable:
             self.verticalHeader().hide()
-            self.setSelectionBehavior(self.SelectRows)
-            self.setSelectionMode(self.SingleSelection)
-            self.setDragDropMode(self.InternalMove)
+            self.setSelectionBehavior(self.SelectionBehavior.SelectRows)
+            self.setSelectionMode(self.SelectionMode.SingleSelection)
+            self.setDragDropMode(self.DragDropMode.InternalMove)
             self.setDragDropOverwriteMode(False)
             self.setStyle(self.DropmarkerStyle())
 
     def dropEvent(self, event: QDropEvent):
         if (event.source() is not self or
-            (event.dropAction() != Qt.MoveAction and
-             self.dragDropMode() != QAbstractItemView.InternalMove)):
+            (event.dropAction() != Qt.DropAction.MoveAction and
+             self.dragDropMode() != QAbstractItemView.DragDropMode.InternalMove)):
             super().dropEvent(event)
 
         selection = self.selectedIndexes()
@@ -356,25 +355,19 @@ class RdsFieldTableView(QTableView):
             event.accept()
         super().dropEvent(event)
 
-    def startDrag(self, supportedActions: Union[Qt.DropActions, Qt.DropAction]):
-        super().startDrag(supportedActions)
-
-    def dragMoveEvent(self, e: QDragMoveEvent):
-        super().dragMoveEvent(e)
-
     def dataChanged(self, topLeft: QModelIndex, bottomRight: QModelIndex, roles: Iterable[int] = None):
         super().dataChanged(topLeft, bottomRight, roles)
         self.fieldsChanged.emit(self.model().fields)
 
     def mousePressEvent(self, e: QMouseEvent):
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.MouseButton.LeftButton:
             index = self.indexAt(e.pos())
             if index.isValid():
                 self.pressIndex = index
         return super().mousePressEvent(e)
 
     def mouseReleaseEvent(self, e: QMouseEvent):
-        if e.button() == Qt.LeftButton and self.canDelete:
+        if e.button() == Qt.MouseButton.LeftButton and self.canDelete:
             index = self.indexAt(e.pos())
             if index.isValid() and index == self.pressIndex and index.column() == self._model.columnCount() - 1:
                 self._model.deleteField(index.row())

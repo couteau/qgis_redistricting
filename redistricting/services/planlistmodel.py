@@ -61,17 +61,17 @@ class PlanListModel(QAbstractTableModel):
         return 3
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if orientation == Qt.Horizontal:
-            if role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal:
+            if role == Qt.ItemDataRole.DisplayRole:
                 return self.header[section]
-            if role == Qt.SizeHintRole:
+            if role == Qt.ItemDataRole.SizeHintRole:
                 if section in (0, 2):
                     return QSize(150, 30)
 
         return None
 
     def data(self, index, role):
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             plan = self.planList[index.row()]
             if index.column() == 0:
                 v = plan.name
@@ -82,14 +82,14 @@ class PlanListModel(QAbstractTableModel):
             else:
                 v = None
             return v
-        elif role == Qt.TextAlignmentRole and index.column() == 1:
-            return int(Qt.AlignRight | Qt.AlignCenter)
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole and index.column() == 1:
+            return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        elif role == Qt.ItemDataRole.FontRole:
             if index.row() == self.activePlanIndex().row():
                 f = QFont()
                 f.setBold(True)
                 return f
-        elif role == Qt.TextColorRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             if index.row() == self.activePlanIndex().row():
                 return QColor(Qt.blue)
 
@@ -145,9 +145,9 @@ class PlanListModel(QAbstractTableModel):
     def activePlanAboutToChange(self, oldPlan, newPlan):  # pylint: disable=unused-argument
         idx1 = self.indexFromPlan(oldPlan)
         idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
-        self.dataChanged.emit(idx1, idx2, [Qt.FontRole, Qt.TextColorRole])
+        self.dataChanged.emit(idx1, idx2, [Qt.ItemDataRole.FontRole, Qt.ItemDataRole.ForegroundRole])
 
     def activePlanChanged(self, plan):
         idx1 = self.indexFromPlan(plan)
         idx2 = self.createIndex(idx1.row(), self.columnCount() - 1)
-        self.dataChanged.emit(idx1, idx2, [Qt.FontRole, Qt.TextColorRole])
+        self.dataChanged.emit(idx1, idx2, [Qt.ItemDataRole.FontRole, Qt.ItemDataRole.ForegroundRole])

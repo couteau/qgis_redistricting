@@ -70,9 +70,14 @@ from ..utils import tr
 from .base import DockWidgetController
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
+    from qgis.PyQt.QtCore import QT_VERSION
+    if QT_VERSION >= 0x060000:
+        from PyQt6.QtGui import QAction  # type: ignore[import]
+    else:
+        from PyQt5.QtWidgets import QAction  # type: ignore[import]
+
 else:
-    from qgis.PyQt.QtWidgets import QAction
+    from qgis.PyQt.QtGui import QAction
 
 
 class DistrictController(DockWidgetController):
@@ -147,7 +152,7 @@ class DistrictController(DockWidgetController):
             text=self.tr("Copy Data"),
             tooltip=self.tr("Copy selected demographic data to clipboard"),
             callback=self.copySelection,
-            shortcut=QKeySequence.Copy,
+            shortcut=QKeySequence.StandardKey.Copy,
             parent=self.iface.mainWindow()
         )
 
@@ -200,7 +205,7 @@ class DistrictController(DockWidgetController):
         dockwidget = DockDistrictDataTable()
         dockwidget.installEventFilter(self)
         dockwidget.tblDataTable.activated.connect(self.editDistrict)
-        dockwidget.tblDataTable.setContextMenuPolicy(Qt.CustomContextMenu)
+        dockwidget.tblDataTable.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         dockwidget.tblDataTable.customContextMenuRequested.connect(self.prepareDataTableContextMenu)
         dockwidget.tblDataTable.setModel(self.proxyModel)
         dockwidget.btnCopy.setDefaultAction(self.actionCopyDistrictData)
@@ -239,7 +244,7 @@ class DistrictController(DockWidgetController):
         self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
 
     def eventFilter(self, obj: QObject, event: QContextMenuEvent):  # pylint: disable=unused-argument
-        if event.type() != QEvent.ContextMenu:
+        if event.type() != QEvent.Type.ContextMenu:
             return False
 
         menu = QMenu()

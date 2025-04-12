@@ -22,10 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional
 
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import (
@@ -38,11 +35,11 @@ from .ui.DlgExportPlan import Ui_dlgExportPlan
 
 
 class DlgExportPlan(Ui_dlgExportPlan, QDialog):
-    def __init__(self, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, parent: Optional[QWidget] = None, flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         self.fwEquivalency.lineEdit().setEnabled(False)
         self.fwShape.lineEdit().setEnabled(False)
 
@@ -59,7 +56,7 @@ class DlgExportPlan(Ui_dlgExportPlan, QDialog):
             bool(self.cbxExportShape.isChecked() or self.fwShape.filePath()))
         self.fwEquivalency.lineEdit().setEnabled(self.cbxExportEquivalency.isChecked())
         self.fwShape.lineEdit().setEnabled(self.cbxExportShape.isChecked())
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
             bool((self.exportEquivalency and self.equivalencyFileName) or
                  (self.exportShapefile and self.shapefileFileName))
         )

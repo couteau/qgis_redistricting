@@ -43,11 +43,11 @@ class DistrictClipboardAccess:
     def getSelectionData(self, model: QAbstractTableModel, selection: Iterable[tuple[int, int]]) -> pd.DataFrame:
         data = {}
         index = [
-            model.data(model.createIndex(d, 0), Qt.DisplayRole) for d in range(model.rowCount())
+            model.data(model.createIndex(d, 0), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())
         ]
         for c in range(1, model.columnCount()):
-            data[model.headerData(c, Qt.Horizontal, Qt.DisplayRole)] = [
-                model.data(model.createIndex(d, c), Qt.DisplayRole) for d in range(model.rowCount())
+            data[model.headerData(c, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)] = [
+                model.data(model.createIndex(d, c), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())
             ]
         df = pd.DataFrame(data=data, index=index)
         df.fillna("", inplace=True)
@@ -70,7 +70,7 @@ class DistrictClipboardAccess:
     def getAsHtml(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         def colorRowHeader(row):
             r = 0 if row == tr("Unassigned") else int(row)
-            clr: QBrush = model.data(model.index(r, 0), Qt.BackgroundColorRole)
+            clr: QBrush = model.data(model.index(r, 0), Qt.ItemDataRole.BackgroundColorRole)
             return f'background-color: #{clr.color().rgb() & 0xFFFFFF:x};'
         model = RdsDistrictDataModel(plan)
         df = self.getSelectionData(model, selection)

@@ -65,10 +65,10 @@ class TestPlanCopier:
         builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
         builder = builder_class.fromPlan.return_value
         builder.createPlan.return_value = None
-        builder.errors.return_value = [('create error', Qgis.Critical)]
+        builder.errors.return_value = [('create error', Qgis.MessageLevel.Critical)]
         plan = copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False, False)
         assert not plan
-        assert copier.errors() == [('create error', Qgis.Critical)]
+        assert copier.errors() == [('create error', Qgis.MessageLevel.Critical)]
 
     def test_copy_assignments(self, copier: PlanCopier, new_plan: RdsPlan):
         with sqlite3.connect(new_plan.geoPackagePath) as db:

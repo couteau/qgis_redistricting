@@ -102,7 +102,7 @@ class DistrictColumnData:
 
 
 class RdsDistrictDataModel(QAbstractTableModel):
-    RawDataRole = Qt.UserRole + 2
+    RawDataRole = Qt.ItemDataRole.UserRole + 2
 
     _plan: RdsPlan = None
 
@@ -114,6 +114,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self._validator: BaseDeviationValidator = None
         self.plan = plan
 
+    @property
     @property
     def plan(self) -> RdsPlan:
         return self._plan
@@ -172,13 +173,15 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self.endResetModel()
 
     def deviationChanged(self):
-        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
+            self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
 
     def deviationTypeChanged(self):
-        self._validator = PlusMinusDeviationValidator() \
+        self._validator = PlusMinusDeviationValidator(self._plan) \
             if self._plan.deviationType == DeviationType.OverUnder \
-            else MaxDeviationValidator()
-        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.BackgroundRole])
+            else MaxDeviationValidator(self._plan)
+        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
+            self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
 
     def districtListChanged(self):
         self.beginResetModel()
@@ -188,7 +191,8 @@ class RdsDistrictDataModel(QAbstractTableModel):
         row = self._districts.index(district)
         start = self.createIndex(row, 1)
         end = self.createIndex(row, self.columnCount())
-        self.dataChanged.emit(start, end, {Qt.DisplayRole, Qt.EditRole, Qt.BackgroundRole})
+        self.dataChanged.emit(start, end, {Qt.ItemDataRole.DisplayRole,
+                              Qt.ItemDataRole.EditRole, Qt.ItemDataRole.BackgroundRole})
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._districts) if self._districts and not parent.isValid() else 0
@@ -199,7 +203,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
 
         return len(self._columns)
 
-    def data(self, index, role=Qt.DisplayRole):
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         value = None
         try:
             row = index.row()
@@ -207,7 +211,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             key = self._columns[col].key
             district = self._districts[row]
 
-            if role in (Qt.DisplayRole, Qt.EditRole, RdsDistrictDataModel.RawDataRole):
+            if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, RdsDistrictDataModel.RawDataRole):
                 if key[:3] == 'pct' and key != 'pct_deviation':
                     pctbase = self._plan.dataFields[key[4:]].pctBase
                     if pctbase == self._plan.popField:
@@ -236,7 +240,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
                     elif isinstance(value, (float, np.floating)):
                         value = f'{value:,.2f}'
 
-            elif role == Qt.BackgroundRole:
+            elif role == Qt.ItemDataRole.BackgroundRole:
                 if col == 0 or district.district == 0:
                     color = getColorForDistrict(self._plan, district.district)
                     value = QBrush(color)
@@ -245,7 +249,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
                         color = QColor(0x60, 0xbd, 0x63)  # QColor(99, 196, 101)  # 60be63ff
                         value = QBrush(color)
 
-            elif role == Qt.FontRole:
+            elif role == Qt.ItemDataRole.FontRole:
                 # bold for district name and deviations (except for the unassigned row)
                 if col == 0 or (
                         district.district != 0 and
@@ -254,13 +258,13 @@ class RdsDistrictDataModel(QAbstractTableModel):
                     value = QFont()
                     value.setBold(True)
 
-            elif role == Qt.TextAlignmentRole:
+            elif role == Qt.ItemDataRole.TextAlignmentRole:
                 if col == 0:
-                    value = Qt.AlignCenter
+                    value = Qt.AlignmentFlag.AlignCenter
                 else:
-                    value = Qt.AlignRight
+                    value = Qt.AlignmentFlag.AlignRight
 
-            elif role == Qt.TextColorRole:
+            elif role == Qt.ItemDataRole.ForegroundRole:
                 if col == 0 or district.district == 0:
                     value = QColor(55, 55, 55)
 
@@ -270,16 +274,16 @@ class RdsDistrictDataModel(QAbstractTableModel):
         return value
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
-        if role == Qt.EditRole and self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
+        if role == Qt.ItemDataRole.EditRole and self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
             dist = self._districts[index.row()]
             dist.name = value
-            self.dataChanged.emit(index, index, {Qt.EditRole})
+            self.dataChanged.emit(index, index, {Qt.ItemDataRole.EditRole})
             return True
 
         return False
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal and section < len(self._columns):
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal and section < len(self._columns):
             return self._columns[section].heading
 
         return None
@@ -287,7 +291,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
     def flags(self, index):
         f = super().flags(index)
         if self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
-            f |= Qt.ItemIsEditable
+            f |= Qt.ItemFlag.ItemIsEditable
 
         return f
 
@@ -300,9 +304,9 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 self.dataChanged.emit(
                     self.createIndex(d, 3),
                     self.createIndex(d, self.columnCount()),
-                    [Qt.DisplayRole, Qt.EditRole]
+                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
                 )
-                self.dataChanged.emit(self.createIndex(d, 4), self.createIndex(d, 5), [Qt.FontRole])
+                self.dataChanged.emit(self.createIndex(d, 4), self.createIndex(d, 5), [Qt.ItemDataRole.FontRole])
         else:
             self.beginResetModel()
             self.endResetModel()
@@ -371,7 +375,7 @@ class DistrictSelectModel(QAbstractListModel):
     def districtNameChanged(self, district: RdsDistrict):
         idx = self._districts.index(district)
         index = self.createIndex(idx + self._offset, 0)
-        self.dataChanged.emit(index, index, {Qt.DisplayRole})
+        self.dataChanged.emit(index, index, {Qt.ItemDataRole.DisplayRole})
 
     def indexFromDistrict(self, district):
         if district in self._districts:
@@ -396,7 +400,7 @@ class DistrictSelectModel(QAbstractListModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role in {Qt.DisplayRole, Qt.EditRole}:
+        if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
             if row == 0:
                 return tr('All')
 
@@ -406,7 +410,7 @@ class DistrictSelectModel(QAbstractListModel):
             if row > self._offset:
                 return self._districts[row - self._offset].name
 
-        if role == Qt.DecorationRole:
+        if role == Qt.ItemDataRole.DecorationRole:
             if row == 0:
                 return QgsApplication.getThemeIcon('/mActionSelectAll.svg')
 
@@ -425,15 +429,15 @@ class DistrictSelectModel(QAbstractListModel):
                     pixmap.fill(color)
                 return QIcon(pixmap)
 
-        if role == Qt.AccessibleDescriptionRole and row == self._offset:
+        if role == Qt.ItemDataRole.AccessibleDescriptionRole and row == self._offset:
             return 'separator'
 
         return QVariant()
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         flags = super().flags(index)
         if index.row() == self._offset:
-            flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
+            flags = flags & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable
         return flags
 
 
@@ -447,20 +451,20 @@ class SourceDistrictModel(DistrictSelectModel):
         row = index.row()
 
         if row == 2:
-            if role in {Qt.DisplayRole, Qt.EditRole}:
+            if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
                 return tr('Selected')
-            if role == Qt.DecorationRole:
+            if role == Qt.ItemDataRole.DecorationRole:
                 return QgsApplication.getThemeIcon('/mActionProcessSelected.svg')
 
         return super().data(index, role)
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         flags = super().flags(index)
         if index.row() == 2 and \
                 self._plan.assignLayer.selectedFeatureCount() == 0 and \
                 self._plan.popLayer.selectedFeatureCount() == 0 and \
                 self._plan.geoLayer.selectedFeatureCount() == 0:
-            flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
+            flags = flags & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable
         return flags
 
 
@@ -468,25 +472,25 @@ class TargetDistrictModel(DistrictSelectModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role == Qt.DisplayRole or role == Qt.EditRole:
+        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
             if row == 0:
                 return tr('Select district')
 
-        elif role == Qt.DecorationRole:
+        elif role == Qt.ItemDataRole.DecorationRole:
             if row == 0:
                 return QgsApplication.getThemeIcon('/mActionToggleEditing.svg')
 
         return super().data(index, role)
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         flags = super().flags(index)
         if index.row() == 0:
-            flags = flags & ~Qt.ItemIsEnabled & ~Qt.ItemIsSelectable
+            flags = flags & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable
         return flags
 
 
 class DeltaListModel(QAbstractTableModel):
-    FieldTypeRole = Qt.UserRole + 1
+    FieldTypeRole = Qt.ItemDataRole.UserRole + 1
 
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -615,7 +619,7 @@ class DeltaListModel(QAbstractTableModel):
             row = index.row()
             col = index.column()
 
-            if role in {Qt.DisplayRole, Qt.EditRole}:
+            if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
                 value = self._delta[row, col]
                 return self._fields[col]['format'].format(value) if value is not None else None
 
@@ -626,20 +630,20 @@ class DeltaListModel(QAbstractTableModel):
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...):
         if self._delta:
-            if role == Qt.DisplayRole:
-                if orientation == Qt.Vertical:
+            if role == Qt.ItemDataRole.DisplayRole:
+                if orientation == Qt.Orientation.Vertical:
                     return self._delta[section].name
                 else:
                     return self._fields[section]['caption']
-            if role == Qt.TextAlignmentRole:
-                return int(Qt.AlignVCenter | Qt.AlignRight) if orientation == Qt.Horizontal else int(Qt.AlignCenter)
+            if role == Qt.ItemDataRole.TextAlignmentRole:
+                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignCenter)
 
-            if role == Qt.BackgroundRole and orientation == Qt.Horizontal:
+            if role == Qt.ItemDataRole.BackgroundRole and orientation == Qt.Orientation.Horizontal:
                 ft = self._fields[section]['field-type']
                 if ft in FieldColors:
                     return QBrush(FieldColors[ft])
 
-            if role == DeltaListModel.FieldTypeRole and orientation == Qt.Horizontal:
+            if role == DeltaListModel.FieldTypeRole and orientation == Qt.Orientation.Horizontal:
                 return self._fields[section]['field-type']
 
         return None
@@ -690,9 +694,9 @@ class GeoFieldsModel(QAbstractListModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role in (Qt.DisplayRole, Qt.EditRole):
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return self._data[row].caption
-        if role == Qt.DecorationRole:
+        if role == Qt.ItemDataRole.DecorationRole:
             return QgsApplication.getThemeIcon('/mIconVector.svg')
 
         return QVariant()
@@ -715,9 +719,9 @@ class PopFieldsModel(QAbstractListModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role in (Qt.DisplayRole, Qt.EditRole):
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return self._data[row].caption
-        if role == Qt.DecorationRole:
+        if role == Qt.ItemDataRole.DecorationRole:
             return QgsApplication.getThemeIcon('/mIconVector.svg')
 
         return QVariant()
@@ -796,8 +800,8 @@ class RdsMetricsModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return 1 if not parent.isValid() else 0
 
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Any:
-        if orientation == Qt.Vertical and role in (Qt.DisplayRole, Qt.SizeHintRole):
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
+        if orientation == Qt.Orientation.Vertical and role == Qt.ItemDataRole.DisplayRole:
 
             m = self._data[section]
             if m is None:
@@ -823,23 +827,23 @@ class RdsMetricsModel(QAbstractTableModel):
 
         return None
 
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         metric = self.metric(index)
         if metric is None:
             return None
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if metric.level() == Level.GEOGRAPHIC:
                 idx = self.metricKey(index.row())
                 result = metric.format(idx)
             else:
                 result = metric.format()
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.FontRole:
             result = QFont()
             result.setBold(True)
-        elif role == Qt.TextColorRole:
+        elif role == Qt.ItemDataRole.TextColorRole:
             result = metric.color()
-        elif role == Qt.ToolTipRole:
+        elif role == Qt.ItemDataRole.ToolTipRole:
             result = metric.tooltip()
         else:
             result = None
@@ -862,8 +866,8 @@ class RdsMetricsModel(QAbstractTableModel):
         return ['text/csv', 'text/plain']
 
     def mimeData(self, indexes: Iterable[QModelIndex]) -> QMimeData:
-        data = {self.headerData(idx.row(), Qt.Vertical, Qt.DisplayRole):
-                self.data(idx, Qt.DisplayRole) or ''
+        data = {self.headerData(idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole):
+                self.data(idx, Qt.ItemDataRole.DisplayRole) or ''
                 for idx in indexes}
         mime = QMimeData()
         mime.setData('text/csv', '\n'.join(','.join(r) for r in data.items()).encode())
@@ -904,9 +908,9 @@ class RdsSplitsModel(QAbstractItemModel):
 
         return 0
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         if not index.isValid():
-            return Qt.NoItemFlags
+            return Qt.ItemFlag.NoItemFlags
 
         return super().flags(index)
 
@@ -924,7 +928,7 @@ class RdsSplitsModel(QAbstractItemModel):
                 return QVariant()
             col -= 1
 
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             value = item.attributes[col]
             if isinstance(value, (int, np.integer)):
                 value = f'{value:,}'
@@ -935,8 +939,8 @@ class RdsSplitsModel(QAbstractItemModel):
         return QVariant()
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
-        if orientation == Qt.Horizontal:
-            if role == Qt.DisplayRole:
+        if orientation == Qt.Orientation.Horizontal:
+            if role == Qt.ItemDataRole.DisplayRole:
                 return self._header[section] if section < len(self._header) else ""
 
         return QVariant()

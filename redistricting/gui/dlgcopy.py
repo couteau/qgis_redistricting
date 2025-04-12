@@ -43,7 +43,7 @@ from .ui.DlgCopyPlan import Ui_dlgCopyPlan
 
 
 class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
-    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
@@ -55,7 +55,7 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
         self.inpPlanName.textChanged.connect(self.updateButtonBox)
         self.txtDescription.setPlainText(plan.description)
         self.fwGeoPackage.fileChanged.connect(self.updateButtonBox)
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
 
     @property
     def planName(self) -> str:
@@ -83,6 +83,6 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
             )
 
     def updateButtonBox(self):
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
             bool(self.planName) and bool(self.fwGeoPackage.filePath())
         )
