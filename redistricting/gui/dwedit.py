@@ -23,9 +23,17 @@
  ***************************************************************************/
  """
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import pyqtSignal
-from qgis.PyQt.QtWidgets import QUndoStack
+from qgis.PyQt.QtCore import (
+    QT_VERSION,
+    pyqtSignal
+)
 
+if QT_VERSION >= 0x060000:  # Qt 6 or higher
+    from qgis.PyQt.QtGui import QUndoStack
+else:
+    from qgis.PyQt.QtWidgets import QUndoStack
+
+# pylint: disable=wrong-import-position
 from ..models import RdsPlan
 from .rdsdockwidget import RdsDockWidget
 from .ui.DistrictTools import Ui_qdwDistrictTools

@@ -76,8 +76,8 @@ class TestBaseController:
             d.show()
         with qtbot.waitSignal(d.canceled):
             b = d.findChild(QPushButton)
-            qtbot.mouseClick(b, Qt.LeftButton)
-        m = qgis_iface.messageBar().get_messages(Qgis.Warning)
+            qtbot.mouseClick(b, Qt.MouseButton.LeftButton)
+        m = qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
         assert 'Canceled:Progress test canceled' in m
         d.hide()
         del d
@@ -90,9 +90,9 @@ class TestBaseController:
         assert d.value() == 50
         with qtbot.waitSignal(d.canceled):
             b = d.findChild(QPushButton)
-            qtbot.mouseClick(b, Qt.LeftButton)
+            qtbot.mouseClick(b, Qt.MouseButton.LeftButton)
             d.setValue(100)
-        m = qgis_iface.messageBar().get_messages(Qgis.Warning)
+        m = qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
         assert 'Canceled:Progress test canceled' in m
         assert d.value() == -1
         d.hide()
@@ -122,7 +122,7 @@ class TestBaseController:
         result = controller.checkActivePlan('test')
         assert not result
         assert "Oops!:Cannot test: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
         controller.planManager.activePlan = mock_plan
 
@@ -130,36 +130,37 @@ class TestBaseController:
         assert result
 
     def test_push_errors(self, controller: BaseController, qgis_iface):
-        controller.pushErrors([("Error message", Qgis.Critical)], "Error!", Qgis.Warning)
-        assert "Error!:Error message" in qgis_iface.messageBar().get_messages(Qgis.Warning)
+        controller.pushErrors([("Error message", Qgis.MessageLevel.Critical)], "Error!", Qgis.MessageLevel.Warning)
+        assert "Error!:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_progress_error_mixin_supplies_error_list(self, controller: BaseController, qtbot: QtBot, qgis_iface):
         mixin = ErrorListMixin()
-        mixin.setError("Error message", Qgis.Warning)
+        mixin.setError("Error message", Qgis.MessageLevel.Warning)
         d: QProgressDialog = controller.startProgress('Progress test', errorList=mixin)
         with qtbot.waitActive(d):
             d.show()
         with qtbot.waitSignal(d.canceled):
             b = d.findChild(QPushButton)
-            qtbot.mouseClick(b, Qt.LeftButton)
-        assert "Canceled:Error message" in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            qtbot.mouseClick(b, Qt.MouseButton.LeftButton)
+        assert "Canceled:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
         d.hide()
         del d
 
     def test_push_errors_empty_list_returns(self, controller: BaseController, qgis_iface):
         # qgis_iface is a session scoped fixture -- meaning the message log is not cleared
         # between tests, so we can't check for an empty message log
-        l = len(qgis_iface.messageBar().get_messages(Qgis.Warning))
-        controller.pushErrors([], "Error!", Qgis.Warning)
-        assert len(qgis_iface.messageBar().get_messages(Qgis.Warning)) == l
+        l = len(qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning))
+        controller.pushErrors([], "Error!", Qgis.MessageLevel.Warning)
+        assert len(qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)) == l
 
     def test_push_errors_no_title_uses_default(self, controller: BaseController, qgis_iface):
-        controller.pushErrors([("Error message", Qgis.Critical)],  level=Qgis.Warning)
-        assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.Warning)
+        controller.pushErrors([("Error message", Qgis.MessageLevel.Critical)],  level=Qgis.MessageLevel.Warning)
+        assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_push_errors_no_level_uses_first_error(self, controller: BaseController, qgis_iface):
-        controller.pushErrors([("Error message", Qgis.Critical), ("Warning message", Qgis.Warning)])
-        assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.Critical)
+        controller.pushErrors([("Error message", Qgis.MessageLevel.Critical),
+                              ("Warning message", Qgis.MessageLevel.Warning)])
+        assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Critical)
 
     def test_end_progress(self, controller: BaseController, qtbot: QtBot):
         d: QProgressDialog = controller.startProgress('Progress test')

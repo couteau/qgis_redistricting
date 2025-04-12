@@ -94,18 +94,19 @@ class TestFieldTableView:
         assert field_list_model.rowCount() == 1
 
     def test_data(self, datafield_list_model: FieldListModel):
-        data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.DisplayRole)
+        data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.ItemDataRole.DisplayRole)
         assert data == 'vap_nh_white'
-        data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.DecorationRole)
+        data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.ItemDataRole.DecorationRole)
         assert isinstance(data, QIcon)
-        data = datafield_list_model.data(datafield_list_model.createIndex(0, 2), Qt.CheckStateRole)
-        assert data == Qt.Checked
+        data = datafield_list_model.data(datafield_list_model.createIndex(0, 2), Qt.ItemDataRole.CheckStateRole)
+        assert data == Qt.CheckState.Checked
 
     def test_set_data(self, datafield_list_model: FieldListModel):
-        assert not datafield_list_model.setData(datafield_list_model.createIndex(0, 0), 'dummy', Qt.EditRole)
-        assert datafield_list_model.setData(datafield_list_model.createIndex(0, 1), 'WVAP', Qt.EditRole)
+        assert not datafield_list_model.setData(
+            datafield_list_model.createIndex(0, 0), 'dummy', Qt.ItemDataRole.EditRole)
+        assert datafield_list_model.setData(datafield_list_model.createIndex(0, 1), 'WVAP', Qt.ItemDataRole.EditRole)
         assert datafield_list_model.fields[0].caption == 'WVAP'
 
     def test_flags(self, datafield_list_model: FieldListModel):
-        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 1)) & Qt.ItemIsEditable
-        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 2)) & Qt.ItemIsUserCheckable
+        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 1)) & Qt.ItemFlag.ItemIsEditable
+        assert datafield_list_model.flags(datafield_list_model.createIndex(0, 2)) & Qt.ItemFlag.ItemIsUserCheckable

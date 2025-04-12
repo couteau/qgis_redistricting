@@ -75,14 +75,21 @@ from ..services.tasks.autoassign import AutoAssignUnassignedUnits
 from ..utils import tr
 from .base import BaseController
 
-# annoyingly, Anaconda QGIS 3.36 converts QAction to a variable type reference instead of a type
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import (
-        QAction,
-        QActionGroup
-    )
+    from qgis.PyQt.QtCore import QT_VERSION
+    if QT_VERSION >= 0x060000:
+        from PyQt6.QtGui import (  # type: ignore[import]
+            QAction,
+            QActionGroup
+        )
+    else:
+        from PyQt5.QtWidgets import (  # type: ignore[import]
+            QAction,
+            QActionGroup
+        )
+
 else:
-    from qgis.PyQt.QtWidgets import (
+    from qgis.PyQt.QtGui import (
         QAction,
         QActionGroup
     )
@@ -115,7 +122,7 @@ class PlanController(BaseController):
 
         self.menuButton = QToolButton()
         self.menuButton.setMenu(self.menu)
-        self.menuButton.setPopupMode(QToolButton.MenuButtonPopup)
+        self.menuButton.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         self.menuButton.setIcon(self.icon)
         self.menuButton.setToolTip(tr('Redistricting Utilities'))
 
@@ -397,12 +404,12 @@ class PlanController(BaseController):
                 tr("Oops!"),
                 tr("Cannot create a redistricting plan for an "
                    "empty project. Try adding some layers."),
-                level=Qgis.Warning,
+                level=Qgis.MessageLevel.Warning,
                 duration=5)
             return
 
         dlgNewPlan = DlgEditPlan(parent=self.iface.mainWindow())
-        if dlgNewPlan.exec() == QDialog.Accepted:
+        if dlgNewPlan.exec() == QDialog.DialogCode.Accepted:
             builder = PlanBuilder() \
                 .setName(dlgNewPlan.planName()) \
                 .setNumDistricts(dlgNewPlan.numDistricts()) \
@@ -447,7 +454,7 @@ class PlanController(BaseController):
             return
 
         dlgEditPlan = DlgEditPlan(plan, self.iface.mainWindow())
-        if dlgEditPlan.exec() == QDialog.Accepted:
+        if dlgEditPlan.exec() == QDialog.DialogCode.Accepted:
             builder = PlanEditor.fromPlan(plan) \
                 .setName(dlgEditPlan.planName()) \
                 .setNumDistricts(dlgEditPlan.numDistricts()) \
@@ -473,7 +480,7 @@ class PlanController(BaseController):
                 return
 
         dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
-        if dlgCopyPlan.exec() == QDialog.Accepted:
+        if dlgCopyPlan.exec() == QDialog.DialogCode.Accepted:
             copier = PlanCopier(self.planManager.activePlan)
 
             # if copying assignments, we don't need a background task, so no need for a progress dialog
@@ -507,7 +514,7 @@ class PlanController(BaseController):
                 return
 
         dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
-        if dlgImportPlan.exec() == QDialog.Accepted:
+        if dlgImportPlan.exec() == QDialog.DialogCode.Accepted:
             # importer = AssignmentImporter(self.iface) \
             #     .setSourceFile(dlgImportPlan.equivalencyFileName) \
             #     .setJoinField(dlgImportPlan.joinField) \
@@ -542,7 +549,7 @@ class PlanController(BaseController):
                 return
 
         dlgImportPlan = DlgImportShape(self.iface.mainWindow())
-        if dlgImportPlan.exec() == QDialog.Accepted:
+        if dlgImportPlan.exec() == QDialog.DialogCode.Accepted:
             # importer = ShapefileImporter(self.iface) \
             #     .setSourceFile(dlgImportPlan.shapefileFileName) \
             #     .setDistField(dlgImportPlan.distField) \
@@ -569,7 +576,7 @@ class PlanController(BaseController):
     def exportPlan(self, plan=None):
         def planExported():
             self.iface.messageBar().pushMessage(
-                "Success", f"Export of {plan.name} complete!", level=Qgis.Success)
+                "Success", f"Export of {plan.name} complete!", level=Qgis.MessageLevel.Success)
 
         def exportError():
             for msg, level in export.errors():  # pylint: disable=used-before-assignment
@@ -583,7 +590,7 @@ class PlanController(BaseController):
         dlgExportPlan = DlgExportPlan(self.iface.mainWindow())
         dlgExportPlan.cmbGeography.setModel(GeoFieldsModel(plan, self))
 
-        if dlgExportPlan.exec() == QDialog.Accepted:
+        if dlgExportPlan.exec() == QDialog.DialogCode.Accepted:
             if dlgExportPlan.exportEquivalency or dlgExportPlan.exportShapefile:
                 export = PlanExporter(
                     plan,
@@ -621,7 +628,7 @@ class PlanController(BaseController):
     def deletePlan(self, plan: RdsPlan):
         if plan in self.planManager:
             dlg = DlgConfirmDelete(plan, self.iface.mainWindow())
-            if dlg.exec() == QDialog.Accepted:
+            if dlg.exec() == QDialog.DialogCode.Accepted:
                 if dlg.removeLayers():
                     self.layerTreeManager.removeGroup(plan)
                     if dlg.deleteGeoPackage():

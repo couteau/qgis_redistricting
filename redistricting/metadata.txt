@@ -2,6 +2,7 @@
 [general]
 name=QGIS Redistricting
 qgisMinimumVersion=3.34
+supportsQt6=yes
 description=Tool for drawing districting plans from geographic units. Requires python 3.9 or higher.
 version=0.0.5-alpha
 author=Cryptodira

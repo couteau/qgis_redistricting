@@ -29,9 +29,10 @@ class TestAddons:
 
         assert (vendor_dir / 'geopandas').exists()
         assert (vendor_dir / 'pyogrio').exists()
-        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0])
+        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)[0])
                 / 'startup.py').exists()
-        (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0]) / 'startup.py').unlink()
+        (pathlib.Path(QStandardPaths.standardLocations(
+            QStandardPaths.StandardLocation.AppDataLocation)[0]) / 'startup.py').unlink()
 
     @pytest.mark.xdist_group("addons")
     def test_install_pyarrow(self, vendor_dir):
@@ -43,6 +44,7 @@ class TestAddons:
         process.waitForFinished()
 
         assert (vendor_dir / 'pyarrow').exists()
-        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0])
+        assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)[0])
                 / 'startup.py').exists()
-        (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)[0]) / 'startup.py').unlink()
+        (pathlib.Path(QStandardPaths.standardLocations(
+            QStandardPaths.StandardLocation.AppDataLocation)[0]) / 'startup.py').unlink()

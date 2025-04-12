@@ -63,7 +63,7 @@ class GeoFieldDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor: QComboBox, index: QModelIndex):
         if index.column() == 1:
-            text = index.model().data(index, Qt.EditRole)
+            text = index.model().data(index, Qt.ItemDataRole.EditRole)
             editor.setCurrentText(text)
         else:
             super().setEditorData(editor, index)
@@ -71,7 +71,7 @@ class GeoFieldDelegate(QStyledItemDelegate):
     def setModelData(self, editor: QComboBox, model: FieldListModel, index: QModelIndex):
         if index.column() == 1:
             text = editor.currentText()
-            model.setData(index, text, Qt.EditRole)
+            model.setData(index, text, Qt.ItemDataRole.EditRole)
         else:
             super().setModelData(editor, model, index)
 

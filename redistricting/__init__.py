@@ -33,6 +33,7 @@ from typing import (
 )
 
 from qgis.core import QgsSettings
+from qgis.PyQt.QtCore import QT_VERSION
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -40,7 +41,7 @@ __author__ = "Stuart C. Naifeh"
 __contact__ = "stuart@cryptodira.org"
 __copyright__ = "Copyright (c) 2022-2024, Stuart C. Naifeh"
 __license__ = "GPLv3"
-__version__ = "0.0.1"
+__version__ = "0.0.5"
 
 # noinspection PyPep8Naming
 
@@ -69,6 +70,13 @@ class Settings:
 
 settings = Settings()
 
+# patch QVariant for Qt5/6 compatibility
+if QT_VERSION <= 0x060000:
+    from qgis.PyQt.QtCore import QVariant
+
+    def typeId(self):
+        return QVariant.type(self)
+    QVariant.typeId = typeId
 
 # patch typing to maintain compatibility with python 3.9
 if not hasattr(typing, "Self"):

@@ -77,7 +77,7 @@ class RdsDockWidget(QgsDockWidget):
             self.lblWaiting.stop()
 
     def dockChanged(self, area: Qt.DockWidgetArea):
-        if area == Qt.NoDockWidgetArea:
+        if area == Qt.DockWidgetArea.NoDockWidgetArea:
             self.layout().setContentsMargins(8, 4, 8, 4)
         else:
             self.layout().setContentsMargins(0, 4, 0, 4)

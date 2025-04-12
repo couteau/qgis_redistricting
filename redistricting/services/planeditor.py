@@ -37,8 +37,8 @@ from qgis.core import (
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import (
+    QMetaType,
     QObject,
-    QVariant,
     pyqtSignal
 )
 
@@ -95,7 +95,7 @@ class PlanEditor(BasePlanBuilder):
         self.RaiseChangedReadonlyFieldError("Geography Join RdsField")
 
     @overload
-    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QVariant.Type):
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QMetaType.Type):
         ...
 
     @overload
@@ -131,7 +131,7 @@ class PlanEditor(BasePlanBuilder):
 
         provider = layer.dataProvider()
         if not QgsVectorDataProvider.AddAttributes & provider.capabilities():
-            self.pushError('Could not add field to layer', Qgis.Critical)
+            self.pushError('Could not add field to layer', Qgis.MessageLevel.Critical)
             return
         for field in reversed(fields):
             # ignore fields with conflicting names
@@ -139,7 +139,7 @@ class PlanEditor(BasePlanBuilder):
                 self.pushError(
                     tr('A field named {field} already exists in layer {layer}. Omitting.').
                     format(field=field.name(), layer=layer.name()),
-                    Qgis.Warning
+                    Qgis.MessageLevel.Warning
                 )
                 fields.remove(field)
         if fields:
@@ -270,7 +270,7 @@ class PlanEditor(BasePlanBuilder):
             self.endPlanUpdate()
         except Exception as e:  # pylint: disable=broad-except
             self.cancelPlanUpdate()
-            self.pushError(e, Qgis.Critical)
+            self.pushError(e, Qgis.MessageLevel.Critical)
 
         return self._plan
 

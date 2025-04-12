@@ -92,7 +92,7 @@ class Redistricting:
         self.pluginDir = pathlib.Path(__file__).parent
 
         if not hasattr(Qgis, 'UserCanceled'):
-            Qgis.UserCanceled = Qgis.Success + 0x100
+            Qgis.UserCanceled = Qgis.MessageLevel.Success + 0x100
 
         # initialize locale
         locale = QSettings().value('locale/userLocale')[0:2]

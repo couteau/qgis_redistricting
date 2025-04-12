@@ -52,10 +52,10 @@ from .painttool import (
 
 class TableViewKeyEventFilter(QObject):
     def eventFilter(self, obj: QTableView, event: QKeyEvent):  # pylint: disable=unused-argument
-        if event.type() != QEvent.KeyPress:
+        if event.type() != QEvent.Type.KeyPress:
             return False
 
-        if event.key() in (Qt.Key_Enter, Qt.Key_Return):
+        if event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return):
             obj.activated.emit(obj.currentIndex())
             return True
 

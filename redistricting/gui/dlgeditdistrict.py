@@ -40,7 +40,7 @@ from .ui.DlgNewDistrict import Ui_dlgNewDistrict
 
 class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
     def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None,
-                 flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+                 flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
         self.sbxDistrictNo.setValue(0)
@@ -60,12 +60,12 @@ class DlgNewDistrict(Ui_dlgNewDistrict, QDialog):
 
         if (i > plan.numDistricts):
             # No more districts in the plan
-            self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(False)
+            self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         else:
             self.sbxDistrictNo.setValue(i)
 
     def updateButton(self):
-        self.buttonBox.button(QDialogButtonBox.Ok).setEnabled(
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
             bool(self.districtNumber)
         )
 

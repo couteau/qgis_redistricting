@@ -153,7 +153,7 @@ class PlanStylerService(QObject):
 
     def createAssignmentRenderer(self, numDistricts: int):
         symbol: QgsFillSymbol = QgsSymbol.defaultSymbol(DISTRICT_GEOMETRY_TYPE)
-        symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.NoPen))
+        symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle.NoPen)
         symbol.symbolLayer(0).setStrokeWidth(0)
 
         assignRenderer = QgsCategorizedSymbolRenderer("district")
@@ -173,9 +173,9 @@ class PlanStylerService(QObject):
     def createDistrictRenderer(self, numDistricts: int):
         symbol = QgsSymbol.defaultSymbol(DISTRICT_GEOMETRY_TYPE)
         symbol.symbolLayer(0).setStrokeColor(QColor('white'))
-        symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle(Qt.SolidLine))
+        symbol.symbolLayer(0).setStrokeStyle(Qt.PenStyle.SolidLine)
         symbol.symbolLayer(0).setStrokeWidth(2)
-        symbol.appendSymbolLayer(QgsSimpleLineSymbolLayer(QColor('#384450'), 1.0, Qt.SolidLine))
+        symbol.appendSymbolLayer(QgsSimpleLineSymbolLayer(QColor('#384450'), 1.0, Qt.PenStyle.SolidLine))
 
         distRenderer = QgsCategorizedSymbolRenderer("district")
         for dist in range(0, numDistricts+1):

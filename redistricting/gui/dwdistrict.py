@@ -62,4 +62,4 @@ class DockDistrictDataTable(Ui_qdwDistrictData, RdsDockWidget):
 
     def addFieldDlg(self):
         dlg = DlgEditFields(self._plan)
-        dlg.exec_()
+        dlg.exec()

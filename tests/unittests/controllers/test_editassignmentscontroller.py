@@ -242,7 +242,8 @@ class TestEditAssignmentsController:
         mock_project.layerTreeRoot.return_value.findLayer.return_value.isVisible.return_value = False
         controller_with_plan.activateMapTool(painttool.PaintMode.PaintByGeography)
         qtbot.assertNotEmitted(qgis_canvas.mapToolSet)
-        assert "Oops!:Cannot paint districts for a plan that is not visible. Please toggle the visibility of plan test's assignment layer." in qgis_iface.messageBar().get_messages(Qgis.Warning)
+        assert "Oops!:Cannot paint districts for a plan that is not visible. Please toggle the visibility of plan test's assignment layer." in qgis_iface.messageBar(
+        ).get_messages(Qgis.MessageLevel.Warning)
 
     def test_set_invalid_geofield_throws_exception(self, controller_with_plan: EditAssignmentsController, plan):
         type(controller_with_plan.planManager).activePlan = plan
@@ -269,7 +270,7 @@ class TestEditAssignmentsController:
         type(mock_plan).allocatedSeats = mocker.PropertyMock(return_value=0)
         mock_plan.districts.__len__.return_value = 1
         mock_plan.addDistrict.return_value = mock_district
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         d = controller_with_plan.createDistrict()
         assert d == 1
         mock_project.setDirty.assert_called_once()
@@ -280,32 +281,32 @@ class TestEditAssignmentsController:
         assert d is None
         mock_newdistrict_dlg.assert_not_called()
         assert "Oops!:Cannot create district: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_create_district_cancel_returns_none(self, controller_with_plan: EditAssignmentsController, mock_project, mock_plan, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
         type(mock_plan).allocatedDistricts = mocker.PropertyMock(return_value=0)
         type(mock_plan).allocatedSeats = mocker.PropertyMock(return_value=0)
         mock_plan.districts.__len__.return_value = 1
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Rejected
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Rejected
         d = controller_with_plan.createDistrict()
         assert d is None
         mock_newdistrict_dlg.assert_called_once()
         mock_project.setDirty.assert_not_called()
 
     def test_create_district_complete_plan_returns_none(self, controller_with_plan: EditAssignmentsController, mock_project, mock_plan, mock_newdistrict_dlg, qgis_iface):
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         assert mock_plan.allocatedDistricts == mock_plan.numDistricts
         d = controller_with_plan.createDistrict()
         assert d is None
         mock_newdistrict_dlg.assert_not_called()
         mock_newdistrict_dlg.return_value.exec.assert_not_called()
         mock_project.setDirty.assert_not_called()
-        assert "Warning:All districts have already been allocated" in qgis_iface.messageBar().get_messages(Qgis.Warning)
+        assert "Warning:All districts have already been allocated" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_edit_district(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         n = mocker.PropertyMock(return_value="District Name", name="name")
         type(mock_district).name = n
         assert mock_district.district == 1
@@ -314,7 +315,7 @@ class TestEditAssignmentsController:
         n.assert_called_with("District 1")
 
     def test_edit_district_unassigned_returns(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         type(mock_district).district = mocker.PropertyMock(return_value=0)
         controller_with_plan.editDistrict(mock_district)
         mock_project.setDirty.assert_not_called()
@@ -322,14 +323,14 @@ class TestEditAssignmentsController:
 
     def test_edit_district_with_no_argument_and_no_source_target_returns(self, controller_with_plan: EditAssignmentsController, mock_project, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         controller_with_plan.editDistrict()
         mock_project.setDirty.assert_not_called()
         mock_newdistrict_dlg.assert_not_called()
 
     def test_edit_district_target_from_signal(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         n = mocker.PropertyMock(return_value="District Name", name="name")
         type(mock_district).name = n
         controller_with_plan.targetDistrict = mock_district
@@ -341,7 +342,7 @@ class TestEditAssignmentsController:
 
     def test_edit_district_target(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         n = mocker.PropertyMock(return_value="District Name", name="name")
         type(mock_district).name = n
         controller_with_plan.targetDistrict = mock_district
@@ -351,7 +352,7 @@ class TestEditAssignmentsController:
 
     def test_edit_district_source_from_signal(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         n = mocker.PropertyMock(return_value="District Name", name="name")
         type(mock_district).name = n
         controller_with_plan.sourceDistrict = mock_district
@@ -363,7 +364,7 @@ class TestEditAssignmentsController:
 
     def test_edit_district_source(self, controller_with_plan: EditAssignmentsController, mock_project, mock_district, mock_newdistrict_dlg, mocker: MockerFixture):
         mocker.patch.object(controller_with_plan, 'dockwidget')
-        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_newdistrict_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         n = mocker.PropertyMock(return_value="District Name", name="name")
         type(mock_district).name = n
         controller_with_plan.sourceDistrict = mock_district
@@ -376,19 +377,19 @@ class TestEditAssignmentsController:
         controller.saveChangesAsNewPlan()
         mock_copy_dlg.assert_not_called()
         assert "Oops!:Cannot save changes to new plan: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_save_as_new_no_pending_changes_logs_error_returns(self, controller_with_plan: EditAssignmentsController, mock_copy_dlg, mock_plan, qgis_iface: QgisInterface):
         mock_plan.assignLayer.isEditable.return_value = False
         controller_with_plan.saveChangesAsNewPlan()
         mock_copy_dlg.assert_not_called()
         assert "Oops!:Cannot save changes to no plan: active plan has no unsaved changes." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_save_as_new(self, controller_with_plan: EditAssignmentsController, mock_copy_dlg, mock_plan, qgis_iface: QgisInterface, mocker: MockerFixture):
         copier = mocker.patch('redistricting.controllers.edit.PlanCopier', spec=PlanCopier)
         mock_plan.assignLayer.isEditable.return_value = True
-        mock_copy_dlg.return_value.exec.return_value = QDialog.Accepted
+        mock_copy_dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         controller_with_plan.saveChangesAsNewPlan()
         mock_copy_dlg.assert_called_once()
         mock_copy_dlg.return_value.exec.assert_called_once()
@@ -399,7 +400,7 @@ class TestEditAssignmentsController:
     def test_save_as_new_cancel_returns(self, controller_with_plan: EditAssignmentsController, mock_copy_dlg, mock_plan, qgis_iface: QgisInterface, mocker: MockerFixture):
         copier = mocker.patch('redistricting.controllers.edit.PlanCopier', spec=PlanCopier)
         mock_plan.assignLayer.isEditable.return_value = True
-        mock_copy_dlg.return_value.exec.return_value = QDialog.Rejected
+        mock_copy_dlg.return_value.exec.return_value = QDialog.DialogCode.Rejected
         controller_with_plan.saveChangesAsNewPlan()
         mock_copy_dlg.assert_called_once()
         mock_copy_dlg.return_value.exec.assert_called_once()

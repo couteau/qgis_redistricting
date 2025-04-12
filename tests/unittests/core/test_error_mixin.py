@@ -37,32 +37,32 @@ class TestErrorListMixin:
     def test_push_error_exception_logs_message(self, log: QgsMessageLog):
         errorlistmixin = ErrorListMixin()
         errorlistmixin.pushError(Exception("message"))
-        log.logMessage.assert_called_with("message", "Redistricting", Qgis.Warning)
-        assert errorlistmixin.error() == ("message", Qgis.Warning)
+        log.logMessage.assert_called_with("message", "Redistricting", Qgis.MessageLevel.Warning)
+        assert errorlistmixin.error() == ("message", Qgis.MessageLevel.Warning)
 
     def test_push_error_string_logs_message(self, log: QgsMessageLog):
         errorlistmixin = ErrorListMixin()
         errorlistmixin.pushError("message")
-        log.logMessage.assert_called_once_with("message", "Redistricting", Qgis.Warning)
-        assert errorlistmixin.error() == ("message", Qgis.Warning)
+        log.logMessage.assert_called_once_with("message", "Redistricting", Qgis.MessageLevel.Warning)
+        assert errorlistmixin.error() == ("message", Qgis.MessageLevel.Warning)
 
     def test_clear(self):
         errorlistmixin = ErrorListMixin()
         errorlistmixin.pushError("message")
-        assert errorlistmixin.error() == ("message", Qgis.Warning)
+        assert errorlistmixin.error() == ("message", Qgis.MessageLevel.Warning)
         errorlistmixin.clearErrors()
         assert errorlistmixin.error() is None
 
     def test_set_error(self):
         errorlistmixin = ErrorListMixin()
         errorlistmixin.pushError("message")
-        assert errorlistmixin.error() == ("message", Qgis.Warning)
+        assert errorlistmixin.error() == ("message", Qgis.MessageLevel.Warning)
         errorlistmixin.setError("other message")
-        assert errorlistmixin.error() == ("other message", Qgis.Warning)
+        assert errorlistmixin.error() == ("other message", Qgis.MessageLevel.Warning)
         assert len(errorlistmixin.errors()) == 1
 
     def test_push_error_with_level_logs_level(self, log: QgsMessageLog):
         errorlistmixin = ErrorListMixin()
-        errorlistmixin.pushError(Exception("message"), Qgis.Critical)
-        log.logMessage.assert_called_with("message", "Redistricting", Qgis.Critical)
-        assert errorlistmixin.error() == ("message", Qgis.Critical)
+        errorlistmixin.pushError(Exception("message"), Qgis.MessageLevel.Critical)
+        log.logMessage.assert_called_with("message", "Redistricting", Qgis.MessageLevel.Critical)
+        assert errorlistmixin.error() == ("message", Qgis.MessageLevel.Critical)

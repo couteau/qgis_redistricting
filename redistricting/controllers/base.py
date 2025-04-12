@@ -55,9 +55,14 @@ from ..services import (
 from ..utils import tr
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
+    from qgis.PyQt.QtCore import QT_VERSION
+    if QT_VERSION >= 0x060000:
+        from PyQt6.QtGui import QAction  # type: ignore[import]
+    else:
+        from PyQt5.QtWidgets import QAction  # type: ignore[import]
+
 else:
-    from qgis.PyQt.QtWidgets import QAction
+    from qgis.PyQt.QtGui import QAction
 
 
 class RdsProgressDialog(QProgressDialog):
@@ -103,10 +108,10 @@ class BaseController(QObject):
         if self.errorList:
             errors = self.errorList.errors()
         else:
-            errors = [(f'{self.dlg.labelText()} canceled', Qgis.Warning)]
+            errors = [(f'{self.dlg.labelText()} canceled', Qgis.MessageLevel.Warning)]
 
         if errors:
-            self.pushErrors(errors, tr("Canceled"), Qgis.Warning)
+            self.pushErrors(errors, tr("Canceled"), Qgis.MessageLevel.Warning)
 
         self.dlg.canceled.disconnect(self.progressCanceled)
         self.dlg.close()
@@ -121,7 +126,7 @@ class BaseController(QObject):
             text, tr('Cancel'),
             0, maximum,
             self.iface.mainWindow(),
-            Qt.WindowStaysOnTopHint)
+            Qt.WindowType.WindowStaysOnTopHint)
         if not canCancel:
             self.dlg.setCancelButton(None)
         else:
@@ -174,7 +179,7 @@ class BaseController(QObject):
             self.iface.messageBar().pushMessage(
                 tr("Oops!"),
                 tr(f"Cannot {action}: no active redistricting plan. Try creating a new plan."),
-                level=Qgis.Warning
+                level=Qgis.MessageLevel.Warning
             )
             return False
 
@@ -199,7 +204,7 @@ class DockWidgetController(BaseController):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.dockwidget: QDockWidget = None
         self.actionToggle: QAction = None
-        self.defaultArea = Qt.BottomDockWidgetArea
+        self.defaultArea = Qt.DockWidgetArea.BottomDockWidgetArea
 
     @abstractmethod
     def createDockWidget(self) -> QgsDockWidget:
@@ -219,7 +224,7 @@ class DockWidgetController(BaseController):
 
     def load(self):
         self.dockwidget = self.createDockWidget()
-        self.iface.addDockWidget(Qt.BottomDockWidgetArea, self.dockwidget)
+        self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.dockwidget)
         self.actionToggle = self.createToggleAction()
         self.actions.registerAction(f'actionToggle{self.dockwidget.objectName()}', self.actionToggle)
         self.toolbar.addAction(self.actionToggle)

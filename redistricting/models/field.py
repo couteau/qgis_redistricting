@@ -172,9 +172,9 @@ class RdsField(RdsBaseModel):
             if f is not None:
                 v = self.getValue(f)
                 # TODO: change this type .typeId() when QGIS moves to Qt 6
-                return QMetaType.Type(QVariant(v).type())
+                return QMetaType.Type(QVariant(v).typeId())
 
-        return QMetaType.UnknownType
+        return QMetaType.Type.UnknownType
 
     def qgsField(self) -> QgsField:
         idx = self.fieldIndex()
@@ -189,7 +189,7 @@ class RdsField(RdsBaseModel):
 
         t = self.fieldType()
 
-        if t is QMetaType.UnknownType:
+        if t is QMetaType.Type.UnknownType:
             return None
 
         return QgsField(name, t)
@@ -306,7 +306,7 @@ class RdsDataField(RdsField):
 
     def isNumeric(self):
         return self.fieldType() in (
-            QMetaType.Double, QMetaType.Int, QMetaType.LongLong, QMetaType.UInt, QMetaType.ULongLong
+            QMetaType.Type.Double, QMetaType.Type.Int, QMetaType.Type.LongLong, QMetaType.Type.UInt, QMetaType.Type.ULongLong
         )
 
     category: int = FieldCategory.Demographic

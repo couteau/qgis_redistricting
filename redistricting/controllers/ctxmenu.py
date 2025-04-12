@@ -47,7 +47,11 @@ from .base import BaseController
 from .plan import PlanController
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
+    from qgis.PyQt.QtCore import QT_VERSION
+    if QT_VERSION >= 0x060000:
+        from PyQt6.QtGui import QAction  # type: ignore[import]
+    else:
+        from PyQt5.QtWidgets import QAction  # type: ignore[import]
 else:
     from qgis.PyQt.QtWidgets import QAction
 

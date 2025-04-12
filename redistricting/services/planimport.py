@@ -71,17 +71,17 @@ class PlanImporter(ErrorListMixin, QObject):
     def isValid(self) -> bool:
         result = True
         if not self._plan:
-            self.pushError(tr('No plan provided to import service'), Qgis.Critical)
+            self.pushError(tr('No plan provided to import service'), Qgis.MessageLevel.Critical)
             result = False
         elif not self._plan.isValid():
-            self.pushError(tr('Plan must be valid for import'), Qgis.Critical)
+            self.pushError(tr('Plan must be valid for import'), Qgis.MessageLevel.Critical)
             result = False
 
         if not self._file:
-            self.pushError(tr('Source file is required for import'), Qgis.Critical)
+            self.pushError(tr('Source file is required for import'), Qgis.MessageLevel.Critical)
             result = False
         elif not self._file.exists():
-            self.pushError(tr('{file!s} does not exist').format(file=self._file), Qgis.Critical)
+            self.pushError(tr('{file!s} does not exist').format(file=self._file), Qgis.MessageLevel.Critical)
             result = False
 
         return result
@@ -222,22 +222,23 @@ class ShapefileImporter(PlanImporter):
             self._layer = QgsVectorLayer(str(self._file), '__import_layer')
             self._layer.setParent(self)
             if not self._layer.isValid() or self._layer.dataProvider().storageType() != 'ESRI Shapefile':
-                self.pushError(tr('Invalid shapefile for import: {file!s}').format(file=self._file), Qgis.Critical)
+                self.pushError(tr('Invalid shapefile for import: {file!s}').format(
+                    file=self._file), Qgis.MessageLevel.Critical)
                 result = False
             elif not self._distField or self._layer.fields().lookupField(self._distField) == -1:
                 self.pushError(tr('Field {field} not found in shapefile {file!s}').format(
-                    field=self._distField, file=self._file), Qgis.Critical)
+                    field=self._distField, file=self._file), Qgis.MessageLevel.Critical)
                 result = False
 
         if result:
             if self._nameField and self._layer.fields().lookupField(self._nameField) == -1:
                 self.pushError((tr('Field {field} not found in shapefile {file}') + tr('--Ignoring.')).format(
-                    field=self._nameField, file=self._file), Qgis.Warning)
+                    field=self._nameField, file=self._file), Qgis.MessageLevel.Warning)
                 self._nameField = None
 
             if self._membersField and self._layer.fields().lookupField(self._membersField) == -1:
                 self.pushError((tr('Field {field} not found in shapefile {file}') + tr('--Ignoring.')).format(
-                    field=self._membersField, file=self._file), Qgis.Warning)
+                    field=self._membersField, file=self._file), Qgis.MessageLevel.Warning)
                 self._membersField = None
 
         return result

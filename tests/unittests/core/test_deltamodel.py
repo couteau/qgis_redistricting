@@ -86,7 +86,7 @@ class TestDeltaModel:
         qtmodeltester.check(empty_model)
 
     def test_heading(self, delta_model: DeltaListModel):
-        assert delta_model.headerData(3, Qt.Horizontal, Qt.DisplayRole) == '%Deviation'
+        assert delta_model.headerData(3, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == '%Deviation'
 
     def test_update_districts(self, delta_model, mock_delta):
         mock_delta.__len__.return_value = 1

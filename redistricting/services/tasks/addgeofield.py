@@ -131,6 +131,6 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
         if not result:
             if self.exception is not None:
                 QgsMessageLog.logMessage(
-                    f'{self.exception!r}', 'Redistricting', Qgis.Critical)
+                    f'{self.exception!r}', 'Redistricting', Qgis.MessageLevel.Critical)
         else:
             self.assignLayer.reload()

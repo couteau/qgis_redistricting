@@ -24,8 +24,7 @@
 """
 from typing import (
     TYPE_CHECKING,
-    Optional,
-    Union
+    Optional
 )
 
 from qgis.PyQt.QtCore import (
@@ -44,16 +43,21 @@ from qgis.PyQt.QtWidgets import (
 from .ui.DlgSelectPlan import Ui_dlgSelectPlan
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
+    from qgis.PyQt.QtCore import QT_VERSION
+    if QT_VERSION >= 0x060000:
+        from PyQt6.QtGui import QAction  # type: ignore[import]
+    else:
+        from PyQt5.QtWidgets import QAction  # type: ignore[import]
+
 else:
-    from qgis.PyQt.QtWidgets import QAction
+    from qgis.PyQt.QtGui import QAction
 
 
 class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
     currentIndexChanged = pyqtSignal(int)
 
     def __init__(self, parent: Optional[QWidget] = None,
-                 flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+                 flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
         self._newAction: QAction = None
@@ -74,7 +78,7 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
             return
 
         for i in range(model.columnCount()):
-            sizeHint = model.headerData(i, Qt.Horizontal, Qt.SizeHintRole)
+            sizeHint = model.headerData(i, Qt.Orientation.Horizontal, Qt.ItemDataRole.SizeHintRole)
             if isinstance(sizeHint, QSize):
                 self.lvwPlans.setColumnWidth(i, sizeHint.width())
         # self.lvwPlans.resizeColumnsToContents()

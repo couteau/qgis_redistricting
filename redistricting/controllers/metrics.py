@@ -143,7 +143,7 @@ class MetricsController(DockWidgetController):
             text=self.tr("Copy Metrics"),
             tooltip=self.tr("Copy selected metrics to clipboard"),
             callback=self.copySelection,
-            shortcut=QKeySequence.Copy,
+            shortcut=QKeySequence.StandardKey.Copy,
             parent=self.iface.mainWindow()
         )
 
@@ -231,7 +231,7 @@ class MetricsController(DockWidgetController):
             table = []
             for idx in selection:
                 table.append([self.metricsModel.headerData(
-                    idx.row(), Qt.Vertical, Qt.DisplayRole), idx.data()])
+                    idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole), idx.data()])
             stream = io.StringIO()
             csv.writer(stream, delimiter='\t').writerows(table)
             QgsApplication.instance().clipboard().setText(stream.getvalue())
@@ -270,7 +270,7 @@ class MetricsController(DockWidgetController):
 
         if self.dlgSplits is None:
             self.dlgSplits = DlgSplitDetail(self.planManager.activePlan, self.iface.mainWindow())
-            self.dlgSplits.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgSplits.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
             self.dlgSplits.destroyed.connect(self.deleteDialog)
             self.dlgSplits.geographyChanged.connect(self.updateSplitsDialog)
 
@@ -334,7 +334,7 @@ class MetricsController(DockWidgetController):
             self.dlgSplitDistricts = QDialog()
             self.dlgSplitDistricts.setObjectName('dlgSplitDistricts')
             self.dlgSplitDistricts.setWindowTitle(tr("Non-contiguous Districts"))
-            self.dlgSplitDistricts.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgSplitDistricts.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
             self.dlgSplitDistricts.destroyed.connect(self.deleteDialog)
             vbox = QVBoxLayout(self.dlgSplitDistricts)
             self.dlgSplitDistricts.splitsTable = QTableView(self.dlgSplitDistricts)
@@ -407,7 +407,7 @@ class MetricsController(DockWidgetController):
             self.dlgUnassignedGeography = QDialog()
             self.dlgUnassignedGeography.setObjectName('dlgUnassignedGeography')
             self.dlgUnassignedGeography.setWindowTitle(tr("Unassigned Geography"))
-            self.dlgUnassignedGeography.setAttribute(Qt.WA_DeleteOnClose, True)
+            self.dlgUnassignedGeography.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
             self.dlgUnassignedGeography.destroyed.connect(self.deleteDialog)
 
             vbox = QVBoxLayout(self.dlgUnassignedGeography)

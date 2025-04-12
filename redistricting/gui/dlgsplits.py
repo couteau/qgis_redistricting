@@ -22,10 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional
 
 from qgis.PyQt.QtCore import (
     QAbstractItemModel,
@@ -74,7 +71,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
             self,
             plan: RdsPlan,
             parent: Optional[QWidget] = None,
-            flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog
+            flags: Qt.WindowType = Qt.WindowType.Dialog
     ):
         super().__init__(parent, flags)
         self.setupUi(self)

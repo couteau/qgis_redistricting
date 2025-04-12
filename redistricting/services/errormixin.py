@@ -55,7 +55,7 @@ class ErrorListMixin:
         """
         return bool(self._errors)
 
-    def setError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.Warning):
+    def setError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
         """Clear the error list and push the passed error
         :param error: the error to set on the object
         :param level: the message level for the error: Info, Warning, Critical, etc.
@@ -63,7 +63,7 @@ class ErrorListMixin:
         self._errors.clear()
         self.pushError(error, level)
 
-    def pushErrors(self, errors: Iterable[Union[str, Exception]], level: Qgis.MessageLevel = Qgis.Warning):
+    def pushErrors(self, errors: Iterable[Union[str, Exception]], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
         """
         Push the passed error onto the error list for the object and
         log it to the Qgis message log with the "Redistricting" tag
@@ -76,7 +76,7 @@ class ErrorListMixin:
             self._errors.append((error, level))
             QgsMessageLog.logMessage(error, 'Redistricting', level)
 
-    def pushError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.Warning):
+    def pushError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
         """
         Push the passed error onto the error list for the object and
         log it to the Qgis message log with the "Redistricting" tag

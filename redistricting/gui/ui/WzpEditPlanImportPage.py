@@ -7,7 +7,16 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qgis.PyQt import (
+    QtCore,
+    QtGui,
+    QtWidgets
+)
+
+from .RedistrictingWidgets import (
+    RdsFieldComboBox,
+    RdsFileWidget
+)
 
 
 class Ui_wzpImport(object):
@@ -17,7 +26,7 @@ class Ui_wzpImport(object):
         self.gridLayout_2 = QtWidgets.QGridLayout(wzpImport)
         self.gridLayout_2.setObjectName("gridLayout_2")
         self.lblGeoCol = QtWidgets.QLabel(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lblGeoCol.sizePolicy().hasHeightForWidth())
@@ -25,7 +34,7 @@ class Ui_wzpImport(object):
         self.lblGeoCol.setObjectName("lblGeoCol")
         self.gridLayout_2.addWidget(self.lblGeoCol, 5, 0, 1, 1)
         self.lblDistrictCol = QtWidgets.QLabel(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lblDistrictCol.sizePolicy().hasHeightForWidth())
@@ -41,7 +50,8 @@ class Ui_wzpImport(object):
         self.rbOther = QtWidgets.QRadioButton(self.gbDelimiter)
         self.rbOther.setObjectName("rbOther")
         self.gridLayout2.addWidget(self.rbOther, 3, 0, 1, 1)
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding,
+                                           QtWidgets.QSizePolicy.Policy.Minimum)
         self.gridLayout2.addItem(spacerItem, 3, 2, 1, 1)
         self.rbComma = QtWidgets.QRadioButton(self.gbDelimiter)
         self.rbComma.setChecked(True)
@@ -66,7 +76,8 @@ class Ui_wzpImport(object):
         self.rbSingleQuote = QtWidgets.QRadioButton(self.gbQuote)
         self.rbSingleQuote.setObjectName("rbSingleQuote")
         self.gridLayout.addWidget(self.rbSingleQuote, 1, 0, 1, 1)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        spacerItem1 = QtWidgets.QSpacerItem(
+            40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.gridLayout.addItem(spacerItem1, 2, 2, 1, 1)
         self.rbDoubleQuote = QtWidgets.QRadioButton(self.gbQuote)
         self.rbDoubleQuote.setChecked(True)
@@ -80,18 +91,20 @@ class Ui_wzpImport(object):
         self.edOtherQuote.setMaxLength(1)
         self.edOtherQuote.setObjectName("edOtherQuote")
         self.gridLayout.addWidget(self.edOtherQuote, 2, 1, 1, 1)
-        spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem2 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
+                                            QtWidgets.QSizePolicy.Policy.Expanding)
         self.gridLayout.addItem(spacerItem2, 3, 0, 1, 1)
         self.horizontalLayout2.addWidget(self.gbQuote)
         self.gridLayout_2.addLayout(self.horizontalLayout2, 3, 0, 1, 3)
-        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem3 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
+                                            QtWidgets.QSizePolicy.Policy.Expanding)
         self.gridLayout_2.addItem(spacerItem3, 8, 0, 1, 3)
         self.cbxHeaderRow = QtWidgets.QCheckBox(wzpImport)
         self.cbxHeaderRow.setChecked(True)
         self.cbxHeaderRow.setObjectName("cbxHeaderRow")
         self.gridLayout_2.addWidget(self.cbxHeaderRow, 2, 0, 1, 3)
         self.lblImportAssignment = QtWidgets.QLabel(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lblImportAssignment.sizePolicy().hasHeightForWidth())
@@ -105,7 +118,8 @@ class Ui_wzpImport(object):
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.tbPreview = QtWidgets.QTableWidget(self.gbPreview)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding,
+                                           QtWidgets.QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.tbPreview.sizePolicy().hasHeightForWidth())
@@ -126,7 +140,7 @@ class Ui_wzpImport(object):
         self.verticalLayout.addWidget(self.tbPreview)
         self.gridLayout_2.addWidget(self.gbPreview, 4, 0, 1, 3)
         self.lblJoinField = QtWidgets.QLabel(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.lblJoinField.sizePolicy().hasHeightForWidth())
@@ -134,7 +148,8 @@ class Ui_wzpImport(object):
         self.lblJoinField.setObjectName("lblJoinField")
         self.gridLayout_2.addWidget(self.lblJoinField, 1, 0, 1, 1)
         self.cmbJoinField = RdsFieldComboBox(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbJoinField.sizePolicy().hasHeightForWidth())
@@ -143,7 +158,8 @@ class Ui_wzpImport(object):
         self.gridLayout_2.addWidget(self.cmbJoinField, 1, 1, 1, 2)
         self.fileImportFrom = RdsFileWidget(wzpImport)
         self.fileImportFrom.setEnabled(True)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.fileImportFrom.sizePolicy().hasHeightForWidth())
@@ -154,7 +170,8 @@ class Ui_wzpImport(object):
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.sbxGeographyCol = QtWidgets.QSpinBox(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.sbxGeographyCol.sizePolicy().hasHeightForWidth())
@@ -164,7 +181,8 @@ class Ui_wzpImport(object):
         self.sbxGeographyCol.setObjectName("sbxGeographyCol")
         self.horizontalLayout_2.addWidget(self.sbxGeographyCol)
         self.cmbGeographyCol = QtWidgets.QComboBox(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbGeographyCol.sizePolicy().hasHeightForWidth())
@@ -175,7 +193,8 @@ class Ui_wzpImport(object):
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout()
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.sbxDistrictCol = QtWidgets.QSpinBox(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.sbxDistrictCol.sizePolicy().hasHeightForWidth())
@@ -186,7 +205,8 @@ class Ui_wzpImport(object):
         self.sbxDistrictCol.setObjectName("sbxDistrictCol")
         self.horizontalLayout_3.addWidget(self.sbxDistrictCol)
         self.cmbDistrictCol = QtWidgets.QComboBox(wzpImport)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+                                           QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.cmbDistrictCol.sizePolicy().hasHeightForWidth())
@@ -230,7 +250,8 @@ class Ui_wzpImport(object):
         self.rbComma.setText(_translate("wzpImport", "&Comma"))
         self.rbSpace.setText(_translate("wzpImport", "&Space"))
         self.rbTab.setText(_translate("wzpImport", "&Tab"))
-        self.gbQuote.setToolTip(_translate("wzpImport", "Select or enter the quote character that will define field values"))
+        self.gbQuote.setToolTip(_translate(
+            "wzpImport", "Select or enter the quote character that will define field values"))
         self.gbQuote.setTitle(_translate("wzpImport", "Text Qualifier"))
         self.rbSingleQuote.setText(_translate("wzpImport", "Single Quote"))
         self.rbDoubleQuote.setText(_translate("wzpImport", "Double Quote"))
@@ -243,14 +264,20 @@ class Ui_wzpImport(object):
         item.setText(_translate("wzpImport", "Geography ID"))
         item = self.tbPreview.horizontalHeaderItem(1)
         item.setText(_translate("wzpImport", "District"))
-        self.lblJoinField.setToolTip(_translate("wzpImport", "Geography field on which equivalency file will be joined to assignments layer", "redistricting"))
+        self.lblJoinField.setToolTip(_translate(
+            "wzpImport", "Geography field on which equivalency file will be joined to assignments layer", "redistricting"))
         self.lblJoinField.setText(_translate("wzpImport", "Assigment Geography"))
-        self.cmbJoinField.setToolTip(_translate("wzpImport", "Choose the geography field on which equivalency file will be joined to assignments layer"))
-        self.fileImportFrom.setToolTip(_translate("wzpImport", "Select the equivalency file from which assignments will be imported"))
+        self.cmbJoinField.setToolTip(_translate(
+            "wzpImport", "Choose the geography field on which equivalency file will be joined to assignments layer"))
+        self.fileImportFrom.setToolTip(_translate(
+            "wzpImport", "Select the equivalency file from which assignments will be imported"))
         self.fileImportFrom.setStatusTip(_translate("wzpImport", "Choose an equivalency file to import"))
         self.fileImportFrom.setDialogTitle(_translate("wzpImport", "Select Equivalency File"))
-        self.sbxGeographyCol.setToolTip(_translate("wzpImport", "Choose the column that will be matched to the geography in the assignment layer"))
-        self.cmbGeographyCol.setToolTip(_translate("wzpImport", "Choose the column that will be matched to the geography in the assignment layer"))
-        self.sbxDistrictCol.setToolTip(_translate("wzpImport", "Choose the column that will be imported as the district for the corresponding unit of geography"))
-        self.cmbDistrictCol.setToolTip(_translate("wzpImport", "Choose the column that will be imported as the district for the corresponding unit of geography"))
-from .RedistrictingWidgets import RdsFieldComboBox, RdsFileWidget
+        self.sbxGeographyCol.setToolTip(_translate(
+            "wzpImport", "Choose the column that will be matched to the geography in the assignment layer"))
+        self.cmbGeographyCol.setToolTip(_translate(
+            "wzpImport", "Choose the column that will be matched to the geography in the assignment layer"))
+        self.sbxDistrictCol.setToolTip(_translate(
+            "wzpImport", "Choose the column that will be imported as the district for the corresponding unit of geography"))
+        self.cmbDistrictCol.setToolTip(_translate(
+            "wzpImport", "Choose the column that will be imported as the district for the corresponding unit of geography"))

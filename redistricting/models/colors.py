@@ -1027,4 +1027,4 @@ def getColorForDistrict(plan: RdsPlan, district: int):
         cat = renderer.categories()[idx]
         return QColor(cat.symbol().color())
 
-    return QColor(QPalette().color(QPalette.Normal, QPalette.Window))
+    return QColor(QPalette().color(QPalette.ColorGroup.Normal, QPalette.ColorRole.Window))

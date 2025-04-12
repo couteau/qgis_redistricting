@@ -7,7 +7,13 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from qgis import gui
+from .RedistrictingWidgets import RdsFieldTableView
+from qgis.PyQt import (
+    QtCore,
+    QtGui,
+    QtWidgets
+)
 
 
 class Ui_wzpDisplayFields(object):
@@ -42,7 +48,6 @@ class Ui_wzpDisplayFields(object):
         _translate = QtCore.QCoreApplication.translate
         wzpDisplayFields.setWindowTitle(_translate("wzpDisplayFields", "Additional Population Fields"))
         wzpDisplayFields.setTitle(_translate("wzpDisplayFields", "Additional Population Fields"))
-        wzpDisplayFields.setSubTitle(_translate("wzpDisplayFields", "Configure additional fields from the population layer for district analysis"))
+        wzpDisplayFields.setSubTitle(_translate(
+            "wzpDisplayFields", "Configure additional fields from the population layer for district analysis"))
         self.fexDataField.setExpressionDialogTitle(_translate("wzpDisplayFields", "Define Expression"))
-from qgis import gui
-from .RedistrictingWidgets import RdsFieldTableView

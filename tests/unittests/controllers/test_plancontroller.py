@@ -118,8 +118,7 @@ class TestPlanController:
         dlg.importGeoCol.return_value = 0
         dlg.importDistCol.return_value = 1
 
-        dlg.exec.return_value = QDialog.Accepted
-        dlg.exec_.return_value = QDialog.Accepted
+        dlg.exec.return_value = QDialog.DialogCode.Accepted
         return dlg_class
 
     @pytest.fixture
@@ -270,7 +269,7 @@ class TestPlanController:
         mocker: MockerFixture
     ):
         dlg = mocker.patch('redistricting.controllers.plan.DlgConfirmDelete')
-        dlg.return_value.exec.return_value = QDialog.Accepted
+        dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         dlg.return_value.removeLayers.return_value = remove_layers
         dlg.return_value.deleteGeoPackage.return_value = delete_gpkg
 
@@ -382,7 +381,7 @@ class TestPlanController:
         mock_edit_dlg.assert_not_called()
         mock_builder.assert_not_called()
         assert "Oops!:Cannot create a redistricting plan for an empty project. Try adding some layers." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_copy_plan_no_active_plan_warns(
         self,
@@ -395,7 +394,7 @@ class TestPlanController:
         controller.copyPlan()
         dlg.assert_not_called()
         assert "Oops!:Cannot copy: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     @pytest.mark.parametrize('copy_assignments', [True, False])
     def test_copy_plan_active_plan_executes_copy(
@@ -410,7 +409,7 @@ class TestPlanController:
         dlg.return_value.description = 'copy of plan'
         dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
         dlg.return_value.copyAssignments = copy_assignments
-        dlg.return_value.exec.return_value = QDialog.Accepted
+        dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
 
         cpy = mocker.patch('redistricting.controllers.plan.PlanCopier', spec=services.PlanCopier)
 
@@ -432,7 +431,7 @@ class TestPlanController:
         controller.importPlan()
         dlg_class.assert_not_called()
         assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_import_plan_with_active_plan_executes_import(
         self,
@@ -449,7 +448,7 @@ class TestPlanController:
         dlgImportPlan.distColumn = 1
         dlgImportPlan.delimiter = ','
         dlgImportPlan.quotechar = '"'
-        dlgImportPlan.exec.return_value = QDialog.Accepted
+        dlgImportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
         importService = mocker.patch.object(controller_with_active_plan, 'importService')
 
@@ -469,7 +468,7 @@ class TestPlanController:
         controller.importShapefile()
         dlg_class.assert_not_called()
         assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_import_shapefile_with_active_plan_executes_import(
         self,
@@ -483,7 +482,7 @@ class TestPlanController:
         dlgImportPlan.distField = 'GEOID20'
         dlgImportPlan.nameField = None
         dlgImportPlan.membersField = None
-        dlgImportPlan.exec.return_value = QDialog.Accepted
+        dlgImportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
         importService = mocker.patch.object(controller_with_active_plan, 'importService')
 
@@ -503,7 +502,7 @@ class TestPlanController:
         controller.exportPlan()
         dlg_class.assert_not_called()
         assert "Oops!:Cannot export: no active redistricting plan. Try creating a new plan." \
-            in qgis_iface.messageBar().get_messages(Qgis.Warning)
+            in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
     def test_export_plan_with_active_plan_executes_export(
         self,
@@ -523,7 +522,7 @@ class TestPlanController:
         dlgExportPlan.includeUnassigned = False
         dlgExportPlan.includeDemographics = True
         dlgExportPlan.includeMetrics = True
-        dlgExportPlan.exec.return_value = QDialog.Accepted
+        dlgExportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
         exporter_class = mocker.patch('redistricting.controllers.plan.PlanExporter',
                                       spec=services.PlanExporter)

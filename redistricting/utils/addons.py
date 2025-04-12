@@ -47,7 +47,7 @@ def vendor_dir():
 def install_vendor_dir():
     # create a startup.py file that will add the vendor directory to the path
     # before other python code loads modules we have overridden
-    homePath = QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)
+    homePath = QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)
     if len(homePath) > 0:
         startuppy = pathlib.Path(homePath[0]) / 'startup.py'
         with startuppy.open("a+") as f:
@@ -65,7 +65,7 @@ def install_vendor_dir():
 
 
 def uninstall_vendor_dir():
-    homePath = QStandardPaths.standardLocations(QStandardPaths.AppDataLocation)
+    homePath = QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)
     if len(homePath) > 0:
         startuppy = pathlib.Path(homePath[0]) / 'startup.py'
         if startuppy.exists():

@@ -39,7 +39,7 @@ from .ui.DlgConfirmDelete import Ui_dlgConfirmDelete
 
 
 class DlgConfirmDelete(Ui_dlgConfirmDelete, QDialog):
-    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.Dialog):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
         self.setWindowTitle(tr('Confirm Delete {name}').format(name=plan.name))
