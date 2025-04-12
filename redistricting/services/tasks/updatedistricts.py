@@ -34,6 +34,7 @@ from typing import (
 import geopandas as gpd
 import pandas as pd
 import shapely.ops
+from qgis.core import QgsTask
 from qgis.PyQt.QtCore import (
     QRunnable,
     QThreadPool
@@ -52,7 +53,10 @@ from ...utils import (
 )
 from ..districtio import DistrictReader
 from ._debug import debug_thread
-from .updatebase import AggregateDataTask
+from .updatebase import (
+    AggregateDataTask,
+    UpdateMetricsTask
+)
 
 if TYPE_CHECKING:
     from ...models import (
@@ -82,7 +86,34 @@ class DissolveWorker(QRunnable):
             self.callback()
 
 
-class AggregateDistrictDataTask(AggregateDataTask):
+class AggregateDistrictDataTask(QgsTask):
+    def __init__(
+        self,
+        plan: 'RdsPlan',
+        updateDistricts: Iterable[int] = None,
+        includeDemographics=True,
+        includeGeometry=True
+    ):
+        super().__init__(tr('Updating districts'), QgsTask.AllFlags)
+
+        trigger: MetricTriggers = 0
+        if includeDemographics:
+            trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+        if includeGeometry:
+            trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
+
+        updateSubTask = AggregateDistrictDataSubTask(plan, updateDistricts, includeDemographics, includeGeometry)
+        updateMetricsSubTask = UpdateMetricsTask(plan, trigger)
+        self.addSubTask(updateSubTask, subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+        self.addSubTask(updateMetricsSubTask, dependencies=[updateSubTask],
+                        subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+
+    def run(self):
+        debug_thread()
+        return True
+
+
+class AggregateDistrictDataSubTask(AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(
@@ -108,11 +139,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
-        self.trigger: MetricTriggers = 0
-        if self.includeDemographics:
-            self.trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
-        if self.includeGeometry:
-            self.trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
 
         self.districtData: Union[pd.DataFrame, gpd.GeoDataFrame] = None
 
@@ -204,21 +230,21 @@ class AggregateDistrictDataTask(AggregateDataTask):
             )
 
             if self.includeDemographics:
-                ideal = round(self.totalPopulation / self.numSeats)
-                deviation = self.districtData[DistrictColumns.POPULATION].sub(members * ideal)
-                pct_dev = deviation.div(members * ideal)
+                # ideal = round(self.totalPopulation / self.numSeats)
+                # deviation = self.districtData[DistrictColumns.POPULATION].sub(members * ideal)
+                # pct_dev = deviation.div(members * ideal)
                 df = pd.DataFrame(
-                    {DistrictColumns.NAME: name,
-                     DistrictColumns.MEMBERS: members,
-                     DistrictColumns.DEVIATION: deviation,
-                     DistrictColumns.PCT_DEVIATION: pct_dev}
+                    {
+                        DistrictColumns.NAME: name,
+                        DistrictColumns.MEMBERS: members,
+                        # DistrictColumns.DEVIATION: deviation,
+                        # DistrictColumns.PCT_DEVIATION: pct_dev
+                    }
                 )
             else:
                 df = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
 
             self.districtData = self.districtData.join(df)
-
-            self.updateMetrics(self.trigger)
 
             return True
         except Exception as e:  # pylint: disable=broad-except
@@ -230,8 +256,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         if not result:
             return
-
-        self.finishMetrics(self.trigger)
 
         with spatialite_connect(self.geoPackagePath) as db:
             fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districtData.columns)}
@@ -261,7 +285,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
             db.executemany(sql, data)
             db.commit()
 
-            reader = DistrictReader(self.plan.distLayer, self.distField, self.popField, self.plan.districtColumns)
-            reader.loadDistricts(self.plan)
+        reader = DistrictReader(self.plan.distLayer, self.distField, self.popField, self.plan.districtColumns)
+        reader.loadDistricts(self.plan)
 
         self.distLayer.reload()

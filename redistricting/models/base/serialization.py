@@ -126,17 +126,26 @@ def register_serializer(
         deserializers[dtype] = deserializer
 
 
-def to_kebabcase(s: str):
+def camel_to_snake(s: str):
+    return re.sub(r'([A-Z])', r'_\1', s).lower()
+
+
+def snake_to_camel(s: str):
+    f = "".join(c.capitalize() for c in s.split("_"))
+    return f[0].lower() + f[1:]
+
+
+def camel_to_kebab(s: str):
     return re.sub(r'([A-Z])', r'-\1', s).lower()
 
 
-def to_camelcase(s: str):
+def kebab_to_camel(s: str):
     f = "".join(c.capitalize() for c in s.split("-"))
     return f[0].lower() + f[1:]
 
 
 def kebab_dict(kw: Iterable[tuple[str, Any]]):
-    return {to_kebabcase(k): v for k, v in kw}
+    return {camel_to_kebab(k): v for k, v in kw}
 
 
 _memo = object()

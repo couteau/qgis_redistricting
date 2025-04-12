@@ -27,7 +27,7 @@ from .columns import (
 )
 from .field import RdsGeoField
 from .metricslist import (
-    Level,
+    MetricLevel,
     MetricTriggers,
     RdsAggregateMetric,
     RdsMetric,
@@ -45,7 +45,7 @@ from .validators import validators
 
 class RdsTotalPopulationMetric(RdsMetric[int],
                                mname="totalPopulation",
-                               level=Level.PLANWIDE,
+                               level=MetricLevel.PLANWIDE,
                                triggers=MetricTriggers.ON_CREATE_PLAN):
 
     def caption(self):
@@ -67,7 +67,7 @@ class RdsTotalPopulationMetric(RdsMetric[int],
 
 class RdsDeviationMetric(RdsMetric[pd.Series],
                          mname="deviation",
-                         level=Level.DISTRICT,
+                         level=MetricLevel.DISTRICT,
                          triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
                          depends=(RdsTotalPopulationMetric,)):
 
@@ -91,7 +91,7 @@ class RdsDeviationMetric(RdsMetric[pd.Series],
             self._value = \
                 populationData[[self.plan.distField, DistrictColumns.POPULATION]] \
                 .groupby(self.plan.distField) \
-                .sum().T \
+                .sum()[DistrictColumns.POPULATION] \
                 .sub(members * ideal)
 
     def format(self, idx=None) -> str:
@@ -109,7 +109,7 @@ class RdsDeviationMetric(RdsMetric[pd.Series],
 
 class RdsPctDeviationMetric(RdsMetric[pd.Series],
                             mname="pctDeviation",
-                            level=Level.DISTRICT,
+                            level=MetricLevel.DISTRICT,
                             triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
                             depends=(RdsTotalPopulationMetric, RdsDeviationMetric)):
 
@@ -160,7 +160,7 @@ class RdsPctDeviationMetric(RdsMetric[pd.Series],
 
 class RdsPlanDeviationMetric(RdsAggregateMetric[tuple[float, float]],
                              mname="planDeviation",
-                             level=Level.PLANWIDE,
+                             level=MetricLevel.PLANWIDE,
                              triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
                              values=RdsPctDeviationMetric):
 
@@ -168,7 +168,7 @@ class RdsPlanDeviationMetric(RdsAggregateMetric[tuple[float, float]],
         return DistrictColumns.PCT_DEVIATION.comment
 
     def aggregate(self, populationData, geometry, values: pd.Series):
-        return float(values.min(axis=1)), float(values.max(axis=1))
+        return float(values.min()), float(values.max())
 
     def format(self, idx=None):
         if self._value is None:
@@ -194,7 +194,7 @@ class RdsPlanDeviationMetric(RdsAggregateMetric[tuple[float, float]],
 
 class CeaProjMetric(RdsMetric[gpd.GeoSeries],
                     mname="cea_proj",
-                    level=Level.DISTRICT,
+                    level=MetricLevel.DISTRICT,
                     triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
                     display=False,
                     serialize=False
@@ -205,7 +205,7 @@ class CeaProjMetric(RdsMetric[gpd.GeoSeries],
 
 
 class DistrictAggregateMixin:
-    def __init_subclass__(cls, *, level=Level.PLANWIDE, **kwargs):
+    def __init_subclass__(cls, *, level=MetricLevel.PLANWIDE, **kwargs):
         super().__init_subclass__(**kwargs)
         cls._level = level
 
@@ -277,7 +277,7 @@ class RdsCompactnessMetric(RdsMetric[float], mname="__compactness"):
     def __init_subclass__(cls,
                           score: ConstStr,
                           group=tr("Compactness"),
-                          level=Level.DISTRICT,
+                          level=MetricLevel.DISTRICT,
                           triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
                           depends=(CeaProjMetric,),
                           **kwargs):
@@ -352,7 +352,7 @@ class RdsMaxPolsbyPopper(DistrictMaxMixin, RdsCompactnessAggregate,
     ...
 
 
-class RdsAggScores(RdsMetric, mname="__agg_compactness", level=Level.PLANWIDE):
+class RdsAggScores(RdsMetric, mname="__agg_compactness", level=MetricLevel.PLANWIDE):
     def __init_subclass__(cls,
                           score: ConstStr,
                           triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
@@ -459,7 +459,7 @@ class RdsAggConvexHull(RdsAggScores,
 class RdsCutEdges(RdsMetric[int],
                   mname="cutEdges",
                   group=tr("Compactness"),
-                  level=Level.PLANWIDE,
+                  level=MetricLevel.PLANWIDE,
                   triggers=MetricTriggers.ON_UPDATE_GEOMETRY):
 
     def caption(self):
@@ -494,7 +494,7 @@ class RdsCutEdges(RdsMetric[int],
 
 class RdsSplitsMetric(RdsMetric[KeyedList[RdsSplits]],
                       mname="splits",
-                      level=Level.GEOGRAPHIC,
+                      level=MetricLevel.GEOGRAPHIC,
                       triggers=MetricTriggers.ON_UPDATE_GEOMETRY | MetricTriggers.ON_UPDATE_DEMOGRAPHICS):
 
     def __init__(self, plan: RdsPlan = None):

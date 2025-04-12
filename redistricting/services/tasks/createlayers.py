@@ -37,6 +37,8 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsField,
+    QgsProject,
+    QgsTask,
     QgsVectorLayer
 )
 from qgis.PyQt.QtCore import QVariant
@@ -44,17 +46,23 @@ from qgis.PyQt.QtCore import QVariant
 from ... import CanceledError
 from ...models import (
     DistrictColumns,
-    MetricsColumns
+    MetricLevel,
+    MetricTriggers,
+    base_metrics,
+    camel_to_snake
 )
-from ...models.metricslist import MetricTriggers
 from ...utils import (
     createGeoPackage,
     createGpkgTable,
     spatialite_connect,
     tr
 )
+from ..districtio import DistrictReader
 from ._debug import debug_thread
-from .updatebase import AggregateDataTask
+from .updatebase import (
+    AggregateDataTask,
+    UpdateMetricsTask
+)
 
 if TYPE_CHECKING:
     from ...models import (
@@ -63,7 +71,24 @@ if TYPE_CHECKING:
     )
 
 
-class CreatePlanLayersTask(AggregateDataTask):
+class CreatePlanLayersTask(QgsTask):
+    def __init__(
+        self,
+        plan: 'RdsPlan',
+        gpkgPath,
+        geoLayer: QgsVectorLayer,
+        geoJoinField: str
+    ):
+        super().__init__(tr('Updating districts'), QgsTask.AllFlags)
+
+        updateSubTask = CreatePlanLayersSubTask(plan, gpkgPath, geoLayer, geoJoinField)
+        updateMetricsSubTask = UpdateMetricsTask(plan, MetricTriggers.ON_CREATE_PLAN)
+        self.addSubTask(updateSubTask, subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+        self.addSubTask(updateMetricsSubTask, dependencies=[updateSubTask],
+                        subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
+
+
+class CreatePlanLayersSubTask(AggregateDataTask):
     def __init__(self, plan: RdsPlan, gpkgPath, geoLayer: QgsVectorLayer, geoJoinField: str):
         super().__init__(plan, tr('Create assignments layer'))
         self.path = gpkgPath
@@ -117,14 +142,15 @@ class CreatePlanLayersTask(AggregateDataTask):
         else:
             raise ValueError(f'RdsField {self.popField} has invalid field type for population field')
 
-        sql = 'CREATE TABLE districts (' \
-            'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
-            f'{DistrictColumns.DISTRICT} INTEGER UNIQUE NOT NULL,' \
-            f'{DistrictColumns.NAME} TEXT DEFAULT \'\',' \
-            f'{DistrictColumns.MEMBERS} INTEGER DEFAULT 1,' \
-            f'{DistrictColumns.POPULATION} {poptype} DEFAULT 0,' \
-            f'{DistrictColumns.DEVIATION} {poptype} DEFAULT 0,' \
-            f'{DistrictColumns.PCT_DEVIATION} REAL DEFAULT 0,'
+        fields = [
+            'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL',
+            f'{DistrictColumns.DISTRICT} INTEGER UNIQUE NOT NULL',
+            f'{DistrictColumns.NAME} TEXT DEFAULT \'\'',
+            f'{DistrictColumns.MEMBERS} INTEGER DEFAULT 1',
+            f'{DistrictColumns.POPULATION} {poptype} DEFAULT 0',
+            f'{DistrictColumns.DEVIATION} {poptype} DEFAULT 0',
+            f'{DistrictColumns.PCT_DEVIATION} REAL DEFAULT 0'
+        ]
 
         fieldNames = {self.distField, 'name', 'members', self.popField, 'deviation', 'pct_deviation'}
 
@@ -148,7 +174,7 @@ class CreatePlanLayersTask(AggregateDataTask):
             else:
                 continue
 
-            sql += f'{f.fieldName} {tp},'
+            fields.append(f'{f.fieldName} {tp}')
             fieldNames.add(f.fieldName)
 
         for f in self.dataFields:
@@ -166,12 +192,28 @@ class CreatePlanLayersTask(AggregateDataTask):
             else:
                 continue
 
-            sql += f'{f.fieldName} {tp},'
+            fields.append(f'{f.fieldName} {tp}')
             fieldNames.add(f.fieldName)
 
-        sql += f'{MetricsColumns.POLSBYPOPPER} REAL,' \
-            f'{MetricsColumns.REOCK} REAL,' \
-            f'{MetricsColumns.CONVEXHULL} REAL)'
+        for m in self.plan.metrics.metrics:
+            name = camel_to_snake(m.name())
+            if name in fieldNames:
+                continue
+
+            if m.level() == MetricLevel.DISTRICT and m.serialize() and m.name() not in base_metrics:
+                if m.get_type() in (int, bool):
+                    tp = "INTEGER"
+                elif m.get_type is float:
+                    tp = "REAL"
+                elif m.get_type() is str:
+                    tp = "TEXT"
+                else:
+                    continue
+
+                fields.append(f'{name} {tp}')
+                fieldNames.add(name)
+
+        sql = f'CREATE TABLE districts (\n  {", ".join(fields)}\n)'
 
         success, error = createGpkgTable(db, 'districts', sql, srid=self.srid)
         if success:
@@ -200,10 +242,9 @@ class CreatePlanLayersTask(AggregateDataTask):
         else:
             return False
 
-        sql = 'CREATE TABLE assignments (' \
-            'fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,' \
-            f'{self.geoIdField} {tp} UNIQUE NOT NULL,' \
-            f'{self.distField} INTEGER NOT NULL DEFAULT 0'
+        fields = ['fid INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL',
+                  f'{self.geoIdField} {tp} UNIQUE NOT NULL',
+                  f'{self.distField} INTEGER NOT NULL DEFAULT 0']
 
         fieldNames = [self.geoIdField, self.distField]
 
@@ -223,10 +264,10 @@ class CreatePlanLayersTask(AggregateDataTask):
             else:
                 continue
 
-            sql += f',{f.fieldName} {tp}'
+            fields.append(f'{f.fieldName} {tp}')
             fieldNames.append(f.fieldName)
 
-        sql += ')'
+        sql = f'CREATE TABLE assignments ({",".join(fields)})'
         success, error = createGpkgTable(db, 'assignments', sql, srid=self.srid)
         if success:
             db.execute(f'CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})')
@@ -317,7 +358,6 @@ class CreatePlanLayersTask(AggregateDataTask):
 
             self.populationData[self.distField] = 0  # add assignments column
             self.geometry = gpd.read_file(self.path, layer="districts").geometry
-            self.updateMetrics(MetricTriggers.ON_CREATE_PLAN)
         except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
@@ -333,4 +373,8 @@ class CreatePlanLayersTask(AggregateDataTask):
 
     def finished(self, result):
         super().finished(result)
-        self.finishMetrics(MetricTriggers.ON_CREATE_PLAN)
+        self.plan.addLayersFromGeoPackage(self.path)
+        reader = DistrictReader(self.plan.distLayer)
+        unassigned = reader.readFromLayer()[0]
+        self.plan.districts[0].update(unassigned)
+        QgsProject.instance().addMapLayers([self.plan.assignLayer, self.plan.distLayer], False)

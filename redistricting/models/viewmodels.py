@@ -73,7 +73,7 @@ from .field import (
     RdsField
 )
 from .metricslist import (
-    Level,
+    MetricLevel,
     RdsMetric,
     RdsMetrics
 )
@@ -179,7 +179,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
     def deviationTypeChanged(self):
         self._validator = PlusMinusDeviationValidator(self._plan) \
             if self._plan.deviationType == DeviationType.OverUnder \
-            else MaxDeviationValidator(self._plan)
+            else MaxDeviationValidator()
         self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
             self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
 
@@ -636,7 +636,7 @@ class DeltaListModel(QAbstractTableModel):
                 else:
                     return self._fields[section]['caption']
             if role == Qt.ItemDataRole.TextAlignmentRole:
-                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignCenter)
+                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignmentFlag.AlignCenter)
 
             if role == Qt.ItemDataRole.BackgroundRole and orientation == Qt.Orientation.Horizontal:
                 ft = self._fields[section]['field-type']
@@ -764,10 +764,10 @@ class RdsMetricsModel(QAbstractTableModel):
         rows: dict[str, RdsMetric] = {}
         groups: dict[str, dict[str, RdsMetric]] = {}
         for name, metric in self._metrics.metrics.items():
-            if metric.level() == Level.DISTRICT or not metric.display():
+            if metric.level() == MetricLevel.DISTRICT or not metric.display():
                 continue
 
-            if metric.level() == Level.GEOGRAPHIC:
+            if metric.level() == MetricLevel.GEOGRAPHIC:
                 if len(self._plan.geoFields) == 0:
                     continue
                 g = metric.caption()
@@ -801,14 +801,14 @@ class RdsMetricsModel(QAbstractTableModel):
         return 1 if not parent.isValid() else 0
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if orientation == Qt.Orientation.Vertical and role == Qt.ItemDataRole.DisplayRole:
+        if orientation == Qt.Orientation.Vertical and role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.SizeHintRole):
 
             m = self._data[section]
             if m is None:
                 # it's a group or a geographic metric header
                 header = self.metricKey(section)
 
-            elif m.level() == Level.GEOGRAPHIC:
+            elif m.level() == MetricLevel.GEOGRAPHIC:
                 # it's an entry in a geographic metric -- header is geoField's caption
                 g = self.metricKey(section)
                 header = f'    {self._plan.geoFields[g].caption}'
@@ -819,9 +819,9 @@ class RdsMetricsModel(QAbstractTableModel):
             else:
                 header = m.caption()
 
-            if role == Qt.DisplayRole:
+            if role == Qt.ItemDataRole.DisplayRole:
                 return header
-            if role == Qt.SizeHintRole:
+            if role == Qt.ItemDataRole.SizeHintRole:
                 fm = QFontMetrics(QFont())
                 return QSize(fm.width(header), 24)
 
@@ -833,7 +833,7 @@ class RdsMetricsModel(QAbstractTableModel):
             return None
 
         if role == Qt.ItemDataRole.DisplayRole:
-            if metric.level() == Level.GEOGRAPHIC:
+            if metric.level() == MetricLevel.GEOGRAPHIC:
                 idx = self.metricKey(index.row())
                 result = metric.format(idx)
             else:

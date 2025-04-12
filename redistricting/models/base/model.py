@@ -66,9 +66,9 @@ from .serialization import (
     _memo,
     deserialize_value,
     kebab_dict,
+    kebab_to_camel,
     register_serializer,
-    serialize_value,
-    to_camelcase
+    serialize_value
 )
 
 # pylint: disable=redefined-builtin
@@ -857,7 +857,7 @@ def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optio
     flds = get_type_hints(cls)
 
     for k, v in data.items():
-        f = to_camelcase(k)
+        f = kebab_to_camel(k)
         if f in flds:
             t = flds[f]
         else:

@@ -91,7 +91,7 @@ class PlanListModel(QAbstractTableModel):
                 return f
         elif role == Qt.ItemDataRole.ForegroundRole:
             if index.row() == self.activePlanIndex().row():
-                return QColor(Qt.blue)
+                return QColor(Qt.GlobalColor.blue)
 
         return None
 

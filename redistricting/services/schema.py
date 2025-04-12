@@ -43,9 +43,9 @@ from qgis.core import (
 from redistricting.models.columns import MetricsColumns
 
 from ..models import DistrictColumns
-from ..models.base.serialization import to_kebabcase
+from ..models.base.serialization import camel_to_kebab
 from ..models.metricslist import (
-    Level,
+    MetricLevel,
     metrics_classes
 )
 from ..utils import (
@@ -526,8 +526,8 @@ def migrateSchema1_0_3_to_1_0_4(data: planSchema1_0_2):
 
 def migrateSchema1_0_4_to_1_0_5(data: planSchema1_0_4):
     metrics: dict[str, Any] = {
-        to_kebabcase(n): None for n, m in metrics_classes.items()
-        if m.level() != Level.DISTRICT
+        camel_to_kebab(n): None for n, m in metrics_classes.items()
+        if m.level() != MetricLevel.DISTRICT and m.serialize()
     }
     metrics['total-population'] = data['total-population']
 

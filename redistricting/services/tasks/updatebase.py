@@ -50,8 +50,29 @@ from ...models import (
 )
 from ...utils import (
     LayerReader,
-    SqlAccess
+    SqlAccess,
+    tr
 )
+
+
+class UpdateMetricsTask(QgsTask):
+    def __init__(self, plan: RdsPlan, trigger: MetricTriggers = 0):
+        super().__init__(tr("Updating metrics"),  QgsTask.AllFlags)
+        self.plan = plan
+        self.trigger = trigger
+
+    def updateMetrics(self, trigger: MetricTriggers):
+        self.plan.metrics.updateMetrics(trigger, self.populationData, self.geometry)
+
+    def finishMetrics(self, trigger: MetricTriggers):
+        self.plan.metrics.updateFinished(trigger)
+
+    def run(self):
+        self.updateMetrics(self.trigger)
+
+    def finished(self, result: bool):
+        super().finished(result)
+        self.finishMetrics(self.trigger)
 
 
 class AggregateDataTask(SqlAccess, QgsTask):
@@ -152,12 +173,6 @@ class AggregateDataTask(SqlAccess, QgsTask):
                 df.loc[:, f.fieldName] = df.query(f.field)
 
         return df
-
-    def updateMetrics(self, trigger: MetricTriggers):
-        self.plan.metrics.updateMetrics(trigger, self.populationData, self.geometry)
-
-    def finishMetrics(self, trigger: MetricTriggers):
-        self.plan.metrics.updateFinished(trigger)
 
     def finished(self, result: bool):
         super().finished(result)

@@ -31,8 +31,7 @@ from typing import (
 
 from qgis.core import (
     Qgis,
-    QgsApplication,
-    QgsProject
+    QgsApplication
 )
 from qgis.PyQt.QtCore import (
     QObject,
@@ -48,7 +47,6 @@ from ..models import (
 from ..models.base.lists import KeyedList
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
-from .districtio import DistrictReader
 from .tasks.createlayers import CreatePlanLayersTask
 
 
@@ -96,12 +94,6 @@ class PlanBuilder(BasePlanBuilder):
     def createLayers(self, plan: RdsPlan):
         def taskCompleted():
             self._createLayersTask = None
-
-            plan.addLayersFromGeoPackage(self._geoPackagePath)
-            reader = DistrictReader(plan.distLayer)
-            unassigned = reader.readFromLayer()[0]
-            plan.districts[0].update(unassigned)
-            QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
             self.layersCreated.emit(plan)
 
         def taskTerminated():
