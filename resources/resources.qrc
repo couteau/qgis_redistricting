@@ -6,6 +6,7 @@
     <file alias="addplan.svg">addplan.svg</file>
     <file alias="editplan.svg">editplan.svg</file>
     <file alias="copyplan.svg">copyplan.svg</file>
+    <file alias="deleteplan.svg">deleteplan.svg</file>
     <file alias="importplan.svg">importplan.svg</file>
     <file alias="exportplan.svg">exportplan.svg</file>
     <file alias="planmanager.svg">toolbox.svg</file>
