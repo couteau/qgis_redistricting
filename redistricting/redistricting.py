@@ -43,6 +43,7 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtWidgets import (
     QMenu,
+    QMessageBox,
     QToolBar
 )
 from qgis.PyQt.QtXml import QDomDocument
@@ -72,7 +73,8 @@ from .services import (
     PlanImportService,
     PlanManager,
     PlanStylerService,
-    ProjectStorage
+    ProjectStorage,
+    schema
 )
 
 
@@ -266,12 +268,26 @@ class Redistricting:
         self.unloading = True
 
     def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
-        dirtyBlocker = QgsProjectDirtyBlocker(self.project)
-        try:
-            self.clear()
-            storage = ProjectStorage(self.project, doc, context)
+        self.clear()
+        storage = ProjectStorage(self.project, doc, context)
+
+        if schema.needsMigration(storage.getVersion()):
+            # confirm migration
+            if QMessageBox.warning(
+                self.iface.mainWindow(),
+                self.tr('Redistricting Plugin'),
+                self.tr('The project was created with an older version of the Redistricting plugin. '
+                        'All plans will be updated to the current version. This cannot be undone. '
+                        'Please ensure you have a backup of your project before proceeding.'),
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+            ) == QMessageBox.StandardButton.Cancel:
+                return
+
             self.planManager.extend(storage.readRedistrictingPlans())
 
+        # don't let setting active plan dirty the project
+        dirtyBlocker = QgsProjectDirtyBlocker(self.project)
+        try:
             if len(self.planManager) == 1:
                 self.planManager.setActivePlan(self.planManager[0])
             else:

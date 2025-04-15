@@ -317,44 +317,41 @@ def _renameField(data: dict, old_name: str, new_name: str):
 
 
 def migrateSchema1_0_0_to_1_0_1(data: planSchema1_0_0):
-    _renameField(data, 'join-field', 'pop-join-field')
-    _renameField(data, 'geo-id-display', 'geo-id-caption')
-    _renameField(data, 'src-layer', 'geo-layer')
-    _renameField(data, 'src-id-field', 'geo-join-field')
+    migrated = planSchema1_0_1(data)
+    _renameField(migrated, 'join-field', 'pop-join-field')
+    _renameField(migrated, 'geo-id-display', 'geo-id-caption')
+    _renameField(migrated, 'src-layer', 'geo-layer')
+    _renameField(migrated, 'src-id-field', 'geo-join-field')
 
-    vap = data.get('vap-field')
+    migrated['pop-fields'] = []
+
+    vap = migrated.get('vap-field')
     if vap:
-        if 'pop-fields' not in data:
-            data['pop-fields'] = []
-
-        data['pop-fields'].append(
+        migrated['pop-fields'].append(
             fieldSchema(
-                layer=data['pop-layer'],
+                layer=migrated['pop-layer'],
                 field=vap,
                 expression=False,
                 caption=tr("VAP")
             )
         )
-        del data['vap-field']
+        del migrated['vap-field']
 
-    cvap = data.get('cvap-field')
+    cvap = migrated.get('cvap-field')
     if cvap:
-        if 'pop-fields' not in data:
-            data['pop-fields'] = []
-
-        data['pop-fields'].append(
+        migrated['pop-fields'].append(
             fieldSchema(
-                layer=data['pop-layer'],
+                layer=migrated['pop-layer'],
                 field=cvap,
                 expression=False,
                 caption=tr("CVAP")
             )
         )
-        del data['cvap-field']
+        del migrated['cvap-field']
 
-    for field in data.get('data-fields', []):
+    for field in migrated.get('data-fields', []):
         if field['pctbase'] == 1:
-            field['pctbase'] = data['pop-field']
+            field['pctbase'] = migrated['pop-field']
         elif field['pctbase'] == 2:
             field['pctbase'] = vap
         elif field['pctbase'] == 3:
@@ -362,16 +359,16 @@ def migrateSchema1_0_0_to_1_0_1(data: planSchema1_0_0):
         else:
             field['pctbase'] = None
 
-    splits = data["plan-stats"].get("splits")
+    splits = migrated["plan-stats"].get("splits")
     split_data: dict[str, list] = {}
     if splits:
         for f, s in splits.items():
             split_data[f] = [
                 {f: g[0], "districts": {}, "splits": g[1]} for g in s
             ]
-    data["plan-stats"]["splits"] = split_data
+    migrated["plan-stats"]["splits"] = split_data
 
-    return data, version.parse('1.0.1')
+    return migrated, version.parse('1.0.1')
 
 
 def _updateDistLayer1_0_1_to_1_0_2(data: planSchema1_0_1):
@@ -588,6 +585,10 @@ schemas = {
     version.parse('1.0.4'): planSchema1_0_4,
     schemaVersion: planSchema
 }
+
+
+def needsMigration(v: version.Version):
+    return v < schemaVersion
 
 
 def checkMigrateSchema(data: dict, v: version.Version):
