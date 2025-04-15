@@ -81,9 +81,8 @@ class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
             sizeHint = model.headerData(i, Qt.Orientation.Horizontal, Qt.ItemDataRole.SizeHintRole)
             if isinstance(sizeHint, QSize):
                 self.lvwPlans.setColumnWidth(i, sizeHint.width())
-        # self.lvwPlans.resizeColumnsToContents()
-        # self.lvwPlans.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.lvwPlans.horizontalHeader().setSectionResizeMode(model.columnCount() - 1, QHeaderView.Stretch)
+
+        self.lvwPlans.horizontalHeader().setSectionResizeMode(model.columnCount() - 1, QHeaderView.ResizeMode.Stretch)
         self.lvwPlans.selectionModel().currentRowChanged.connect(self.viewCurrentRowChanged)
 
     def currentIndex(self):

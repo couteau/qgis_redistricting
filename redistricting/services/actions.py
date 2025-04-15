@@ -34,14 +34,10 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 from qgis.PyQt.QtGui import (
+    QAction,
     QIcon,
     QKeySequence
 )
-
-if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QAction
-else:
-    from qgis.PyQt.QtWidgets import QAction
 
 if TYPE_CHECKING:
     from ..models import RdsPlan

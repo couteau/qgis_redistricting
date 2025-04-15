@@ -23,7 +23,6 @@
 """
 import pathlib
 from typing import (
-    TYPE_CHECKING,
     Iterable,
     Optional
 )
@@ -36,7 +35,11 @@ from qgis.core import (
 )
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
-from qgis.PyQt.QtGui import QIcon
+from qgis.PyQt.QtGui import (
+    QAction,
+    QActionGroup,
+    QIcon
+)
 from qgis.PyQt.QtWidgets import (
     QDialog,
     QMenu,
@@ -74,25 +77,6 @@ from ..services.actions import PlanAction
 from ..services.tasks.autoassign import AutoAssignUnassignedUnits
 from ..utils import tr
 from .base import BaseController
-
-if TYPE_CHECKING:
-    from qgis.PyQt.QtCore import QT_VERSION
-    if QT_VERSION >= 0x060000:
-        from PyQt6.QtGui import (  # type: ignore[import]
-            QAction,
-            QActionGroup
-        )
-    else:
-        from PyQt5.QtWidgets import (  # type: ignore[import]
-            QAction,
-            QActionGroup
-        )
-
-else:
-    from qgis.PyQt.QtGui import (
-        QAction,
-        QActionGroup
-    )
 
 
 class PlanController(BaseController):
@@ -259,7 +243,7 @@ class PlanController(BaseController):
 
         self.actionSelectPlan = self.actions.createPlanAction(
             'actionSelectPlan',
-            QIcon(':/plugins/redistricting/selectplan.svg'),
+            QIcon(':/plugins/redistricting/activateplan.svg'),
             tr('Select Plan'),
             tooltip=tr('Make the selected plan the active plan'),
             callback=self.selectPlan,
