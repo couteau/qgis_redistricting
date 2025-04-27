@@ -21,12 +21,18 @@ Copyright 2022-2024, Stuart C. Naifeh
 import pytest
 from pytest_mock import MockerFixture
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import pyqtBoundSignal
+from qgis.PyQt.QtCore import (
+    QModelIndex,
+    pyqtBoundSignal
+)
 from qgis.PyQt.QtWidgets import QAction
 
 from redistricting.controllers import MetricsController
-from redistricting.gui import DlgSplitDetail
-from redistricting.models import RdsGeoField
+from redistricting.gui import RdsMetricGuiHandler
+from redistricting.models import (
+    RdsMetric,
+    RdsMetricsModel
+)
 
 
 class TestMetricsController:
@@ -43,10 +49,14 @@ class TestMetricsController:
 
     def test_create(self, controller):
         assert controller
-        assert isinstance(controller.actionShowSplitsDialog, QAction)
+        assert controller.metricsModel is not None
+        assert controller.handler_cache is not None and len(controller.handler_cache) == 0
+        assert isinstance(controller.actionCopyMetrics, QAction)
 
     def test_load(self, controller, mock_planmanager):
         controller.load()
+        assert controller.metricsModel is not None
+        assert controller.dockwidget is not None
         mock_planmanager.activePlanChanged.connect.assert_called_once_with(controller.planChanged)
 
     def test_unload(self, controller, mock_planmanager):
@@ -55,56 +65,52 @@ class TestMetricsController:
         mock_planmanager.activePlanChanged.disconnect.assert_called_once_with(controller.planChanged)
 
     def test_plan_changed(self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture):
-        controller_with_active_plan.dlgSplits = mocker.MagicMock()
-        assert not controller_with_active_plan.actionShowSplitsDialog.isEnabled()
+        handler = mocker.MagicMock()
+        controller_with_active_plan.handler_cache['test'] = handler
         controller_with_active_plan.planChanged(mock_plan)
-        assert controller_with_active_plan.actionShowSplitsDialog.isEnabled()
-        assert controller_with_active_plan.dlgSplits is None
-
-    def test_plan_changed_none_disables_action(self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture):
-        controller_with_active_plan.dlgSplits = mocker.MagicMock()
-        controller_with_active_plan.planChanged(mock_plan)
-        assert controller_with_active_plan.actionShowSplitsDialog.isEnabled()
+        handler.update.assert_called_once_with(mock_plan)
         controller_with_active_plan.planChanged(None)
-        assert not controller_with_active_plan.actionShowSplitsDialog.isEnabled()
-        assert controller_with_active_plan.dlgSplits is None
+        handler.deactivate.assert_called_once()
+        assert len(controller_with_active_plan.handler_cache) == 0
 
-    def test_show_splits_dialog(self, controller_with_active_plan: MetricsController, mock_plan, qgis_iface, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
-        dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.cmbGeography = mocker.MagicMock()
-        field = mocker.create_autospec(spec=RdsGeoField)
-        controller_with_active_plan.showSplits(field)
-        dlgClass.assert_called_once_with(mock_plan, qgis_iface.mainWindow())
+    def test_show_metric_detail_creates_handler(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
+        get_metric_handler = mocker.patch("redistricting.controllers.metrics.get_metric_handler")
+        handler = mocker.create_autospec(spec=RdsMetricGuiHandler)
+        handler.deactivated = mocker.create_autospec(spec=pyqtBoundSignal)
+        get_metric_handler.return_value = handler
+        mocker.patch.object(controller_with_active_plan, "metricsModel", spec=RdsMetricsModel)
+        metric = mocker.create_autospec(spec=RdsMetric)
+        controller_with_active_plan.metricsModel.metric.return_value = metric
+        controller_with_active_plan.metricsModel.metricKey.return_value = None
+        index = mocker.create_autospec(spec=QModelIndex)
+        assert len(controller_with_active_plan.handler_cache) == 0
+        controller_with_active_plan.showMetricsDetail(index)
+        assert len(controller_with_active_plan.handler_cache) == 1
+        assert list(controller_with_active_plan.handler_cache.values())[0] == handler
+        get_metric_handler.assert_called_once()
+        get_metric_handler.reset_mock()
+        controller_with_active_plan.showMetricsDetail(index)
+        assert len(controller_with_active_plan.handler_cache) == 1
+        get_metric_handler.assert_not_called()
 
-    def test_show_splits_dialog_no_geofield_returns(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
+    def test_show_detail_for_metric_with_no_handler_creates_no_handler(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
+        get_metric_handler = mocker.patch("redistricting.controllers.metrics.get_metric_handler")
+        get_metric_handler.return_value = None
+        metric = mocker.create_autospec(spec=RdsMetric)
+        mocker.patch.object(controller_with_active_plan, "metricsModel", spec=RdsMetricsModel)
+        controller_with_active_plan.metricsModel.metric.return_value = metric
+        controller_with_active_plan.metricsModel.metricKey.return_value = None
+        index = mocker.create_autospec(spec=QModelIndex)
+        assert len(controller_with_active_plan.handler_cache) == 0
+        controller_with_active_plan.showMetricsDetail(index)
+        assert len(controller_with_active_plan.handler_cache) == 0
+
+    def test_show_update_handler_calls_update(self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture):
         sender = mocker.patch.object(controller_with_active_plan, "sender")
-        sender.return_value = controller_with_active_plan.actionShowSplitsDialog
-        controller_with_active_plan.showSplits()
-        dlgClass.assert_not_called()
-
-    def test_show_splits_dialog_geofield_on_sender_runs_dialog(self, controller_with_active_plan: MetricsController, mock_plan, qgis_iface, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
-        dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.cmbGeography = mocker.MagicMock()
-        field = mocker.create_autospec(spec=RdsGeoField)
-        controller_with_active_plan.actionShowSplitsDialog.setData(field)
-        sender = mocker.patch.object(controller_with_active_plan, "sender")
-        sender.return_value = controller_with_active_plan.actionShowSplitsDialog
-        controller_with_active_plan.showSplits()
-        dlgClass.assert_called_once_with(mock_plan, qgis_iface.mainWindow())
-
-    def test_show_splits_dialog_existing_dialog(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
-        dlgClass = mocker.patch("redistricting.controllers.metrics.DlgSplitDetail", autospec=DlgSplitDetail)
-        dlgClass.return_value.geographyChanged = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.destroyed = mocker.PropertyMock(spec=pyqtBoundSignal)
-        dlgClass.return_value.cmbGeography = mocker.MagicMock()
-        field = mocker.create_autospec(spec=RdsGeoField)
-        controller_with_active_plan.dlgSplits = dlgClass.return_value
-        field = mocker.create_autospec(spec=RdsGeoField)
-        controller_with_active_plan.showSplits(field)
-        dlgClass.assert_not_called()
-        dlgClass.return_value.show.assert_called_once()
+        sender.return_value = mock_plan
+        metric = mocker.create_autospec(spec=RdsMetric)
+        mock_plan.metrics.metrics.__iter__.return_value = [metric]
+        handler = mocker.create_autospec(spec=RdsMetricGuiHandler)
+        controller_with_active_plan.handler_cache[type(metric)] = handler
+        controller_with_active_plan.updateMetricsDetail()
+        handler.update.assert_called_once_with(mock_plan, metric)

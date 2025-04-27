@@ -60,6 +60,9 @@ from qgis.PyQt import (
     sip
 )
 
+from redistricting.models import \
+    metrics  # noqa: F401; pylint: disable=unused-import
+
 if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
 
@@ -620,7 +623,7 @@ def qgis_new_project(qgis_iface: QgisInterface) -> None:
     """
     Initializes new QGIS project by removing layers and relations etc.
     """
-    qgis_iface.newProject()
+    qgis_iface.newProject(False)
 
 
 # pylint: disable=wrong-import-position
@@ -685,6 +688,23 @@ def plan(qgis_parent, block_layer, assign_layer, dist_layer):
                 'caption': 'VTD'}
         ],
         'total-population': 227036,
+        'metrics': {
+            'metrics': {
+                'total-population': 227036,
+                'plan-deviation': [100, -500],
+                'mean-polsbypopper': 0.4,
+                'min-polsbypopper': 0.15,
+                'max-polsbypopper': 0.8,
+                'mean-reock': 0.5,
+                'min-reock': 0.1,
+                'max-reock': 0.9,
+                'mean-convexhull': 0.5,
+                'min-convexhull': 0.1,
+                'max-convexhull': 0.9,
+                'contiguity': True,
+                'complete': True,
+            }
+        }
     }, parent=qgis_parent)
 
     r = DistrictReader(dist_layer, popField='pop_total')
@@ -720,8 +740,7 @@ def new_plan(block_layer: QgsVectorLayer, datadir: pathlib.Path):
 
     p.addLayersFromGeoPackage(dst)
     QgsProject.instance().addMapLayers([p.distLayer, p.assignLayer], False)
-    p.updateMetrics(227036, None, None)
-
+    p.metrics['totalPopulation'].setValue(227036)  # noqa: F541; pylint: disable=unsubscriptable-object
     yield p
 
     p._setAssignLayer(None)

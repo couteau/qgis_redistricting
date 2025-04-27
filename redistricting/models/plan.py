@@ -339,11 +339,6 @@ class RdsPlan(RdsBaseModel):
             self.districts.remove(district)  # pylint: disable=no-member
             self.districtRemoved.emit(district)
 
-    def updateMetrics(self, totalPopulation, cutEdges, splitsData):
-        if totalPopulation is not None:
-            self.totalPopulation = totalPopulation
-        self.metrics.updateMetrics(cutEdges, splitsData)  # pylint: disable=no-member
-
     def isValid(self):
         """Test whether plan meets minimum specifications for use"""
         return self.assignLayer is not None and \

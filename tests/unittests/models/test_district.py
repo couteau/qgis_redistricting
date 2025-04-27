@@ -42,7 +42,7 @@ class TestDistrict:
         assert district.pct_deviation == 0
 
         with pytest.raises(TypeError):
-            district = RdsDistrict()
+            district = RdsDistrict()  # pylint: disable=no-value-for-parameter
 
     def test_create_with_name_sets_name(self):
         district = RdsDistrict(1, name="District 1")

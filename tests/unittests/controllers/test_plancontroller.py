@@ -208,7 +208,8 @@ class TestPlanController:
         assert len(controller_with_active_plan.planMenu.actions()) == 0
         assert not controller_with_active_plan.actionSelectPlan.isEnabled()
 
-    def test_enable_active_plan_actions(self, controller: controllers.PlanController, mock_plan):
+    def test_enable_active_plan_actions(self, controller: controllers.PlanController, mock_plan, mocker):
+        mock_plan.metrics = mocker.MagicMock()
         controller.addPlanToMenu(mock_plan)
         controller.enableActivePlanActions(mock_plan)
         assert controller.actionEditActivePlan.isEnabled()
@@ -219,7 +220,8 @@ class TestPlanController:
         assert controller.planActions.findChild(QAction, "test") is not None
         assert controller.planActions.findChild(QAction, "test").isChecked()
 
-    def test_set_active_plan_none(self, controller: controllers.PlanController, mock_plan):
+    def test_set_active_plan_none(self, controller: controllers.PlanController, mock_plan, mocker):
+        mock_plan.metrics = mocker.MagicMock()
         controller.addPlanToMenu(mock_plan)
         controller.enableActivePlanActions(mock_plan)
         assert controller.actionEditActivePlan.isEnabled()

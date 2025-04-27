@@ -37,17 +37,14 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsField,
-    QgsProject,
-    QgsTask,
     QgsVectorLayer
 )
-from qgis.PyQt.QtCore import QVariant
+from qgis.PyQt.QtCore import QMetaType
 
 from ... import CanceledError
 from ...models import (
     DistrictColumns,
     MetricLevel,
-    MetricTriggers,
     base_metrics,
     camel_to_snake
 )
@@ -59,10 +56,7 @@ from ...utils import (
 )
 from ..districtio import DistrictReader
 from ._debug import debug_thread
-from .updatebase import (
-    AggregateDataTask,
-    UpdateMetricsTask
-)
+from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
     from ...models import (
@@ -71,24 +65,7 @@ if TYPE_CHECKING:
     )
 
 
-class CreatePlanLayersTask(QgsTask):
-    def __init__(
-        self,
-        plan: 'RdsPlan',
-        gpkgPath,
-        geoLayer: QgsVectorLayer,
-        geoJoinField: str
-    ):
-        super().__init__(tr('Updating districts'), QgsTask.AllFlags)
-
-        updateSubTask = CreatePlanLayersSubTask(plan, gpkgPath, geoLayer, geoJoinField)
-        updateMetricsSubTask = UpdateMetricsTask(plan, MetricTriggers.ON_CREATE_PLAN)
-        self.addSubTask(updateSubTask, subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
-        self.addSubTask(updateMetricsSubTask, dependencies=[updateSubTask],
-                        subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
-
-
-class CreatePlanLayersSubTask(AggregateDataTask):
+class CreatePlanLayersTask(AggregateDataTask):
     def __init__(self, plan: RdsPlan, gpkgPath, geoLayer: QgsVectorLayer, geoJoinField: str):
         super().__init__(plan, tr('Create assignments layer'))
         self.path = gpkgPath
@@ -134,10 +111,12 @@ class CreatePlanLayersSubTask(AggregateDataTask):
 
     def createDistLayer(self, db: sqlite3.Connection):
         fld = self.popLayer.fields()[self.popField]
-        if fld.type() in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
-                          QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
+        if fld.type() in (QMetaType.Type.Int, QMetaType.Type.Short, QMetaType.Type.Long, QMetaType.Type.LongLong,
+                          QMetaType.Type.UInt, QMetaType.Type.UShort, QMetaType.Type.ULong, QMetaType.Type.ULongLong,
+                          QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
+                          QMetaType.Type.SChar, QMetaType.Type.UChar):
             poptype = 'INTEGER'
-        elif fld.type() == QVariant.Double:
+        elif fld.type() in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
             poptype = 'REAL'
         else:
             raise ValueError(f'RdsField {self.popField} has invalid field type for population field')
@@ -164,12 +143,15 @@ class CreatePlanLayersSubTask(AggregateDataTask):
             f.prepare(context)
 
             t = f.fieldType()
-            if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
-                     QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
+            if t in (QMetaType.Type.Int, QMetaType.Type.Short, QMetaType.Type.Long, QMetaType.Type.LongLong,
+                     QMetaType.Type.UInt, QMetaType.Type.UShort, QMetaType.Type.ULong, QMetaType.Type.ULongLong,
+                     QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
+                     QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t == QVariant.Double:
+            elif t in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
                 tp = 'REAL'
-            elif t in (QVariant.String, QVariant.ByteArray, QVariant.Char):
+            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
+                       QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
                 tp = 'TEXT'
             else:
                 continue
@@ -184,10 +166,12 @@ class CreatePlanLayersSubTask(AggregateDataTask):
             f.prepare(context)
 
             t = f.fieldType()
-            if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong,
-                     QVariant.Bool, QVariant.Date, QVariant.Time, QVariant.DateTime):
+            if t in (QMetaType.Type.Int, QMetaType.Type.Short, QMetaType.Type.Long, QMetaType.Type.LongLong,
+                     QMetaType.Type.UInt, QMetaType.Type.UShort, QMetaType.Type.ULong, QMetaType.Type.ULongLong,
+                     QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
+                     QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t == QVariant.Double:
+            elif t in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
                 tp = 'REAL'
             else:
                 continue
@@ -235,9 +219,13 @@ class CreatePlanLayersSubTask(AggregateDataTask):
 
     def createAssignLayer(self, db: sqlite3.Connection):
         t = QgsField(self.geoField).type()
-        if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong):
+        if t in (QMetaType.Type.Int, QMetaType.Type.Short, QMetaType.Type.Long, QMetaType.Type.LongLong,
+                 QMetaType.Type.UInt, QMetaType.Type.UShort, QMetaType.Type.ULong, QMetaType.Type.ULongLong,
+                 QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
+                 QMetaType.Type.SChar, QMetaType.Type.UChar):
             tp = 'INTEGER'
-        elif t in (QVariant.String, QVariant.ByteArray):
+        elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
+                   QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
             tp = 'TEXT'
         else:
             return False
@@ -257,9 +245,13 @@ class CreatePlanLayersSubTask(AggregateDataTask):
 
             f.prepare(context)
             t = f.fieldType()
-            if t in (QVariant.Int, QVariant.LongLong, QVariant.UInt, QVariant.ULongLong):
+            if t in (QMetaType.Type.Int, QMetaType.Type.Short, QMetaType.Type.Long, QMetaType.Type.LongLong,
+                     QMetaType.Type.UInt, QMetaType.Type.UShort, QMetaType.Type.ULong, QMetaType.Type.ULongLong,
+                     QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
+                     QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t in (QVariant.String, QVariant.ByteArray):
+            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
+                       QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
                 tp = 'TEXT'
             else:
                 continue
@@ -377,4 +369,3 @@ class CreatePlanLayersSubTask(AggregateDataTask):
         reader = DistrictReader(self.plan.distLayer)
         unassigned = reader.readFromLayer()[0]
         self.plan.districts[0].update(unassigned)
-        QgsProject.instance().addMapLayers([self.plan.assignLayer, self.plan.distLayer], False)

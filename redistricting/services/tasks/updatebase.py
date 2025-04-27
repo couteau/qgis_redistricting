@@ -53,22 +53,27 @@ from ...utils import (
     SqlAccess,
     tr
 )
+from ._debug import debug_thread
 
 
 class UpdateMetricsTask(QgsTask):
-    def __init__(self, plan: RdsPlan, trigger: MetricTriggers = 0):
-        super().__init__(tr("Updating metrics"),  QgsTask.AllFlags)
+    def __init__(self, plan: RdsPlan, trigger: MetricTriggers, populationData: pd.DataFrame, geometry: gpd.GeoSeries):
+        super().__init__(tr("Updating metrics"),  QgsTask.Flag.AllFlags)
         self.plan = plan
         self.trigger = trigger
+        self.populationData = populationData
+        self.geometry = geometry
 
-    def updateMetrics(self, trigger: MetricTriggers):
-        self.plan.metrics.updateMetrics(trigger, self.populationData, self.geometry)
+    def updateMetrics(self):
+        self.plan.metrics.updateMetrics(self.trigger, self.populationData, self.geometry)
 
     def finishMetrics(self, trigger: MetricTriggers):
         self.plan.metrics.updateFinished(trigger)
 
     def run(self):
-        self.updateMetrics(self.trigger)
+        debug_thread()
+        self.updateMetrics()
+        return True
 
     def finished(self, result: bool):
         super().finished(result)

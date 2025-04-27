@@ -1,3 +1,27 @@
+# -*- coding: utf-8 -*-
+"""QGIS Redistricting Plugin - metrics classes
+
+        begin                : 2022-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 import math
 from collections.abc import (
     Iterable,
@@ -498,9 +522,9 @@ class RdsSplitsMetric(RdsMetric[KeyedList[RdsSplits]],
                       triggers=MetricTriggers.ON_UPDATE_GEOMETRY | MetricTriggers.ON_UPDATE_DEMOGRAPHICS):
 
     def __init__(self, plan: RdsPlan = None):
+        super().__init__(plan)
         self._value: KeyedList[RdsSplits] = KeyedList()
         self.data: dict[str, pd.DataFrame] = {}
-        super().__init__(plan)
 
     @RdsMetric.plan.setter
     def plan(self, value: RdsPlan):

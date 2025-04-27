@@ -34,7 +34,7 @@ from redistricting.services.districtio import DistrictReader
 class TestLayerTreeManager:
     @pytest.fixture
     def manager(self):
-        manager = LayerTreeManager()
+        manager = LayerTreeManager(QgsProject.instance())
         return manager
 
     @pytest.fixture

@@ -32,8 +32,7 @@ from qgis.core import (
     Qgis,
     QgsApplication,
     QgsProject,
-    QgsProjectDirtyBlocker,
-    QgsReadWriteContext
+    QgsProjectDirtyBlocker
 )
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import (
@@ -73,8 +72,7 @@ from .services import (
     PlanImportService,
     PlanManager,
     PlanStylerService,
-    ProjectStorage,
-    schema
+    ProjectStorage
 )
 
 
@@ -111,7 +109,7 @@ class Redistricting:
 
         # set up services
         self.planManager = PlanManager()
-        self.layerTreeManger = LayerTreeManager()
+        self.layerTreeManger = LayerTreeManager(self.project)
         self.planStyler = PlanStylerService(self.planManager)
         self.deltaService = DeltaUpdateService(self.planManager)
         self.updaterService = DistrictUpdater()
@@ -191,7 +189,7 @@ class Redistricting:
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
         QgsApplication.instance().aboutToQuit.connect(self.onQuit)
 
-        self.project.readProjectWithContext.connect(self.onReadProject)
+        self.project.readProject.connect(self.onReadProject)
         self.project.writeProject.connect(self.onWriteProject)
 
         if Qgis.versionInt() < 33400:
@@ -232,7 +230,7 @@ class Redistricting:
 
         self.iface.unregisterOptionsWidgetFactory(self.optionsFactory)
 
-        self.project.readProjectWithContext.disconnect(self.onReadProject)
+        self.project.readProject.disconnect(self.onReadProject)
         self.project.writeProject.disconnect(self.onWriteProject)
         if Qgis.versionInt() < 33400:
             # prior to v. 3.34, there is no signal that gets triggered
@@ -267,11 +265,11 @@ class Redistricting:
     def onQuit(self):
         self.unloading = True
 
-    def onReadProject(self, doc: QDomDocument, context: QgsReadWriteContext):
+    def onReadProject(self, doc: QDomDocument):
         self.clear()
-        storage = ProjectStorage(self.project, doc, context)
+        storage = ProjectStorage(self.project, doc)
 
-        if schema.needsMigration(storage.getVersion()):
+        if storage.needsMigration():
             # confirm migration
             if QMessageBox.warning(
                 self.iface.mainWindow(),
@@ -283,7 +281,15 @@ class Redistricting:
             ) == QMessageBox.StandardButton.Cancel:
                 return
 
-            self.planManager.extend(storage.readRedistrictingPlans())
+            oldVersion = storage.version
+            storage.migrate()
+            self.iface.messageBar().pushMessage(
+                self.tr('Redistricting Plugin'),
+                self.tr(f'Plans migrated from schema version {oldVersion} to {storage.version}.'),
+                level=Qgis.MessageLevel.Success
+            )
+
+        self.planManager.extend(storage.readRedistrictingPlans())
 
         # don't let setting active plan dirty the project
         dirtyBlocker = QgsProjectDirtyBlocker(self.project)

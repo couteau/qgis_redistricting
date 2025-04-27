@@ -30,10 +30,7 @@ from typing import (
 from uuid import UUID
 
 from packaging import version
-from qgis.core import (
-    QgsProject,
-    QgsReadWriteContext
-)
+from qgis.core import QgsProject
 from qgis.PyQt.QtXml import QDomDocument
 
 from ..models import (
@@ -54,14 +51,22 @@ from .schema import (
 
 
 class ProjectStorage:
-    def __init__(self, project: QgsProject, doc: QDomDocument, context: QgsReadWriteContext = None):
+    def __init__(self, project: QgsProject, doc: QDomDocument):
         self._project = project
         self._doc = doc
-        self._context = context
-        self._version = self.getVersion() or schemaVersion
+        self._version = self._readVersion() or schemaVersion
+
+    @property
+    def version(self) -> version.Version:
+        """Get the current schema version of the redistricting plans"""
+        return self._version
+
+    def needsMigration(self) -> bool:
+        """Check if the redistricting plans need to be migrated to the current schema version"""
+        return self._version < schemaVersion
 
     def migrate(self):
-        """Migrate plugin node in project file to new schema"""
+        """Migrate edistricting plans in project file to new schema"""
         if self._version < schemaVersion:
             l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
             if not success:
@@ -71,18 +76,19 @@ class ProjectStorage:
                 data = json.loads(d)
                 l[i] = json.dumps(checkMigrateSchema(data, self._version))
             self._project.writeEntry('redistricting', 'redistricting-plans', l)
+            self._version = schemaVersion
+            self._writeVersion()
+            self._project.setDirty(True)
 
-        self._version = schemaVersion
-
-    def getVersion(self):
+    def _readVersion(self):
         v, success = self._project.readEntry('redistricting', 'schema-version', None)
         if not success or v is None:
             return version.parse('1.0.0')
 
         return version.parse(v)
 
-    def setVersion(self):
-        self._project.writeEntry('redistricting', 'schema-version', str(schemaVersion))
+    def _writeVersion(self):
+        self._project.writeEntry('redistricting', 'schema-version', str(self._version))
 
     def readDistricts(self, plan: RdsPlan):
         if plan.distLayer is None:
@@ -126,11 +132,11 @@ class ProjectStorage:
             l.append(jsonPlan)
             self.writeDistricts(p)
         self._project.writeEntry('redistricting', 'redistricting-plans', l)
-        self.setVersion()
+        self._version = schemaVersion
+        self._writeVersion()
 
     def readRedistrictingPlans(self) -> List[RdsPlan]:
         plans = []
-        self.migrate()
         l, success = self._project.readListEntry('redistricting', 'redistricting-plans', [])
         if success:
             for p in l:
@@ -162,4 +168,3 @@ class ProjectStorage:
             self._project.writeEntry('redistricting', 'active-plan', str(plan.id))
         else:
             self._project.removeEntry('redistricting', 'active-plan')
-        self.setVersion()

@@ -49,6 +49,7 @@ class TestBaseController:
         controller = BaseController(qgis_iface, QgsProject.instance(), planManager, toolbar)
         return controller
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress(self, controller: BaseController, qtbot: QtBot):
         d: QProgressDialog = controller.startProgress('Progress test')
         with qtbot.waitActive(d):
@@ -60,6 +61,7 @@ class TestBaseController:
         d.hide()
         del d
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress_no_cancel(self, controller: BaseController, qtbot: QtBot):
         d: QProgressDialog = controller.startProgress('Progress test', canCancel=False)
         with qtbot.waitActive(d):
@@ -70,6 +72,7 @@ class TestBaseController:
         d.hide()
         del d
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress_cancel(self, controller: BaseController, qtbot: QtBot, qgis_iface):
         d: QProgressDialog = controller.startProgress('Progress test')
         with qtbot.waitActive(d):
@@ -82,6 +85,7 @@ class TestBaseController:
         d.hide()
         del d
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress_set_value_after_cancel_returns(self, controller: BaseController, qtbot: QtBot, qgis_iface):
         d: QProgressDialog = controller.startProgress('Progress test')
         with qtbot.waitActive(d):
@@ -98,6 +102,7 @@ class TestBaseController:
         d.hide()
         del d
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress_create_new_dialog_closes_old_dialog(self, controller: BaseController, qtbot: QtBot):
         d1: QProgressDialog = controller.startProgress('Progress test1')
         with qtbot.wait_exposed(d1):
@@ -133,6 +138,7 @@ class TestBaseController:
         controller.pushErrors([("Error message", Qgis.MessageLevel.Critical)], "Error!", Qgis.MessageLevel.Warning)
         assert "Error!:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
+    @pytest.mark.xdist_group(name='gui')
     def test_progress_error_mixin_supplies_error_list(self, controller: BaseController, qtbot: QtBot, qgis_iface):
         mixin = ErrorListMixin()
         mixin.setError("Error message", Qgis.MessageLevel.Warning)
@@ -162,6 +168,7 @@ class TestBaseController:
                               ("Warning message", Qgis.MessageLevel.Warning)])
         assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Critical)
 
+    @pytest.mark.xdist_group(name='gui')
     def test_end_progress(self, controller: BaseController, qtbot: QtBot):
         d: QProgressDialog = controller.startProgress('Progress test')
         with qtbot.waitActive(d):

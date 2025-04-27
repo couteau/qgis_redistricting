@@ -60,13 +60,14 @@ class TestCreateLayersTask:
         result = task.run()
         assert task.exception is None
         assert result
-        assert task.totalPopulation == 227036
         assert gpkg.exists()
 
     @pytest.mark.parametrize(('datafields', 'geofields'), [
         ([], []),
         (['vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
         (['vap_ap_black - vap_nh_black'], []),
+        (['vap_ap_black', 'vap_ap_black - vap_nh_black', 'vap_hispanic', 'vap_nh_white'], []),
+        (['vap_ap_black - vap_nh_black', 'vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
         ([], ['countyid', 'vtdid']),
         ([], ['statefp || countyfp']),
     ])
@@ -76,8 +77,8 @@ class TestCreateLayersTask:
         p._geoIdField = 'geoid'
         p._popField = 'pop_total'
 
-        p._dataFields.extend([RdsDataField(block_layer, f) for f in datafields])
-        p._geoFields.extend([RdsField(block_layer, f) for f in geofields])
+        p.dataFields.extend([RdsDataField(block_layer, f) for f in datafields])
+        p.geoFields.extend([RdsField(block_layer, f) for f in geofields])
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
         task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid')
         result = task.run()

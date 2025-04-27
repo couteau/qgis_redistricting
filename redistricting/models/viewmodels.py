@@ -754,7 +754,7 @@ class RdsMetricsModel(QAbstractTableModel):
 
     def resetModelAndHeader(self):
         self.endResetModel()
-        self.headerDataChanged.emit(Qt.Vertical, 0, self.rowCount())
+        self.headerDataChanged.emit(Qt.Orientation.Vertical, 0, self.rowCount())
 
     def updateModel(self):
         self._data = KeyedList()

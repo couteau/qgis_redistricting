@@ -44,22 +44,23 @@ if TYPE_CHECKING:
 
 
 class LayerTreeManager(QObject):
-    def __init__(self, parent: Optional[QObject] = None):
+    def __init__(self, project: QgsProject, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self.root = QgsProject.instance().layerTreeRoot()
+        self._project = project
+        self._root = self._project.layerTreeRoot()
 
     @property
     def planRoot(self):
-        for group in self.root.findGroups(False):
+        for group in self._root.findGroups(False):
             if group.customProperty('redistricting-plan-root', False) is True:
                 break
             if group.customProperty('redistricting-plan-id', None) is not None:
-                return self.root
+                return self._root
         else:
             name = tr("Redistricting Plans")
-            if self.root.findGroup(name) is not None:
+            if self._root.findGroup(name) is not None:
                 name = f"{name}-{str(uuid4())}"
-            group = self.root.addGroup(name)
+            group = self._root.addGroup(name)
             group.setCustomProperty('redistricting-plan-root', True)
 
         return group
@@ -68,7 +69,7 @@ class LayerTreeManager(QObject):
         if not plan.isValid():
             raise ValueError(tr("Cannot add incomplete plan to layer tree"))
 
-        QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
+        self._project.addMapLayers([plan.assignLayer, plan.distLayer], False)
         group = QgsLayerTreeGroup(plan.name)
         group.setCustomProperty('redistricting-plan-id', str(plan.id))
         group.addLayer(plan.assignLayer)
@@ -113,8 +114,8 @@ class LayerTreeManager(QObject):
 
         plan_layers: list[QgsVectorLayer] = [l.layer() for g in groups for l in g.findLayers()]
 
-        self.root.setHasCustomLayerOrder(False)
-        order = self.root.layerOrder()
+        self._root.setHasCustomLayerOrder(False)
+        order = self._root.layerOrder()
         new_order = []
         plans_added = False
 
@@ -128,8 +129,8 @@ class LayerTreeManager(QObject):
 
             new_order.append(layer)
 
-        self.root.setHasCustomLayerOrder(True)
-        self.root.setCustomLayerOrder(new_order)
+        self._root.setHasCustomLayerOrder(True)
+        self._root.setCustomLayerOrder(new_order)
 
     def renameGroupAndLayers(self, plan: "RdsPlan"):
         group = self.getGroupForPlan(plan)

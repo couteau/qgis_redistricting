@@ -34,7 +34,7 @@ from redistricting.services import PlanEditor
 class TestMetricsModel:
     @pytest.fixture
     def metrics_model(self, plan: RdsPlan):
-        return RdsMetricsModel(plan.metrics)
+        return RdsMetricsModel(plan)
 
     def test_model(self, metrics_model, qtmodeltester):
         qtmodeltester.check(metrics_model)
@@ -47,11 +47,11 @@ class TestMetricsModel:
 
     @pytest.mark.parametrize("row,value", [
         (0, '227,036'),
-        (2, 'Yes'),
-        (3, 'Yes'),
-        (5, '0.341'),
-        (6, '0.417'),
-        (7, '0.811'),
+        (4, '0.400, 0.150, 0.800'),
+        (5, '0.500, 0.100, 0.900'),
+        (6, '0.500, 0.100, 0.900'),
+        (9, 'YES'),
+        (10, 'YES'),
     ])
     def test_data(self, metrics_model: RdsMetricsModel, row, value):
         data = metrics_model.data(metrics_model.createIndex(row, 0), Qt.ItemDataRole.DisplayRole)
@@ -66,4 +66,6 @@ class TestMetricsModel:
 
     def test_clear_metrics(self, metrics_model: RdsMetricsModel, qtbot: QtBot):
         with qtbot.waitSignals([metrics_model.modelAboutToBeReset, metrics_model.modelReset]):
-            metrics_model.setMetrics(None)
+            metrics_model.setPlan(None)
+
+        assert metrics_model.rowCount() == 0

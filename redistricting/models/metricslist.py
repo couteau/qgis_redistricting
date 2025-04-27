@@ -1,3 +1,27 @@
+# -*- coding: utf-8 -*-
+"""QGIS Redistricting Plugin - modular metrics base classes
+
+        begin                : 2024-09-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2024 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 from abc import (
     ABC,
     abstractmethod
@@ -25,8 +49,8 @@ import geopandas as gpd
 import pandas as pd
 from qgis.core import QgsField
 from qgis.PyQt.QtCore import (
+    QMetaType,
     QObject,
-    QVariant,
     pyqtSignal
 )
 from qgis.PyQt.QtGui import QColor
@@ -35,6 +59,7 @@ from ..utils import tr
 from .base.lists import KeyedList
 from .base.model import RdsBaseModel
 from .base.serialization import (
+    camel_to_kebab,
     camel_to_snake,
     deserialize_value,
     kebab_to_camel,
@@ -319,6 +344,12 @@ class RdsMetrics(RdsBaseModel):
     def __pre_init__(self):
         self._plan: 'RdsPlan' = None
 
+    def __getitem__(self, name: str) -> RdsMetric:
+        if name in self.metrics:  # pylint: disable=unsupported-membership-test
+            return self.metrics[name]  # pylint: disable=unsubscriptable-object
+
+        raise KeyError(f"Metric '{name}' not found.")
+
     def __getattr__(self, name: str) -> Any:
         # pylint: disable=no-member, unsubscriptable-object
         if name in self.metrics.keys():
@@ -364,11 +395,11 @@ class RdsMetrics(RdsBaseModel):
             return
 
         if metric.get_type() == float:
-            t = QVariant.Double
+            t = QMetaType.Type.Double
         elif metric.get_type() == int:
-            t = QVariant.Int
+            t = QMetaType.Type.Int
         elif metric.get_type() == str:
-            t = QVariant.String
+            t = QMetaType.Type.QString
         else:
             return
 
@@ -435,10 +466,48 @@ class RdsMetrics(RdsBaseModel):
         self.metricsChanged.emit()
 
     def updateGeoFields(self, geoFields: Iterable[RdsGeoField]):
+        metrics_updated = False
         for metric in self.metrics:  # pylint: disable=not-an-iterable
             if metric.level() == MetricLevel.GEOGRAPHIC:
                 if hasattr(metric, "updateGeoFields"):
+                    if not metrics_updated:
+                        self.metricsAboutToChange.emit()
+                    metrics_updated = True
                     metric.updateGeoFields(geoFields)
+
+        if metrics_updated:
+            self.metricsChanged.emit()
+
+    def addMetric(self, metric_cls: type[RdsMetric]):
+        """adds a metric to the metrics list"""
+        if not issubclass(metric_cls, RdsMetric):
+            raise TypeError("Only RdsMetric subclasses can be added.")
+
+        if metric_cls.name() in self.metrics:  # pylint: disable=unsupported-membership-test
+            raise ValueError(f"Metric '{metric_cls.name()}' already exists.")
+
+        for dep in metric_cls.depends():
+            if dep.name() not in self.metrics:  # pylint: disable=unsupported-membership-test
+                self.addMetric(dep)
+
+        metric = metric_cls(self.plan)
+        self.metrics.append(metric)
+
+        return metric_cls
+
+    def removeMetric(self, metric_cls: type[RdsMetric]):
+        """removes a metric from the metrics list"""
+        if not issubclass(metric_cls, RdsMetric):
+            raise TypeError("Only RdsMetric subclasses can be removed.")
+
+        if metric_cls.name() not in self.metrics:  # pylint: disable=unsupported-membership-test
+            raise ValueError(f"Metric '{metric_cls.name()}' does not exist.")
+
+        metric = self.metrics[metric_cls.name()]  # pylint: disable=unsubscriptable-object
+        self.metrics.remove(metric)
+
+        # TODO: handle removing the metric field from the district layer if it exists
+        # TODO: handle removing metrics that are dependencies of the removed metric and are no longer needed
 
 
 def serialize_metrics(value: RdsMetrics, memo: dict[int, Any], exclude_none=True):
@@ -447,7 +516,7 @@ def serialize_metrics(value: RdsMetrics, memo: dict[int, Any], exclude_none=True
         if metric.serialize() and metric.level() != MetricLevel.DISTRICT:
             v = metric.value()
             if v is not None or not exclude_none:
-                data[name] = serialize_value(metric.value(), memo, exclude_none)
+                data[camel_to_kebab(name)] = serialize_value(metric.value(), memo, exclude_none)
 
     return {'metrics': data}
 

@@ -42,6 +42,8 @@ from qgis.PyQt.QtCore import (
     pyqtSignal
 )
 
+from ..models import MetricTriggers
+from .tasks.updatebase import UpdateMetricsTask
 from .tasks.updatedistricts import AggregateDistrictDataTask
 
 if TYPE_CHECKING:
@@ -69,6 +71,15 @@ class DistrictUpdater(QObject):
     def updateTaskCompleted(self):
         updateTask: AggregateDistrictDataTask = self.sender()
         del self._updateTasks[updateTask.plan]
+
+        trigger: MetricTriggers = 0
+        if updateTask.includeDemographics:
+            trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+        if updateTask.includeGeometry:
+            trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
+
+        updateMetricsTask = UpdateMetricsTask(updateTask.plan, trigger)
+        QgsApplication.taskManager().addTask(updateMetricsTask)
 
         if updateTask.districtData is not None:
             self.updateDistrictData(updateTask.plan, updateTask.districtData)

@@ -180,9 +180,9 @@ class MetricsController(DockWidgetController):
             handler = self.handler_cache[type(metric)]
         else:
             handler = get_metric_handler(metric)
-            handler.deactivated.connect(self.handlerDeactivated)
             if handler is None:
                 return
+            handler.deactivated.connect(self.handlerDeactivated)
             self.handler_cache[type(metric)] = handler
 
         idx = self.metricsModel.metricKey(index.row())

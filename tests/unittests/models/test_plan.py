@@ -22,6 +22,7 @@ import pandas as pd
 import pytest
 from pytestqt.plugin import QtBot
 
+from redistricting.models import metrics  # pylint: disable=unused-import
 from redistricting.models import (
     DeviationType,
     FieldCategory,
@@ -211,16 +212,43 @@ class TestPlan:
                           'category': FieldCategory.Geography}
             },
             'total-population': 227036,
-            'metrics': {'splits': {
-                'vtdid': {'field': 'vtdid', 'data': {
-                    "schema": {
-                        "fields": [{"name": "index", "type": "integer"}], 
-                        "primaryKey": ["index"], 
-                        "pandas_version": "1.4.0" if pd.__version__ >= "1.4" else "0.20.0"
-                    }, 
-                    "data": []
-                }}
-            }}
+            'metrics': {
+                'metrics': {
+                    'total-population': 227036,
+                    'plan-deviation': [100, -500],
+                    'mean-polsbypopper': 0.4,
+                    'min-polsbypopper': 0.15,
+                    'max-polsbypopper': 0.8,
+                    'mean-reock': 0.5,
+                    'min-reock': 0.1,
+                    'max-reock': 0.9,
+                    'mean-convexhull': 0.5,
+                    'min-convexhull': 0.1,
+                    'max-convexhull': 0.9,
+                    'contiguity': True,
+                    'complete': True,
+                    'splits': {
+                        'vtdid': {
+                            'data': {
+                                'data': [],
+                                'schema': {
+                                    'fields': [
+                                        {
+                                            'name': 'index',
+                                            'type': 'integer',
+                                        },
+                                    ],
+                                    "pandas_version": "1.4.0" if pd.__version__ >= "1.4" else "0.20.0",
+                                    'primaryKey': [
+                                        'index',
+                                    ],
+                                },
+                            },
+                            'field': 'vtdid',
+                        },
+                    },
+                }
+            }
         }
 
     def test_deserialize(self, block_layer, assign_layer, dist_layer):
@@ -275,7 +303,9 @@ class TestPlan:
                           'category': FieldCategory.Geography}
             },
             'total-population': 227036,
-            'metrics': {'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}}
+            'metrics': {'metrics': {
+                'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}
+            }}
         }
         plan = deserialize(RdsPlan, data)
         assert str(plan.id) == '6f17839d-5adc-458a-9f4b-fe88ecfc2069'

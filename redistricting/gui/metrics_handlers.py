@@ -97,9 +97,34 @@ class AttributeTableDialogHandler(DialogHandler):
         super().__init__()
         self.model: QgsAttributeTableFilterModel = None
 
+    def createDialogAndView(self, plan, metric, idx):
+        # create the dialog
+        self.dialog = QDialog()
+        self.dialog.setObjectName(f'dlg{metric.name()}')
+        self.dialog.setWindowTitle(metric.caption())
+        self.dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self.dialog.destroyed.connect(self.deleteDialog)
+
+        # create the view
+        self.createView(plan, metric, idx)
+
+        vbox = QVBoxLayout(self.dialog)
+        vbox.addWidget(self.itemView)
+
+        # create the model
+        self.updateDialog(plan, metric, idx)
+
+        return True
+
     @abstractmethod
     def createModel(self, plan: RdsPlan,  metric: RdsMetric, idx: Any) -> QAbstractItemModel:
         ...
+
+    def createView(self, plan: RdsPlan, metric: RdsMetric, idx: Any):  # pylint: disable=unused-argument
+        self.itemView = QTableView(self.dialog)
+        self.itemView.installEventFilter(TableViewKeyEventFilter(self.dialog))
+        self.itemView.setSortingEnabled(True)
+        self.itemView.verticalHeader().hide()
 
     def updateDialog(self, plan: RdsPlan, metric: RdsMetric = None, idx: Any = None):
         if self.itemView is None:
@@ -116,29 +141,11 @@ class AttributeTableDialogHandler(DialogHandler):
 
 
 class CompleteHandler(AttributeTableDialogHandler):
-    def createDialogAndView(self, plan: RdsPlan,  metric: RdsMetric, idx: Any):
-        # create the dialog
-        self.dialog = QDialog()
-        self.dialog.setObjectName('dlgUnassignedGeography')
-        self.dialog.setWindowTitle(tr("Unassigned Geography"))
-        self.dialog.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.dialog.destroyed.connect(self.deleteDialog)
-
-        # create the view
-        vbox = QVBoxLayout(self.dialog)
-        self.itemView = QTableView(self.dialog)
-        self.itemView.installEventFilter(
-            TableViewKeyEventFilter(self.dialog))
+    def createView(self, plan: RdsPlan, metric: RdsMetric, idx: Any) -> QTableView:
+        super().createView(plan, metric, idx)
         delegate = RdsNullsAsBlanksDelegate(self.itemView)
         self.itemView.setItemDelegate(delegate)
-        self.itemView.verticalHeader().hide()
         self.itemView.activated.connect(partial(self.zoomToUnassignedGeography, plan=plan))
-        vbox.addWidget(self.itemView)
-
-        # create the model
-        self.updateDialog(plan, metric, idx)
-
-        return True
 
     def createModel(self, plan: RdsPlan, metric: RdsMetric, idx: Any):
         ctx = QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(plan.assignLayer))
@@ -197,23 +204,9 @@ class CompleteHandler(AttributeTableDialogHandler):
 
 
 class ContiguityHandler(AttributeTableDialogHandler):
-    def createDialogAndView(self, plan, metric, idx):
-        self.dialog = QDialog()
-        self.dialog.setObjectName('dlgSplitDistricts')
-        self.dialog.setWindowTitle(tr("Non-contiguous Districts"))
-        self.dialog.setAttribute(Qt.WA_DeleteOnClose, True)
-        self.dialog.destroyed.connect(self.deleteDialog)
-
-        vbox = QVBoxLayout(self.dialog)
-        self.itemView = QTableView(self.dialog)
-        self.itemView.installEventFilter(TableViewKeyEventFilter(self.dialog))
-        self.itemView.verticalHeader().hide()
+    def createView(self, plan: RdsPlan, metric: RdsMetric, idx: Any):
+        super().createView(plan, metric, idx)
         self.itemView.activated.connect(partial(self.zoomToSplitDistrict, plan=plan))
-        vbox.addWidget(self.itemView)
-
-        self.updateDialog(plan, metric, idx)
-
-        return True
 
     def createModel(self, plan, metric, idx):
         ctx = QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(plan.distLayer))

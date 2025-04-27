@@ -100,8 +100,8 @@ def spatialite_connect(
         return True if result else False
 
     con = sqlite3.connect(
-        database, timeout, detect_types, isolation_level,
-        check_same_thread, factory, cached_statements, uri
+        database, timeout=timeout, detect_types=detect_types, isolation_level=isolation_level,
+        check_same_thread=check_same_thread, factory=factory, cached_statements=cached_statements, uri=uri
     )
     con.enable_load_extension(True)
     cur = con.cursor()

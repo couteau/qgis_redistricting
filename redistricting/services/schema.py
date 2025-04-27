@@ -518,6 +518,18 @@ def migrateSchema1_0_3_to_1_0_4(data: planSchema1_0_2):
     data['plan-stats']['splits'] = splits
     _renameField(data, 'plan-stats', 'metrics')
 
+    if data['pop-field'] != DistrictColumns.POPULATION:
+        distLayer: QgsVectorLayer = QgsProject.instance().mapLayer(data.get('dist-layer'))
+        if distLayer is not None:
+            geoPackagePath, _ = distLayer.source().split('|', 1)
+            with spatialite_connect(geoPackagePath) as db:
+                cur = db.execute("SELECT * FROM districts LIMIT 1")
+                for col in cur.description:
+                    if col[0] == data['pop-field']:
+                        db.execute(
+                            f"ALTER TABLE districts RENAME COLUMN {data['pop-field']} TO {DistrictColumns.POPULATION}")
+                        break
+
     return data, version.parse('1.0.4')
 
 
@@ -585,10 +597,6 @@ schemas = {
     version.parse('1.0.4'): planSchema1_0_4,
     schemaVersion: planSchema
 }
-
-
-def needsMigration(v: version.Version):
-    return v < schemaVersion
 
 
 def checkMigrateSchema(data: dict, v: version.Version):

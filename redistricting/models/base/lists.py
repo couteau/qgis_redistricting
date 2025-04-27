@@ -24,19 +24,21 @@
 """
 import bisect
 import sys
+from collections.abc import (
+    Iterable,
+    Iterator,
+    Mapping,
+    MutableMapping,
+    MutableSequence,
+    Sized
+)
 from copy import copy
 from types import GenericAlias
 from typing import (  # pylint: disable=no-name-in-module
     Any,
     Callable,
     Generic,
-    Iterable,
-    Iterator,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
     Self,
-    Sized,
     TypeVar,
     Union,
     overload
@@ -117,9 +119,6 @@ class KeyedListItemsView(KeyedListView[T]):
 
     def __repr__(self):
         return f"KeyedListItemsView([{', '.join(f'({k}, {repr(self._list._items[k])})' for k in self._list._keys)}])"
-
-
-KeyedListT = TypeVar('KeyedListT', bound='KeyedList')
 
 
 class KeyedList(Generic[T]):

@@ -20,7 +20,10 @@ Copyright 2022-2024, Stuart C. Naifeh
 """
 import pytest
 from pytest_mock import MockerFixture
-from qgis.core import QgsLayerTreeGroup
+from qgis.core import (
+    QgsLayerTreeGroup,
+    QgsProject
+)
 from qgis.gui import QgisInterface
 
 from redistricting.services.layertree import LayerTreeManager
@@ -36,8 +39,8 @@ class TestLayerTreeManager:
     @pytest.fixture
     def manager(self, mocker: MockerFixture):
         mocker.patch("redistricting.services.layertree.QgsLayerTreeGroup")
-        mocker.patch("redistricting.services.layertree.QgsProject")
-        manager = LayerTreeManager()
+        project = mocker.create_autospec(spec=QgsProject)
+        manager = LayerTreeManager(project)
         return manager
 
     def test_create_group(self, manager: LayerTreeManager, layertree_plan):

@@ -59,7 +59,7 @@ class PlanCopier(ErrorListMixin, QObject):
         self,
         sourcePlan: RdsPlan
     ):
-        super().__init__(sourcePlan)
+        super().__init__()
         self._plan = sourcePlan
         self._builder: PlanBuilder = None
 

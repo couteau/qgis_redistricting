@@ -34,7 +34,6 @@ from typing import (
 import geopandas as gpd
 import pandas as pd
 import shapely.ops
-from qgis.core import QgsTask
 from qgis.PyQt.QtCore import (
     QRunnable,
     QThreadPool
@@ -46,17 +45,13 @@ from shapely.geometry import (
 )
 
 from ...models import DistrictColumns
-from ...models.metricslist import MetricTriggers
 from ...utils import (
     spatialite_connect,
     tr
 )
 from ..districtio import DistrictReader
 from ._debug import debug_thread
-from .updatebase import (
-    AggregateDataTask,
-    UpdateMetricsTask
-)
+from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
     from ...models import (
@@ -86,34 +81,7 @@ class DissolveWorker(QRunnable):
             self.callback()
 
 
-class AggregateDistrictDataTask(QgsTask):
-    def __init__(
-        self,
-        plan: 'RdsPlan',
-        updateDistricts: Iterable[int] = None,
-        includeDemographics=True,
-        includeGeometry=True
-    ):
-        super().__init__(tr('Updating districts'), QgsTask.AllFlags)
-
-        trigger: MetricTriggers = 0
-        if includeDemographics:
-            trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
-        if includeGeometry:
-            trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
-
-        updateSubTask = AggregateDistrictDataSubTask(plan, updateDistricts, includeDemographics, includeGeometry)
-        updateMetricsSubTask = UpdateMetricsTask(plan, trigger)
-        self.addSubTask(updateSubTask, subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
-        self.addSubTask(updateMetricsSubTask, dependencies=[updateSubTask],
-                        subTaskDependency=QgsTask.SubTaskDependency.ParentDependsOnSubTask)
-
-    def run(self):
-        debug_thread()
-        return True
-
-
-class AggregateDistrictDataSubTask(AggregateDataTask):
+class AggregateDistrictDataTask(AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(

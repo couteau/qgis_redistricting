@@ -80,8 +80,11 @@ if QT_VERSION <= 0x060000:
 
 # patch typing to maintain compatibility with python 3.9
 if not hasattr(typing, "Self"):
-    class Self:
-        ...
+    try:
+        from typing_extensions import Self  # type: ignore[import]
+    except ImportError:
+        class Self:
+            ...
 
     setattr(typing, "Self", Self)
 

@@ -1,7 +1,7 @@
 import functools
 import timeit
 
-import redistricting
+import redistricting.utils.layer
 
 
 # pylint: disable=import-outside-toplevel

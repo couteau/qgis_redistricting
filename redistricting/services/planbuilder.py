@@ -31,7 +31,8 @@ from typing import (
 
 from qgis.core import (
     Qgis,
-    QgsApplication
+    QgsApplication,
+    QgsProject
 )
 from qgis.PyQt.QtCore import (
     QObject,
@@ -39,6 +40,7 @@ from qgis.PyQt.QtCore import (
 )
 
 from ..models import (
+    MetricTriggers,
     RdsDataField,
     RdsField,
     RdsGeoField,
@@ -48,6 +50,7 @@ from ..models.base.lists import KeyedList
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
 from .tasks.createlayers import CreatePlanLayersTask
+from .tasks.updatebase import UpdateMetricsTask
 
 
 class PlanBuilder(BasePlanBuilder):
@@ -58,7 +61,9 @@ class PlanBuilder(BasePlanBuilder):
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
         self._isCancelled = False
+        self._updateMetrics = True
         self._createLayersTask = None
+        self.updateMetricsTask = None
 
     @classmethod
     def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
@@ -93,6 +98,15 @@ class PlanBuilder(BasePlanBuilder):
 
     def createLayers(self, plan: RdsPlan):
         def taskCompleted():
+            QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
+            if self._updateMetrics:
+                self.updateMetricsTask = UpdateMetricsTask(
+                    plan,
+                    MetricTriggers.ON_CREATE_PLAN,
+                    self._createLayersTask.populationData,
+                    self._createLayersTask.geometry
+                )
+                QgsApplication.taskManager().addTask(self.updateMetricsTask)
             self._createLayersTask = None
             self.layersCreated.emit(plan)
 
@@ -136,9 +150,10 @@ class PlanBuilder(BasePlanBuilder):
             if f != -1:
                 self._popLayer.dataProvider().createAttributeIndex(f)
 
-    def createPlan(self, createLayers=True, planParent: Optional[QObject] = None) -> RdsPlan:
+    def createPlan(self, createLayers=True, updateMetrics: bool = True, planParent: Optional[QObject] = None) -> RdsPlan:
         self.clearErrors()
         self._isCancelled = False
+        self._updateMetrics = updateMetrics
 
         if createLayers:
             if not self._geoPackagePath:
