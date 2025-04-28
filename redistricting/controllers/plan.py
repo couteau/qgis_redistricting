@@ -495,7 +495,7 @@ class PlanController(BaseController):
                 return
 
         dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
-        if dlgImportPlan.exec() == QDialog.Accepted:
+        if dlgImportPlan.exec() == QDialog.DialogCode.Accepted:
             progress = self.startProgress(tr('Importing assignments...'))
             importer = self.importService.importEquivalencyFile(
                 self.activePlan,

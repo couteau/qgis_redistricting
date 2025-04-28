@@ -149,10 +149,10 @@ class RdsField(RdsBaseModel):
             self._context = context
         return self.validate()
 
-    def getValue(self, feature: QgsFeature = None):
+    def getValue(self, feature: QgsFeature = None, context: QgsExpressionContext = None) -> Union[str, int, float]:
         if feature is not None:
             if not self._prepared:
-                self.prepare()
+                self.prepare(context)
             self._context.setFeature(feature)
         return self._expression.evaluate(self._context)
 

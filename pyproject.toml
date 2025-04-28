@@ -3,5 +3,5 @@ max_line_length = 120
 
 [tool.pytest.ini_options]
 filterwarnings = "ignore:distutils:DeprecationWarning"
-qt_api = "pyqt5"
+qt_api = "pyqt6"
 addopts = "-nauto --import-mode=importlib -vv --dist loadgroup"

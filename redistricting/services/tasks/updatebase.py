@@ -155,13 +155,26 @@ class AggregateDataTask(SqlAccess, QgsTask):
         cols = [self.popJoinField, self.popField]
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
+        remove = set()
         for f in self.popFields:
             f.prepare(context)
-            cols += f.expression.referencedColumns()
+            new_cols = [c for c in f.expression.referencedColumns() if c not in cols]
+            if f.isExpression():
+                remove.update(new_cols)
+            else:
+                remove.difference_update(new_cols)
+
+            cols.extend(new_cols)
 
         for f in self.dataFields:
             f.prepare(context)
-            cols += f.expression.referencedColumns()
+            new_cols = [c for c in f.expression.referencedColumns() if c not in cols]
+            if f.isExpression():
+                remove.update(new_cols)
+            else:
+                remove.difference_update(new_cols)
+
+            cols.extend(new_cols)
 
         df = self.read_layer(
             self.popLayer,
@@ -172,12 +185,12 @@ class AggregateDataTask(SqlAccess, QgsTask):
 
         for f in self.popFields:
             if f.isExpression():
-                df.loc[:, f.fieldName] = df.query(f.field)
+                df.loc[:, f.fieldName] = df.eval(f.field)
         for f in self.dataFields:
             if f.isExpression():
-                df.loc[:, f.fieldName] = df.query(f.field)
+                df.loc[:, f.fieldName] = df.eval(f.field)
 
-        return df
+        return df.drop(columns=remove)
 
     def finished(self, result: bool):
         super().finished(result)

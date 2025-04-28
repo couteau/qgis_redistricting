@@ -26,7 +26,6 @@ import contextlib
 import os
 import pathlib
 import shutil
-import tempfile
 import unittest.mock
 from typing import (
     TYPE_CHECKING,
@@ -36,6 +35,7 @@ from typing import (
     Union,
     overload
 )
+from unittest.mock import MagicMixin
 from uuid import uuid4
 
 import pytest
@@ -44,13 +44,18 @@ from qgis.core import (
     Qgis,
     QgsApplication,
     QgsCoordinateReferenceSystem,
+    QgsLayerTree,
     QgsMapLayer,
     QgsProject,
+    QgsRelationManager,
+    QgsTask,
+    QgsTaskManager,
     QgsVectorLayer
 )
 from qgis.gui import (
     QgisInterface,
     QgsGui,
+    QgsLayerTreeMapCanvasBridge,
     QgsLayerTreeView,
     QgsMapCanvas
 )
@@ -59,9 +64,6 @@ from qgis.PyQt import (
     QtWidgets,
     sip
 )
-
-from redistricting.models import \
-    metrics  # noqa: F401; pylint: disable=unused-import
 
 if TYPE_CHECKING:
     from _pytest.fixtures import SubRequest
@@ -134,9 +136,41 @@ def dist_layer(plan_gpkg_path, qgis_new_project):
     return layer
 
 
+def addTask(self: QgsTaskManager, task: QgsTask, priority: int = 0) -> int:
+
+    self.taskAdded.emit(0)
+    if isinstance(task, MagicMixin):
+        success = task.run()
+        if isinstance(success, MagicMixin):
+            success = True
+    else:
+        task.statusChanged.emit(QgsTask.TaskStatus.Running)
+        self.statusChanged.emit(0, QgsTask.TaskStatus.Running)
+        task.begun.emit()
+        success = task.run()
+
+    if success:
+        task.statusChanged.emit(QgsTask.TaskStatus.Complete)
+        self.statusChanged.emit(0, QgsTask.TaskStatus.Complete)
+    else:
+        task.statusChanged.emit(QgsTask.TaskStatus.Terminated)
+        self.statusChanged.emit(0, QgsTask.TaskStatus.Terminated)
+
+    task.finished(success)
+
+    if success:
+        task.taskCompleted.emit()
+    else:
+
+        task.taskTerminated.emit()
+
+    return 0
+
+
 @pytest.fixture
-def mock_taskmanager(qgis_app, mocker: MockerFixture):
-    mock = mocker.patch.object(qgis_app.taskManager(), 'addTask')
+def mock_taskmanager(qgis_app: QgsApplication, mocker: MockerFixture):
+    new = addTask.__get__(qgis_app.taskManager(), None)  # pylint: disable=no-value-for-parameter
+    mock = mocker.patch.object(qgis_app.taskManager(), 'addTask', new=new)
     return mock
 
 
@@ -147,6 +181,7 @@ except AttributeError:
 
 _APP: Optional[QgsApplication] = None
 _CANVAS: Optional[QgsMapCanvas] = None
+_BRIDGE: Optional[QgsLayerTreeMapCanvasBridge] = None
 _IFACE: Optional[QgisInterface] = None
 _PARENT: Optional[QtWidgets.QWidget] = None
 _QGIS_CONFIG_PATH: Optional[pathlib.Path] = None
@@ -247,15 +282,24 @@ class MockQgisInterface(QgisInterface):
     def __init__(self, canvas: QgsMapCanvas, parent: QtWidgets.QMainWindow):
         super().__init__()
         self.setParent(parent)
-        self._canvases = [canvas]
         self._layers: list[QgsMapLayer] = []
+        # unittest.mock.patch.object(canvas, 'layers', new=self.layers).start()
+
+        self._canvases = [canvas]
+        QgsProject.instance().legendLayersAdded.connect(self.addLayers)
+        QgsProject.instance().layersRemoved.connect(self.removeLayers)
+        QgsProject.instance().removeAll.connect(self.removeAllLayers)
+
         self._toolbars: dict[str, QtWidgets.QToolBar] = {}
         self._layerTreeView = QgsLayerTreeView(parent)
         self._layerTreeView.currentLayerChanged.connect(self.currentLayerChanged)
         self._activeLayerId = None
         self._messageBar = MockMessageBar()
-        QgsProject.instance().layersAdded.connect(self.addLayers)
-        QgsProject.instance().removeAll.connect(self.removeAllLayers)
+
+    def __del__(self):
+        QgsProject.instance().legendLayersAdded.disconnect(self.addLayers)
+        QgsProject.instance().layersRemoved.disconnect(self.removeLayers)
+        QgsProject.instance().removeAll.disconnect(self.removeAllLayers)
 
     def layerTreeView(self):
         return self._layerTreeView
@@ -281,6 +325,10 @@ class MockQgisInterface(QgisInterface):
     def messageBar(self):
         return self._messageBar
 
+    def layers(self) -> list[QgsMapLayer]:
+        """Get the list of layers in the canvas."""
+        return self._layers
+
     @QtCore.pyqtSlot("QList<QgsMapLayer*>")
     def addLayers(self, layers: list[QgsMapLayer]) -> None:
         """Handle layers being added to the registry so they show up in canvas.
@@ -290,34 +338,34 @@ class MockQgisInterface(QgisInterface):
         .. note:: The QgsInterface api does not include this method,
             it is added here as a helper to facilitate testing.
         """
-        current_layers = self._canvases[0].layers()
-        final_layers = []
-        for layer in current_layers:
-            final_layers.append(layer)
-        for layer in layers:
-            final_layers.append(layer)
-        self._layers = final_layers
+        self._layers.extend(layers)
+        # self._canvases[0].setLayers(self._layers)
 
-        self._canvases[0].setLayers(final_layers)
+    @QtCore.pyqtSlot("QList<QString>")
+    def removeLayers(self, layers: list[str] = None) -> None:
+        if layers is None:
+            return
+        self._layers = [layer for layer in self._layers if not sip.isdeleted(layer) and layer.id() not in layers]
+        # self._canvases[0].setLayers(self._layers)
 
     @QtCore.pyqtSlot()
     def removeAllLayers(self) -> None:
         """Remove layers from the canvas before they get deleted."""
-        if not sip.isdeleted(self._canvases[0]):
-            self._canvases[0].setLayers([])
         self._layers = []
+        # if not sip.isdeleted(self._canvases[0]):
+        #    self._canvases[0].setLayers(self._layers)
 
     def newProject(self, promptToSaveFlag: bool = False) -> None:
         """Create new project."""
         # noinspection PyArgumentList
         instance = QgsProject.instance()
-        instance.clear()
-        # instance.removeAllMapLayers()
-        # root: QgsLayerTree = instance.layerTreeRoot()
-        # root.removeAllChildren()
-        # relation_manager: QgsRelationManager = instance.relationManager()
-        # for relation in relation_manager.relations():
-        #     relation_manager.removeRelation(relation)
+        # instance.clear()
+        instance.removeAllMapLayers()
+        root: QgsLayerTree = instance.layerTreeRoot()
+        root.removeAllChildren()
+        relation_manager: QgsRelationManager = instance.relationManager()
+        for relation in relation_manager.relations():
+            relation_manager.removeRelation(relation)
         self._layers = []
         self.newProjectCreated.emit()
         return True
@@ -552,21 +600,23 @@ class MockQgisInterface(QgisInterface):
 
 
 def _init_qgis():
-    global _APP, _CANVAS, _IFACE, _PARENT, _QGIS_CONFIG_PATH  # noqa: PLW0603 # pylint: disable=global-statement
+    global _APP, _CANVAS, _IFACE, _PARENT  # noqa: PLW0603 # pylint: disable=global-statement
+    # global _BRIDGE
 
     # Use temporary path for QGIS config
-    _QGIS_CONFIG_PATH = pathlib.Path(tempfile.mkdtemp(prefix="pytest-qgis"))
-    os.environ["QGIS_CUSTOM_CONFIG_PATH"] = str(_QGIS_CONFIG_PATH)
-
     _APP = QgsApplication([], GUIenabled=True)
     _APP.initQgis()
     QgsGui.editorWidgetRegistry().initEditors()
     QgsProject.instance().legendLayersAdded.connect(_APP.processEvents)
 
     _PARENT = QtWidgets.QMainWindow()
-    _CANVAS = QgsMapCanvas(_PARENT)
+    _CANVAS = QgsMapCanvas()
+    _PARENT.setCentralWidget(_CANVAS)
     _PARENT.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
     _CANVAS.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
+    # _BRIDGE = QgsLayerTreeMapCanvasBridge(
+    #    QgsProject.instance().layerTreeRoot(), _CANVAS
+    # )
     _IFACE = MockQgisInterface(_CANVAS, _PARENT)
 
     if _QGIS_VERSION >= 31800:
@@ -588,17 +638,25 @@ _init_qgis()
 
 
 @pytest.fixture(autouse=True, scope="session")
-def qgis_app(request: "SubRequest") -> Generator[QgsApplication, Any, Any]:
+def qgis_app(request: "SubRequest", tmp_path_factory: pytest.TempPathFactory) -> Generator[QgsApplication, Any, Any]:
+    global _APP, _QGIS_CONFIG_PATH  # noqa: PLW0603 # pylint: disable=global-statement
+
+    _QGIS_CONFIG_PATH = tmp_path_factory.mktemp("qgis_config")
+    os.environ["QGIS_CUSTOM_CONFIG_PATH"] = str(_QGIS_CONFIG_PATH)
+
+    _APP.setPrefixPath(str(_QGIS_CONFIG_PATH))
+
     yield _APP
 
-    assert _APP
     QgsProject.instance().legendLayersAdded.disconnect(_APP.processEvents)
-    if not sip.isdeleted(_CANVAS) and _CANVAS is not None:
-        _CANVAS.deleteLater()
+
     _APP.exitQgis()
+
     if _QGIS_CONFIG_PATH and _QGIS_CONFIG_PATH.exists():
         with contextlib.suppress(PermissionError):
             shutil.rmtree(_QGIS_CONFIG_PATH)
+
+    _APP = None
 
 
 @pytest.fixture(scope="session")
@@ -631,6 +689,7 @@ from redistricting.services.planbuilder import PlanBuilder  # isort:skip # nopep
 from redistricting.services.districtio import DistrictReader  # isort:skip # nopep8
 from redistricting.models.plan import RdsPlan  # isort: skip # nopep8
 from redistricting.models.base.serialization import deserialize  # isort: skip # nopep8
+from redistricting.models import metrics  # isort: skip # nopep8; pylint: disable=unused-import
 
 
 @pytest.fixture
