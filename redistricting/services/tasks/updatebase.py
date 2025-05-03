@@ -46,6 +46,7 @@ from ...models import (
     MetricTriggers,
     RdsDataField,
     RdsField,
+    RdsGeoField,
     RdsPlan
 )
 from ...utils import (
@@ -64,28 +65,26 @@ class UpdateMetricsTask(QgsTask):
         self.populationData = populationData
         self.geometry = geometry
 
-    def updateMetrics(self):
-        self.plan.metrics.updateMetrics(self.trigger, self.populationData, self.geometry)
-
-    def finishMetrics(self, trigger: MetricTriggers):
-        self.plan.metrics.updateFinished(trigger)
-
     def run(self):
         debug_thread()
-        self.updateMetrics()
+        self.plan.metrics.updateMetrics(self.trigger, self.populationData, self.geometry, self.plan)
         return True
 
     def finished(self, result: bool):
         super().finished(result)
-        self.finishMetrics(self.trigger)
+        self.plan.metrics.updateFinished(self.trigger, self.plan)
 
 
 class AggregateDataTask(SqlAccess, QgsTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(self, plan: RdsPlan, description: str):
-        super().__init__(description, QgsTask.AllFlags)
+        super().__init__(description, QgsTask.Flag.AllFlags)
         self.plan = plan
+        self.numDistricts: int = plan.numDistricts
+        self.numSeats: int = plan.numSeats
+        self.totalPopulation = plan.totalPopulation
+        self.ideal = plan.idealPopulation
         self.assignLayer: QgsVectorLayer = plan.assignLayer
         self.distLayer: QgsVectorLayer = plan.distLayer
         self.popLayer: QgsVectorLayer = plan.popLayer
@@ -95,8 +94,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.popField: str = plan.popField
         self.popFields: Sequence[RdsField] = plan.popFields
         self.dataFields: Sequence[RdsDataField] = plan.dataFields
-        self.totalPopulation = plan.totalPopulation
-        self.ideal = plan.idealPopulation
+        self.geoFields: Sequence[RdsGeoField] = plan.geoFields
         self.districts = plan.districts
         self.count = 0
         self.total = 1

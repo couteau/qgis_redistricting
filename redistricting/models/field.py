@@ -52,7 +52,7 @@ from .base.model import (
     RdsBaseModel,
     rds_property
 )
-from .columns import FieldCategory
+from .consts import FieldCategory
 
 
 class RdsField(RdsBaseModel):
@@ -60,10 +60,11 @@ class RdsField(RdsBaseModel):
 
     layer: QgsVectorLayer = rds_property(private=True)
     field: str = rds_property(private=True)
-    caption: str = None
+    caption: str = rds_property(private=True, notify=captionChanged, default=None)
     category: int = FieldCategory.Population
 
     def __pre_init__(self):
+        self._field: str = None
         self._icon: QIcon = None
         self._expression: QgsExpression = None
         self._context: QgsExpressionContext = None
@@ -73,7 +74,7 @@ class RdsField(RdsBaseModel):
     def __key__(self):
         return self._field
 
-    @rds_property(private=True, notify=captionChanged)
+    @caption.getter
     def caption(self) -> str:
         if self._caption is None:
             if self.qgsField() is not None:

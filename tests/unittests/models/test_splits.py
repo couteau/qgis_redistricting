@@ -21,19 +21,10 @@ Copyright 2022-2024, Stuart C. Naifeh
 import pandas as pd
 import pytest
 
-from redistricting.models import (
-    RdsGeoField,
-    RdsSplitDistrict,
-    RdsSplitGeography,
-    RdsSplits
-)
+from redistricting.models import RdsSplitDistrict, RdsSplitGeography, RdsSplits
 
 
 class TestSplits:
-    @pytest.fixture
-    def geo_field(self, block_layer):
-        return RdsGeoField(block_layer, 'vtdid', 'VTD')
-
     @pytest.fixture
     def splits_data(self):
         return pd.read_json(
@@ -126,22 +117,20 @@ class TestSplits:
             orient="table"
         )
 
-    def test_create_splits_no_data(self, geo_field):
-        s = RdsSplits(geo_field)
-        assert s.geoField == geo_field
+    def test_create_splits_no_data(self):
+        s = RdsSplits('vtdid')
         assert s.field == 'vtdid'
         assert isinstance(s.data, pd.DataFrame) and s.data.empty
 
-    def test_create_splits_with_data(self, geo_field, splits_data):
-        s = RdsSplits(geo_field, splits_data)
-        assert s.geoField == geo_field
+    def test_create_splits_with_data(self, splits_data):
+        s = RdsSplits('vtdid', data=splits_data)
         assert s.field == 'vtdid'
         assert isinstance(s.data, pd.DataFrame) and len(s.data) == 12
         assert len(s.splits) == 4
         assert s.attrCount == 16
 
-    def test_create_split_geography(self, geo_field, splits_data):
-        s = RdsSplits(geo_field, splits_data)
+    def test_create_split_geography(self, splits_data):
+        s = RdsSplits('vtdid', data=splits_data)
         g = RdsSplitGeography(s, splits_data, '0155200')
         assert len(g) == 3
         assert g.name == 'Northport'
@@ -149,8 +138,8 @@ class TestSplits:
         assert g.districts == [1, 3, 5]
         assert g.attributes == ['Northport (0155200)', '1, 3, 5']
 
-    def test_create_split_district(self, geo_field, splits_data):
-        s = RdsSplits(geo_field, splits_data)
+    def test_create_split_district(self, splits_data):
+        s = RdsSplits('vtdid', data=splits_data)
         g = RdsSplitGeography(s, splits_data, '0155200')
         d = RdsSplitDistrict(g, splits_data, ('0155200', 3))
         assert d.geoid == '0155200'

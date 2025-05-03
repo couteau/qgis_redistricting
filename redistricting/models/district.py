@@ -45,7 +45,7 @@ from .base.model import (
     not_empty,
     rds_property
 )
-from .columns import (
+from .consts import (
     DistrictColumns,
     MetricsColumns
 )

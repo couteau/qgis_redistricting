@@ -17,6 +17,7 @@
  ***************************************************************************/
 """
 import json
+from typing import Generator
 
 import pytest
 from pytestqt.plugin import QtBot
@@ -29,7 +30,7 @@ from redistricting.services import ProjectStorage
 
 class TestStorage:
     @pytest.fixture
-    def storage(self, datadir, qtbot: QtBot) -> ProjectStorage:
+    def storage(self, datadir, qtbot: QtBot) -> Generator[ProjectStorage, None, None]:
         def check_params(d: QDomDocument):
             nonlocal doc
             doc.setContent(d.toString())
@@ -39,7 +40,9 @@ class TestStorage:
         doc = QDomDocument()
         with qtbot.waitSignal(project.readProject, check_params_cb=check_params):
             project.read(str((datadir / 'test_project.qgz').resolve()))
-        return ProjectStorage(project, doc)
+        yield ProjectStorage(project, doc)
+        with qtbot.waitSignal(project.cleared):
+            project.clear()
 
     @pytest.fixture
     def empty_storage(self) -> ProjectStorage:

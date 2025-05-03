@@ -1,66 +1,52 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - modular metrics base classes
-
-        begin                : 2024-09-15
-        git sha              : $Format:%H$
-        copyright            : (C) 2024 by Cryptodira
-        email                : stuart@cryptodira.org
-
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 3 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- *   This program is distributed in the hope that it will be useful, but   *
- *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
- *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
- *   GNU General Public License for more details. You should have          *
- *   received a copy of the GNU General Public License along with this     *
- *   program. If not, see <http://www.gnu.org/licenses/>.                  *
- *                                                                         *
- ***************************************************************************/
-"""
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Iterable
-from copy import copy
-from enum import Enum, IntFlag, auto
-from types import GenericAlias
+from collections.abc import (
+    Callable,
+    Iterable,
+    Mapping
+)
+from enum import (
+    Enum,
+    IntFlag,
+    auto
+)
 from typing import (
-    TYPE_CHECKING,
     Any,
     Generic,
-    Mapping,
     Optional,
     TypeVar,
     Union,
-    _GenericAlias,
-    get_args,
-    get_origin,
-    overload,
+    get_args
 )
 
 import geopandas as gpd
 import pandas as pd
-from qgis.core import QgsField, QgsVectorLayer
-from qgis.PyQt.QtCore import QMetaType, QObject, pyqtSignal
+from qgis.core import (
+    QgsField,
+    QgsVectorLayer
+)
+from qgis.PyQt.QtCore import (
+    QMetaType,
+    pyqtSignal
+)
 from qgis.PyQt.QtGui import QColor
 
 from ..utils import tr
 from .base.lists import KeyedList
-from .base.model import RdsBaseModel, rds_property
+from .base.model import (
+    InitVar,
+    RdsBaseModel,
+    fields,
+    rds_property
+)
 from .base.serialization import (
     camel_to_kebab,
     camel_to_snake,
     deserialize_value,
     kebab_to_camel,
-    serialize_value,
+    register_serializer,
+    serialize_value
 )
-
-if TYPE_CHECKING:
-    from .plan import RdsPlan
 
 
 class MetricTriggers(IntFlag):
@@ -77,14 +63,12 @@ class MetricLevel(Enum):
     DISTRICT = auto()
 
 
-T = TypeVar("T")
+_T = TypeVar("_T")
 
-class RdsMetric(Generic[T], RdsBaseModel):
-    value: T = rds_property(private=True, readonly=True, default=None)
 
-    def __pre_init__(self):
-        self._value: T = None
-        
+class RdsMetric(Generic[_T], RdsBaseModel):
+    value: Any = rds_property(private = True, readonly=True, default=None)
+
     def __init_subclass__(
         cls,
         *args,
@@ -99,17 +83,22 @@ class RdsMetric(Generic[T], RdsBaseModel):
     ):
         super().__init_subclass__(*args, **kwargs)
         cls._type = get_args(cls.__orig_bases__[0])[0]  # pylint: disable=no-member
-        if cls._type is T:
-            cls._type = Any
-
-        if cls.value.type != cls._type:
+        if cls._type is _T:
+            cls._type = None
+        else:
             cls.__annotations__['value'] = cls._type
-            setattr(cls, "value", copy(cls.value))
-            if isinstance(cls._type, (_GenericAlias, GenericAlias)):
-                cls.value.type = get_origin(cls._type)
-            else:
-                cls.value.type = cls._type
-            cls.__fields__['value'] = cls.value
+            fields(cls)[0].type = cls._type
+
+        if level == MetricLevel.DISTRICT:
+            triggers |= MetricTriggers.ON_UPDATE_DISTRICTS
+            depends = tuple(depends) if depends else ()
+            if RdsDistrictsMetric not in depends:
+                depends = (RdsDistrictsMetric, *depends)
+        elif level == MetricLevel.GEOGRAPHIC:
+            triggers |= MetricTriggers.ON_UPDATE_GEOFIELDS
+            depends = tuple(depends) if depends else ()
+            if RdsGeoFieldsMetric not in depends:
+                depends = (RdsGeoFieldsMetric, *depends)
 
         cls._name = mname
         cls._display = display
@@ -119,56 +108,55 @@ class RdsMetric(Generic[T], RdsBaseModel):
         cls._serialize = serialize
         cls._depends: tuple[type['RdsMetric']] = tuple(depends) if depends else ()
 
-
-    def __key__(self) -> str:
+    def name(self):
         return self._name
+    
+    @classmethod
+    def level(cls):
+        return cls._level
+    
+    @classmethod
+    def group(cls):
+        return cls._group
+    
+    @classmethod
+    def triggers(cls):
+        return cls._triggers
+    
+    @classmethod
+    def display(cls):
+        return cls._display
+    
+    @classmethod
+    def serialize(cls):
+        return cls._serialize
+
+    @classmethod
+    def depends(cls):
+        return cls._depends
     
     @classmethod
     def get_type(cls) -> type:
         return cls._type
 
+    def __key__(self) -> str:
+        return type(self)._name
+    
     @abstractmethod
     def calculate(
         self,
+        triggers: MetricTriggers,
         populationData: pd.DataFrame,
         geometry: gpd.GeoSeries,
-        plan: 'RdsPlan',
         **depends
     ):
         ...
 
-    def finished(self, plan: 'RdsPlan'):  # pylint: disable=unused-argument
+    def finished(self, triggers: MetricTriggers):
         ...
 
-    @classmethod
-    def name(cls) -> str:
-        return cls._name
-
-    @classmethod
-    def display(cls) -> bool:
-        return cls._display
-
-    @classmethod
-    def serialize(cls) -> bool:
-        return cls._serialize
-
-    @classmethod
-    def triggers(cls) -> MetricTriggers:
-        return cls._triggers
-
-    @classmethod
-    def level(cls) -> MetricLevel:
-        return cls._level
-
-    @classmethod
-    def depends(cls) -> Iterable[type['RdsMetric']]:
-        return cls._depends
-
-    def group(self) -> str:
-        return self._group
-
     def caption(self) -> str:
-        return tr(self.name().replace("_", " ").title())
+        return self._name.replace("_", " ").title()
 
     def format(self, idx=None) -> str:
         try:
@@ -187,9 +175,36 @@ class RdsMetric(Generic[T], RdsBaseModel):
 
     def tooltip(self, idx=None) -> str:  # pylint: disable=unused-argument
         return None
+    
+class RdsPropertyGetterMetric(RdsMetric, mname="__getter", serialize=False):
+    instance: InitVar[Any] = None
+    prop_name: InitVar[str] = None
 
-class RdsAggregateMetric(RdsMetric[T], mname="__aggregate"):
-    def __init_subclass__(cls, *args, mname: str, level=MetricLevel.PLANWIDE, values: type[RdsMetric], **kwargs):
+    def name(self):
+        return self._prop
+    
+    def __post_init__(self, instance: Any, prop_name: str):
+        self._instance = instance
+        self._prop = prop_name
+
+    def calculate(self, triggers, populationData, geometry, **depends):
+        self._value = getattr(self._instance, self._prop)
+    
+    
+class RdsDistrictsMetric(RdsMetric[Iterable[int]], mname="__districts", triggers=MetricTriggers.ON_UPDATE_DISTRICTS, serialize=False):
+    distField: str = 'district'
+
+    def calculate(self, populationData: pd.DataFrame, geometry, **depends):
+        self._value = list(populationData[self.distField].unique())
+
+class RdsGeoFieldsMetric(RdsMetric[Iterable[str]], mname="__geofields", triggers=MetricTriggers.ON_UPDATE_GEOFIELDS, serialize=False):
+    geoFields: list[str] = rds_property(private="_value", serialize=False)
+    
+    def calculate(self, populationData: pd.DataFrame, geometry, **depends):
+        ...
+
+class RdsAggregateMetric(RdsMetric[_T], mname="__aggregate"):
+    def __init_subclass__(cls, *args, mname: str, values: type[RdsMetric], level=MetricLevel.PLANWIDE, **kwargs):
         super().__init_subclass__(*args, mname=mname, level=level, **kwargs)
         cls._source_metric = values
 
@@ -210,7 +225,6 @@ class RdsAggregateMetric(RdsMetric[T], mname="__aggregate"):
         self,
         populationData: pd.DataFrame,
         geometry: gpd.GeoSeries,
-        plan: 'RdsPlan',
         values: Iterable[Any]
     ) -> Any:
         ...
@@ -219,7 +233,6 @@ class RdsAggregateMetric(RdsMetric[T], mname="__aggregate"):
         self,
         populationData: pd.DataFrame,
         geometry: gpd.GeoSeries,
-        plan: 'RdsPlan',
         **depends
     ):
         values = depends.get(self._source_metric.name())
@@ -231,17 +244,21 @@ class RdsAggregateMetric(RdsMetric[T], mname="__aggregate"):
         if isinstance(values, Mapping):
             values = values.values()
 
-        self._value = self.aggregate(populationData, geometry, plan, values)
+        self._value = self.aggregate(populationData, geometry,values)
 
     @classmethod
     def short_name(cls):
         return tr("Aggregate")
-
-
-metrics_classes: dict[str, type[RdsMetric]] = {}
-base_metrics: dict[str, type[RdsMetric]] = {}
+    
+metrics_classes: dict[str, type[RdsMetric]] = {
+    RdsDistrictsMetric.name(): RdsDistrictsMetric, 
+    RdsGeoFieldsMetric.name(): RdsGeoFieldsMetric
+}
+base_metrics: dict[str, type[RdsMetric]] = {
+    RdsDistrictsMetric.name(): RdsDistrictsMetric, 
+    RdsGeoFieldsMetric.name(): RdsGeoFieldsMetric
+}
 aggregates: dict[str, list[RdsAggregateMetric]] = defaultdict(default_factory=list)
-
 
 def register_metrics(classes: Union[type[RdsMetric], Iterable[type[RdsMetric]]], base: bool = False):
     if not isinstance(classes, Iterable):
@@ -296,7 +313,6 @@ def get_batches(metrics: Mapping[str, RdsMetric], ready: dict[str, RdsMetric] = 
 
     return batches
 
-
 class RdsMetrics(RdsBaseModel):
     metricsAboutToChange = pyqtSignal()
     metricsChanged = pyqtSignal()
@@ -305,6 +321,7 @@ class RdsMetrics(RdsBaseModel):
 
     distLayer: QgsVectorLayer = None
     distField: str = None
+
 
     def __pre_init__(self):
         self._metrics = KeyedList[RdsMetric]({k: v() for k, v in base_metrics.items()})
@@ -315,7 +332,7 @@ class RdsMetrics(RdsBaseModel):
     
     @metrics.serializer
     @staticmethod
-    def metrics(value: KeyedList[RdsMetric], memo: dict[int, Any], exclude_none=True):
+    def serialize_metrics(value: KeyedList[RdsMetric], memo: dict[int, Any], exclude_none=True):
         metrics = {}
         for name, metric in value.items():
             if metric.serialize() and metric.level() != MetricLevel.DISTRICT:
@@ -325,9 +342,10 @@ class RdsMetrics(RdsBaseModel):
 
         return metrics
 
+
     @metrics.deserializer
     @staticmethod
-    def metrics(value: dict[str, dict[str, Any]]):
+    def deserialize_metrics(value: dict[str, dict[str, Any]]):
         metrics: dict[str, RdsMetric] = {}
         for k, v in value.items():
             n = kebab_to_camel(k)
@@ -372,29 +390,10 @@ class RdsMetrics(RdsBaseModel):
 
         return KeyedList[RdsMetric](metrics)
 
+    
     @metrics.setter
     def metrics(self, value: Iterable[RdsMetric]):
         self._metrics.update(value)
-
-    @overload
-    def __init__(self, *, parent: Optional[QObject] = None, **kwargs):
-        ...
-
-    @overload
-    def __init__(self, metrics: KeyedList[RdsMetric], parent: Optional[QObject] = None):
-        ...
-
-    def __init__(self, metrics: KeyedList[RdsMetric] = None, parent: Optional[QObject] = None, **kwargs):
-        # TODO: limit to metrics selected for plan
-        m = KeyedList[RdsMetric]({k: v() for k, v in metrics_classes.items()})
-        if metrics is not None:
-            m.update(metrics)
-        else:
-            for k, v in kwargs.items():
-                if k in m:
-                    m[k] = metrics_classes[k](v)
-
-        super().__init__(m, parent=parent)
 
     def __getitem__(self, name: str) -> RdsMetric:
         if name in self.metrics:  # pylint: disable=unsupported-membership-test
@@ -409,6 +408,13 @@ class RdsMetrics(RdsBaseModel):
 
         return super().__getattr__(name)
     
+    def _has_dependants(self, metric: type[RdsMetric]):
+        for m in self.metrics:
+            if metric in m.depends():
+                return True
+            
+        return False
+
     def _get_batches_for_trigger(self, trigger: MetricTriggers):
         metrics = {name: metric for name, metric in self.metrics.items() if metric.triggers() & trigger}
         ready = {m.name(): m for metric in metrics.values() for m in metric.depends() if not m.triggers() & trigger}
@@ -420,7 +426,6 @@ class RdsMetrics(RdsBaseModel):
         trigger: MetricTriggers,
         populationData: pd.DataFrame,
         geometry: gpd.GeoSeries,
-        plan: 'RdsPlan'
     ):
         """called in background thread to recalculate metrics"""
         batches = self._get_batches_for_trigger(trigger)
@@ -434,9 +439,9 @@ class RdsMetrics(RdsBaseModel):
                         for m in metric.depends()
                         if m.name() in self.metrics  # pylint: disable=unsupported-membership-test
                     }
-                    metric.calculate(populationData, geometry, plan, **depends)
+                    metric.calculate(populationData, geometry, **depends)
 
-    def addDistrictMetricField(self, plan: 'RdsPlan', metric: RdsMetric):
+    def addDistrictMetricField(self, metric: RdsMetric):
         """adds a district metric field to the metrics list"""
         if metric.level() != MetricLevel.DISTRICT:
             raise ValueError("Only district level metrics can be added as fields.")
@@ -447,16 +452,16 @@ class RdsMetrics(RdsBaseModel):
         if metric.get_type() is None:
             return
 
-        if metric.get_type() == float:
+        if metric.get_type() is float:
             t = QMetaType.Type.Double
-        elif metric.get_type() == int:
+        elif metric.get_type() is int:
             t = QMetaType.Type.Int
-        elif metric.get_type() == str:
+        elif metric.get_type() is str:
             t = QMetaType.Type.QString
         else:
             return
 
-        provider = plan.distLayer.dataProvider() if plan.distLayer else None
+        provider = self.distLayer.dataProvider() if self.distLayer else None
         if provider is None:
             raise RuntimeError("No district layer available to add the metric field.")
 
@@ -466,9 +471,9 @@ class RdsMetrics(RdsBaseModel):
 
         field = QgsField(metric.name(), t)
         if provider.addAttributes([field]):
-            plan.distLayer.updateFields()
+            self.distLayer.updateFields()
 
-    def updateDistrictMetrics(self, trigger: MetricTriggers, plan: 'RdsPlan'):
+    def updateDistrictMetrics(self, trigger: MetricTriggers):
         """updates the district-level metrics in the plan's district layer"""
         def to_dict(value: Union[Mapping, pd.Series, pd.DataFrame]) -> dict:
             if isinstance(value, pd.Series):
@@ -480,7 +485,7 @@ class RdsMetrics(RdsBaseModel):
 
             raise TypeError("Unsupported type for serialization.")
 
-        provider = plan.distLayer.dataProvider() if plan.distLayer else None
+        provider = self.distLayer.dataProvider() if self.distLayer else None
         if provider is None:
             raise RuntimeError("No district layer available to add the metric field.")
 
@@ -497,15 +502,15 @@ class RdsMetrics(RdsBaseModel):
 
         try:
             provider.changeAttributeValues({
-                f.id(): {name: values.get(f[plan.distField]) for name, values in dist_metrics.items()}
+                f.id(): {name: values.get(f[self.distField]) for name, values in dist_metrics.items()}
                 for f in provider.getFeatures()
             })  # reset the attributes
 
-            plan.distLayer.reload()
+            self.distLayer.reload()
         except Exception as e:  # pylint: disable=broad-except
             raise RuntimeError(f"Failed to update district metrics: {e}") from e
 
-    def updateFinished(self, trigger, plan: 'RdsPlan'):
+    def updateFinished(self, trigger):
         """called in main thread to allow updating UI and emiting signals on main-thread objects"""
         self.metricsAboutToChange.emit()
         batches = self._get_batches_for_trigger(trigger)
@@ -514,10 +519,10 @@ class RdsMetrics(RdsBaseModel):
             for metric in b:
                 if metric.level() == MetricLevel.DISTRICT:
                     update_districts = True
-                metric.finished(plan)
+                metric.finished(trigger)
 
         if update_districts:
-            self.updateDistrictMetrics(trigger, plan)
+            self.updateDistrictMetrics(trigger)
 
         self.metricsChanged.emit()
 
@@ -553,3 +558,61 @@ class RdsMetrics(RdsBaseModel):
         # TODO: handle removing metrics that are dependencies of the removed metric and are no longer needed
 
 
+def serialize_metrics(value: KeyedList[RdsMetric], memo: dict[int, Any], exclude_none=True):
+    metrics = {}
+    for name, metric in value.items():
+        if metric.serialize() and metric.level() != MetricLevel.DISTRICT:
+            metrics[camel_to_kebab(name)] = serialize_value(metric, memo, exclude_none)
+        elif not name.startswith("__"):
+            metrics[camel_to_kebab(name)] = None
+
+    return metrics
+
+
+def deserialize_metrics(cls: type[RdsMetrics], value: dict[str, dict[str, Any]]):
+    metrics: dict[str, RdsMetric] = {}
+    for k, v in value.items():
+        n = kebab_to_camel(k)
+        metric_cls = metrics_classes.get(n)
+        if metric_cls is None:
+            continue
+
+        if metric_cls.serialize() and metric_cls.level() != MetricLevel.DISTRICT:
+            metrics[n] = deserialize_value(metric_cls, v)
+        else:
+            metrics[n] = metric_cls()
+
+    # instantiate missing metrics that depend on serialized metrics
+    need_calc = {}
+    for n, metric_cls in metrics_classes.items():
+        if n in metrics or metric_cls.level() == MetricLevel.DISTRICT:
+            continue
+
+        for m in metrics:
+            if metrics_classes[m] in metric_cls.depends():
+                need_calc[n] = metric_cls()
+                break
+
+    batches = get_batches(need_calc, metrics)
+    for b in batches:
+        for metric in b:
+            depends = {
+                m.name(): metrics[m.name()].value
+                for m in metric.depends()
+                if m.name() in metrics
+            }
+            metric.calculate(None, None, None, **depends)
+            metrics[metric.name()] = metric
+
+    # instantiate the rest
+    metrics.update(
+        {n: metric_cls() for n, metric_cls in metrics_classes.items() if n not in metrics}
+    )
+
+    # sort
+    metrics = {n: metrics[n] for n in metrics_classes if n in metrics}
+
+    return cls(metrics=KeyedList[RdsMetric](metrics))
+
+
+register_serializer(RdsMetrics, serialize_metrics, deserialize_metrics)

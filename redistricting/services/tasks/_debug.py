@@ -29,7 +29,8 @@ DEBUG = os.getenv("DEBUG")
 
 
 def debug_thread():
-    if not DEBUG:
+    if not DEBUG or "PYTEST_CURRENT_TEST" in os.environ:
+        # Don't debug if not in DEBUG mode or if running pytest
         return
 
     if 'unittest' in sys.modules:

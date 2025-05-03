@@ -35,6 +35,7 @@ from redistricting.models.base.serialization import (
     serialize
 )
 
+# ruff: noqa: E741
 
 class UnkeyedModel(RdsBaseModel):
     name: str
@@ -48,7 +49,7 @@ class ItemModel(UnkeyedModel):
 
 class TestKeyedList:
     def test_construct(self):
-        l = KeyedList()
+        l = KeyedList("key")
         assert len(l) == 0
         assert isinstance(l, Sequence)
         assert isinstance(l, Mapping)
@@ -56,7 +57,7 @@ class TestKeyedList:
     def test_construct_with_list(self):
         l = [ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2)]
 
-        kl = KeyedList[ItemModel](iterable=l)
+        kl = KeyedList[ItemModel](l)
         assert len(kl) == 3
         assert kl[0] is l[0]
         assert kl["A"] is l[0]
@@ -64,7 +65,7 @@ class TestKeyedList:
 
     def test_construct_with_dict(self):
         l = {"A": ItemModel("A", 0), "B": ItemModel("B", 1), "C": ItemModel("C", 2)}
-        kl = KeyedList(iterable=l)
+        kl = KeyedList(iterable=l, key=ItemModel)
         assert len(kl) == 3
         assert kl[0] is l["A"]
         assert kl["A"] is l["A"]
@@ -186,17 +187,6 @@ class TestKeyedList:
         assert len(kl) == 4
         assert list(kl.keys()) == ["A", "D", "E", "C"]
 
-    def test_set_item_slice_with_dict_value_and_non_matching_key_raises_exception(self):
-        kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel(
-            "Z", 1), ItemModel("Y", 2), ItemModel("B", 3), ItemModel("C", 4)])
-
-        itemD = ItemModel("D", 42)
-        itemE = ItemModel("E", 100)
-        itemF = ItemModel("F", 100)
-
-        with pytest.raises(ValueError):
-            kl[2:5] = {"N": itemD, "O": itemE, "F": itemF}
-        assert list(kl.keys()) == ["A", "Z", "Y", "B", "C"]
 
     def test_move_moves_item(self):
         kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2)])
@@ -220,120 +210,6 @@ class TestKeyedList:
         assert kl[1].name == "C"
         assert kl[2].name == "B"
         assert list(kl.keys()) == ["A", "C", "B"]
-
-    # unkeyed items
-
-    def test_construct_with_dict_of_unkeyed_items(self):
-        l = {"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)}
-        kl = KeyedList(iterable=l)
-        assert len(kl) == 3
-        assert kl[0] is l["X"]
-        assert kl["X"] is l["X"]
-        assert kl["X"].name == "A"
-
-    def test_remove_unkeyed_item_removes_item(self):
-        itemB = UnkeyedModel("B", 1)
-        l = {"A": UnkeyedModel("A", 0), "B": itemB, "C": UnkeyedModel("C", 2)}
-        kl = KeyedList(iterable=l)
-        kl.remove(itemB)
-        assert len(kl) == 2
-        with pytest.raises(KeyError):
-            kl["B"]  # pylint: disable=pointless-statement
-        assert kl[1].name == "C"
-
-    def test_set_unkeyeditem_int_index_replaces(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        kl[1] = itemD
-        assert len(kl) == 3
-        assert kl[1] is itemD
-        assert kl["Y"] is itemD
-
-    def test_append_unkeyeditem_raises_exception(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        with pytest.raises(ValueError):
-            kl.append(itemD)
-
-    def test_insert_unkeyeditem_raises_exception(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        with pytest.raises(ValueError):
-            kl.insert(1, itemD)
-
-    def test_set_unkeyeditem_new_key_appends(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        kl["W"] = itemD
-        assert len(kl) == 4
-        assert kl[3] is itemD
-        assert list(kl.keys())[3] == "W"
-
-    def test_set_unkeyeditem_slice_replaces_items(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        kl[1:2] = [itemD]
-        assert list(kl.keys()) == ["X", "Y", "Z"]
-        assert kl[1] is itemD
-
-    def test_set_unkeyeditem_slice_larger_removes_replaces_items(self):
-        kl = KeyedList(iterable={"W": UnkeyedModel("N", 42), "X": UnkeyedModel(
-            "A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        kl[1:3] = [itemD]
-        assert list(kl.keys()) == ["W", "X", "Z"]
-        assert kl[1] is itemD
-
-    def test_set_unkeyeditem_slice_with_dict_value_replaces_keys_and_values(self):
-        itemN = UnkeyedModel("N", 42)
-        itemC = UnkeyedModel("C", 2)
-        kl = KeyedList(iterable={"W": itemN, "X": UnkeyedModel(
-            "A", 0), "Y": UnkeyedModel("B", 1), "Z": itemC})
-        itemD = UnkeyedModel("D", 100)
-        itemE = UnkeyedModel("E", 101)
-        kl[1:3] = {"A": itemD, "B": itemE}
-        assert list(kl.keys()) == ["W", "A", "B", "Z"]
-        assert kl[0] is itemN
-        assert kl[1] is itemD
-        assert kl[2] is itemE
-        assert kl[3] is itemC
-
-    def test_extend_unkeyed_items_from_dict_extends_list(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        kl.extend({"W": itemD})
-        assert len(kl) == 4
-        assert kl[3] is itemD
-        assert list(kl.keys())[3] == "W"
-
-    def test_extend_unkeyed_items_from_list_raises_exception(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        itemD = UnkeyedModel("D", 100)
-        with pytest.raises(ValueError):
-            kl.extend([itemD])
-
-    def test_move_unkeyed_moves_item(self):
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        assert kl[0].name == "A"
-        assert kl[1].name == "B"
-        assert kl[2].name == "C"
-        assert list(kl.keys()) == ["X", "Y", "Z"]
-        kl.move(2, 1)
-        assert kl[0].name == "A"
-        assert kl[1].name == "C"
-        assert kl[2].name == "B"
-        assert list(kl.keys()) == ["X", "Z", "Y"]
-
-        kl = KeyedList(iterable={"X": UnkeyedModel("A", 0), "Y": UnkeyedModel("B", 1), "Z": UnkeyedModel("C", 2)})
-        assert kl[0].name == "A"
-        assert kl[1].name == "B"
-        assert kl[2].name == "C"
-        assert list(kl.keys()) == ["X", "Y", "Z"]
-        kl.move(1, 2)
-        assert kl[0].name == "A"
-        assert kl[1].name == "C"
-        assert kl[2].name == "B"
-        assert list(kl.keys()) == ["X", "Z", "Y"]
 
     # sorted lists
 
@@ -364,7 +240,7 @@ class TestKeyedList:
 
     @pytest.mark.parametrize("cls", [KeyedList, SortedKeyedList])
     def test_serialize(self, cls: type[KeyedList]):
-        kl = cls(iterable={"A": ItemModel("A", 0), "B": ItemModel("B", 1), "C": ItemModel("C", 2)})
+        kl = cls(iterable={"A": ItemModel("A", 0), "B": ItemModel("B", 1), "C": ItemModel("C", 2)}, key=ItemModel)
         d = serialize(kl)
         assert isinstance(d, dict)
         assert len(d) == 3

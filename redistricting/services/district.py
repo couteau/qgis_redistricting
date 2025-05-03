@@ -78,7 +78,7 @@ class DistrictUpdater(QObject):
         if updateTask.includeGeometry:
             trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
 
-        updateMetricsTask = UpdateMetricsTask(updateTask.plan, trigger)
+        updateMetricsTask = UpdateMetricsTask(updateTask.plan, trigger, updateTask.populationData, updateTask.geometry)
         QgsApplication.taskManager().addTask(updateMetricsTask)
 
         if updateTask.districtData is not None:

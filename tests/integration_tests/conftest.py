@@ -19,22 +19,24 @@ Copyright 2022-2024, Stuart C. Naifeh
  ***************************************************************************/
 """
 import pytest
+from qgis.core import QgsProject
 from qgis.PyQt.QtWidgets import QToolBar
 
 from redistricting import services
+from redistricting.resources import *  # pylint: disable=wildcard-import, unused-wildcard-import
 
 # pylint: disable=unused-argument, redefined-outer-name
 
 
 @pytest.fixture
-def planmanager(qgis_new_project):
+def planmanager():
     planManager = services.PlanManager()
     return planManager
 
 
 @pytest.fixture
-def layertreemanager(qgis_new_project):
-    svc = services.LayerTreeManager()
+def layertreemanager():
+    svc = services.LayerTreeManager(QgsProject.instance())
     return svc
 
 

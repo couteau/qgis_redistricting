@@ -33,241 +33,381 @@ from collections.abc import (
     Sized
 )
 from copy import copy
+from itertools import groupby
+from operator import (
+    attrgetter,
+    itemgetter
+)
 from types import GenericAlias
-from typing import (  # pylint: disable=no-name-in-module
-    Any,
+from typing import (
     Callable,
     Generic,
-    Self,
     TypeVar,
     Union,
     overload
 )
 
-from .model import (
-    MISSING,
-    Factory
+from qgis.PyQt.QtCore import (
+    QObject,
+    pyqtSignal
 )
 
-T = TypeVar("T")
+
+def truncate_str(s: str):
+    if len(s) > 23:
+        return f"{s[:10]}...{s[-10:]}"
+
+    return s
 
 
-def _key(item: T, default=MISSING) -> str:
-    if hasattr(item, "__key__"):
-        return item.__key__()
-
-    if default is not MISSING:
-        return default
-
-    raise ValueError(f"Could not determine key of Item {item!r}")
+_T = TypeVar("_T")
 
 
-class KeyedListView(Generic[T], Sized):
-    __slots__ = ("_list",)
+class KeyedListView(Generic[_T], Sized):
+    __slots__ = ("_reflist",)
 
-    def __init__(self, reflist: "KeyedList[T]"):
-        self._list = reflist
+    def __init__(self, reflist: "KeyedList[_T]"):
+        self._reflist = reflist
 
     def __len__(self):
-        return len(self._list)
+        return len(self._reflist)
 
 
-class KeyedListKeyView(KeyedListView[T]):
+class KeyedListKeyView(KeyedListView[_T]):
     __slots__ = ()
 
     def __iter__(self) -> Iterator[str]:
-        yield from self._list._keys
+        yield from self._reflist._keys
 
     def __contains__(self, key: str):  # pylint: disable=redefined-outer-name
-        return key in self._list._items
+        return key in self._reflist._items
 
     def __repr__(self):
-        return f"KeyedListKeyView({repr(self._list._keys)})"
+        return f"KeyedListKeyView({repr(self._reflist._keys)})"
 
 
-class KeyedListValueView(KeyedListView[T]):
+class KeyedListValueView(KeyedListView[_T]):
     __slots__ = ()
 
-    def __iter__(self) -> Iterator[T]:
-        for k in self._list._keys:
-            yield self._list._items[k]
+    def __iter__(self) -> Iterator[_T]:
+        for k in self._reflist._keys:
+            yield self._reflist._items[k]
 
-    def __contains__(self, item: T):
-        return item in self._list._items.values()
+    def __contains__(self, item: _T):
+        return item in self._reflist._items.values()
 
     def __repr__(self):
-        return f"KeyedListValueView([{', '.join(repr(self._list._items[k]) for k in self._list._keys)}])"
+        return f"KeyedListValueView([{truncate_str(
+            ', '.join(repr(self._reflist._items[k]) for k in self._reflist._keys)
+        )}])"
 
     __class_getitem__ = classmethod(GenericAlias)
 
 
-class KeyedListItemsView(KeyedListView[T]):
+class KeyedListItemsView(KeyedListView[_T]):
     __slots__ = ()
 
-    def __iter__(self) -> Iterator[tuple[str, T]]:
-        for k in self._list._keys:
-            yield (k, self._list._items[k])
+    def __iter__(self) -> Iterator[tuple[str, _T]]:
+        for k in self._reflist._keys:
+            yield (k, self._reflist._items[k])
 
-    def __contains__(self, item):
-        item_key, value = item
+    def __contains__(self, item: tuple[str, _T]):
+        key, value = item
         try:
-            v = self._list[item_key]
+            v = self._reflist[key]
         except KeyError:
             return False
 
         return v is value or v == value
 
     def __repr__(self):
-        return f"KeyedListItemsView([{', '.join(f'({k}, {repr(self._list._items[k])})' for k in self._list._keys)}])"
+        return f"KeyedListItemsView([{truncate_str(
+            ', '.join(f'({k}, {repr(self._reflist._items[k])})' for k in self._reflist._keys)
+        )}])"
 
 
-class KeyedList(Generic[T]):
-    """Sequence-Mapping hybrid, indexible by string or integer"""
+list_type_cache: dict[str, type] = {}
 
+
+class KeyedList(Generic[_T], QObject):
+    itemRemoved = pyqtSignal(int, "PyQt_PyObject")
+    itemsRemoved = pyqtSignal(int, int, "PyQt_PyObject")
+    itemAdded = pyqtSignal(int, "PyQt_PyObject")
+    itemsAdded = pyqtSignal(int, int, "PyQt_PyObject")
+    itemReplaced = pyqtSignal(int, int, "PyQt_PyObject", "PyQt_PyObject")
+    itemsReplaced = pyqtSignal(int, int, "PyQt_PyObject", "PyQt_PyObject")
+    itemMoved = pyqtSignal(int, int, "PyQt_PyObject")
+
+    def __class_getitem__(cls, *args):
+        generic = super().__class_getitem__(*args)
+        if not all(isinstance(arg, TypeVar) for arg in args):
+            name = repr(generic)
+            if name not in list_type_cache:
+                list_type_cache[name] = type(cls.__name__, (cls,), {'__args__': args})
+            
+            generic.__origin__ = list_type_cache[name]
+
+        return generic
+            
     @overload
-    def __init__(self, key: Callable[[T], str] = None):
+    def __init__(self, key: Callable[[_T], str]):
         ...
 
     @overload
-    def __init__(self, iterable: Union[Iterable[T], Mapping[str, T]], key: Callable[[T], str] = None):
+    def __init__(self, key: str):
+        ...
+
+    @overload
+    def __init__(self, key: int):
+        ...
+
+    @overload
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: Callable[[_T], str]):
+        ...
+
+    @overload
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: str):
+        ...
+
+    @overload
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: int):
         ...
 
     def __init__(self, iterable=None, key=None):
-        if callable(iterable) and key is None:
+        super().__init__()
+
+        if isinstance(iterable, (Callable, str, int)):
             key = iterable
             iterable = None
 
-        if key is not None:
-            self._key = lambda i, default=MISSING: key(i)
-        else:
-            self._key = _key
+        if key is None:
+            if hasattr(type(self), "__args__") and len(type(self).__args__) > 0 and hasattr(type(self).__args__[0], "__key__"):
+                key = type(self).__args__[0].__key__
+            else:
+                raise ValueError("Key function must be supplied to KeyedList")
+
+        if isinstance(key, str):
+            key = attrgetter(key)
+        elif isinstance(key, int):
+            key = itemgetter(key)
+        elif isinstance(key, type) and hasattr(key, "__key__"):
+            key = key.__key__
+
+        self._keyfunc: Callable[[_T], str] = key
 
         if iterable is not None:
             if isinstance(iterable, Mapping):
-                self._items = dict(iterable.items())
-            elif isinstance(iterable, Iterable) and not isinstance(iterable, (str, bytes)):
-                self._items = {self._key(v): v for v in iterable}
+                self._items: dict[str, _T] = dict(iterable)
             else:
-                raise TypeError(f"Cannot create KeyedList from {iterable}")
-            self._keys = list(self._items.keys())
+                self._items: dict[str, _T] = {self._keyfunc(i): i for i in iterable}
         else:
-            self._items: dict[str, T] = {}
-            self._keys = []
+            self._items = {}
+
+        self._keys = list(self._items.keys())
+
+    def __len__(self):
+        return len(self._items)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}([{', '.join(repr(self._items[d]) for d in self._keys)}])"
+        return f"{self.__class__.__name__}([{truncate_str(', '.join(repr(self._items[d]) for d in self._keys))}])"
 
     def __copy__(self):
-        inst = type(self)()
-        inst._keys = self._keys.copy()
-        inst._items = self._items.copy()
+        return type(self)(self._items, self._keyfunc)
+
+    def __reversed__(self):
+        inst = type(self)(self._keyfunc)
+        inst._items = self._items  # pylint: disable=attribute-defined-outside-init
+        inst._keys = reversed(self._keys)  # pylint: disable=attribute-defined-outside-init
         return inst
 
+    def keys(self) -> KeyedListKeyView[_T]:
+        return KeyedListKeyView(self)
+
+    def values(self) -> KeyedListValueView[_T]:
+        return KeyedListValueView(self)
+
+    def items(self) -> KeyedListItemsView[_T]:
+        return KeyedListItemsView(self)
+
+    def _getranges(self, indices):
+        """return a list of ranges of indices from a list of indices"""
+        gb = groupby(enumerate(sorted(indices)), key=lambda x: x[0] - x[1])
+        groups = [list(g[1]) for g in gb]
+        return (range(s[0][1], s[-1][1]+1) for s in groups)
+
+    def _addkey(self, key: str) -> int:
+        if key in self._keys:
+            raise KeyError('Key already in list')
+        self._keys.append(key)
+        return len(self._keys) - 1
+
+    def _addkeys(self, keys: Iterable[str]):
+        newkeys = copy(self._keys)
+        newkeys.extend(keys)
+        if len(set(newkeys)) != len(newkeys):
+            raise KeyError("Keys overlap")
+
+        start = len(self._keys)
+        self._keys = newkeys
+        stop = len(self._keys)
+
+        return (range(start, stop),)
+
+    def _insertkey(self, index: int, key: str) -> int:
+        if key in self._keys:
+            raise KeyError('Key already in list')
+        self._keys.insert(index, key)
+        return index
+
+    def _replacekey(self, index: int, key: str) -> int:
+        if key in self._keys and self._keys.index(key) != index:
+            raise KeyError('Key already in list')
+
+        self._keys[index] = key
+        return index
+
+    def _replacekeys(self, index: slice, keys: Iterable[str]):
+        newkeys = copy(self._keys)
+        newkeys[index] = keys
+        
+        if len(set(newkeys)) != len(newkeys):
+            raise KeyError("Keys overlap")
+        
+        self._keys = newkeys
+        return (range(*index.indices(len(self._keys))),)
+
+    def _updatekeys(self, keys: Iterable[str]):
+        updatedkeys = []
+        start = len(self._keys)
+        for k in keys:
+            if k in self._keys:
+                updatedkeys.append(self._keys.index(k))
+            else:
+                self._keys.append(k)
+
+        return self._getranges(updatedkeys), (range(start, len(self._keys)),)
+
+    def _replaceitem(self, index: int, oldkey: str, item: _T):
+        newkey = self._keyfunc(item)
+        newindex = self._replacekey(index, newkey)
+        olditem = self._items[oldkey]
+        del self._items[oldkey]
+        self._items[newkey] = item
+
+        self.itemReplaced.emit(newindex, index, item, olditem)
+
+    def _additem(self, key, item):
+        self._addkey(key)
+        self._items[key] = item
+        self.itemAdded.emit(self._keys.index(key), item)
+
+    def _setitembykey(self, oldkey: str, item: _T):
+        if oldkey in self._keys:
+            self._replaceitem(self._keys.index(oldkey), oldkey, item)
+        else:
+            self._additem(oldkey, item)
+
+    def _setitembyindex(self, index: int, item: _T):
+        self._replaceitem(index, self._keys[index], item)
+
+    def _replaceitems(self, index: slice, items: Iterable[_T]):
+        value = {self._keyfunc(v): v for v in items}
+
+        oldkeys = self._keys[index]
+        oldrange = range(*index.indices(len(self._keys)))
+        olditems = {k: self._items[k] for k in oldkeys}
+
+        newranges = self._replacekeys(index, value.keys())
+
+        if len(olditems) > 0:
+            self._items = {k: v for k, v in self._items.items() if k not in oldkeys}
+            self.itemsRemoved.emit(oldrange.start, oldrange.stop-1, olditems)
+
+        if len(value) > 0:
+            self._items.update(value)
+            for g in newranges:
+                self.itemsAdded.emit(g.start, g.stop-1, (value[self._keys[i]] for i in g))
+
+    def _delitem(self, index: Union[str, int]):
+        if isinstance(index, int):
+            key = self._keys.pop(index)
+        else:
+            key = index
+            index = self._keys.index(key)
+            del self._keys[index]
+
+        item = self._items[key]
+        del self._items[key]
+
+        self.itemRemoved.emit(index, item)
+
+    def _delitems(self, index: slice):
+        r = range(*index.indices(len(self._items)))
+        keys = self._keys[index]
+        items = [self._items[k] for k in keys]
+
+        del self._keys[index]
+        self._items = {k: v for k, v in self._items.items() if k not in keys}
+
+        self.itemsRemoved(r.start, r.stop-1, items)
+
     @overload
-    def __getitem__(self, index: int) -> T:
+    def __getitem__(self, index: int) -> _T:
         ...
 
     @overload
-    def __getitem__(self, index: str) -> T:
+    def __getitem__(self, index: str) -> _T:
         ...
 
     @overload
-    def __getitem__(self, index: slice) -> Iterable[T]:
+    def __getitem__(self, index: slice) -> Iterable[_T]:
         ...
 
-    @overload
-    def __getitem__(self, index: tuple[Union[int, str], str]) -> Any:
-        ...
-
-    @overload
-    def __getitem__(self, index: tuple[slice, str]) -> Iterable[Any]:
-        ...
-
-    def __getitem__(self, index: Union[int, str, slice, tuple[Union[int, str, slice], str]]) -> Union[T, Self, Any]:
-        if isinstance(index, tuple):
-            index, field = index
-            item = self[index]
-            if isinstance(item, Iterable):
-                return (i[field] for i in item)
-
-            return item[field]
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return type(self)([self._items[i] for i in self._keys[index]], self._keyfunc)
+        
+        if isinstance(index, int):
+            return self._items[self._keys[index]]
 
         if isinstance(index, str):
             return self._items[index]
 
-        if isinstance(index, int):
-            return self._items[self._keys[index]]
+        raise IndexError("Index must be string, integer, or slice")
 
+    @overload
+    def __setitem__(self, index: int, value: _T):
+        ...
+
+    @overload
+    def __setitem__(self, index: str, value: _T):
+        ...
+
+    @overload
+    def __setitem__(self, index: slice, value: Union[Iterable[_T], Mapping[str, _T]]):
+        ...
+
+    def __setitem__(self, index: Union[int, str, slice], value: Union[_T, Iterable[_T]]):
         if isinstance(index, slice):
-            # pylint: disable=attribute-defined-outside-init
-            inst = copy(self)
-            inst._keys = self._keys[index]
-            inst._items = {k: self._items[k] for k in inst._keys}
-            return inst
-
-        raise IndexError()
-
-    @overload
-    def __setitem__(self, index: int, value: T):
-        ...
-
-    @overload
-    def __setitem__(self, index: str, value: T):
-        ...
-
-    @overload
-    def __setitem__(self, index: slice, value: Iterable[T]):
-        ...
-
-    def __setitem__(self, index: Union[int, str, slice], value: Union[T, Iterable[T]]):
-        if isinstance(index, slice):
-            oldkeys = self._keys[index]
+            if not isinstance(value, Iterable):
+                raise TypeError("can only assign an iterable")
+            
             if isinstance(value, Mapping):
-                if any(self._key(v, k) != k for k, v in value.items()):
-                    raise ValueError("Item key doesn't match index")
-            elif isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
-                value = {
-                    self._key(item, oldkeys[i] if i < len(oldkeys) else MISSING): item
-                    for i, item in enumerate(value)
-                }
-            else:  # value is a scalar
-                r = range(*index.indices(len(self._items)))
-                # pylint: disable-next=invalid-sequence-index
-                default = MISSING if len(r) == 0 else self._keys[r.start]
-                value = {
-                    self._key(value, default): value
-                }
-
-            for k in value.keys():
-                if k in self._items and k not in oldkeys:
-                    raise ValueError("Duplicate key(s)")
-
-            self._delitems(oldkeys)
-            self._setitems(index, value)
-        else:
-            if isinstance(index, str):
-                item_key = index
-                if item_key != self._key(value, item_key):
-                    raise ValueError("Item key doesn't match index")
-
-                if item_key not in self._items:
-                    index = slice(len(self._keys), len(self._keys))
-                    self._setitems(index, {item_key: value})
-                    return
-
-                index = self._keys.index(index)
-            else:
-                item_key = self._key(value, self._keys[index])
-                if item_key in self._items and item_key != self._keys[index]:
-                    raise KeyError("Key already in list")
-
+                value = value.values()
+                
+            self._replaceitems(index, value)
+        elif isinstance(index, int):
             if index < 0 or index >= len(self._keys):
                 raise IndexError("Index out of range")
 
-            if item_key in self._items:
-                self._delitem(item_key)
+            self._setitembyindex(index, value)
+        elif isinstance(index, str):
+            if index != self._keyfunc(value):
+                raise ValueError("Item key doesn't match index")
 
-            self._setitem(index, item_key, value)
+            self._setitembykey(index, value)
+        else:
+            raise IndexError("invalid index")
 
     @overload
     def __delitem__(self, index: int):
@@ -283,237 +423,192 @@ class KeyedList(Generic[T]):
 
     def __delitem__(self, index: Union[int, str, slice]):
         if isinstance(index, (str, int)):
-            if isinstance(index, int):
-                index = self._keys.pop(index)
-            else:
-                self._keys.remove(index)
             self._delitem(index)
         elif isinstance(index, slice):
-            removed = self._keys[index]
-            del self._keys[index]
-            self._delitems(removed)
+            self._delitems(index)
         else:
             raise IndexError()
 
-    def __len__(self):
-        return len(self._items)
-
-    def __contains__(self, item: Union[str, T]):
+    def __contains__(self, item: Union[str, _T]):
         if isinstance(item, str):
             return item in self._items
 
         return item in self._items.values()
-
-    def __reversed__(self):
-        inst = type(self)()
-        inst._items = self._items  # pylint: disable=attribute-defined-outside-init
-        inst._keys = reversed(self._keys)  # pylint: disable=attribute-defined-outside-init
-        return inst
 
     def __eq__(self, value: "KeyedList") -> bool:
         if not isinstance(value, KeyedList):
             return False
         return self._keys == value._keys and self._items == value._items
 
-    def __iter__(self) -> Iterator[T]:
+    def __iter__(self) -> Iterator[_T]:
         for k in self._keys:
             yield self._items[k]
 
-    def get_key(self, item: Union[T, int]) -> str:
-        if isinstance(item, int):
-            return self._keys[item]
-
-        return self._key(item)
-
-    def keys(self) -> KeyedListKeyView[T]:
-        return KeyedListKeyView(self)
-
-    def values(self) -> KeyedListValueView[T]:
-        return KeyedListValueView(self)
-
-    def items(self) -> KeyedListItemsView[T]:
-        return KeyedListItemsView(self)
-
-    def index(self, item: T, start=0, stop=sys.maxsize):
-        item_key = self._key(item, None)
-        if item_key is None:
-            for k, v in self._items.items():
-                if v == item:
-                    item_key = k
-                    break
-            else:
-                raise ValueError(f"{item!r} is not in list")
-
-        return self._keys.index(item_key, start, stop)
-
-    def __iadd__(self, other: Union[Iterable[T], Mapping[str, T]]):
+    def __iadd__(self, other: Union[_T, Iterable[_T], Mapping[str, _T]]):
         if not isinstance(other, Iterable):
-            return NotImplemented
-        self.extend(other)
-        return self
-
-    def __add__(self, other: Union[Iterable[T], Mapping[str, T]]):
-        if not isinstance(other, Iterable):
-            return NotImplemented
-        newlist = type(self)(self)
-        newlist.extend(other)
-        return newlist
-
-    def __radd__(self, other: Union[Iterable[T], Mapping[str, T]]):
-        if not isinstance(other, Iterable):
-            return NotImplementedError()
-        newlist = type(self)(other)
-        newlist.extend(self)
-        return newlist
-
-    def __or__(self, other: Union[Iterable[T], Mapping[str, T]]) -> Self:
-        if not isinstance(other, Mapping):
-            other = {self._key(v): v for v in other}
-
-        newlist = type(self)(self)
-        newlist._keys.extend(other.keys() - self._items.keys())
-        newlist._items.update(other)
-        return newlist
-
-    def __ior__(self, other: Union[Iterable[T], Mapping[str, T]]):
-        if not isinstance(other, Mapping):
-            other = {self._key(v): v for v in other}
-
-        self._keys.extend(other.keys() - self._items.keys())
-        self._items.update(other)
-
-    def __lshift__(self, item) -> Self:
-        self.append(item)
-        return self
-
-    def append(self, item: T):
-        item_key = self._key(item)
-        if item_key in self._items:
-            raise KeyError(f"Key {item_key!r} already exists in list")
-
-        index = slice(len(self._keys), len(self._keys))
-        self._setitems(index, {item_key: item})
-
-    def extend(self, values: Union[Iterable[T], Mapping[str, T]]):
-        if not isinstance(values, Mapping):
-            values = {self._key(v): v for v in values}
-
-        dups = self._items.keys() & values.keys()
-        if dups:
-            raise KeyError(f"{len(dups)} keys already exists in list: {dups!r}")
-
-        index = slice(len(self._keys), len(self._keys))
-        self._setitems(index, values)
-
-    def update(self, values: Mapping[str, T]):
-        self._items.update(values)
-        self._keys.extend([k for k in values.keys() if k not in self._keys])
-
-    def insert(self, index: int, item: T):
-        item_key = self._key(item)
-        if item_key in self._items:
-            raise KeyError(f"Keys {item_key} already exists in list")
-
-        index = slice(index, index)
-        self._setitems(index, {item_key: item})
-
-    def remove(self, item: T):
-        item_key = self._key(item, None)
-        if item_key is None:
-            for item_key, v in self._items.items():
-                if v == item:
-                    break
-            else:
-                raise ValueError("Item {item!r} not in Collection")
+            self.append(other)
         else:
-            if item_key not in self._items:
-                raise ValueError("Item {item!r} not in Collection")
+            self.extend(other)
+        return self
 
-        self._keys.remove(item_key)
-        self._delitem(item_key)
+    def __add__(self, other: Union[_T, Iterable[_T], Mapping[str, _T]]):
+        newlist = copy(self)
+        if not isinstance(other, Iterable):
+            newlist.append(other)
+        else:
+            newlist.extend(other)
 
-    def move(self, idx1: int, idx2: int):
-        if 0 <= idx1 < len(self._items) and 0 <= idx2 < len(self._items):
-            self._keys[idx2:idx2] = self._keys.pop(idx1)
+        return newlist
+
+    def append(self, item: _T):
+        key = self._keyfunc(item)
+        self._additem(key, item)
+
+    def insert(self, index: int, item: _T):
+        key = self._keyfunc(item)
+        index = self._insertkey(index, key)
+        self._items[key] = item
+        self.itemAdded.emit(index, key)
+
+    def move(self, from_index: int, to_index: int):
+        if 0 <= from_index < len(self._items) and 0 <= to_index < len(self._items):
+            self._keys[to_index:to_index] = self._keys.pop(from_index)
+            self.itemMoved.emit(from_index, to_index, self._items[self._keys[to_index]])
         else:
             raise IndexError()
+
+    def extend(self, iterable: Union[Iterable[_T], Mapping[str, _T]]):
+        if isinstance(iterable, Mapping):
+            iterable = iterable.values()
+
+        if len(iterable) == 0:
+            return
+
+        items = {self._keyfunc(item): item for item in iterable}
+        newranges = self._addkeys(items.keys())
+        self._items.update(items)
+        if len(newranges) == 1:
+            self.itemsAdded.emit(newranges[0].start, newranges[0].stop, items.values())
+        else:
+            for g in newranges:
+                self.itemsAdded.emit(
+                    g.start, g.stop,
+                    (self._items[self._keys[i]] for i in g)
+                )
+
+    def update(self, values: Union[Iterable[_T], Mapping[str, _T]]):
+        if isinstance(values, Mapping):
+            values = values.values()
+
+        values = {self._keyfunc(v): v for v in values}
+        olditems = {k: self._items[k] for k in values if k in self._items}
+
+        updateranges, newranges = self._updatekeys(values.keys())
+        self._items.update(values)
+        for g in updateranges:
+            self.itemsReplaced.emit(
+                g.start, g.stop,
+                (self._items[self._keys[i]] for i in g),
+                (olditems[self._keys[i]] for i in g)
+            )
+        for g in newranges:
+            if g:
+                self.itemsAdded.emit(
+                    g.start, g.stop,
+                    (self._items[self._keys[i]] for i in g)
+                )
+
+    def index(self, item: _T, start=0, stop=sys.maxsize):
+        key = self._keyfunc(item)
+        return self._keys.index(key, start, stop)
+
+    def remove(self, item: _T):
+        key = self._keyfunc(item)
+        if key not in self._items:
+            raise ValueError(f"Item {key} not in Collection")
+
+        self._delitem(key)
 
     def clear(self):
         self._keys.clear()
         self._items.clear()
-
-    def _delitem(self, key: str):  # pylint: disable=redefined-outer-name
-        del self._items[key]
-
-    def _delitems(self, keys: Iterable[str]):
-        for k in keys:
-            self._delitem(k)
-
-    def _setitem(self, index: int, key: str, item: T):  # pylint: disable=redefined-outer-name
-        self._keys[index] = key
-        self._items[key] = item
-
-    def _setitems(self, index: slice, value: Mapping[str, T]):
-        self._items.update(value)
-        self._keys[index] = value.keys()
 
 
 MutableSequence.register(KeyedList)
 MutableMapping.register(KeyedList)
 
 
-class SortedKeyedList(KeyedList[T]):
+class SortedKeyedList(KeyedList[_T]):
     def __init__(self, iterable=None, key=None):
         super().__init__(iterable, key)
-        self._keys = sorted(self._items.keys())
-
-    def append(self, item: T):
-        item_key = self._key(item)
-        if item_key in self._items:
-            raise KeyError(f"Key {item_key!r} already exists in list")
-
-        bisect.insort(self._keys, item_key)
-        self._items[item_key] = item
-
-    def extend(self, values: Union[Iterable[T], Mapping[str, T]]):
-        if not isinstance(values, Mapping):
-            values = {self._key(v): v for v in values}
-
-        dups = self._items.keys() & values.keys()
-        if dups:
-            raise KeyError(f"{len(dups)} keys already exists in list: {dups!r}")
-
-        for k in values.keys():
-            bisect.insort(self._keys, k)
-        self._items.update(values)
-
-    def _raise_not_impl_error(self, func_name):
-        raise NotImplementedError(f"{func_name} not implemented for sorted list")
-
-    def __setitem__(self, index: str, value: T):
-        if isinstance(index, str):
-            super().__setitem__(index, value)
-        else:
-            self._raise_not_impl_error("Indexed assignment")
-
-    def __or__(self, other: Union[Iterable[T], Mapping[str, T]]):
-        newlist = super().__or__(other)
-        newlist._keys = sorted(newlist._keys)
-
-    def __ior__(self, other: Union[Iterable[T], Mapping[str, T]]):
-        super().__ior__(other)
         self._keys = sorted(self._keys)
 
-    def insert(self, index, item):
-        self._raise_not_impl_error("Insertion")
+    def _addkey(self, key: str) -> int:
+        if key in self._keys:
+            raise KeyError('Key already in list')
+        index = bisect.bisect(self._keys, key)
+        self._keys.insert(index, key)
+        return index
+
+    def _addkeys(self, keys: Iterable[str]):
+        if set(keys) & set(self._keys):
+            raise KeyError("Keys overlap")
+
+        indices = []
+        for k in keys:
+            index = bisect.bisect(self._keys, k)
+            self._keys.insert(index, k)
+            indices.append(index)
+
+        return self._getranges(indices)
+
+    def _insertkey(self, index: int, key: str) -> int:
+        raise NotImplementedError("Cannot insert key into sorted list at arbitrary point")
+
+    def _replacekey(self, index: int, key: str) -> int:
+        if key in self._keys and bisect.bisect_left(self._keys, key) != index:
+            raise KeyError('Key already in list')
+
+        del self._keys[index]
+        newindex = bisect.bisect(self._keys, key)
+        self._keys.insert(self._keys, key)
+        return newindex
+
+    def _replacekeys(self, index: slice, keys: Iterable[str]):
+        newkeys = copy(self._keys)
+        del newkeys[index]
+
+        indices = []
+        for k in keys:
+            if k in newkeys:
+                raise KeyError("Keys overlap")
+
+            index = bisect.bisect(self._keys, k)
+            newkeys.insert(index, k)
+            indices.append(index)
+
+        return self._getranges(indices)
+
+    def _updatekeys(self, keys: Iterable[str]):
+        updateindices = []
+        newindices = []
+        for k in keys:
+
+            if k in self._keys:
+                updateindices.append(bisect.bisect_left(self._keys, k))
+            else:
+                index = bisect.bisect(self._keys, k)
+                self._keys.insert(index, k)
+                newindices.append(index)
+
+        return self._getranges(updateindices), self._getranges(newindices)
+    
+    def _setitembyindex(self, index, item):
+        raise NotImplementedError("Cannot set item at arbitrary point in sorted list")
 
     def move(self, idx1, idx2):
-        self._raise_not_impl_error("Move item")
-
-    def update(self, values):
-        super().update(values)
-        self._keys = sorted(self._keys)
+        raise NotImplementedError("Cannot move items in a sorted list")
 
 
-KeyedListFactory = Factory(KeyedList, False)
-SortedKeyedListFactory = Factory(SortedKeyedList, False)
+MutableSequence.register(SortedKeyedList)
+MutableMapping.register(SortedKeyedList)

@@ -54,10 +54,7 @@ from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
-    from ...models import (
-        RdsGeoField,
-        RdsPlan
-    )
+    from ...models import RdsPlan
 
 
 class DissolveWorker(QRunnable):
@@ -92,13 +89,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
         includeGeometry=True
     ):
         super().__init__(plan, tr('Calculating district geometry and metrics'))
-        self.distList = plan.districts[:]
-
         self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
-
-        self.geoFields: Sequence['RdsGeoField'] = plan.geoFields
-        self.numDistricts: int = plan.numDistricts
-        self.numSeats: int = plan.numSeats
         self.geoPackagePath = plan.geoPackagePath
 
         self.updateDistricts: set[int] = None \
@@ -182,7 +173,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             name = pd.Series(
                 [
-                    self.distList[d].name if d in self.distList else str(d)
+                    self.districts[d].name if d in self.districts else str(d)
                     for d in self.districtData.index
                 ],
                 index=self.districtData.index
@@ -190,7 +181,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
             members = pd.Series(
                 [
                     None if d == 0
-                    else self.distList[d].members if d in self.distList
+                    else self.districts[d].members if d in self.districts
                     else 1
                     for d in self.districtData.index
                 ],

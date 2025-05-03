@@ -41,7 +41,7 @@ from redistricting.services import (
 
 class TestBaseController:
     @pytest.fixture
-    def controller(self, qgis_iface, qgis_new_project, mocker: MockerFixture):  # pylint: disable=unused-argument
+    def controller(self, qgis_iface, mocker: MockerFixture):  # pylint: disable=unused-argument
         # mocker.patch('redistricting.controllers.base.RdsProgressDialog', spec=QProgressDialog)
         planManager = mocker.create_autospec(spec=PlanManager)
         planManager.activePlan = None

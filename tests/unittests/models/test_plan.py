@@ -18,23 +18,19 @@
 """
 from uuid import UUID
 
-import pandas as pd
 import pytest
 from pytestqt.plugin import QtBot
 
-from redistricting.models import metrics  # pylint: disable=unused-import
 from redistricting.models import (
     DeviationType,
     FieldCategory,
     RdsDataField,
     RdsDistrict,
     RdsField,
-    RdsPlan
+    RdsPlan,
+    metrics,  # pylint: disable=unused-import
 )
-from redistricting.models.base.serialization import (
-    deserialize,
-    serialize
-)
+from redistricting.models.base.serialization import deserialize, serialize
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -141,7 +137,6 @@ class TestPlan:
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
             valid_plan.geoFields = [RdsField(block_layer, 'vtdid20')]
         assert len(valid_plan.geoFields) == 1
-        assert len(valid_plan.metrics.splits) == 1
 
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):
         plan = RdsPlan('test', 5)
@@ -211,44 +206,47 @@ class TestPlan:
                           'caption': 'VTD',
                           'category': FieldCategory.Geography}
             },
-            'total-population': 227036,
-            'metrics': {
-                'metrics': {
-                    'total-population': 227036,
-                    'plan-deviation': [100, -500],
-                    'mean-polsbypopper': 0.4,
-                    'min-polsbypopper': 0.15,
-                    'max-polsbypopper': 0.8,
-                    'mean-reock': 0.5,
-                    'min-reock': 0.1,
-                    'max-reock': 0.9,
-                    'mean-convexhull': 0.5,
-                    'min-convexhull': 0.1,
-                    'max-convexhull': 0.9,
-                    'contiguity': True,
-                    'complete': True,
-                    'splits': {
+            'metrics': { 'metrics': {
+                'total-population': {'value': 227036},
+                'cea_proj': None,
+                'plan-deviation': {'value': [100, -500]},
+                'deviation': None,
+                'pct-deviation': None,
+                'polsbypopper': None,
+                'mean-polsbypopper': {'value': 0.4},
+                'min-polsbypopper': {'value': 0.15},
+                'max-polsbypopper': {'value': 0.8},
+                'agg-polsbypopper': None,
+                'reock': None,
+                'mean-reock': {'value': 0.5},
+                'min-reock': {'value': 0.1},
+                'max-reock': {'value': 0.9},
+                'agg-reock': None,
+                'convexhull': None,
+                'mean-convexhull': {'value': 0.5},
+                'min-convexhull': {'value': 0.1},
+                'max-convexhull': {'value': 0.9},
+                'agg-convexhull': None,
+                'cut-edges': {},
+                'contiguity': {'value': True},
+                'complete': {'value': True},
+                'splits': {
+                    'value': {
                         'vtdid': {
+                            'field': 'vtdid', 
+                            'caption': 'VTD',
                             'data': {
-                                'data': [],
-                                'schema': {
-                                    'fields': [
-                                        {
-                                            'name': 'index',
-                                            'type': 'integer',
-                                        },
-                                    ],
-                                    "pandas_version": "1.4.0" if pd.__version__ >= "1.4" else "0.20.0",
-                                    'primaryKey': [
-                                        'index',
-                                    ],
-                                },
-                            },
-                            'field': 'vtdid',
-                        },
-                    },
+                                "schema": {
+                                    "fields": [{"name": "index", "type": "integer"}], 
+                                    "primaryKey": ["index"], 
+                                    "pandas_version": "1.4.0"
+                                }, 
+                                "data": []
+                            }
+                        }
+                    }
                 }
-            }
+            }}
         }
 
     def test_deserialize(self, block_layer, assign_layer, dist_layer):
@@ -302,9 +300,9 @@ class TestPlan:
                           'caption': 'VTD',
                           'category': FieldCategory.Geography}
             },
-            'total-population': 227036,
             'metrics': {'metrics': {
-                'splits': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}
+                'total-population': {'value': 227036},
+                'splits': {'value': {'vtdid': {'field': 'vtdid', 'data': {"schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, "data": []}}}}
             }}
         }
         plan = deserialize(RdsPlan, data)
@@ -338,7 +336,7 @@ class TestPlan:
         assert plan.metrics.splits['vtdid'].data.empty
 
     def test_validate_district(self, plan: RdsPlan, mocker):
-        plan.totalPopulation = 500
+        plan.metrics['totalPopulation']._value = 500
         plan.deviation = 0.05
 
         district = mocker.create_autospec(spec=RdsDistrict)
@@ -364,7 +362,7 @@ class TestPlan:
         assert plan.isDistrictValid(district)
 
     def test_validate_district_multi_member(self, plan: RdsPlan, mocker):
-        plan.totalPopulation = 500
+        plan.metrics['totalPopulation']._value = 500
         plan.numDistricts = 5
         plan.numSeats = 5
         plan.deviation = 0.05

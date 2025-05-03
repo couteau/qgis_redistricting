@@ -22,7 +22,6 @@
  ***************************************************************************/
 """
 from abc import abstractmethod
-from enum import IntEnum
 from math import (
     ceil,
     floor
@@ -34,14 +33,11 @@ from typing import (
 
 from qgis.PyQt.QtCore import QObject
 
+from .consts import DeviationType
+
 if TYPE_CHECKING:
     from .district import RdsDistrict
     from .plan import RdsPlan
-
-
-class DeviationType(IntEnum):
-    OverUnder = 0
-    TopToBottom = 1
 
 
 class BaseDeviationValidator(QObject):

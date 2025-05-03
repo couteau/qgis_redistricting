@@ -117,10 +117,12 @@ class TestPaintTool:
 
         with qtbot.assertNotEmitted(active_tool.paintingStarted):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
+        qtbot.mouseRelease(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
 
         active_tool.setTargetDistrict(2)
         with qtbot.waitSignal(active_tool.paintingStarted):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
+        qtbot.mouseRelease(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
 
     def test_mouse_right_press_with_target_without_source_no_edit(self,
                                                                   active_tool: PaintDistrictsTool,
@@ -129,6 +131,7 @@ class TestPaintTool:
         active_tool.setTargetDistrict(2)
         with qtbot.assertNotEmitted(active_tool.paintingStarted):
             qtbot.mousePress(qgis_canvas.viewport(), Qt.MouseButton.RightButton)
+        qtbot.mouseRelease(qgis_canvas.viewport(), Qt.MouseButton.RightButton)
 
     def test_mouse_press_select(
         self,
@@ -140,6 +143,7 @@ class TestPaintTool:
         active_tool.paintMode = PaintMode.SelectByGeography
         qtbot.mousePress(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
         assert active_tool._selectRect.topLeft() == qgis_canvas.viewport().rect().center()
+        qtbot.mouseRelease(qgis_canvas.viewport(), Qt.MouseButton.LeftButton)
 
     def test_mouse_release(self,
                            active_tool_with_plan: PaintDistrictsTool,

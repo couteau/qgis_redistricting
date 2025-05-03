@@ -28,23 +28,10 @@
 """
 import pathlib
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsProject,
-    QgsProjectDirtyBlocker
-)
+from qgis.core import Qgis, QgsApplication, QgsProject, QgsProjectDirtyBlocker
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import (
-    QCoreApplication,
-    QSettings,
-    QTranslator
-)
-from qgis.PyQt.QtWidgets import (
-    QMenu,
-    QMessageBox,
-    QToolBar
-)
+from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
+from qgis.PyQt.QtWidgets import QMenu, QMessageBox, QToolBar
 from qgis.PyQt.QtXml import QDomDocument
 
 from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
@@ -61,7 +48,7 @@ from .controllers import (
     PlanController
 )
 from .gui import metrics_handlers  # pylint: disable=unused-import
-from .models import metrics  # pylint: disable=unused-import
+from .models import metrics, splitsmetric  # pylint: disable=unused-import
 from .services import (
     ActionRegistry,
     AssignmentsService,

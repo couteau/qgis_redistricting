@@ -2,50 +2,20 @@
 import pathlib
 from contextlib import contextmanager
 from itertools import repeat
-from math import (
-    ceil,
-    floor
-)
-from typing import (
-    Annotated,
-    Iterable,
-    Optional,
-    Union,
-    overload
-)
-from uuid import (
-    UUID,
-    uuid4
-)
+from math import ceil, floor
+from typing import Annotated, Iterable, Optional, Union, overload
+from uuid import UUID, uuid4
 
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
 from .base.lists import KeyedList
-from .base.model import (
-    Factory,
-    RdsBaseModel,
-    in_range,
-    not_empty,
-    rds_property
-)
-from .columns import (
-    DistrictColumns,
-    MetricsColumns
-)
-from .district import (
-    DistrictList,
-    RdsDistrict,
-    RdsUnassigned
-)
-from .field import (
-    RdsDataField,
-    RdsField,
-    RdsGeoField
-)
+from .base.model import RdsBaseModel, in_range, not_empty, rds_property
+from .consts import DeviationType, DistrictColumns, MetricsColumns
+from .district import DistrictList, RdsDistrict, RdsUnassigned
+from .field import RdsDataField, RdsField, RdsGeoField
 from .metricslist import RdsMetrics
-from .validators import DeviationType
 
 
 class RdsPlan(RdsBaseModel):
@@ -83,8 +53,11 @@ class RdsPlan(RdsBaseModel):
     districts: DistrictList = rds_property(
         private=True, serialize=False, factory=DistrictList
     )
-    metrics: RdsMetrics = Factory[RdsMetrics](RdsMetrics)
-    totalPopulation: int = 0
+    metrics: RdsMetrics = rds_property(private=True, factory=RdsMetrics)
+
+    @property
+    def totalPopulation(self) -> int:
+        return self.metrics.totalPopulation or 0
 
     geoLayer: QgsVectorLayer = rds_property(private=True, fvalid=_validLayer, default=None)
     geoJoinField: str = None
@@ -92,17 +65,16 @@ class RdsPlan(RdsBaseModel):
     def _setGeoFields(self, geoFields: Iterable[RdsGeoField]):
         self._geoFields.clear()
         self._geoFields.extend(geoFields)
-        self.metrics.updateGeoFields(self._geoFields)  # pylint: disable=no-member
 
     geoFields: KeyedList[RdsGeoField] = rds_property(
-        private=True, fset=_setGeoFields, finit=_setGeoFields, notify=geoFieldsChanged, factory=KeyedList
+        private=True, fset=_setGeoFields, finit=_setGeoFields, notify=geoFieldsChanged, factory=KeyedList[RdsGeoField]
     )
 
     popLayer: QgsVectorLayer = None
     popJoinField: str = None
     popField: str
-    popFields: KeyedList[RdsField] = rds_property(private=True, factory=KeyedList, notify=popFieldsChanged)
-    dataFields: KeyedList[RdsDataField] = rds_property(private=True, factory=KeyedList, notify=dataFieldsChanged)
+    popFields: KeyedList[RdsField] = rds_property(private=True, factory=KeyedList[RdsField], notify=popFieldsChanged)
+    dataFields: KeyedList[RdsDataField] = rds_property(private=True, factory=KeyedList[RdsDataField], notify=dataFieldsChanged)
 
     assignLayer: QgsVectorLayer = None
     geoIdField: str = rds_property(private=True, default=None)
@@ -119,16 +91,12 @@ class RdsPlan(RdsBaseModel):
         self._geoLayer = None
         self._popLayer = None
         self._distField = None
-        self._geoFields = KeyedList()
+        self._geoFields = KeyedList[RdsGeoField]()
+        self._numDistricts = -1
 
     def __post_init__(self, **kwargs):
         self.districts.append(self.createDistrict(0))
-
-        if self.metrics.plan is None:
-            self.metrics.plan = self
-            self.metrics.updateGeoFields(self.geoFields)  # pylint: disable=no-member
-
-        self.metrics.metricsChanged.connect(self.metricsChanged)  # pylint: disable=no-member
+        self.metrics.metricsChanged.connect(self.metricsChanged)
 
     @name.setter
     def name(self, value: str):
@@ -141,7 +109,9 @@ class RdsPlan(RdsBaseModel):
 
     @numDistricts.setter
     def numDistricts(self, value: int):
-        self._numDistricts = value
+        if self._numDistricts != value:
+            self.metrics.updateDistricts(self)
+            self._numDistricts = value
         if self._numSeats is not None and self._numSeats < self._numDistricts:
             self._numSeats = None
 
@@ -260,7 +230,7 @@ class RdsPlan(RdsBaseModel):
 
     @property
     def idealPopulation(self):
-        return round(self.totalPopulation / self.numSeats)  # pylint: disable=no-member
+        return round(self.totalPopulation / self.numSeats)
 
     @property
     def allocatedDistricts(self):
@@ -327,16 +297,16 @@ class RdsPlan(RdsBaseModel):
         district.nameChanged.connect(self.districtUpdated)
         district.descriptionChanged.connect(self.districtUpdated)
         district.membersChanged.connect(self.districtUpdated)
-        self.districts.append(district)  # pylint: disable=no-member
+        self.districts.append(district)
         self.districtAdded.emit(district)
         return district
 
     def removeDistrict(self, district: Union[RdsDistrict, int]):
-        if district in self.districts:  # pylint: disable=not-an-iterable, unsupported-membership-test
+        if district in self.districts:
             district.nameChanged.disconnect(self.districtUpdated)
             district.descriptionChanged.disconnect(self.districtUpdated)
             district.membersChanged.disconnect(self.districtUpdated)
-            self.districts.remove(district)  # pylint: disable=no-member
+            self.districts.remove(district)
             self.districtRemoved.emit(district)
 
     def isValid(self):

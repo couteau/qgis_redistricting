@@ -76,8 +76,8 @@ class TestLayerTreeManager:
                  'field': 'vtdid',
                  'caption': 'VTD'}
             ],
-            'stats': {
-                'total-population': 227036,
+            'metrics': {
+                'total-population': {'vale': 227036},
             }
 
         })
@@ -93,14 +93,14 @@ class TestLayerTreeManager:
 
         p.deleteLater()
 
-    def test_remove_plan(self, manager: LayerTreeManager, qgis_new_project, plan: RdsPlan):
+    def test_remove_plan(self, manager: LayerTreeManager, plan: RdsPlan):
         project = QgsProject.instance()
         manager.createGroup(plan)
         assert project.layerTreeRoot().findGroup(plan.name) is not None
         manager.removeGroup(plan)
         assert project.layerTreeRoot().findGroup(plan.name) is None
 
-    def test_bring_plan_to_top(self, manager: LayerTreeManager, qgis_new_project, plan, plan2, qgis_iface, block_layer):
+    def test_bring_plan_to_top(self, manager: LayerTreeManager, plan, plan2, qgis_iface, block_layer):
         project = QgsProject.instance()
         manager.createGroup(plan)
         manager.createGroup(plan2)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - models
+'''QGIS Redistricting Plugin - models
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
@@ -21,7 +21,7 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
-"""
+'''
 from .base import lists
 from .base.serialization import (
     camel_to_kebab,
@@ -29,53 +29,25 @@ from .base.serialization import (
     deserialize,
     kebab_to_camel,
     serialize,
-    snake_to_camel
+    snake_to_camel,
 )
-from .colors import getColorForDistrict
-from .columns import (
-    DistrictColumns,
-    FieldCategory,
-    FieldColors,
-    MetricsColumns
-)
-from .delta import (
-    Delta,
-    DeltaList
-)
-from .district import (
-    DistrictList,
-    RdsDistrict,
-    RdsUnassigned
-)
-from .field import (
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    RdsRelatedField
-)
+from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
+from .delta import Delta, DeltaList
+from .district import DistrictList, RdsDistrict, RdsUnassigned
+from .field import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
 from .metricslist import (
     MetricLevel,
     MetricTriggers,
     RdsMetric,
     RdsMetrics,
-    base_metrics,
-    metrics_classes,
-    register_metrics
+    register_metrics,
 )
-from .plan import (
-    DeviationType,
-    RdsPlan
-)
-from .splits import (
-    RdsSplitBase,
-    RdsSplitDistrict,
-    RdsSplitGeography,
-    RdsSplits
-)
+from .plan import DeviationType, RdsPlan
+from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
 from .validators import (
     BaseDeviationValidator,
     MaxDeviationValidator,
-    PlusMinusDeviationValidator
+    PlusMinusDeviationValidator,
 )
 from .viewmodels import (
     DeltaFieldFilterProxy,
@@ -88,11 +60,11 @@ from .viewmodels import (
     RdsMetricsModel,
     RdsSplitsModel,
     SourceDistrictModel,
-    TargetDistrictModel
+    TargetDistrictModel,
 )
 
 __all__ = (
-    'getColorForDistrict',
+    'lists',
     'DeviationType',
     'DistrictColumns',
     'MetricsColumns',
@@ -128,14 +100,13 @@ __all__ = (
     'RdsSplitGeography',
     'RdsSplitsModel',
     'RdsPlan',
-    "serialize",
-    "deserialize",
-    "base_metrics",
-    "metrics_classes",
-    "register_metrics",
-    "MetricTriggers",
-    "camel_to_kebab",
-    "camel_to_snake",
-    "kebab_to_camel",
-    "snake_to_camel",
+    'serialize',
+    'deserialize',
+    'register_metrics',
+    'MetricLevel',
+    'MetricTriggers',
+    'camel_to_kebab',
+    'camel_to_snake',
+    'kebab_to_camel',
+    'snake_to_camel',
 )

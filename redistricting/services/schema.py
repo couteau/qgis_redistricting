@@ -40,7 +40,7 @@ from qgis.core import (
     QgsVectorLayer
 )
 
-from redistricting.models.columns import MetricsColumns
+from redistricting.models.consts import MetricsColumns
 
 from ..models import DistrictColumns
 from ..models.base.serialization import camel_to_kebab
@@ -273,8 +273,15 @@ planSchema1_0_4 = TypedDict(
 )
 
 
-class statsSchema(TypedDict):
-    metrics: dict[str, Any]
+statsSchema = TypedDict(
+    'statsSchema',
+    {
+
+        'dist-layer': str,
+        'dist-field': str,
+        'metrics': dict[str, Any]
+    }
+)
 
 
 planSchema = TypedDict(
@@ -305,7 +312,7 @@ planSchema = TypedDict(
         'pop-fields': list[fieldSchema],
         'data-fields': list[dataFieldSchema],
 
-        'plan-stats': statsSchema
+        'metrics': statsSchema
     }
 )
 
@@ -576,7 +583,7 @@ def migrateSchema1_0_4_to_1_0_5(data: planSchema1_0_4):
 
     metrics['cut-edges'] = data['metrics'].pop('cut-edges', 0)
     metrics['splits'] = data['metrics'].pop('splits', {})
-    data['metrics']['metrics'] = metrics
+    data['metrics'] = metrics
 
     return data, version.parse('1.0.5')
 

@@ -22,11 +22,9 @@ import pandas as pd
 import pytest
 from qgis.PyQt.QtCore import QModelIndex
 
-from redistricting.models import (
-    RdsGeoField,
-    RdsSplits,
-    RdsSplitsModel
-)
+from redistricting.models.plan import RdsPlan
+from redistricting.models.splits import RdsSplits
+from redistricting.models.viewmodels import RdsSplitsModel
 
 
 class TestSplitsModel:
@@ -123,15 +121,14 @@ class TestSplitsModel:
             orient="table"
         )
 
-    def test_create(self, plan, qtmodeltester):
+    def test_create(self, plan: RdsPlan, qtmodeltester):
         s = RdsSplitsModel(plan.metrics.splits['vtdid'], (*plan.popFields, *plan.dataFields))
         assert s.rowCount(QModelIndex()) == 0
         assert s.columnCount(QModelIndex()) == 2
         qtmodeltester.check(s)
 
     def test_create_with_data(self, splits_data, block_layer, qtmodeltester):
-        field = RdsGeoField(block_layer, 'vtdid', 'VTD')
-        split = RdsSplits(field, splits_data)
+        split = RdsSplits('vtdid', 'VTD', splits_data)
         model = RdsSplitsModel(split, [])
         assert model.rowCount(QModelIndex()) == 4
         assert model.columnCount(QModelIndex()) == 16

@@ -27,7 +27,6 @@ class TestAddons:
         process = addons.install_pyogrio()
         process.waitForFinished()
 
-        assert (vendor_dir / 'geopandas').exists()
         assert (vendor_dir / 'pyogrio').exists()
         assert (pathlib.Path(QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)[0])
                 / 'startup.py').exists()

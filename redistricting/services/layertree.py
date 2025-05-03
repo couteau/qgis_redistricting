@@ -112,7 +112,7 @@ class LayerTreeManager(QObject):
         groups.remove(group)
         groups.insert(0, group)
 
-        plan_layers: list[QgsVectorLayer] = [l.layer() for g in groups for l in g.findLayers()]
+        plan_layers: list[QgsVectorLayer] = [lyr.layer() for g in groups for lyr in g.findLayers()]
 
         self._root.setHasCustomLayerOrder(False)
         order = self._root.layerOrder()

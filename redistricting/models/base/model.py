@@ -54,21 +54,24 @@ from typing import (  # pylint: disable=no-name-in-module
     get_args,
     get_origin,
     get_type_hints,
-    overload
+    overload,
 )
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 from .serialization import (
+    DeserializerFunction,
+    SerializerFunction,
+    SimpleDeserializeFunction,
+    SimpleSerializeFunction,
     _memo,
     deserialize_value,
     kebab_dict,
     kebab_to_camel,
     register_serializer,
-    serialize_value
+    serialize_value,
+    wrap_simple_deserializer,
+    wrap_simple_serializer,
 )
 
 # pylint: disable=redefined-builtin
@@ -131,7 +134,7 @@ def coerce_type(tp: Union[type, tuple[type]], value: Any, default: Any = MISSING
     for t in tp:
         if issubclass(t, MutableSequence) and isinstance(value, Iterable):
             return value
-
+        
         # try to coerce numeric types (but not bool)
         if issubclass(t, numbers.Number) and t is not bool:
             try:
@@ -257,6 +260,8 @@ class Field:
             hash: bool = None,
             compare: bool = True,
             serialize: bool = True,
+            serializer: Union[SimpleSerializeFunction[_T], SerializerFunction[_T]] = None,
+            deserializer: Union[SimpleDeserializeFunction[_T], DeserializerFunction[_T]] = None,
             kw_only: bool = MISSING
     ):
         self.name = None
@@ -268,6 +273,17 @@ class Field:
         self.hash = hash
         self.compare = compare
         self.serialize = serialize
+
+        if serializer is not None and len(inspect.signature(serializer).parameters) == 1:
+            self.fserialize = wrap_simple_serializer(serializer)
+        else:
+            self.fserialize = serializer
+
+        if deserializer is not None and len(inspect.signature(deserializer).parameters) == 1:
+            self.fdeserialize = wrap_simple_deserializer(deserializer)
+        else:
+            self.fdeserialize = deserializer
+
         self.kw_only = kw_only
         self._field_type = FieldType.FIELD
 
@@ -289,15 +305,32 @@ class Field:
                 f'serialize={self.serialize},'
                 f'kw_only={self.kw_only!r}'
                 ')')
+    
+    def __copy__(self):
+        newinst = type(self)(
+            self.default,
+            self.default_factory,
+            self.init,
+            self.repr,
+            self.hash,
+            self.compare,
+            self.serialize,
+            self.fserialize,
+            self.fdeserialize,
+            self.kw_only
+        )
+        newinst.name = self.name
+        newinst.type = self.type
 
     __class_getitem__ = classmethod(GenericAlias)
 
 
 def field(*, default=MISSING, factory=MISSING, init=True,
-          repr=True, hash=None, compare=True, serialize=True, kw_only=MISSING):
+          repr=True, hash=None, compare=True, serialize=True, 
+          serializer=None, deserializer=None, kw_only=MISSING):
     if default is not MISSING and factory is not MISSING:
         raise ValueError('cannot specify both default and default_factory')
-    return Field(default, factory, init, repr, hash, compare, serialize, kw_only)
+    return Field(default, factory, init, repr, hash, compare, serialize, serializer, deserializer, kw_only)
 
 
 class _accessor:
@@ -348,9 +381,11 @@ class Property(Generic[_T], Field):
         hash: bool = None,
         compare: bool = True,
         serialize: bool = True,
+        serializer: Union[SimpleSerializeFunction[_T], SerializerFunction[_T]] = None,
+        deserializer: Union[SimpleDeserializeFunction[_T], DeserializerFunction[_T]] = None,
         kw_only: bool = MISSING
     ):
-        super().__init__(default, factory, init, repr, hash, compare, serialize, kw_only)
+        super().__init__(default, factory, init, repr, hash, compare, serialize, serializer, deserializer, kw_only)
 
         if readonly and (fset or fdel):
             raise AttributeError("readonly cannot be True when a setter and/or deleter is provided")
@@ -397,6 +432,19 @@ class Property(Generic[_T], Field):
 
     def __call__(self, fget: Callable[[Any], _T]) -> Self:
         return self.getter(fget)
+    
+    def __copy__(self):
+        newinst = type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
+                            private=self.private, notify=self.notify, doc=self.__doc__,
+                            default=self.default, factory=self.default_factory,
+                            init=self.init, repr=self.repr, hash=self.hash, 
+                            compare=self.compare, serialize=self.serialize, 
+                            serializer=self.fserialize, deserializer=self.fdeserialize,
+                            kw_only=self.kw_only)
+        newinst.name = self.name
+        newinst.type = self.type
+        newinst._rebind(newinst, oldself=self)
+        return newinst
 
     def __set_name__(self, owner, name: str):
         self.name = name
@@ -514,29 +562,38 @@ class Property(Generic[_T], Field):
     def del_private(self, instance):
         delattr(instance, self.private)
 
-    def rebind(self, new_inst: 'Property'):
+    def _rebind(self, new_inst: 'Property', oldself=None):
         """Rebind property accessors to the new instance if bound to the old instance"""
+        if oldself is None:
+            oldself = self
+
         # pylint: disable=unnecessary-dunder-call
-        if hasattr(new_inst.fget, "__self__") and new_inst.fget.__self__ is self:
+        if hasattr(new_inst.fget, "__self__") and new_inst.fget.__self__ is oldself:
             new_inst.fget = new_inst.fget.__func__.__get__(new_inst)
-        if hasattr(new_inst.fset, "__self__") and new_inst.fset.__self__ is self:
+        if hasattr(new_inst.fset, "__self__") and new_inst.fset.__self__ is oldself:
             new_inst.fset = new_inst.fset.__func__.__get__(new_inst)
-        if hasattr(new_inst.fdel, "__self__") and new_inst.fdel.__self__ is self:
+        if hasattr(new_inst.fdel, "__self__") and new_inst.fdel.__self__ is oldself:
             new_inst.fdel = new_inst.fdel.__func__.__get__(new_inst)
-        if hasattr(new_inst.fvalid, "__self__") and new_inst.fvalid.__self__ is self:
+        if hasattr(new_inst.fvalid, "__self__") and new_inst.fvalid.__self__ is oldself:
             new_inst.fvalid = new_inst.fvalid.__func__.__get__(new_inst)
-        if hasattr(new_inst.finit, "__self__") and new_inst.finit.__self__ is self:
+        if hasattr(new_inst.finit, "__self__") and new_inst.finit.__self__ is oldself:
             new_inst.finit = new_inst.finit.__func__.__get__(new_inst)
-        if hasattr(new_inst.default_factory, "__self__") and new_inst.default_factory.__self__ is self:
+        if hasattr(new_inst.default_factory, "__self__") and new_inst.default_factory.__self__ is oldself:
             new_inst.default_factory = new_inst.default_factory.__func__.__get__(new_inst)
+        if hasattr(new_inst.fserialize, "__self__") and new_inst.fserialize.__self__ is oldself:
+            new_inst.fserialize = new_inst.fserialize.__func__.__get__(new_inst)
+        if hasattr(new_inst.fdeserialize, "__self__") and new_inst.fdeserialize.__self__ is oldself:
+            new_inst.fdeserialize = new_inst.fdeserialize.__func__.__get__(new_inst)
         return new_inst
 
     def getter(self, fget: Callable[[Any], _T]) -> Self:
-        return self.rebind(type(self)(fget, self.fset, self.fdel, self.fvalid, self.finit,
+        return self._rebind(type(self)(fget, self.fset, self.fdel, self.fvalid, self.finit,
                                       private=self.private, notify=self.notify, doc=self.__doc__,
                                       default=self.default, factory=self.default_factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
 
     @overload
     def setter(self, fset: Callable[[Any, _T], None]) -> Self:
@@ -556,43 +613,96 @@ class Property(Generic[_T], Field):
         if fset is None:
             raise TypeError("Setter must be specified")
 
-        return self.rebind(type(self)(self.fget, fset, self.fdel, self.fvalid, self.finit,
+        return self._rebind(type(self)(self.fget, fset, self.fdel, self.fvalid, self.finit,
                                       private=self.private, notify=self.notify, doc=self.__doc__,
                                       default=self.default, factory=self.default_factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
 
     def deleter(self, fdel: Callable[[Any], None]) -> Self:
-        return self.rebind(type(self)(self.fget, self.fset, fdel, self.fvalid, self.finit,
+        return self._rebind(type(self)(self.fget, self.fset, fdel, self.fvalid, self.finit,
                                       private=self.private, notify=self.notify, doc=self.__doc__,
                                       default=self.default, factory=self.default_factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
 
     def validator(self, fvalid: Callable[[Any, Any], _T]) -> Self:
-        return self.rebind(type(self)(self.fget, self.fset, self.fdel, fvalid, self.finit,
+        return self._rebind(type(self)(self.fget, self.fset, self.fdel, fvalid, self.finit,
                                       private=self.private, notify=self.notify, doc=self.__doc__,
                                       default=self.default, factory=self.default_factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
 
     def initializer(self, finit: Callable[[Any, _T], None]) -> Self:
-        return self.rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, finit,
+        return self._rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, finit,
                                       private=self.private, notify=self.notify, doc=self.__doc__,
                                       default=self.default, factory=self.default_factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash,
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
+    
+    def serializer(self, fserializer: Callable[[Any, _T], None]) -> Self:
+        return self._rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
+                                      private=self.private, notify=self.notify, doc=self.__doc__,
+                                      default=self.default, factory=self.default_factory,
+                                      init=self.init, repr=self.repr, hash=self.hash,
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=fserializer, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
+    
+    def deserializer(self, fdeserializer: Callable[[Any, _T], None]) -> Self:
+        return self._rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
+                                      private=self.private, notify=self.notify, doc=self.__doc__,
+                                      default=self.default, factory=self.default_factory,
+                                      init=self.init, repr=self.repr, hash=self.hash,
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=fdeserializer,
+                                      kw_only=self.kw_only))
 
+
+    @overload
     def factory(self, factory: Callable[[Any], _T]) -> Self:
-        if self.default is not MISSING:
+        ...
+
+    @overload
+    def factory(*, override) -> Self:
+        ...
+
+    @overload
+    def factory(self, factory: Callable[[Any], _T], *, override) -> Self:
+        ...
+
+    def factory(self, factory: Callable[[Any], _T] = None, *, override=False) -> Self:
+        if not override and self.default is not MISSING:
             raise TypeError("Cannot set both factory and default")
+        
+        if override and factory is None and self.default is not MISSING:
+            # need to create a new instance so we don't trample the default value of the super class
+            return self._rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
+                                      private=self.private, notify=self.notify,
+                                      doc=self.__doc__, default=MISSING, factory=factory,
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only)).factory
+        
         if not isinstance(factory, (Factory, staticmethod, classmethod)):
             factory = Factory(factory)
-        return self.rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
+
+        return self._rebind(type(self)(self.fget, self.fset, self.fdel, self.fvalid, self.finit,
                                       private=self.private, notify=self.notify,
                                       doc=self.__doc__, default=self.default, factory=factory,
-                                      init=self.init, repr=self.repr, hash=self.hash, compare=self.compare,
-                                      serialize=self.serialize, kw_only=self.kw_only))
+                                      init=self.init, repr=self.repr, hash=self.hash, 
+                                      compare=self.compare, serialize=self.serialize, 
+                                      serializer=self.fserialize, deserializer=self.fdeserialize,
+                                      kw_only=self.kw_only))
 
 
 def rds_property(fget: Optional[Callable[[Any], _T]] = None,
@@ -605,12 +715,14 @@ def rds_property(fget: Optional[Callable[[Any], _T]] = None,
                  notify=None, doc=None,
                  default: Union[_T, _MISSING_TYPE] = MISSING,
                  factory: Union[Callable[[Any], _T], Callable[[], _T], _MISSING_TYPE] = MISSING,
-                 init=True, repr=True, hash=None, compare=True, serialize=True, kw_only=MISSING):
+                 init=True, repr=True, hash=None, compare=True, 
+                 serialize=True,  serializer= None, deserializer=None, kw_only=MISSING):
     if default is not MISSING and factory is not MISSING:
         raise ValueError('cannot specify both default and default_factory')
     return Property[_T](fget, fset, fdel, fvalid, finit, private=private, readonly=readonly,
                         notify=notify, doc=doc, default=default, factory=factory, init=init,
-                        repr=repr, hash=hash, compare=compare, serialize=serialize, kw_only=kw_only)
+                        repr=repr, hash=hash, compare=compare, serialize=serialize, 
+                        serializer=serializer, deserializer=deserializer, kw_only=kw_only)
 
 
 class _FACTORY_MARKER_TYPE:
@@ -638,7 +750,7 @@ def compare_models(self, other):
 
 @dataclass_transform(field_specifiers=(rds_property, Property, field, Field))
 class RdsBaseModel(QObject):
-    __fields__: list[Field]
+    __fields__: dict[str, Field]
 
     @classmethod
     def has_method(cls, method_name):
@@ -654,7 +766,7 @@ class RdsBaseModel(QObject):
     @classmethod
     def make_init_signature(cls) -> inspect.Signature:
         args = []
-        for f in cls.__fields__:
+        for f in cls.__fields__.values():
             if f.init and f._field_type != FieldType.CLASS_VAR:  # pylint: disable=protected-access
                 if f.default_factory is not MISSING:
                     default = _FACTORY_MARKER
@@ -692,7 +804,6 @@ class RdsBaseModel(QObject):
 
         super().__init_subclass__()
         flds = {}
-
         default_seen = False
         kwonly_seen = False
         cls_annotations = get_type_hints(cls, include_extras=True)
@@ -738,7 +849,7 @@ class RdsBaseModel(QObject):
 
             flds[n] = fld
 
-        setattr(cls, "__fields__", flds.values())
+        setattr(cls, "__fields__", flds)
         setattr(cls, "__init__", wrap_init(getattr(cls, "__init__")))
         if cls.__dataclass_transform__['eq_default']:
             setattr(cls, "__eq__", compare_models)
@@ -765,7 +876,7 @@ class RdsBaseModel(QObject):
 
         deferred: list[Field] = []
         post_init_args = {}
-        for f in self.__fields__:
+        for f in self.__fields__.values():
             if f.name in sig.parameters:
                 p = sig.parameters[f.name]
                 if f.name in bound_args.arguments:
@@ -817,15 +928,20 @@ class RdsBaseModel(QObject):
 
     @recursive_repr()
     def __repr__(self):
-        return f"{self.__class__.__name__}({', '.join(f'{f.name}={getattr(self, f.name)!r}' for f in self.__fields__ if f._field_type == FieldType.FIELD and f.repr)})"
+        return f"{self.__class__.__name__}({', '.join(f'{f.name}={getattr(self, f.name)!r}' for f in self.__fields__.values() if f._field_type == FieldType.FIELD and f.repr)})"
 
 
-def fields(cls: Union[RdsBaseModel, type[RdsBaseModel]]) -> list[Field]:
-    if not isinstance(cls, RdsBaseModel) or (isinstance(cls, type) and not issubclass(cls, RdsBaseModel)):
+def field_dict(cls: Union[RdsBaseModel, type[RdsBaseModel]]) -> dict[str, Field]:
+    if not isinstance(cls, RdsBaseModel) and not (isinstance(cls, type) and issubclass(cls, RdsBaseModel)):
         raise TypeError(f"{cls!r} is not an instance or subclass of RdsBaseModel")
 
-    return [f for f in cls.__fields__ if f._field_type == FieldType.FIELD]  # pylint: disable=protected-access
+    return {k: v for k, v in cls.__fields__.items() if v._field_type == FieldType.FIELD}  # pylint: disable=protected-access
 
+def fields(cls: Union[RdsBaseModel, type[RdsBaseModel]]) -> list[Field]:
+    if not isinstance(cls, RdsBaseModel) and not (isinstance(cls, type) and issubclass(cls, RdsBaseModel)):
+        raise TypeError(f"{cls!r} is not an instance or subclass of RdsBaseModel")
+    
+    return [f for f in cls.__fields__.values() if f._field_type is FieldType.FIELD] # pylint: disable=protected-access
 
 def serialize_model(obj, memo=None, exclude_none=True):
     """Right now we just ignore already memo objects to avoid recursion.
@@ -837,8 +953,8 @@ def serialize_model(obj, memo=None, exclude_none=True):
         if not prop.serialize:
             continue
 
-        if callable(prop.serialize):
-            value = prop.serialize(value, memo)
+        if prop.fserialize is not None:
+            value = prop.fserialize(getattr(obj, prop.name), memo, exclude_none)
         else:
             value = serialize_value(getattr(obj, prop.name), memo)
 
@@ -855,6 +971,7 @@ def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optio
     kw = {}
 
     flds = get_type_hints(cls)
+    props = field_dict(cls)
 
     for k, v in data.items():
         f = kebab_to_camel(k)
@@ -864,11 +981,15 @@ def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optio
             continue
 
         if t is not None:
-            v = deserialize_value(t, v)
+            if f in props and props[f].fdeserialize is not None:
+                v = props[f].fdeserialize(t, v)
+            else:
+                v = deserialize_value(t, v)
 
         kw[f] = v
 
     return cls(**kw, parent=parent)
 
 
+register_serializer(RdsBaseModel, serialize_model, deserialize_model)
 register_serializer(RdsBaseModel, serialize_model, deserialize_model)

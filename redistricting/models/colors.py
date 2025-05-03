@@ -1,10 +1,4 @@
-from qgis.core import QgsCategorizedSymbolRenderer
-from qgis.PyQt.QtGui import (
-    QColor,
-    QPalette
-)
-
-from .plan import RdsPlan
+from qgis.PyQt.QtGui import QColor
 
 colors = [
     QColor(200, 207, 201, 255),  # #c8cfc9
@@ -1015,16 +1009,3 @@ colors = [
     QColor(145, 222, 207, 255),  # #91decf
     QColor(213, 106, 144, 255),  # #d56a90
 ]
-
-
-def getColorForDistrict(plan: RdsPlan, district: int):
-    renderer = plan.assignLayer.renderer()
-    if isinstance(renderer, QgsCategorizedSymbolRenderer):
-        idx = renderer.categoryIndexForValue(district)
-        if idx == -1:
-            idx = 0
-
-        cat = renderer.categories()[idx]
-        return QColor(cat.symbol().color())
-
-    return QColor(QPalette().color(QPalette.ColorGroup.Normal, QPalette.ColorRole.Window))

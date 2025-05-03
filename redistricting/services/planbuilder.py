@@ -44,6 +44,7 @@ from ..models import (
     RdsDataField,
     RdsField,
     RdsGeoField,
+    RdsMetrics,
     RdsPlan
 )
 from ..models.base.lists import KeyedList
@@ -127,9 +128,7 @@ class PlanBuilder(BasePlanBuilder):
 
         self._createLayersTask = CreatePlanLayersTask(
             plan,
-            str(self._geoPackagePath),
-            self._geoLayer,
-            self._geoJoinField)
+            str(self._geoPackagePath))
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
         self._createLayersTask.progressChanged.connect(self.setProgress)
@@ -195,7 +194,6 @@ class PlanBuilder(BasePlanBuilder):
             numSeats=self._numSeats if self._numSeats > self._numDistricts else None,
             deviation=self._deviation,
             deviationType=self._deviationType,
-            totalPopulation=self._totalPopulation,
             geoLayer=self._geoLayer,
             geoJoinField=self._geoJoinField if self._geoJoinField != self._geoIdField else None,
             popLayer=self._popLayer if self._geoLayer != self._popLayer else None,
@@ -208,6 +206,7 @@ class PlanBuilder(BasePlanBuilder):
             geoIdCaption=self._geoIdCaption,
             geoFields=KeyedList[RdsGeoField](self._geoFields),
             description=self._description,
+            metrics=RdsMetrics(totalPopulation=self._totalPopulation),
             parent=planParent
         )
 

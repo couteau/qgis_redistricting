@@ -9,9 +9,9 @@ class TestMetrics:
 
     def test_define_metric(self, mock_plan):
         class TestMetricClass(metricslist.RdsMetric[str], mname="test"):
-            def calculate(self, populationData, geometry, **depends):
+            def calculate(self, populationData, geometry, plan, **depends):
                 self._value = "dummy"
 
-        m = TestMetricClass(mock_plan)
-        m.calculate(None, None)
-        assert m.value() == "dummy"
+        m = TestMetricClass()
+        m.calculate(None, None, mock_plan)
+        assert m.value == "dummy"

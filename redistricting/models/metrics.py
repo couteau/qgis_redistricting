@@ -23,15 +23,9 @@
  ***************************************************************************/
 """
 import math
-from collections.abc import (
-    Iterable,
-    Sequence
-)
-from itertools import repeat
-from statistics import (
-    StatisticsError,
-    mean
-)
+from collections.abc import Mapping, Sequence
+from statistics import StatisticsError, mean
+from typing import TYPE_CHECKING, Optional, Union
 
 import geopandas as gpd
 import pandas as pd
@@ -39,30 +33,19 @@ import pyproj
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
 
-from ..utils import (
-    spatialite_connect,
-    tr
-)
-from .base.lists import KeyedList
-from .columns import (
-    ConstStr,
-    DistrictColumns,
-    MetricsColumns
-)
-from .field import RdsGeoField
+from ..utils import spatialite_connect, tr
+from .consts import ConstStr, DeviationType, DistrictColumns, MetricsColumns
 from .metricslist import (
     MetricLevel,
     MetricTriggers,
     RdsAggregateMetric,
     RdsMetric,
-    register_metrics
+    register_metrics,
 )
-from .plan import (
-    DeviationType,
-    RdsPlan
-)
-from .splits import RdsSplits
 from .validators import validators
+
+if TYPE_CHECKING:
+    from .plan import RdsPlan
 
 # pylint: disable=unused-argument
 
@@ -75,12 +58,9 @@ class RdsTotalPopulationMetric(RdsMetric[int],
     def caption(self):
         return DistrictColumns.POPULATION.comment
 
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', **depends):
         if populationData is not None:
             self._value = int(populationData[DistrictColumns.POPULATION].sum())
-
-    def value(self) -> int:
-        return self._value
 
     def format(self, idx=None) -> str:
         if self._value is None:
@@ -98,23 +78,23 @@ class RdsDeviationMetric(RdsMetric[pd.Series],
     def caption(self):
         return DistrictColumns.DEVIATION.comment
 
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, *, totalPopulation: int = 0, **depends):
-        if populationData is not None:
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', *, totalPopulation: int = 0, **depends):
+        if populationData is not None and plan is not None:
             members = pd.Series(
                 [
                     None if d == 0
                     else d.members
-                    for d in self.plan.districts
+                    for d in plan.districts
                 ],
-                index=(d.district for d in self.plan.districts),
+                index=(d.district for d in plan.districts),
                 dtype="Int64"
             )
 
-            ideal = round(totalPopulation / self.plan.numSeats)
+            ideal = round(totalPopulation / plan.numSeats)
 
             self._value = \
-                populationData[[self.plan.distField, DistrictColumns.POPULATION]] \
-                .groupby(self.plan.distField) \
+                populationData[[plan.distField, DistrictColumns.POPULATION]] \
+                .groupby(plan.distField) \
                 .sum()[DistrictColumns.POPULATION] \
                 .sub(members * ideal)
 
@@ -144,26 +124,27 @@ class RdsPctDeviationMetric(RdsMetric[pd.Series],
         self,
         populationData: pd.DataFrame,
         geometry: gpd.GeoSeries,
+        plan: 'RdsPlan',
         *,
         totalPopulation: int = 0,
         deviation: pd.Series = None,
         **depends
     ):
-        if deviation is None:
+        if deviation is None or plan is None:
             self._value = None
             return
 
         if totalPopulation == 0:
-            self._value = pd.Series(0, deviation.index())
+            self._value = pd.Series(0, deviation.index)
         else:
-            idealPerMember = round(totalPopulation / self.plan.numSeats)
+            idealPerMember = round(totalPopulation / plan.numSeats)
             districtIdeal = pd.Series(
                 [
                     None if d.district == 0
                     else d.members * idealPerMember
-                    for d in self.plan.districts
+                    for d in plan.districts
                 ],
-                index=(d.district for d in self.plan.districts),
+                index=(d.district for d in plan.districts),
                 dtype="Int64"
             )
 
@@ -188,32 +169,31 @@ class RdsPlanDeviationMetric(RdsAggregateMetric[tuple[float, float]],
                              triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
                              values=RdsPctDeviationMetric):
 
+    def __post_init__(self):
+        super().__post_init__()
+        self._formatted_value = ""
+        self._valid = True
+
     def caption(self):
         return DistrictColumns.PCT_DEVIATION.comment
 
-    def aggregate(self, populationData, geometry, values: pd.Series):
-        return float(values.min()), float(values.max())
+    def aggregate(self, populationData, geometry, plan: 'RdsPlan', values: pd.Series):
+        minDeviation, maxDeviation = float(values.min()), float(values.max())
+        self._formatted_value = f"{maxDeviation:+.2%}, {minDeviation:+.2%}" \
+            if plan is None or plan.deviationType == DeviationType.OverUnder \
+            else f"{maxDeviation-minDeviation:.2%}"
+        if plan is not None:
+            validator = validators[plan.deviationType](plan)
+            self._valid = validator.validatePlan()
+        else:
+            self._valid = True
+        return minDeviation, maxDeviation
 
     def format(self, idx=None):
-        if self._value is None:
-            return None
-
-        minDeviation, maxDeviation = self._value
-        if minDeviation is None or maxDeviation is None:
-            result = ""
-        else:
-            result = f"{maxDeviation:+.2%}, {minDeviation:+.2%}" \
-                if self.plan.deviationType == DeviationType.OverUnder \
-                else f"{maxDeviation-minDeviation:.2%}"
-
-        return result
-
-    def isValid(self) -> bool:
-        validator = validators[self.plan.deviationType](self.plan)
-        return validator.validatePlan()
+        return self._formatted_value
 
     def forgroundColor(self, idx=None):
-        return QColor(Qt.GlobalColor.red) if not self.isValid() else QColor(Qt.GlobalColor.green)
+        return QColor(Qt.GlobalColor.red) if not self._valid else QColor(Qt.GlobalColor.green)
 
 
 class CeaProjMetric(RdsMetric[gpd.GeoSeries],
@@ -223,7 +203,7 @@ class CeaProjMetric(RdsMetric[gpd.GeoSeries],
                     display=False,
                     serialize=False
                     ):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', **depends):
         cea_crs = pyproj.CRS('+proj=cea')
         self._value: gpd.GeoSeries = geometry.geometry.to_crs(cea_crs)
 
@@ -235,7 +215,7 @@ class DistrictAggregateMixin:
 
 
 class DistrictMeanMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, values):
+    def aggregate(self, populationData, geometry, plan: 'RdsPlan', values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].mean())
 
@@ -253,7 +233,7 @@ class DistrictMeanMixin(DistrictAggregateMixin):
 
 
 class DistrictMinMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, values):
+    def aggregate(self, populationData, geometry, plan: 'RdsPlan', values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].min())
 
@@ -268,7 +248,7 @@ class DistrictMinMixin(DistrictAggregateMixin):
 
 
 class DistrictMaxMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, values):
+    def aggregate(self, populationData, geometry, plan: 'RdsPlan', values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].max())
 
@@ -283,7 +263,7 @@ class DistrictMaxMixin(DistrictAggregateMixin):
 
 
 class DistrictSumMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, values):
+    def aggregate(self, populationData, geometry, plan: 'RdsPlan', values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].sum())
 
@@ -297,7 +277,7 @@ class DistrictSumMixin(DistrictAggregateMixin):
         return tr("Total")
 
 
-class RdsCompactnessMetric(RdsMetric[float], mname="__compactness"):
+class RdsCompactnessMetric(RdsMetric[pd.Series], mname="__compactness"):
     def __init_subclass__(cls,
                           score: ConstStr,
                           group=tr("Compactness"),
@@ -308,14 +288,17 @@ class RdsCompactnessMetric(RdsMetric[float], mname="__compactness"):
         super().__init_subclass__(mname=score, group=group, level=level, triggers=triggers, depends=depends, **kwargs)
         cls._score = score
 
-    @RdsMetric.plan.setter
-    def plan(self, value: RdsPlan):
-        RdsMetric.plan.__set__(self, value)  # pylint: disable=unnecessary-dunder-call
-        numDistricts = value.numDistricts + 1 if value is not None else 1
-        self._value = pd.Series(
-            data=repeat(0, numDistricts),
-            index=pd.RangeIndex(numDistricts)
-        )
+    def __init__(self, value: Optional[Union[Mapping[int, float], Sequence[float]]] = None):
+        if value is None:
+            value = pd.Series(
+                data=[0.0],
+                index=pd.RangeIndex(1)
+            )
+        elif isinstance(value, Mapping):
+            value = pd.Series(value)
+        else:
+            value = pd.Series(data=value, index=pd.RangeIndex(len(value)))
+        super().__init__(value)
 
     def caption(self):
         return self._score.comment
@@ -349,7 +332,7 @@ class RdsCompactnessAggregate(RdsAggregateMetric[float], mname="__compactnessagg
 
 
 class RdsPolsbyPopper(RdsCompactnessMetric, score=MetricsColumns.POLSBYPOPPER):
-    def calculate(self, populationData, geometry: gpd.GeoSeries, *, cea_proj: gpd.GeoSeries = None, **depends):
+    def calculate(self, populationData, geometry: gpd.GeoSeries, plan: 'RdsPlan', *, cea_proj: gpd.GeoSeries = None, **depends):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
         self._value = 4 * math.pi * cea_proj.area / (cea_proj.length**2)
@@ -387,7 +370,7 @@ class RdsAggScores(RdsMetric, mname="__agg_compactness", level=MetricLevel.PLANW
                                   **kwargs)
         cls._score = score
 
-    def calculate(self, populationData, geometry, **depends):
+    def calculate(self, populationData, geometry, plan: 'RdsPlan', **depends):
         self._value: dict[type[RdsAggregateMetric], float] = {d: depends[d.name()] for d in self.depends()}
 
     def caption(self):
@@ -411,7 +394,7 @@ class RdsAggPolsbyPopper(RdsAggScores,
 
 
 class RdsReock(RdsCompactnessMetric, score=MetricsColumns.REOCK):
-    def calculate(self, populationData, geometry, *, cea_proj: gpd.GeoSeries = None, **depends):
+    def calculate(self, populationData, geometry, plan: 'RdsPlan', *, cea_proj: gpd.GeoSeries = None, **depends):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
         self._value = cea_proj.area / cea_proj.minimum_bounding_circle().area
@@ -445,7 +428,7 @@ class RdsAggReock(RdsAggScores,
 
 
 class RdsConvexHull(RdsCompactnessMetric, score=MetricsColumns.CONVEXHULL):
-    def calculate(self, populationData, geometry, *, cea_proj: gpd.GeoSeries = None, **depends):
+    def calculate(self, populationData, geometry, plan: 'RdsPlan', *, cea_proj: gpd.GeoSeries = None, **depends):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
         self._value = cea_proj.area / cea_proj.convex_hull.area
@@ -489,8 +472,8 @@ class RdsCutEdges(RdsMetric[int],
     def caption(self):
         return tr("Cut Edges")
 
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
-        with spatialite_connect(self.plan.geoPackagePath) as db:
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', **depends):
+        with spatialite_connect(plan.geoPackagePath) as db:
             # select count of unit pairs where
             #   1) assigned districts are different (also takes care of excluding unassigned units from count),
             #   2) combination is unique (count a,b but not b,a),
@@ -498,7 +481,7 @@ class RdsCutEdges(RdsMetric[int],
             #   4) units are adjacent at more than a point
             sql = f"""SELECT count(*)
                 FROM assignments a JOIN assignments b
-                ON b.{self.plan.distField} != a.{self.plan.distField} AND b.{self.plan.geoIdField} > a.{self.plan.geoIdField}
+                ON b.{plan.distField} != a.{plan.distField} AND b.{plan.geoIdField} > a.{plan.geoIdField}
                 AND b.fid IN (
                     SELECT id FROM rtree_assignments_geometry r
                     WHERE r.minx <= st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry)
@@ -516,96 +499,6 @@ class RdsCutEdges(RdsMetric[int],
         return f"{self._value:,}"
 
 
-class RdsSplitsMetric(RdsMetric[KeyedList[RdsSplits]],
-                      mname="splits",
-                      level=MetricLevel.GEOGRAPHIC,
-                      triggers=MetricTriggers.ON_UPDATE_GEOMETRY | MetricTriggers.ON_UPDATE_DEMOGRAPHICS):
-
-    def __init__(self, plan: RdsPlan = None):
-        super().__init__(plan)
-        self._value: KeyedList[RdsSplits] = KeyedList()
-        self.data: dict[str, pd.DataFrame] = {}
-
-    @RdsMetric.plan.setter
-    def plan(self, value: RdsPlan):
-        RdsMetric.plan.__set__(self, value)  # pylint: disable=unnecessary-dunder-call
-        if value is not None:
-            self.updateGeoFields(value.geoFields)
-
-    def updateGeoFields(self, geoFields: Iterable[RdsGeoField]):
-        splits: KeyedList[RdsSplits] = KeyedList([RdsSplits(f) for f in geoFields])
-        for split in splits.values():
-            if split.field in self._value:
-                split.setData(self._value[split.field].data)
-
-        self._value = splits
-
-    def getSplitNames(self, field: 'RdsGeoField', geoids: Iterable[str]):
-        return {g: field.getName(g) for g in geoids}
-
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
-        cols = [self.plan.distField]
-        if DistrictColumns.POPULATION in populationData.columns:
-            cols += [DistrictColumns.POPULATION] + \
-                [f.fieldName for f in self.plan.popFields] + \
-                [f.fieldName for f in self.plan.dataFields]
-
-        self.data = {}
-        for field in self.plan.geoFields:
-            g = populationData.dropna(subset=[field.fieldName])[[field.fieldName] + cols].groupby([field.fieldName])
-            splits_data = g.filter(lambda x: x[self.plan.distField].nunique() > 1)
-
-            splitpop = splits_data[[field.fieldName] + cols] \
-                .groupby([field.fieldName, self.plan.distField]) \
-                .sum()
-
-            if field.nameField and field.getRelation() is not None:
-                name_map = self.getSplitNames(field, splitpop.index.get_level_values(0).unique())
-                names = pd.Series(name_map.values(), index=name_map.keys(), name="__name", dtype=str)
-
-                splitpop = splitpop \
-                    .reset_index(level=1) \
-                    .join(names) \
-                    .set_index('district', append=True) \
-                    .sort_values(by="__name")
-            else:
-                splitpop = splitpop.sort_index()
-
-            self.data[field.fieldName] = splitpop
-
-    def updateSplits(self, data: dict[str, pd.DataFrame]):
-        new_splits: KeyedList[RdsSplits] = KeyedList()
-
-        for f, split in data.items():
-            if f not in self._value:
-                new_splits[f] = RdsSplits(f, split)
-                new_splits[f].geoField = self._plan.geoFields[f]
-            else:
-                new_splits[f] = self._value[f]
-                new_splits[f].setData(split)
-
-        self._value = new_splits
-
-    def finished(self):
-        self.updateSplits(self.data)
-        self.data: dict[str, pd.DataFrame] = {}
-
-    def format(self, idx=None) -> str:
-        if self._value is None:
-            return None
-
-        if idx is None:
-            return repr({k: len(v) for k, v in self._value.items()})
-
-        if idx not in self._value:
-            return ""
-
-        return f"{len(self._value[idx]):,}"
-
-    def tooltip(self, idx=None):
-        return tr('Double-click or press enter to see split details')
-
-
 class RdsBoolMetric(RdsMetric[bool], mname="__boolmetric"):
     def format(self, idx=None):
         if self._value is None:
@@ -614,16 +507,16 @@ class RdsBoolMetric(RdsMetric[bool], mname="__boolmetric"):
         return tr("YES") if self._value else "NO"
 
     def forgroundColor(self, idx=None) -> QColor:
-        return QColor(Qt.green) if self._value else QColor(Qt.red)
+        return QColor(Qt.GlobalColor.green) if self._value else QColor(Qt.GlobalColor.red)
 
 
 class RdsContiguityMetric(RdsBoolMetric, mname="contiguity", triggers=MetricTriggers.ON_UPDATE_GEOMETRY):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
-        if len(self.plan.districts) == 1:
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', **depends):
+        if plan is None or len(plan.districts) == 1:
             self._value = None
             return
 
-        self._value = geometry[geometry.index != 0].count_geometries().sum() == self.plan.allocatedDistricts
+        self._value = geometry[geometry.index != 0].count_geometries().sum() == plan.allocatedDistricts
 
     def tooltip(self, idx=None):
         if self._value:
@@ -633,8 +526,12 @@ class RdsContiguityMetric(RdsBoolMetric, mname="contiguity", triggers=MetricTrig
 
 
 class RdsCompleteMetric(RdsBoolMetric, mname="complete", triggers=MetricTriggers.ON_UPDATE_GEOMETRY):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, **depends):
-        self._value = populationData[populationData[self.plan.distField] == 0].empty
+    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: 'RdsPlan', **depends):
+        if plan is None:
+            self._value = False
+        else:
+            self._value = populationData[populationData[plan.distField] == 0].empty \
+                and populationData[plan.distField].nunique() == plan.numDistricts
 
     def tooltip(self, idx=None):
         if self._value:
@@ -648,5 +545,5 @@ register_metrics([CeaProjMetric, RdsPolsbyPopper, RdsReock, RdsConvexHull, RdsCu
                   RdsMeanPolsbyPopper, RdsMinPolsbyPopper, RdsMaxPolsbyPopper,
                   RdsMeanReock, RdsMinReock, RdsMaxReock,
                   RdsMeanConvexHull, RdsMinConvexHull, RdsMaxConvexHull,
-                  RdsSplitsMetric, RdsContiguityMetric, RdsCompleteMetric,
+                  RdsContiguityMetric, RdsCompleteMetric,
                   RdsAggPolsbyPopper, RdsAggReock, RdsAggConvexHull])

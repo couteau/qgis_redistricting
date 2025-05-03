@@ -22,20 +22,12 @@ and modified under GNU General Public License version 3
  *                                                                         *
  ***************************************************************************/
 """
-import contextlib
 import os
 import pathlib
 import shutil
+import tempfile
 import unittest.mock
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generator,
-    Optional,
-    Union,
-    overload
-)
-from unittest.mock import MagicMixin
+from typing import Optional, Union, overload
 from uuid import uuid4
 
 import pytest
@@ -48,152 +40,33 @@ from qgis.core import (
     QgsMapLayer,
     QgsProject,
     QgsRelationManager,
-    QgsTask,
-    QgsTaskManager,
-    QgsVectorLayer
+    QgsVectorLayer,
 )
 from qgis.gui import (
     QgisInterface,
-    QgsGui,
     QgsLayerTreeMapCanvasBridge,
     QgsLayerTreeView,
-    QgsMapCanvas
+    QgsMapCanvas,
 )
-from qgis.PyQt import (
-    QtCore,
-    QtWidgets,
-    sip
+from qgis.PyQt import sip
+from qgis.PyQt.QtCore import QObject, QSize, pyqtBoundSignal, pyqtSignal
+from qgis.PyQt.QtWidgets import (
+    QAction,
+    QActionGroup,
+    QMainWindow,
+    QMenu,
+    QToolBar,
+    QWidget,
 )
+from qgis.utils import iface  # pylint: disable=unused-import
 
-if TYPE_CHECKING:
-    from _pytest.fixtures import SubRequest
+# pylint: disable=redefined-outer-name
 
-# pylint: disable=redefined-outer-name, unused-argument, protected-access
-
-
-@pytest.fixture
-def datadir(tmp_path: pathlib.Path):
-    d = tmp_path / 'data'
-    s = pathlib.Path(__file__).parent / 'data'
-    if d.exists():
-        shutil.rmtree(d)
-    shutil.copytree(s, d)
-    yield d
-    shutil.rmtree(tmp_path, ignore_errors=True)
-
-
-@pytest.fixture
-def block_layer(datadir: pathlib.Path, qgis_new_project):
-    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
-    layer = QgsVectorLayer(f'{gpkg}|layername=block20', 'blocks', 'ogr')
-    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
-    QgsProject.instance().addMapLayer(layer)
-    return layer
-
-
-@pytest.fixture
-def vtd_layer(datadir: pathlib.Path, qgis_new_project):
-    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
-    layer = QgsVectorLayer(f'{gpkg}|layername=vtd20', 'vtd', 'ogr')
-    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
-    QgsProject.instance().addMapLayer(layer)
-    return layer
-
-
-@pytest.fixture
-def county_layer(datadir: pathlib.Path, qgis_new_project):
-    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
-    layer = QgsVectorLayer(f'{gpkg}|layername=county20', 'county', 'ogr')
-    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
-    QgsProject.instance().addMapLayer(layer)
-    return layer
-
-
-@pytest.fixture
-def related_layers(block_layer, vtd_layer, county_layer):
-    for rel in QgsProject.instance().relationManager().discoverRelations([], [county_layer, vtd_layer, block_layer]):
-        QgsProject.instance().relationManager().addRelation(rel)
-
-
-@pytest.fixture
-def plan_gpkg_path(datadir):
-    return (datadir / 'tuscaloosa_plan.gpkg').resolve()
-
-
-@pytest.fixture
-def assign_layer(plan_gpkg_path, qgis_new_project):
-    layer = QgsVectorLayer(
-        f'{plan_gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
-    QgsProject.instance().addMapLayer(layer, False)
-    return layer
-
-
-@pytest.fixture
-def dist_layer(plan_gpkg_path, qgis_new_project):
-    layer = QgsVectorLayer(
-        f'{plan_gpkg_path}|layername=districts', 'test_districts', 'ogr')
-    QgsProject.instance().addMapLayer(layer, False)
-    return layer
-
-
-def addTask(self: QgsTaskManager, task: QgsTask, priority: int = 0) -> int:
-
-    self.taskAdded.emit(0)
-    if isinstance(task, MagicMixin):
-        success = task.run()
-        if isinstance(success, MagicMixin):
-            success = True
-    else:
-        task.statusChanged.emit(QgsTask.TaskStatus.Running)
-        self.statusChanged.emit(0, QgsTask.TaskStatus.Running)
-        task.begun.emit()
-        success = task.run()
-
-    if success:
-        task.statusChanged.emit(QgsTask.TaskStatus.Complete)
-        self.statusChanged.emit(0, QgsTask.TaskStatus.Complete)
-    else:
-        task.statusChanged.emit(QgsTask.TaskStatus.Terminated)
-        self.statusChanged.emit(0, QgsTask.TaskStatus.Terminated)
-
-    task.finished(success)
-
-    if success:
-        task.taskCompleted.emit()
-    else:
-
-        task.taskTerminated.emit()
-
-    return 0
-
-
-@pytest.fixture
-def mock_taskmanager(qgis_app: QgsApplication, mocker: MockerFixture):
-    new = addTask.__get__(qgis_app.taskManager(), None)  # pylint: disable=no-value-for-parameter
-    mock = mocker.patch.object(qgis_app.taskManager(), 'addTask', new=new)
-    return mock
-
-
-try:
-    _QGIS_VERSION = Qgis.versionInt()
-except AttributeError:
-    _QGIS_VERSION = Qgis.QGIS_VERSION_INT
-
-_APP: Optional[QgsApplication] = None
-_CANVAS: Optional[QgsMapCanvas] = None
-_BRIDGE: Optional[QgsLayerTreeMapCanvasBridge] = None
-_IFACE: Optional[QgisInterface] = None
-_PARENT: Optional[QtWidgets.QWidget] = None
-_QGIS_CONFIG_PATH: Optional[pathlib.Path] = None
-
-CANVAS_SIZE = (600, 600)
-
-
-class MockMessageBar(QtCore.QObject):
+class MockMessageBar(QObject):
     """Mocked message bar to hold the messages."""
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, parent: Optional[QObject] = None):
+        super().__init__(parent)
         self.messages: dict[int, list[str]] = {
             Qgis.MessageLevel.Info: [],
             Qgis.MessageLevel.Warning: [],
@@ -273,13 +146,13 @@ class MockMessageBar(QtCore.QObject):
 
 
 class MockQgisInterface(QgisInterface):
-    initializationCompleted = QtCore.pyqtSignal()
-    projectRead = QtCore.pyqtSignal()
-    newProjectCreated = QtCore.pyqtSignal()
-    layerSavedAs = QtCore.pyqtSignal("PyQt_PyObject", str)
-    currentLayerChanged = QtCore.pyqtSignal()
+    initializationCompleted = pyqtSignal()
+    projectRead = pyqtSignal()
+    newProjectCreated = pyqtSignal()
+    layerSavedAs = pyqtSignal("PyQt_PyObject", str)
+    currentLayerChanged = pyqtSignal()
 
-    def __init__(self, canvas: QgsMapCanvas, parent: QtWidgets.QMainWindow):
+    def __init__(self, canvas: QgsMapCanvas, parent: QMainWindow):
         super().__init__()
         self.setParent(parent)
         self._layers: list[QgsMapLayer] = []
@@ -290,16 +163,11 @@ class MockQgisInterface(QgisInterface):
         QgsProject.instance().layersRemoved.connect(self.removeLayers)
         QgsProject.instance().removeAll.connect(self.removeAllLayers)
 
-        self._toolbars: dict[str, QtWidgets.QToolBar] = {}
+        self._toolbars: dict[str, QToolBar] = {}
         self._layerTreeView = QgsLayerTreeView(parent)
         self._layerTreeView.currentLayerChanged.connect(self.currentLayerChanged)
         self._activeLayerId = None
         self._messageBar = MockMessageBar()
-
-    def __del__(self):
-        QgsProject.instance().legendLayersAdded.disconnect(self.addLayers)
-        QgsProject.instance().layersRemoved.disconnect(self.removeLayers)
-        QgsProject.instance().removeAll.disconnect(self.removeAllLayers)
 
     def layerTreeView(self):
         return self._layerTreeView
@@ -329,7 +197,7 @@ class MockQgisInterface(QgisInterface):
         """Get the list of layers in the canvas."""
         return self._layers
 
-    @QtCore.pyqtSlot("QList<QgsMapLayer*>")
+    # @pyqtSlot("QList<QgsMapLayer*>")
     def addLayers(self, layers: list[QgsMapLayer]) -> None:
         """Handle layers being added to the registry so they show up in canvas.
 
@@ -341,21 +209,21 @@ class MockQgisInterface(QgisInterface):
         self._layers.extend(layers)
         # self._canvases[0].setLayers(self._layers)
 
-    @QtCore.pyqtSlot("QList<QString>")
+    # @pyqtSlot("QList<QString>")
     def removeLayers(self, layers: list[str] = None) -> None:
         if layers is None:
             return
         self._layers = [layer for layer in self._layers if not sip.isdeleted(layer) and layer.id() not in layers]
         # self._canvases[0].setLayers(self._layers)
 
-    @QtCore.pyqtSlot()
+    # @pyqtSlot()
     def removeAllLayers(self) -> None:
         """Remove layers from the canvas before they get deleted."""
         self._layers = []
         # if not sip.isdeleted(self._canvases[0]):
         #    self._canvases[0].setLayers(self._layers)
 
-    def newProject(self, promptToSaveFlag: bool = False) -> None:
+    def newProject(self, promptToSaveFlag: bool = False) -> None:  # pylint: disable=unused-argument
         """Create new project."""
         # noinspection PyArgumentList
         instance = QgsProject.instance()
@@ -403,20 +271,20 @@ class MockQgisInterface(QgisInterface):
         self._activeLayerId = layer.id()
         self.currentLayerChanged.emit()
 
-    def iconSize(self) -> QtCore.QSize:
-        return QtCore.QSize(24, 24)
+    def iconSize(self) -> QSize:
+        return QSize(24, 24)
 
-    def mainWindow(self) -> QtWidgets.QMainWindow:
+    def mainWindow(self) -> QMainWindow:
         return self.parent()
 
-    def addToolBar(self, toolbar: Union[str, QtWidgets.QToolBar]) -> QtWidgets.QToolBar:
+    def addToolBar(self, toolbar: Union[str, QToolBar]) -> QToolBar:
         """Add toolbar with specified name.
 
         :param toolbar: Name for the toolbar or QToolBar object.
         """
         if isinstance(toolbar, str):
             name = toolbar
-            _toolbar = QtWidgets.QToolBar(name, parent=self.parent())
+            _toolbar = QToolBar(name, parent=self.parent())
         else:
             name = toolbar.windowTitle()
             _toolbar = toolbar
@@ -443,44 +311,44 @@ class MockQgisInterface(QgisInterface):
     addToolBarIcon = unittest.mock.MagicMock()
     removeToolBarIcon = unittest.mock.MagicMock()
 
-    projectMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
+    projectMenu = unittest.mock.MagicMock(spec=QMenu)
 
-    projectImportExportMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
+    projectImportExportMenu = unittest.mock.MagicMock(spec=QMenu)
     addProjectImportAction = unittest.mock.MagicMock()
     removeProjectImportAction = unittest.mock.MagicMock()
 
-    editMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    viewMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    layerMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    newLayerMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    addLayerMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    settingsMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    pluginMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    pluginHelpMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    rasterMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    databaseMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    vectorMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    firstRightStandardMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    windowMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
-    helpMenu = unittest.mock.MagicMock(spec=QtWidgets.QMenu)
+    editMenu = unittest.mock.MagicMock(spec=QMenu)
+    viewMenu = unittest.mock.MagicMock(spec=QMenu)
+    layerMenu = unittest.mock.MagicMock(spec=QMenu)
+    newLayerMenu = unittest.mock.MagicMock(spec=QMenu)
+    addLayerMenu = unittest.mock.MagicMock(spec=QMenu)
+    settingsMenu = unittest.mock.MagicMock(spec=QMenu)
+    pluginMenu = unittest.mock.MagicMock(spec=QMenu)
+    pluginHelpMenu = unittest.mock.MagicMock(spec=QMenu)
+    rasterMenu = unittest.mock.MagicMock(spec=QMenu)
+    databaseMenu = unittest.mock.MagicMock(spec=QMenu)
+    vectorMenu = unittest.mock.MagicMock(spec=QMenu)
+    firstRightStandardMenu = unittest.mock.MagicMock(spec=QMenu)
+    windowMenu = unittest.mock.MagicMock(spec=QMenu)
+    helpMenu = unittest.mock.MagicMock(spec=QMenu)
 
-    fileToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    layerToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    dataSourceManagerToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    mapNavToolToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    digitizeToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    advancedDigitizeToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    shapeDigitizeToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    attributesToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    selectionToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    pluginToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    helpToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    rasterToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    vectorToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    databaseToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
-    webToolBar = unittest.mock.MagicMock(spec=QtWidgets.QToolBar)
+    fileToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    layerToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    dataSourceManagerToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    mapNavToolToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    digitizeToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    advancedDigitizeToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    shapeDigitizeToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    attributesToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    selectionToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    pluginToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    helpToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    rasterToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    vectorToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    databaseToolBar = unittest.mock.MagicMock(spec=QToolBar)
+    webToolBar = unittest.mock.MagicMock(spec=QToolBar)
 
-    mapToolActionGroup = unittest.mock.MagicMock(spec=QtWidgets.QActionGroup)
+    mapToolActionGroup = unittest.mock.MagicMock(spec=QActionGroup)
 
     openDataSourceManagerPage = unittest.mock.MagicMock()
 
@@ -501,187 +369,245 @@ class MockQgisInterface(QgisInterface):
     registerProjectPropertiesWidgetFactory = unittest.mock.MagicMock()
     unregisterProjectPropertiesWidgetFactory = unittest.mock.MagicMock()
 
-    actionNewProject = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionOpenProject = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveProject = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveProjectAs = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveMapAsImage = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionProjectProperties = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCreatePrintLayout = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionShowLayoutManager = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionExit = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCutFeatures = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCopyFeatures = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionPasteFeatures = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddFeature = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionDeleteSelected = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionMoveFeature = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSplitFeatures = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSplitParts = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddRing = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddPart = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSimplifyFeature = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionDeleteRing = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionDeletePart = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionVertexTool = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionVertexToolActiveLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
+    actionNewProject = unittest.mock.MagicMock(spec=QAction)
+    actionOpenProject = unittest.mock.MagicMock(spec=QAction)
+    actionSaveProject = unittest.mock.MagicMock(spec=QAction)
+    actionSaveProjectAs = unittest.mock.MagicMock(spec=QAction)
+    actionSaveMapAsImage = unittest.mock.MagicMock(spec=QAction)
+    actionProjectProperties = unittest.mock.MagicMock(spec=QAction)
+    actionCreatePrintLayout = unittest.mock.MagicMock(spec=QAction)
+    actionShowLayoutManager = unittest.mock.MagicMock(spec=QAction)
+    actionExit = unittest.mock.MagicMock(spec=QAction)
+    actionCutFeatures = unittest.mock.MagicMock(spec=QAction)
+    actionCopyFeatures = unittest.mock.MagicMock(spec=QAction)
+    actionPasteFeatures = unittest.mock.MagicMock(spec=QAction)
+    actionAddFeature = unittest.mock.MagicMock(spec=QAction)
+    actionDeleteSelected = unittest.mock.MagicMock(spec=QAction)
+    actionMoveFeature = unittest.mock.MagicMock(spec=QAction)
+    actionSplitFeatures = unittest.mock.MagicMock(spec=QAction)
+    actionSplitParts = unittest.mock.MagicMock(spec=QAction)
+    actionAddRing = unittest.mock.MagicMock(spec=QAction)
+    actionAddPart = unittest.mock.MagicMock(spec=QAction)
+    actionSimplifyFeature = unittest.mock.MagicMock(spec=QAction)
+    actionDeleteRing = unittest.mock.MagicMock(spec=QAction)
+    actionDeletePart = unittest.mock.MagicMock(spec=QAction)
+    actionVertexTool = unittest.mock.MagicMock(spec=QAction)
+    actionVertexToolActiveLayer = unittest.mock.MagicMock(spec=QAction)
 
-    actionPan = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionPanToSelected = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomIn = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomOut = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSelect = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSelectRectangle = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSelectPolygon = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSelectFreehand = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSelectRadius = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionIdentify = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionFeatureAction = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionMeasure = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionMeasureArea = unittest.mock.MagicMock(spec=QtWidgets.QAction)
+    actionPan = unittest.mock.MagicMock(spec=QAction)
+    actionPanToSelected = unittest.mock.MagicMock(spec=QAction)
+    actionZoomIn = unittest.mock.MagicMock(spec=QAction)
+    actionZoomOut = unittest.mock.MagicMock(spec=QAction)
+    actionSelect = unittest.mock.MagicMock(spec=QAction)
+    actionSelectRectangle = unittest.mock.MagicMock(spec=QAction)
+    actionSelectPolygon = unittest.mock.MagicMock(spec=QAction)
+    actionSelectFreehand = unittest.mock.MagicMock(spec=QAction)
+    actionSelectRadius = unittest.mock.MagicMock(spec=QAction)
+    actionIdentify = unittest.mock.MagicMock(spec=QAction)
+    actionFeatureAction = unittest.mock.MagicMock(spec=QAction)
+    actionMeasure = unittest.mock.MagicMock(spec=QAction)
+    actionMeasureArea = unittest.mock.MagicMock(spec=QAction)
 
-    actionZoomFullExtent = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomToLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomToSelected = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomLast = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomNext = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionZoomActualSize = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionMapTips = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionNewBookmark = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionShowBookmarks = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionDraw = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionNewVectorLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddOgrLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddRasterLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddPgLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddWmsLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddXyzLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddVectorTileLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddPointCloudLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddAfsLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddAmsLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCopyLayerStyle = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionPasteLayerStyle = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionOpenTable = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionOpenFieldCalculator = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionOpenStatisticalSummary = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionToggleEditing = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveActiveLayerEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAllEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionSaveAllEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionRollbackEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionRollbackAllEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCancelEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCancelAllEdits = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionLayerSaveAs = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionDuplicateLayer = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionLayerProperties = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddToOverview = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAddAllToOverview = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionRemoveAllFromOverview = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionHideAllLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionShowAllLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionHideSelectedLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionToggleSelectedLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionToggleSelectedLayersIndependently = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionHideDeselectedLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionShowSelectedLayers = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionManagePlugins = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionPluginListSeparator = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionShowPythonDialog = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionToggleFullScreen = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionOptions = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCustomProjection = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionHelpContents = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionQgisHomePage = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionCheckQgisVersion = unittest.mock.MagicMock(spec=QtWidgets.QAction)
-    actionAbout = unittest.mock.MagicMock(spec=QtWidgets.QAction)
+    actionZoomFullExtent = unittest.mock.MagicMock(spec=QAction)
+    actionZoomToLayers = unittest.mock.MagicMock(spec=QAction)
+    actionZoomToSelected = unittest.mock.MagicMock(spec=QAction)
+    actionZoomLast = unittest.mock.MagicMock(spec=QAction)
+    actionZoomNext = unittest.mock.MagicMock(spec=QAction)
+    actionZoomActualSize = unittest.mock.MagicMock(spec=QAction)
+    actionMapTips = unittest.mock.MagicMock(spec=QAction)
+    actionNewBookmark = unittest.mock.MagicMock(spec=QAction)
+    actionShowBookmarks = unittest.mock.MagicMock(spec=QAction)
+    actionDraw = unittest.mock.MagicMock(spec=QAction)
+    actionNewVectorLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddOgrLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddRasterLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddPgLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddWmsLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddXyzLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddVectorTileLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddPointCloudLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddAfsLayer = unittest.mock.MagicMock(spec=QAction)
+    actionAddAmsLayer = unittest.mock.MagicMock(spec=QAction)
+    actionCopyLayerStyle = unittest.mock.MagicMock(spec=QAction)
+    actionPasteLayerStyle = unittest.mock.MagicMock(spec=QAction)
+    actionOpenTable = unittest.mock.MagicMock(spec=QAction)
+    actionOpenFieldCalculator = unittest.mock.MagicMock(spec=QAction)
+    actionOpenStatisticalSummary = unittest.mock.MagicMock(spec=QAction)
+    actionToggleEditing = unittest.mock.MagicMock(spec=QAction)
+    actionSaveActiveLayerEdits = unittest.mock.MagicMock(spec=QAction)
+    actionAllEdits = unittest.mock.MagicMock(spec=QAction)
+    actionSaveEdits = unittest.mock.MagicMock(spec=QAction)
+    actionSaveAllEdits = unittest.mock.MagicMock(spec=QAction)
+    actionRollbackEdits = unittest.mock.MagicMock(spec=QAction)
+    actionRollbackAllEdits = unittest.mock.MagicMock(spec=QAction)
+    actionCancelEdits = unittest.mock.MagicMock(spec=QAction)
+    actionCancelAllEdits = unittest.mock.MagicMock(spec=QAction)
+    actionLayerSaveAs = unittest.mock.MagicMock(spec=QAction)
+    actionDuplicateLayer = unittest.mock.MagicMock(spec=QAction)
+    actionLayerProperties = unittest.mock.MagicMock(spec=QAction)
+    actionAddToOverview = unittest.mock.MagicMock(spec=QAction)
+    actionAddAllToOverview = unittest.mock.MagicMock(spec=QAction)
+    actionRemoveAllFromOverview = unittest.mock.MagicMock(spec=QAction)
+    actionHideAllLayers = unittest.mock.MagicMock(spec=QAction)
+    actionShowAllLayers = unittest.mock.MagicMock(spec=QAction)
+    actionHideSelectedLayers = unittest.mock.MagicMock(spec=QAction)
+    actionToggleSelectedLayers = unittest.mock.MagicMock(spec=QAction)
+    actionToggleSelectedLayersIndependently = unittest.mock.MagicMock(spec=QAction)
+    actionHideDeselectedLayers = unittest.mock.MagicMock(spec=QAction)
+    actionShowSelectedLayers = unittest.mock.MagicMock(spec=QAction)
+    actionManagePlugins = unittest.mock.MagicMock(spec=QAction)
+    actionPluginListSeparator = unittest.mock.MagicMock(spec=QAction)
+    actionShowPythonDialog = unittest.mock.MagicMock(spec=QAction)
+    actionToggleFullScreen = unittest.mock.MagicMock(spec=QAction)
+    actionOptions = unittest.mock.MagicMock(spec=QAction)
+    actionCustomProjection = unittest.mock.MagicMock(spec=QAction)
+    actionHelpContents = unittest.mock.MagicMock(spec=QAction)
+    actionQgisHomePage = unittest.mock.MagicMock(spec=QAction)
+    actionCheckQgisVersion = unittest.mock.MagicMock(spec=QAction)
+    actionAbout = unittest.mock.MagicMock(spec=QAction)
 
 
-def _init_qgis():
-    global _APP, _CANVAS, _IFACE, _PARENT  # noqa: PLW0603 # pylint: disable=global-statement
-    # global _BRIDGE
+profileDir = tempfile.mkdtemp(prefix='qgis_test_')
+_APP = QgsApplication([], True, profileDir)
+_APP.initQgis()
 
-    # Use temporary path for QGIS config
-    _APP = QgsApplication([], GUIenabled=True)
-    _APP.initQgis()
-    QgsGui.editorWidgetRegistry().initEditors()
+_CANVAS: QgsMapCanvas = None
+_PARENT: QWidget = None
+_IFACE: QgisInterface = None
+
+_PARENT = QMainWindow()
+_CANVAS = QgsMapCanvas()
+_PARENT.setCentralWidget(_CANVAS)
+_IFACE = MockQgisInterface(_CANVAS, _PARENT)
+
+unittest.mock.patch("qgis.utils.iface", _IFACE).start()
+
+
+@pytest.fixture(scope='session', autouse=True)
+def qgis_app():
+    """QGIS application fixture."""
+    global _CANVAS, _PARENT, _IFACE  # pylint: disable=global-statement
+
     QgsProject.instance().legendLayersAdded.connect(_APP.processEvents)
-
-    _PARENT = QtWidgets.QMainWindow()
-    _CANVAS = QgsMapCanvas()
-    _PARENT.setCentralWidget(_CANVAS)
-    _PARENT.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
-    _CANVAS.resize(QtCore.QSize(CANVAS_SIZE[0], CANVAS_SIZE[1]))
-    # _BRIDGE = QgsLayerTreeMapCanvasBridge(
-    #    QgsProject.instance().layerTreeRoot(), _CANVAS
-    # )
-    _IFACE = MockQgisInterface(_CANVAS, _PARENT)
-
-    if _QGIS_VERSION >= 31800:
-        # noqa: F401 # pylint: disable=unused-import, import-outside-toplevel
-        from qgis.utils import (  # This import is required
-            iface,
-            plugins
-        )
-
-        unittest.mock.patch("qgis.utils.iface", _IFACE).start()
-        unittest.mock.patch("qgis.utils.plugins", {}).start()
-
-
-# inititalize the QGIS application on loading module --
-# waiting until plugin initialization may result in
-# application modules loading with an uninitialized
-# and unpatched QGIS application
-_init_qgis()
-
-
-@pytest.fixture(autouse=True, scope="session")
-def qgis_app(request: "SubRequest", tmp_path_factory: pytest.TempPathFactory) -> Generator[QgsApplication, Any, Any]:
-    global _APP, _QGIS_CONFIG_PATH  # noqa: PLW0603 # pylint: disable=global-statement
-
-    _QGIS_CONFIG_PATH = tmp_path_factory.mktemp("qgis_config")
-    os.environ["QGIS_CUSTOM_CONFIG_PATH"] = str(_QGIS_CONFIG_PATH)
-
-    _APP.setPrefixPath(str(_QGIS_CONFIG_PATH))
 
     yield _APP
 
     QgsProject.instance().legendLayersAdded.disconnect(_APP.processEvents)
 
+    if os.path.exists(profileDir):
+        shutil.rmtree(profileDir, ignore_errors=True)
+
     _APP.exitQgis()
 
-    if _QGIS_CONFIG_PATH and _QGIS_CONFIG_PATH.exists():
-        with contextlib.suppress(PermissionError):
-            shutil.rmtree(_QGIS_CONFIG_PATH)
 
-    _APP = None
+@pytest.fixture(scope="session")
+def qapp_cls():
+    return QgsApplication
 
 
 @pytest.fixture(scope="session")
-def qgis_parent(qgis_app: QgsApplication) -> QtWidgets.QWidget:  # noqa: ARG001
-    return _PARENT
-
-
-@pytest.fixture(scope="session")
-def qgis_canvas() -> QgsMapCanvas:
-    assert _CANVAS
-    return _CANVAS
-
-
-@pytest.fixture(scope="session")
-def qgis_iface() -> QgisInterface:
-    assert _IFACE
-    return _IFACE
+def qapp(qgis_app):
+    return qgis_app
 
 
 @pytest.fixture
-def qgis_new_project(qgis_iface: QgisInterface) -> None:
-    """
-    Initializes new QGIS project by removing layers and relations etc.
-    """
-    qgis_iface.newProject(False)
+def mock_taskmanager(qgis_app: QgsApplication, mocker: MockerFixture):
+    """Mock the task manager."""
+    addTask = mocker.patch.object(qgis_app.taskManager(), "addTask")
+    addTask.return_value = 0
+    return addTask
+
+
+@pytest.fixture(scope='session')
+def qgis_canvas_session(qgis_app):  # pylint: disable=unused-argument
+    return _CANVAS
+
+
+@pytest.fixture
+def qgis_canvas(qgis_canvas_session):  # pylint: disable=unused-argument
+    bridge = QgsLayerTreeMapCanvasBridge(QgsProject.instance().layerTreeRoot(), _CANVAS)
+    yield qgis_canvas_session
+    bridge.deleteLater()
+
+
+@pytest.fixture(scope='session')
+def qgis_parent(qgis_app):  # pylint: disable=unused-argument
+    return _PARENT
+
+
+@pytest.fixture(scope='session')
+def qgis_iface(qgis_app):  # pylint: disable=unused-argument
+    return _IFACE
+
+
+@pytest.fixture(scope='function', autouse=True)
+def new_project(qgis_app):  # pylint: disable=unused-argument
+    QgsProject.instance().clear()
+
+
+@pytest.fixture
+def datadir(tmp_path: pathlib.Path):
+    d = tmp_path / 'data'
+    s = pathlib.Path(__file__).parent / 'data'
+    if d.exists():
+        shutil.rmtree(d)
+    shutil.copytree(s, d)
+    yield d
+    shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+@pytest.fixture
+def block_layer(datadir: pathlib.Path):
+    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
+    layer = QgsVectorLayer(f'{gpkg}|layername=block20', 'blocks', 'ogr')
+    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
+    QgsProject.instance().addMapLayer(layer)
+    return layer
+
+
+@pytest.fixture
+def vtd_layer(datadir: pathlib.Path):
+    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
+    layer = QgsVectorLayer(f'{gpkg}|layername=vtd20', 'vtd', 'ogr')
+    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
+    QgsProject.instance().addMapLayer(layer)
+    return layer
+
+
+@pytest.fixture
+def county_layer(datadir: pathlib.Path):
+    gpkg = (datadir / 'tuscaloosa.gpkg').resolve()
+    layer = QgsVectorLayer(f'{gpkg}|layername=county20', 'county', 'ogr')
+    layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
+    QgsProject.instance().addMapLayer(layer)
+    return layer
+
+
+@pytest.fixture
+def related_layers(block_layer, vtd_layer, county_layer):
+    for rel in QgsProject.instance().relationManager().discoverRelations([], [county_layer, vtd_layer, block_layer]):
+        QgsProject.instance().relationManager().addRelation(rel)
+
+
+@pytest.fixture
+def plan_gpkg_path(datadir):
+    return (datadir / 'tuscaloosa_plan.gpkg').resolve()
+
+
+@pytest.fixture
+def assign_layer(plan_gpkg_path):
+    layer = QgsVectorLayer(
+        f'{plan_gpkg_path}|layername=assignments', 'test_assignments', 'ogr')
+    QgsProject.instance().addMapLayer(layer, False)
+    return layer
+
+
+@pytest.fixture
+def dist_layer(plan_gpkg_path):
+    layer = QgsVectorLayer(
+        f'{plan_gpkg_path}|layername=districts', 'test_districts', 'ogr')
+    QgsProject.instance().addMapLayer(layer, False)
+    return layer
 
 
 # pylint: disable=wrong-import-position
@@ -689,7 +615,7 @@ from redistricting.services.planbuilder import PlanBuilder  # isort:skip # nopep
 from redistricting.services.districtio import DistrictReader  # isort:skip # nopep8
 from redistricting.models.plan import RdsPlan  # isort: skip # nopep8
 from redistricting.models.base.serialization import deserialize  # isort: skip # nopep8
-from redistricting.models import metrics  # isort: skip # nopep8; pylint: disable=unused-import
+from redistricting.models import metrics, splitsmetric  # isort: skip # nopep8; pylint: disable=unused-import
 
 
 @pytest.fixture
@@ -746,24 +672,33 @@ def plan(qgis_parent, block_layer, assign_layer, dist_layer):
                 'field': 'vtdid',
                 'caption': 'VTD'}
         ],
-        'total-population': 227036,
-        'metrics': {
-            'metrics': {
-                'total-population': 227036,
-                'plan-deviation': [100, -500],
-                'mean-polsbypopper': 0.4,
-                'min-polsbypopper': 0.15,
-                'max-polsbypopper': 0.8,
-                'mean-reock': 0.5,
-                'min-reock': 0.1,
-                'max-reock': 0.9,
-                'mean-convexhull': 0.5,
-                'min-convexhull': 0.1,
-                'max-convexhull': 0.9,
-                'contiguity': True,
-                'complete': True,
+        'metrics': { 'metrics': {
+            'total-population': {'value': 227036},
+            'plan-deviation': {'value': [100, -500]},
+            'mean-polsbypopper': {'value': 0.4},
+            'min-polsbypopper': {'value': 0.15},
+            'max-polsbypopper': {'value': 0.8},
+            'mean-reock': {'value': 0.5},
+            'min-reock': {'value': 0.1},
+            'max-reock': {'value': 0.9},
+            'mean-convexhull': {'value': 0.5},
+            'min-convexhull': {'value': 0.1},
+            'max-convexhull': {'value': 0.9},
+            'contiguity': {'value': True},
+            'complete': {'value': True},
+            'splits': {
+                'value': {
+                    'vtdid': {
+                        'field': 'vtdid',
+                        'caption': 'VTD',
+                        'data': {
+                            "schema": {"fields": [{"name": "index", "type": "integer"}], "primaryKey": ["index"], "pandas_version": "0.20.0"}, 
+                            "data": []
+                        }
+                    }
+                }
             }
-        }
+        }}
     }, parent=qgis_parent)
 
     r = DistrictReader(dist_layer, popField='pop_total')
@@ -799,17 +734,18 @@ def new_plan(block_layer: QgsVectorLayer, datadir: pathlib.Path):
 
     p.addLayersFromGeoPackage(dst)
     QgsProject.instance().addMapLayers([p.distLayer, p.assignLayer], False)
-    p.metrics['totalPopulation'].setValue(227036)  # noqa: F541; pylint: disable=unsubscriptable-object
+    p.metrics['totalPopulation']._value = 227036
+
     yield p
 
-    p._setAssignLayer(None)
-    p._setDistLayer(None)
+    p._setAssignLayer(None)  # pylint: disable=protected-access
+    p._setDistLayer(None)  # pylint: disable=protected-access
     p.deleteLater()
 
 
 @pytest.fixture
 def mock_plan(mocker: MockerFixture) -> RdsPlan:
-    mocker.patch('redistricting.models.plan.pyqtSignal', spec=QtCore.pyqtBoundSignal)
+    mocker.patch('redistricting.models.plan.pyqtSignal', spec=pyqtBoundSignal)
     plan = mocker.create_autospec(
         spec=RdsPlan('mock_plan', 5),
         spec_set=True
@@ -846,14 +782,14 @@ def mock_plan(mocker: MockerFixture) -> RdsPlan:
     type(plan).geoFields = mocker.PropertyMock(return_value=geo_fields)
 
     plan.assignLayer.isEditable.return_value = False
-    plan.assignLayer.editingStarted = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.editingStopped = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.afterRollBack = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.afterCommitChanges = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.beforeRollBack = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.beforeCommitChanges = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.beforeEditingStarted = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.allowCommitChanged = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
-    plan.assignLayer.selectionChanged = mocker.create_autospec(spec=QtCore.pyqtBoundSignal)
+    plan.assignLayer.editingStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.editingStopped = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.afterRollBack = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.afterCommitChanges = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeRollBack = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeCommitChanges = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.beforeEditingStarted = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.allowCommitChanged = mocker.create_autospec(spec=pyqtBoundSignal)
+    plan.assignLayer.selectionChanged = mocker.create_autospec(spec=pyqtBoundSignal)
 
     return plan

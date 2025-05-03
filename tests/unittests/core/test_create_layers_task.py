@@ -20,17 +20,9 @@
 import pathlib
 
 import pytest
-from qgis.core import (
-    QgsCoordinateReferenceSystem,
-    QgsProject,
-    QgsVectorLayer
-)
+from qgis.core import QgsCoordinateReferenceSystem, QgsProject, QgsVectorLayer
 
-from redistricting.models import (
-    RdsDataField,
-    RdsField,
-    RdsPlan
-)
+from redistricting.models import RdsDataField, RdsField, RdsPlan
 from redistricting.services.tasks.createlayers import CreatePlanLayersTask
 
 # pylint: disable=protected-access
@@ -56,7 +48,7 @@ class TestCreateLayersTask:
         p._geoLayer = layer
         p._geoJoinField = geoid_field
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
-        task = CreatePlanLayersTask(p, str(gpkg), layer, geoid_field)
+        task = CreatePlanLayersTask(p, str(gpkg))
         result = task.run()
         assert task.exception is None
         assert result
@@ -73,14 +65,14 @@ class TestCreateLayersTask:
     ])
     def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
         p = RdsPlan('test_create_layers', 5)
-        p._popLayer = block_layer
+        p._geoLayer = block_layer
         p._geoIdField = 'geoid'
         p._popField = 'pop_total'
 
         p.dataFields.extend([RdsDataField(block_layer, f) for f in datafields])
         p.geoFields.extend([RdsField(block_layer, f) for f in geofields])
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
-        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid')
+        task = CreatePlanLayersTask(p, str(gpkg))
         result = task.run()
         assert task.exception is None
         assert result
@@ -110,12 +102,12 @@ class TestCreateLayersTask:
     def test_create_layers_cancel(self, block_layer, datadir: pathlib.Path):
         p = RdsPlan('test_create_layers', 5)
         # pylint: disable=protected-access
-        p._popLayer = block_layer
+        p._geoLayer = block_layer
         p._geoIdField = 'geoid20'
         p._popField = 'pop_total'
 
         gpkg = (datadir / 'test_create_layers.gpkg').resolve()
-        task = CreatePlanLayersTask(p, str(gpkg), block_layer, 'geoid20')
+        task = CreatePlanLayersTask(p, str(gpkg))
         task.cancel()
         result = task.run()
         assert not result

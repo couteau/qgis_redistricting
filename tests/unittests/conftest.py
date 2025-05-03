@@ -47,7 +47,7 @@ def mock_district(mocker: MockerFixture):
 
 
 @pytest.fixture
-def mock_planmanager(qgis_iface, qgis_new_project, active_plan, mocker: MockerFixture):  # pylint: disable=unused-argument
+def mock_planmanager(qgis_iface, active_plan, mocker: MockerFixture):  # pylint: disable=unused-argument
     qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
     qgis_iface.addCustomActionForLayer = mocker.MagicMock()
     qgis_iface.vectorMenu = mocker.MagicMock()
@@ -67,7 +67,7 @@ def mock_planmanager(qgis_iface, qgis_new_project, active_plan, mocker: MockerFi
 
 
 @pytest.fixture
-def mock_planmanager_with_active_plan(qgis_iface, qgis_new_project, mock_district, active_plan: PropertyMock, mock_plan, mocker: MockerFixture):  # pylint: disable=unused-argument
+def mock_planmanager_with_active_plan(qgis_iface, mock_district, active_plan: PropertyMock, mock_plan, mocker: MockerFixture):  # pylint: disable=unused-argument
     qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
     qgis_iface.addCustomActionForLayer = mocker.MagicMock()
     qgis_iface.vectorMenu = mocker.MagicMock()

@@ -8,49 +8,25 @@ from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsFeatureRequest,
-    QgsVectorLayerCache
+    QgsVectorLayerCache,
 )
-from qgis.gui import (
-    QgisInterface,
-    QgsAttributeTableFilterModel,
-    QgsAttributeTableModel
-)
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QLocale,
-    QModelIndex,
-    QObject,
-    Qt
-)
+from qgis.gui import QgisInterface, QgsAttributeTableFilterModel, QgsAttributeTableModel
+from qgis.PyQt.QtCore import QAbstractItemModel, QLocale, QModelIndex, QObject, Qt
 from qgis.PyQt.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QStyledItemDelegate,
     QTableView,
-    QVBoxLayout
+    QVBoxLayout,
 )
 from qgis.utils import iface
 
-from ..models import (
-    DistrictColumns,
-    RdsGeoField,
-    RdsMetric,
-    RdsPlan
-)
-from ..models.metrics import (
-    RdsCompleteMetric,
-    RdsContiguityMetric,
-    RdsSplitsMetric
-)
+from ..models import DistrictColumns, RdsGeoField, RdsMetric, RdsPlan
+from ..models.metrics import RdsCompleteMetric, RdsContiguityMetric
+from ..models.splitsmetric import RdsSplitsMetric
 from ..utils import tr
-from . import (
-    DlgSplitDetail,
-    TableViewKeyEventFilter
-)
-from .metrics_gui import (
-    RdsMetricGuiHandler,
-    register_metric_handler
-)
+from . import DlgSplitDetail, TableViewKeyEventFilter
+from .metrics_gui import RdsMetricGuiHandler, register_metric_handler
 
 iface: QgisInterface
 

@@ -22,10 +22,7 @@ import pytest
 from pytestqt.plugin import QtBot
 from qgis.PyQt.QtCore import Qt
 
-from redistricting.models import (
-    RdsMetricsModel,
-    RdsPlan
-)
+from redistricting.models import RdsMetricsModel, RdsPlan
 from redistricting.services import PlanEditor
 
 # pylint: disable=no-self-use
@@ -50,8 +47,8 @@ class TestMetricsModel:
         (4, '0.400, 0.150, 0.800'),
         (5, '0.500, 0.100, 0.900'),
         (6, '0.500, 0.100, 0.900'),
-        (9, 'YES'),
-        (10, 'YES'),
+        (7, 'YES'),
+        (8, 'YES'),
     ])
     def test_data(self, metrics_model: RdsMetricsModel, row, value):
         data = metrics_model.data(metrics_model.createIndex(row, 0), Qt.ItemDataRole.DisplayRole)
@@ -60,9 +57,7 @@ class TestMetricsModel:
     # pylint: disable=unused-argument
     def test_signals(self, metrics_model: RdsMetricsModel, plan: RdsPlan, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignals([metrics_model.modelAboutToBeReset, metrics_model.modelReset]):
-            e = PlanEditor.fromPlan(plan)
-            e.appendGeoField('countyid')
-            e.updatePlan()
+            plan.metrics.updateFinished(0, plan)
 
     def test_clear_metrics(self, metrics_model: RdsMetricsModel, qtbot: QtBot):
         with qtbot.waitSignals([metrics_model.modelAboutToBeReset, metrics_model.modelReset]):

@@ -27,11 +27,7 @@ import inspect
 import json
 import logging
 import re
-from functools import (
-    partial,
-    reduce,
-    wraps
-)
+from functools import partial, reduce, wraps
 from io import StringIO
 from types import GenericAlias
 from typing import (
@@ -40,30 +36,28 @@ from typing import (
     Iterable,
     Mapping,
     Type,
+    TypeAlias,
     TypeVar,
     Union,
     _GenericAlias,
     _strip_annotations,
     _UnionGenericAlias,
     get_args,
-    get_origin
+    get_origin,
 )
 from uuid import UUID
 
 import pandas as pd
-from qgis.core import (
-    QgsProject,
-    QgsVectorLayer
-)
+from qgis.core import QgsProject, QgsVectorLayer
 
 _ST = TypeVar("_ST")
 
 ScalarType = Union[str, bytes, int, float, bool, None]
 JSONableType = Union[ScalarType, dict[str, "JSONableType"], list["JSONableType"], tuple["JSONableType"]]
-SimpleSerializeFunction = Callable[[_ST], JSONableType]
-SerializerFunction = Callable[[_ST, dict[int, Any], bool], JSONableType]
-SimpleDeserializeFunction = Callable[[JSONableType], _ST]
-DeserializerFunction = Callable[[type, JSONableType, Any], _ST]
+SimpleSerializeFunction: TypeAlias = Callable[[_ST], JSONableType]
+SerializerFunction: TypeAlias = Callable[[_ST, dict[int, Any], bool], JSONableType]
+SimpleDeserializeFunction: TypeAlias = Callable[[JSONableType], _ST]
+DeserializerFunction: TypeAlias = Callable[[type, JSONableType, Any], _ST]
 
 
 def wrap_simple_serializer(f):

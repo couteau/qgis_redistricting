@@ -60,7 +60,7 @@ class TestPluginInit:
         return plugin_with_gui
 
     @pytest.fixture
-    def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, mocker: MockerFixture, qgis_new_project):  # pylint: disable=unused-argument
+    def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, mocker: MockerFixture):
         dlg = mocker.patch('redistricting.redistricting.QMessageBox')
         dlg.return_value.warning.return_value = QMessageBox.StandardButton.Ok
         project = QgsProject.instance()

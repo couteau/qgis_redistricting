@@ -23,18 +23,11 @@
  ***************************************************************************/
 """
 from dataclasses import dataclass
-from typing import (
-    Any,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Union
-)
+from typing import Any, Iterable, List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
-from qgis.core import QgsApplication
+from qgis.core import QgsApplication, QgsCategorizedSymbolRenderer
 from qgis.PyQt.QtCore import (
     QAbstractItemModel,
     QAbstractListModel,
@@ -45,7 +38,7 @@ from qgis.PyQt.QtCore import (
     QSize,
     QSortFilterProxyModel,
     Qt,
-    QVariant
+    QVariant,
 )
 from qgis.PyQt.QtGui import (
     QBrush,
@@ -54,44 +47,36 @@ from qgis.PyQt.QtGui import (
     QFontMetrics,
     QIcon,
     QPainter,
-    QPixmap
+    QPalette,
+    QPixmap,
 )
 
 from ..utils import tr
-from .base.lists import KeyedList
-from .colors import getColorForDistrict
-from .columns import (
-    DistrictColumns,
-    FieldCategory,
-    FieldColors,
-    MetricsColumns
-)
+from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
 from .delta import DeltaList
 from .district import RdsDistrict
-from .field import (
-    RdsDataField,
-    RdsField
-)
-from .metricslist import (
-    MetricLevel,
-    RdsMetric,
-    RdsMetrics
-)
-from .plan import (
-    DeviationType,
-    RdsPlan
-)
-from .splits import (
-    RdsSplitBase,
-    RdsSplitDistrict,
-    RdsSplitGeography,
-    RdsSplits
-)
+from .field import RdsDataField, RdsField
+from .metricslist import MetricLevel, RdsMetric, RdsMetrics
+from .plan import DeviationType, RdsPlan
+from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
 from .validators import (
     BaseDeviationValidator,
     MaxDeviationValidator,
-    PlusMinusDeviationValidator
+    PlusMinusDeviationValidator,
 )
+
+
+def getColorForDistrict(plan: RdsPlan, district: int):
+    renderer = plan.assignLayer.renderer()
+    if isinstance(renderer, QgsCategorizedSymbolRenderer):
+        idx = renderer.categoryIndexForValue(district)
+        if idx == -1:
+            idx = 0
+
+        cat = renderer.categories()[idx]
+        return QColor(cat.symbol().color())
+
+    return QColor(QPalette().color(QPalette.ColorGroup.Normal, QPalette.ColorRole.Window))
 
 
 @dataclass
@@ -114,7 +99,6 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self._validator: BaseDeviationValidator = None
         self.plan = plan
 
-    @property
     @property
     def plan(self) -> RdsPlan:
         return self._plan
@@ -202,7 +186,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             return 0
 
         return len(self._columns)
-
+    
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         value = None
         try:
@@ -734,7 +718,7 @@ class PopFieldsModel(QAbstractListModel):
 class RdsMetricsModel(QAbstractTableModel):
     def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._data: KeyedList[RdsMetric] = KeyedList()
+        self._data: dict[str, RdsMetric] = {}
         self._plan = None
         self._metrics: RdsMetrics = None
         self.setPlan(plan)
@@ -757,7 +741,7 @@ class RdsMetricsModel(QAbstractTableModel):
         self.headerDataChanged.emit(Qt.Orientation.Vertical, 0, self.rowCount())
 
     def updateModel(self):
-        self._data = KeyedList()
+        self._data: dict[str, RdsMetric] = {}
         if self._metrics is None:
             return
 
@@ -803,7 +787,7 @@ class RdsMetricsModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if orientation == Qt.Orientation.Vertical and role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.SizeHintRole):
 
-            m = self._data[section]
+            m = list(self._data.values())[section]
             if m is None:
                 # it's a group or a geographic metric header
                 header = self.metricKey(section)
@@ -856,13 +840,13 @@ class RdsMetricsModel(QAbstractTableModel):
         if self._metrics is None or not index.isValid() or index.column() != 0:
             return None
 
-        return self._data[index.row()]
+        return list(self._data.values())[index.row()]
 
     def metricKey(self, section: int):
         if self._metrics is None or not 0 <= section < len(self._data):
             return None
 
-        return self._data.get_key(section)
+        return list(self._data.keys())[section]
 
     def mimeTypes(self) -> List[str]:
         return ['text/csv', 'text/plain']
@@ -884,7 +868,7 @@ class RdsSplitsModel(QAbstractItemModel):
         self._splits.splitUpdating.connect(self.beginResetModel)
         self._splits.splitUpdated.connect(self.endResetModel)
         self._data: pd.DataFrame = splits.data
-        self._header = [self._splits.geoField.caption, tr("Districts"), tr('Population')]
+        self._header = [self._splits.caption, tr("Districts"), tr('Population')]
         self._header.extend(f.caption for f in fields)
 
     def rowCount(self, parent: QModelIndex = ...) -> int:

@@ -1,6 +1,3 @@
-import functools
-import timeit
-
 import redistricting.utils.layer
 
 
@@ -8,11 +5,8 @@ import redistricting.utils.layer
 class TestLayerReader:
     def test_readqgis(self, block_layer):
         reader = redistricting.utils.layer.LayerReader(block_layer)
-
-        t1 = timeit.timeit(reader.read_qgis, number=20)
-        print(t1)
+        reader.read_qgis()
 
     def test_gpd_read(self, block_layer):
         reader = redistricting.utils.layer.LayerReader(block_layer)
-        t2 = timeit.timeit(functools.partial(reader.gpd_read, chunksize=-1), number=20)
-        print(t2)
+        reader.gpd_read(chunksize=-1)

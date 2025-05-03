@@ -143,6 +143,11 @@ class MetricsColumns(metaclass=ConstantsMeta):
     CONVEXHULL = ConstStr("convexhull", tr("Convex Hull"))
     PIECES = ConstStr("pieces", tr("Pieces"))
 
-    @ classmethod
+    @classmethod
     def CompactnessScores(cls) -> Iterable[ConstStr]:
         return MetricsColumns.POLSBYPOPPER, MetricsColumns.REOCK, MetricsColumns.CONVEXHULL
+
+
+class DeviationType(IntEnum):
+    OverUnder = 0
+    TopToBottom = 1

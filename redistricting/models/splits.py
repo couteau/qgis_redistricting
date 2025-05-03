@@ -24,26 +24,12 @@
 """
 from abc import abstractmethod
 from functools import partial
-from typing import (
-    Any,
-    Optional,
-    Sequence,
-    Union
-)
+from typing import Any, Optional, Sequence, Union
 
 import pandas as pd
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import pyqtSignal
 
-from .base.model import (
-    MISSING,
-    Factory,
-    RdsBaseModel,
-    rds_property
-)
-from .field import RdsGeoField
+from .base.model import Factory, RdsBaseModel, rds_property
 
 
 class RdsSplitBase:
@@ -136,15 +122,8 @@ class RdsSplits(RdsBaseModel):
     splitUpdated = pyqtSignal()
 
     field: str
+    caption: str = rds_property(default=None)
     data: pd.DataFrame = Factory(partial(pd.DataFrame, index=pd.RangeIndex(0)), False)
-    geoField: RdsGeoField = rds_property(private=True, serialize=False, default=None)
-
-    def __init__(self, field: Union[str, RdsGeoField], data: pd.DataFrame = MISSING, parent: Optional[QObject] = None):
-        if isinstance(field, RdsGeoField):
-            super().__init__(field=field.field, data=data, parent=parent)
-            self.geoField = field
-        else:
-            super().__init__(field=field, data=data, parent=parent)
 
     def __post_init__(self, **kwargs):
         if self.data is not None:
@@ -160,10 +139,24 @@ class RdsSplits(RdsBaseModel):
 
     def __key__(self):
         return self.field
+    
+    @caption.getter
+    def caption(self):
+        return self._caption or self.field.capitalize()
+    
+    @caption.setter
+    def caption(self, value: Optional[str]):
+        if value is None or value == self.field:
+            self._caption = None
+        else:
+            self._caption = value
+
+    def updateCaption(self):
+        self.caption = self.sender().caption
 
     def index(self, item: RdsSplitGeography):
-        if not item.geoid in self.data.index.get_level_values(0):
-            raise IndexError(f"No split for {self.geoField.caption} {item.geoid!r}")
+        if item.geoid not in self.data.index.get_level_values(0):
+            raise IndexError(f"No split for {self.caption} {item.geoid!r}")
 
         return self.data.index.get_level_values(0).unique().get_loc(item.geoid)
 

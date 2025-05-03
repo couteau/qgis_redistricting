@@ -27,64 +27,46 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 from itertools import islice
-from typing import (
-    TYPE_CHECKING,
-    Any
-)
+from typing import TYPE_CHECKING, Any
 
 import geopandas as gpd
 from qgis.core import (
     QgsExpressionContext,
     QgsExpressionContextUtils,
     QgsField,
-    QgsVectorLayer
+    QgsVectorLayer,
 )
 from qgis.PyQt.QtCore import QMetaType
 
 from ... import CanceledError
-from ...models import (
-    DistrictColumns,
-    MetricLevel,
-    base_metrics,
-    camel_to_snake
-)
-from ...utils import (
-    createGeoPackage,
-    createGpkgTable,
-    spatialite_connect,
-    tr
-)
+from ...models import DistrictColumns, MetricLevel, camel_to_snake
+from ...utils import createGeoPackage, createGpkgTable, spatialite_connect, tr
 from ..districtio import DistrictReader
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
-    from ...models import (
-        RdsGeoField,
-        RdsPlan
-    )
+    from ...models import RdsGeoField, RdsPlan
 
 
 class CreatePlanLayersTask(AggregateDataTask):
-    def __init__(self, plan: RdsPlan, gpkgPath, geoLayer: QgsVectorLayer, geoJoinField: str):
+    def __init__(self, plan: RdsPlan, gpkgPath):
         super().__init__(plan, tr('Create assignments layer'))
         self.path = gpkgPath
 
         self.assignFields = []
-        self.numDistricts = plan.numDistricts
 
-        self.geoLayer: QgsVectorLayer = geoLayer  # None
+        self.geoLayer: QgsVectorLayer = plan.geoLayer  # None
+        self.geoJoinField = plan.geoJoinField
         self.geoField: QgsField = None
-        self.geoJoinField = geoJoinField
-        self.geoFields: list[RdsGeoField] = list(plan.geoFields)
 
-        authid = geoLayer.sourceCrs().authid()
+        authid = self.geoLayer.sourceCrs().authid()
         _, srid = authid.split(':', 1)
         self.srid = int(srid)
 
         self.popTotals = {}
 
-        self.setDependentLayers(l for l in (self.geoLayer, self.popLayer) if l is not None)
+        self.setDependentLayers(lyr for lyr in (self.geoLayer, self.popLayer) if lyr is not None)
 
     def validatePopFields(self, popLayer: QgsVectorLayer):
         popFields = popLayer.fields()
@@ -116,7 +98,7 @@ class CreatePlanLayersTask(AggregateDataTask):
                           QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
                           QMetaType.Type.SChar, QMetaType.Type.UChar):
             poptype = 'INTEGER'
-        elif fld.type() in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
+        elif fld.type() in (QMetaType.Type.Float, QMetaType.Type.Double):
             poptype = 'REAL'
         else:
             raise ValueError(f'RdsField {self.popField} has invalid field type for population field')
@@ -131,7 +113,7 @@ class CreatePlanLayersTask(AggregateDataTask):
             f'{DistrictColumns.PCT_DEVIATION} REAL DEFAULT 0'
         ]
 
-        fieldNames = {self.distField, 'name', 'members', self.popField, 'deviation', 'pct_deviation'}
+        fieldNames = {self.distField, DistrictColumns.NAME, DistrictColumns.MEMBERS, self.popField, DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}
 
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.popLayer))
@@ -148,10 +130,9 @@ class CreatePlanLayersTask(AggregateDataTask):
                      QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
                      QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
+            elif t in (QMetaType.Type.Float, QMetaType.Type.Double):
                 tp = 'REAL'
-            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
-                       QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
+            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar, QMetaType.Type.Char):
                 tp = 'TEXT'
             else:
                 continue
@@ -171,7 +152,7 @@ class CreatePlanLayersTask(AggregateDataTask):
                      QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
                      QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t in (QMetaType.Type.Float, QMetaType.Type.Float16, QMetaType.Type.Double):
+            elif t in (QMetaType.Type.Float, QMetaType.Type.Double):
                 tp = 'REAL'
             else:
                 continue
@@ -184,7 +165,7 @@ class CreatePlanLayersTask(AggregateDataTask):
             if name in fieldNames:
                 continue
 
-            if m.level() == MetricLevel.DISTRICT and m.serialize() and m.name() not in base_metrics:
+            if m.level() == MetricLevel.DISTRICT and m.serialize() and m.name() not in fieldNames:
                 if m.get_type() in (int, bool):
                     tp = "INTEGER"
                 elif m.get_type is float:
@@ -224,8 +205,7 @@ class CreatePlanLayersTask(AggregateDataTask):
                  QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
                  QMetaType.Type.SChar, QMetaType.Type.UChar):
             tp = 'INTEGER'
-        elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
-                   QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
+        elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar, QMetaType.Type.Char):
             tp = 'TEXT'
         else:
             return False
@@ -250,8 +230,7 @@ class CreatePlanLayersTask(AggregateDataTask):
                      QMetaType.Type.Bool, QMetaType.Type.QDate, QMetaType.Type.QTime, QMetaType.Type.QDateTime,
                      QMetaType.Type.SChar, QMetaType.Type.UChar):
                 tp = 'INTEGER'
-            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar,
-                       QMetaType.Type.Char, QMetaType.Type.Char16, QMetaType.Type.Char32):
+            elif t in (QMetaType.Type.QString, QMetaType.Type.QByteArray, QMetaType.Type.QChar, QMetaType.Type.Char):
                 tp = 'TEXT'
             else:
                 continue
