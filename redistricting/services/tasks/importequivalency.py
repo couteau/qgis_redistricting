@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to create plan layers
 
         begin                : 2022-01-15
@@ -22,24 +21,20 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
-import csv
-import os
-from contextlib import closing
-from typing import TYPE_CHECKING
+import pathlib
+from sqlite3 import DatabaseError
+from typing import TYPE_CHECKING, Union
 
-from osgeo import gdal
-from qgis.core import (
-    Qgis,
-    QgsMessageLog,
-    QgsTask,
-    QgsVectorLayer
-)
-from qgis.utils import spatialite_connect
+import geopandas as gpd
+import pandas as pd
+from qgis.core import Qgis, QgsMessageLog, QgsTask, QgsVectorLayer
+from qgis.PyQt.QtCore import QMetaType
 
-from ... import CanceledError
-from ...utils import tr
+from ...errors import CanceledError
+from ...utils import spatialite_connect, tr
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
@@ -47,18 +42,18 @@ if TYPE_CHECKING:
 
 
 class ImportAssignmentFileTask(QgsTask):
-    def __init__(
-            self,
-            plan: RdsPlan,
-            equivalencyFile,
-            headerRow=True,
-            geoColumn=0,
-            distColumn=1,
-            delimiter=',',
-            quotechar='"',
-            joinField=None
+    def __init__(  # noqa: PLR0913
+        self,
+        plan: RdsPlan,
+        equivalencyFile: Union[str, pathlib.Path],
+        headerRow=True,
+        geoColumn=0,
+        distColumn=1,
+        delimiter=",",
+        quotechar='"',
+        joinField=None,
     ):
-        super().__init__(tr('Import assignment file'), QgsTask.AllFlags)
+        super().__init__(tr("Import assignment file"), QgsTask.AllFlags)
 
         self.assignLayer: QgsVectorLayer = plan.assignLayer
         self.setDependentLayers((self.assignLayer,))
@@ -66,7 +61,7 @@ class ImportAssignmentFileTask(QgsTask):
         self.distField: str = plan.distField
         self.geoIdField: str = plan.geoIdField
         self.geoPackagePath: str = plan.geoPackagePath
-        self.equivalencyFile = equivalencyFile
+        self.equivalencyFile = pathlib.Path(equivalencyFile) if isinstance(equivalencyFile, str) else equivalencyFile
         self.headerRow = headerRow
         self.geoColumn = geoColumn
         self.distColumn = distColumn
@@ -76,82 +71,75 @@ class ImportAssignmentFileTask(QgsTask):
         self.exception: Exception = None
 
     def run(self) -> bool:
-        def makeTuple(tup):
+        def updateProgress(iterator):
             nonlocal progress
-            if self.isCanceled():
-                raise CanceledError()
+            for tup in iterator:
+                if self.isCanceled():
+                    raise CanceledError()
 
-            progress += 1
-            self.setProgress(100*progress/total)
-            return tup
+                progress += 1
+                self.setProgress(100 * progress / total)
+                yield tup
 
         debug_thread()
 
-        oldHeaders = False
-        csvfile = None
+        fGeo = self.assignLayer.fields()[self.geoIdField]
+        geoType = str if fGeo.type() == QMetaType.Type.QString else int
+        fDist = self.assignLayer.fields()[self.distField]
+        distType = str if fDist.type() == QMetaType.Type.QString else int
+
+        converters = {self.geoColumn: geoType, self.distColumn: distType}
+
+        if not self.equivalencyFile.exists():
+            self.exception = FileNotFoundError(f"File {self.equivalencyFile} does not exist")
+            return False
+
+        if self.equivalencyFile.suffix in (".xls", ".xlsx", ".xlsm", ".ods"):
+            assignments = pd.read_excel(
+                self.equivalencyFile,
+                header=0 if self.headerRow else None,
+                usecols=(self.geoColumn, self.distColumn),
+                converters=converters,
+            )
+        elif self.equivalencyFile.suffix in (".csv", ".txt"):
+            try:
+                assignments = pd.read_csv(
+                    self.equivalencyFile,
+                    header=0 if self.headerRow else None,
+                    delimiter=self.delimiter,
+                    quotechar=self.quotechar,
+                    skipinitialspace=True,
+                    usecols=(self.geoColumn, self.distColumn),
+                    converters=converters,
+                )
+            except (ValueError, pd.errors.ParserError, pd.errors.EmptyDataError) as e:
+                self.exception = e
+                return False
+        elif self.equivalencyFile.suffix == ".shp":
+            assignments = gpd.read_file(self.equivalencyFile, columns=(self.geoColumn, self.distColumn))
+        else:
+            self.exception = ValueError(tr("Unsupported file type for import"))
+            return False
+
         try:
-            total = 1
+            total = len(assignments)
             progress = 0
 
-            if not os.path.exists(self.equivalencyFile):
-                return False
+            with spatialite_connect(self.geoPackagePath) as db:
+                sql = f'UPDATE assignments SET "{self.distField}" = ? WHERE "{self.joinField}" == ?'  # noqa: S608
 
-            _, ext = os.path.splitext(self.equivalencyFile)
-            if ext in ('.xls', '.xlsx', '.xlsm', '.ods'):
-                headerConfigKey = 'OGR_XLS_HEADERS' if ext == '.xls' \
-                    else 'OGR_XLSX_HEADERS' if ext in ('.xlsx', '.xlsm') \
-                    else 'OGR_ODS_HEADERS'
-                oldHeaders = gdal.GetConfigOption(headerConfigKey)
-                gdal.SetConfigOption(headerConfigKey, 'FORCE' if self.headerRow else 'DISABLE')
-                l = QgsVectorLayer(str(self.equivalencyFile), '__import', 'ogr')
-                total = l.featureCount()
-                generator = (makeTuple((f[self.distColumn], f[self.geoColumn])) for f in l.getFeatures())
-            elif ext in ('.csv', '.txt'):
-                with open(self.equivalencyFile, encoding='utf-8-sig') as f:
-                    total = sum(1 for l in f) or 1
-
-                csvfile = open(self.equivalencyFile,  # pylint: disable=consider-using-with
-                               newline='',
-                               encoding='utf-8-sig')
-                dialect = csv.Sniffer().sniff(csvfile.read(1024))
-                if self.delimiter is not None:
-                    dialect.delimiter = self.delimiter
-                if self.quotechar is not None:
-                    dialect.quotechar = self.quotechar
-                dialect.skipinitialspace = True
-                csvfile.seek(0)
-                dist = csv.reader(csvfile, dialect=dialect)
-                if self.headerRow:
-                    next(dist)
-
-                generator = (makeTuple((l[self.distColumn], l[self.geoColumn])) for l in dist)
-            else:
-                self.exception = ValueError(tr('Unsupported file type for import'))
-                return False
-
-            with closing(spatialite_connect(self.geoPackagePath)) as db:
-                sql = f"UPDATE assignments SET {self.distField} = ? WHERE {self.joinField} == ?"
-
-                db.executemany(sql, generator)
+                db.executemany(sql, updateProgress(assignments.itertuples(index=False)))
                 db.commit()
         except CanceledError:
             return False
-        except Exception as e:  # pylint: disable=broad-except
+        except DatabaseError as e:
             self.exception = e
             return False
-        finally:
-            if csvfile:
-                csvfile.close()
-            if oldHeaders is not False and self.headerRow:
-                gdal.SetConfigOption(headerConfigKey, oldHeaders)
 
-        self.setProgress(100)
         return True
 
     def finished(self, result: bool):
         if result:
             self.assignLayer.reload()
         elif self.exception:
-            QgsMessageLog.logMessage(
-                f'{self.exception!r}', 'Redistricting', Qgis.MessageLevel.Critical
-            )
+            QgsMessageLog.logMessage(f"{self.exception!r}", "Redistricting", Qgis.MessageLevel.Critical)
