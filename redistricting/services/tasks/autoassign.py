@@ -1,17 +1,35 @@
+"""QGIS Redistricting Plugin - background task to autoassign unassigned geography
+
+        begin                : 2025-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2025 by Stuart C. Naifeh
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 
 from typing import NamedTuple
 
-from qgis.core import (
-    QgsTask,
-    QgsVectorLayer
-)
+import geopandas as gpd
+import libpysal
+from qgis.core import QgsTask, QgsVectorLayer
 
-from ... import CanceledError
-from ...utils import (
-    LayerReader,
-    SqlAccess,
-    tr
-)
+from ...errors import CanceledError
+from ...utils import LayerReader, SqlAccess, tr
 from ._debug import debug_thread
 
 
@@ -27,6 +45,9 @@ class AutoAssignUnassignedUnits(SqlAccess, QgsTask):
         super().__init__(tr("Auto assign unassigned units"))
         self.assignments = assignments
         self.distField = distField
+        self.distIndex = assignments.fields().lookupField(self.distField)
+        if self.distIndex == -1:
+            raise ValueError("Invalid district field")
         self.update: dict[int, int] = None
         self.indeterminate: list[Row] = None
         self.retry: list[Row] = None
@@ -37,88 +58,52 @@ class AutoAssignUnassignedUnits(SqlAccess, QgsTask):
 
         try:
             reader = LayerReader(self.assignments, self)
-            missing = reader.read_layer(columns=["fid", "geoid", self.distField],
-                                        filt={self.distField: 0}, read_geometry=True, fid_as_index=True) \
-                .reset_index() \
+            assignments = (
+                reader.read_layer(
+                    columns=["fid", "geoid", self.distField],
+                    read_geometry=True,
+                    fid_as_index=True,
+                )
+                .reset_index()
                 .rename(columns={self.distField: "district"})
+            )
+            unassigned = assignments[assignments["distrct"] == 0]
+            assigned = assignments[assignments["distrct"] != 0]
 
-            if len(missing) == self.assignments.featureCount():
-                # No units are assigned -- don't waste our time
-                raise RuntimeError("Can't infer districts for unassigned units when no units are assigned")
+            # group Rook-adjacent unassigned units
+            weights = libpysal.weights.Rook.from_dataframe(unassigned, use_index=False)
+            unassigned = unassigned[["fid", "geometry"]].dissolve(by=weights.component_labels, aggfunc=list)
+            unassigned["area_geom"] = unassigned.geometry
 
-            # find polygons that are adjacent by more than a point
-            sql = f"""SELECT fid, geoid, {self.distField} AS district FROM assignments
-                        WHERE ST_relate(geometry, GeomFromText(:geometry), 'F***1****')
-                            AND fid IN (
-                                SELECT id FROM rtree_assignments_geometry r
-                                    WHERE r.minx < st_maxx(GeomFromText(:geometry))
-                                        AND r.maxx >= st_minx(GeomFromText(:geometry))
-                                        AND r.miny < st_maxy(GeomFromText(:geometry))
-                                        AND r.maxy >= st_miny(GeomFromText(:geometry))
-                                )"""
+            unassigned = (
+                gpd.sjoin(assigned[["district", "geometry"]], unassigned, predicate="touches")
+                .rename(columns={"index_right": "group", "fid_right": "fids"})
+                .dissolve(by=["group", "district"])
+            )
+            # TODO: potentially use amount of the cluster bordered by each district to determine which district to assign
+            unassigned["length"] = unassigned.geometry.intersection(unassigned["area_geom"]).length
+            unassigned = (
+                unassigned.drop(columns=["geometry", "area_geom"])  # drop the geometry columns
+                .drop(unassigned[unassigned["length"] == 0].index)  # drop districts that are only connected by a point
+                .reset_index()
+                .groupby("group")
+                .agg({"district": list, "length": list, "fids": "first"})
+            )
 
-            with self._connectSqlOgrSqlite(self.assignments.dataProvider()) as db:
-                db.row_factory = lambda c, r: Row(*r)
-                update: dict[int, int] = {}
-                retry: list[Row] = []
-                indeterminate: list[Row] = []
-                count = 0
-                total = len(missing)
-                for g in missing.to_wkt().itertuples(index=False, name="Row"):
-                    neighbors: list[Row] = db.execute(sql, (g.geometry,)).fetchall()
-                    dists = set(r.district for r in neighbors)
+            update = {}
+            indeterminate = []
+            for group, district, length, fids in unassigned.itertuples(index=True):
+                if len(district) == 1:
+                    # if the poygon grouping only borders one other district, we can automatically assign
+                    update.update({f: {self.distIndex: district[0]} for f in fids})
+                else:
+                    # if the grouping borders more than one district, we don't automatically assign
+                    indeterminate.extend(fids)
 
-                    # is the unassigned unit surrounded by units from the same district or
-                    # unassigned units (but not entirely by unassigned units)
-                    if len(dists) == 1 and 0 in dists:
-                        retry.append(g)
-                    elif len(dists) == 1 or (len(dists) == 2 and 0 in dists):
-                        newdist = max(dists)
-                        if g.fid in update:
-                            print("oops")
-                        update[g.fid] = newdist
-                    else:
-                        # multiple adjacent districts
-                        indeterminate.append(g)
+            self.assignments.dataProvider().changeAttributeValues(update)
 
-                    if self.isCanceled():
-                        raise CanceledError()
-
-                    count += 1
-                    self.setProgress(count/total)
-
-                # TODO: there's probably a better way to to find the surrounding assigned units than continually looping
-                while retry:
-                    retry_count = len(retry)
-                    newretry: list[Row] = []
-                    for g in retry:
-                        neighbors: list[Row] = db.execute(sql, (g.geometry,)).fetchall()
-                        dists = set(update.get(r.fid, r.district) for r in neighbors)
-
-                        # is the unassigned unit surrounded by units from the same district or
-                        # unassigned units (but not entirely by unassigned units)
-                        if len(dists) == 1 and 0 in dists:
-                            newretry.append(g)
-                        elif len(dists) == 1 or (len(dists) == 2 and 0 in dists):
-                            newdist = max(dists)
-                            if g.fid in update:
-                                print("oops")
-                            update[g.fid] = newdist
-                        else:
-                            # multiple adjacent districts
-                            indeterminate.append(g)
-
-                        if self.isCanceled():
-                            raise CanceledError()
-
-                    retry = newretry
-                    if len(retry) == retry_count:
-                        # if we were unable to assign any of the as-yet unassigned units, give up
-                        break
-
-                self.update = update
-                self.indeterminate = indeterminate
-                self.retry = retry
+            self.update = update
+            self.indeterminate = indeterminate
         except CanceledError:
             return False
         except Exception as e:  # pylint: disable=broad-except
