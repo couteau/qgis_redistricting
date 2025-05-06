@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - table model wrapping a list of district deltas
 
         begin                : 2022-01-15
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional, Sequence, Union
 
@@ -40,16 +40,7 @@ from qgis.PyQt.QtCore import (
     Qt,
     QVariant,
 )
-from qgis.PyQt.QtGui import (
-    QBrush,
-    QColor,
-    QFont,
-    QFontMetrics,
-    QIcon,
-    QPainter,
-    QPalette,
-    QPixmap,
-)
+from qgis.PyQt.QtGui import QBrush, QColor, QFont, QFontMetrics, QIcon, QPainter, QPalette, QPixmap
 
 from ..utils import tr
 from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
@@ -59,11 +50,7 @@ from .field import RdsDataField, RdsField
 from .metricslist import MetricLevel, RdsMetric, RdsMetrics
 from .plan import DeviationType, RdsPlan
 from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
-from .validators import (
-    BaseDeviationValidator,
-    MaxDeviationValidator,
-    PlusMinusDeviationValidator,
-)
+from .validators import BaseDeviationValidator, MaxDeviationValidator, PlusMinusDeviationValidator
 
 
 def getColorForDistrict(plan: RdsPlan, district: int):
@@ -105,22 +92,27 @@ class RdsDistrictDataModel(QAbstractTableModel):
 
     def updatePlanFields(self):
         self.beginResetModel()
-        self._columns = [DistrictColumnData(d, d.comment, FieldCategory.Population)
-                         for d in DistrictColumns
-                         if d != DistrictColumns.DISTRICT]
+        self._columns = [
+            DistrictColumnData(d, d.comment, FieldCategory.Population)
+            for d in DistrictColumns
+            if d != DistrictColumns.DISTRICT
+        ]
         self._columns[0].heading = DistrictColumns.DISTRICT.comment  # pylint: disable=no-member
-        self._columns.extend(DistrictColumnData(field.fieldName, field.caption, field.category)
-                             for field in self._plan.popFields)
+        self._columns.extend(
+            DistrictColumnData(field.fieldName, field.caption, field.category) for field in self._plan.popFields
+        )
 
         for field in self._plan.dataFields:
             fn = field.fieldName
             if field.sumField:
                 self._columns.append(DistrictColumnData(field.fieldName, field.caption, field.category))
             if field.pctBase is not None:
-                self._columns.append(DistrictColumnData(f"pct_{fn}", f"%{field.caption}", field.category))
+                self._columns.append(DistrictColumnData(f'pct_{fn}', f'%{field.caption}', field.category))
 
-        self._columns.extend(DistrictColumnData(c, c.comment, FieldCategory.Metrics)  # pylint: disable=no-member
-                             for c in MetricsColumns.CompactnessScores())
+        self._columns.extend(
+            DistrictColumnData(c, c.comment, FieldCategory.Metrics)  # pylint: disable=no-member
+            for c in MetricsColumns.CompactnessScores()
+        )
 
         self.endResetModel()
 
@@ -141,9 +133,11 @@ class RdsDistrictDataModel(QAbstractTableModel):
         if self._plan:
             self._districts = self._plan.districts
             self.updatePlanFields()
-            self._validator = PlusMinusDeviationValidator(self._plan) \
-                if self._plan.deviationType == DeviationType.OverUnder \
+            self._validator = (
+                PlusMinusDeviationValidator(self._plan)
+                if self._plan.deviationType == DeviationType.OverUnder
                 else MaxDeviationValidator(self._plan)
+            )
             self._plan.districtDataChanged.connect(self.districtChanged)
             self._plan.dataFieldsChanged.connect(self.updatePlanFields)
             self._plan.popFieldsChanged.connect(self.updatePlanFields)
@@ -157,15 +151,19 @@ class RdsDistrictDataModel(QAbstractTableModel):
         self.endResetModel()
 
     def deviationChanged(self):
-        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
-            self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
+        self.dataChanged.emit(
+            self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole]
+        )
 
     def deviationTypeChanged(self):
-        self._validator = PlusMinusDeviationValidator(self._plan) \
-            if self._plan.deviationType == DeviationType.OverUnder \
+        self._validator = (
+            PlusMinusDeviationValidator(self._plan)
+            if self._plan.deviationType == DeviationType.OverUnder
             else MaxDeviationValidator(self._plan)
-        self.dataChanged.emit(self.createIndex(1, 1), self.createIndex(
-            self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole])
+        )
+        self.dataChanged.emit(
+            self.createIndex(1, 1), self.createIndex(self.rowCount() - 1, 4), [Qt.ItemDataRole.BackgroundRole]
+        )
 
     def districtListChanged(self):
         self.beginResetModel()
@@ -175,8 +173,9 @@ class RdsDistrictDataModel(QAbstractTableModel):
         row = self._districts.index(district)
         start = self.createIndex(row, 1)
         end = self.createIndex(row, self.columnCount())
-        self.dataChanged.emit(start, end, {Qt.ItemDataRole.DisplayRole,
-                              Qt.ItemDataRole.EditRole, Qt.ItemDataRole.BackgroundRole})
+        self.dataChanged.emit(
+            start, end, {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, Qt.ItemDataRole.BackgroundRole}
+        )
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._districts) if self._districts and not parent.isValid() else 0
@@ -186,8 +185,9 @@ class RdsDistrictDataModel(QAbstractTableModel):
             return 0
 
         return len(self._columns)
-    
-    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+
+    # pylint: disable=too-many-statements
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):  # noqa: PLR0912, PLR0915
         value = None
         try:
             row = index.row()
@@ -228,16 +228,19 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 if col == 0 or district.district == 0:
                     color = getColorForDistrict(self._plan, district.district)
                     value = QBrush(color)
-                elif col in {int(DistrictColumns.POPULATION), int(DistrictColumns.DEVIATION), int(DistrictColumns.PCT_DEVIATION)}:
+                elif col in {
+                    int(DistrictColumns.POPULATION),
+                    int(DistrictColumns.DEVIATION),
+                    int(DistrictColumns.PCT_DEVIATION),
+                }:
                     if self._validator.validateDistrict(district):
-                        color = QColor(0x60, 0xbd, 0x63)  # QColor(99, 196, 101)  # 60be63ff
+                        color = QColor(0x60, 0xBD, 0x63)  # QColor(99, 196, 101)  # 60be63ff
                         value = QBrush(color)
 
             elif role == Qt.ItemDataRole.FontRole:
                 # bold for district name and deviations (except for the unassigned row)
                 if col == 0 or (
-                        district.district != 0 and
-                        key in {DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}
+                    district.district != 0 and key in {DistrictColumns.DEVIATION, DistrictColumns.PCT_DEVIATION}
                 ):
                     value = QFont()
                     value.setBold(True)
@@ -252,13 +255,17 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 if col == 0 or district.district == 0:
                     value = QColor(55, 55, 55)
 
-        except Exception as e:  # pylint: disable=broad-exception-caught, unused-variable
+        except Exception as e:  # noqa  # pylint: disable=broad-exception-caught, unused-variable
             return None
 
         return value
 
     def setData(self, index: QModelIndex, value: Any, role: int) -> bool:
-        if role == Qt.ItemDataRole.EditRole and self._columns[index.column()].key == DistrictColumns.NAME and index.row() != 0:
+        if (
+            role == Qt.ItemDataRole.EditRole
+            and self._columns[index.column()].key == DistrictColumns.NAME
+            and index.row() != 0
+        ):
             dist = self._districts[index.row()]
             dist.name = value
             self.dataChanged.emit(index, index, {Qt.ItemDataRole.EditRole})
@@ -267,7 +274,11 @@ class RdsDistrictDataModel(QAbstractTableModel):
         return False
 
     def headerData(self, section, orientation: Qt.Orientation, role):
-        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal and section < len(self._columns):
+        if (
+            role == Qt.ItemDataRole.DisplayRole
+            and orientation == Qt.Orientation.Horizontal
+            and section < len(self._columns)
+        ):
             return self._columns[section].heading
 
         return None
@@ -288,7 +299,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
                 self.dataChanged.emit(
                     self.createIndex(d, 3),
                     self.createIndex(d, self.columnCount()),
-                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
+                    [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole],
                 )
                 self.dataChanged.emit(self.createIndex(d, 4), self.createIndex(d, 5), [Qt.ItemDataRole.FontRole])
         else:
@@ -372,7 +383,7 @@ class DistrictSelectModel(QAbstractListModel):
         if index < self._offset:
             dist = self._districts[0] if index == 1 else None
         elif index > self._offset:
-            dist = self._districts[index-2]
+            dist = self._districts[index - 2]
         else:
             dist = None
 
@@ -381,7 +392,8 @@ class DistrictSelectModel(QAbstractListModel):
     def rowCount(self, parent: QModelIndex):  # pylint: disable=unused-argument
         return len(self._districts) + self._offset
 
-    def data(self, index: QModelIndex, role: int = ...) -> Any:
+    # pylint: disable=too-many-return-statements
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole) -> Any:  # noqa: PLR0911, PLR0912
         row = index.row()
 
         if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
@@ -399,7 +411,7 @@ class DistrictSelectModel(QAbstractListModel):
                 return QgsApplication.getThemeIcon('/mActionSelectAll.svg')
 
             if row == 1 or row > self._offset:
-                dist = 0 if row == 1 else row-self._offset
+                dist = 0 if row == 1 else row - self._offset
                 color = getColorForDistrict(self._plan, self._districts[dist].district)
                 pixmap = QPixmap(64, 64)
                 pixmap.fill(Qt.transparent)
@@ -425,6 +437,9 @@ class DistrictSelectModel(QAbstractListModel):
         return flags
 
 
+PAINT_SELECTED = 2
+
+
 class SourceDistrictModel(DistrictSelectModel):
     def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(plan, parent)
@@ -434,7 +449,7 @@ class SourceDistrictModel(DistrictSelectModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if row == 2:
+        if row == PAINT_SELECTED:
             if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
                 return tr('Selected')
             if role == Qt.ItemDataRole.DecorationRole:
@@ -444,10 +459,12 @@ class SourceDistrictModel(DistrictSelectModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         flags = super().flags(index)
-        if index.row() == 2 and \
-                self._plan.assignLayer.selectedFeatureCount() == 0 and \
-                self._plan.popLayer.selectedFeatureCount() == 0 and \
-                self._plan.geoLayer.selectedFeatureCount() == 0:
+        if (
+            index.row() == PAINT_SELECTED
+            and self._plan.assignLayer.selectedFeatureCount() == 0
+            and self._plan.popLayer.selectedFeatureCount() == 0
+            and self._plan.geoLayer.selectedFeatureCount() == 0
+        ):
             flags = flags & ~Qt.ItemFlag.ItemIsEnabled & ~Qt.ItemFlag.ItemIsSelectable
         return flags
 
@@ -456,7 +473,7 @@ class TargetDistrictModel(DistrictSelectModel):
     def data(self, index: QModelIndex, role: int = ...) -> Any:
         row = index.row()
 
-        if role == Qt.ItemDataRole.DisplayRole or role == Qt.ItemDataRole.EditRole:
+        if role in {Qt.ItemDataRole.DisplayRole, role == Qt.ItemDataRole.EditRole}:
             if row == 0:
                 return tr('Select district')
 
@@ -525,72 +542,73 @@ class DeltaListModel(QAbstractTableModel):
                 'name': f'new_{DistrictColumns.POPULATION}',
                 'caption': DistrictColumns.POPULATION.comment,  # pylint: disable=no-member
                 'format': '{:,.0f}',
-                'field-type': FieldCategory.Population
+                'field-type': FieldCategory.Population,
             },
             {
                 'name': DistrictColumns.POPULATION,
                 'caption': f'{DistrictColumns.POPULATION.comment} - {tr("Change")}',  # pylint: disable=no-member
                 'format': '{:+,.0f}',
-                'field-type': FieldCategory.Population
+                'field-type': FieldCategory.Population,
             },
             {
                 'name': DistrictColumns.DEVIATION,
                 'caption': DistrictColumns.DEVIATION.comment,  # pylint: disable=no-member
                 'format': '{:,.0f}',
-                'field-type': FieldCategory.Population
+                'field-type': FieldCategory.Population,
             },
             {
                 'name': DistrictColumns.PCT_DEVIATION,
                 'caption': DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
                 'format': '{:+.2%}',
-                'field-type': FieldCategory.Population
-            }
+                'field-type': FieldCategory.Population,
+            },
         ]
 
         field: RdsField
         for field in self._plan.popFields:
             fn = field.fieldName
-            self._fields.extend([
-                {
-                    'name': f'new_{fn}',
-                    'caption': field.caption,
-                    'format': '{:,.0f}',
-                    'field-type': field.category
-                },
-                {
-                    'name': fn,
-                    'caption': f'{field.caption} - {tr("Change")}',
-                    'format': '{:+,.0f}',
-                    'field-type': field.category
-                }
-            ])
+            self._fields.extend(
+                [
+                    {'name': f'new_{fn}', 'caption': field.caption, 'format': '{:,.0f}', 'field-type': field.category},
+                    {
+                        'name': fn,
+                        'caption': f'{field.caption} - {tr("Change")}',
+                        'format': '{:+,.0f}',
+                        'field-type': field.category,
+                    },
+                ]
+            )
 
         field: RdsDataField
         for field in self._plan.dataFields:
             fn = field.fieldName
             if field.sumField:
-                self._fields.extend([
-                    {
-                        'name': f'new_{fn}',
-                        'caption': field.caption,
-                        'format': '{:,.0f}',
-                        'field-type': field.category
-                    },
-                    {
-                        'name': fn,
-                        'caption': field.caption + ' - ' + tr('Change'),
-                        'format': '{:+,.0f}',
-                        'field-type': field.category
-                    }
-                ])
+                self._fields.extend(
+                    [
+                        {
+                            'name': f'new_{fn}',
+                            'caption': field.caption,
+                            'format': '{:,.0f}',
+                            'field-type': field.category,
+                        },
+                        {
+                            'name': fn,
+                            'caption': field.caption + ' - ' + tr('Change'),
+                            'format': '{:+,.0f}',
+                            'field-type': field.category,
+                        },
+                    ]
+                )
 
             if field.pctBase:
-                self._fields.append({
-                    'name': f'pct_{fn}',
-                    'caption': f'%{field.caption}',
-                    'format': '{:.2%}',
-                    'field-type': field.category
-                })
+                self._fields.append(
+                    {
+                        'name': f'pct_{fn}',
+                        'caption': f'%{field.caption}',
+                        'format': '{:.2%}',
+                        'field-type': field.category,
+                    }
+                )
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self._delta) if self._delta is not None and not parent.isValid() else 0
@@ -620,7 +638,11 @@ class DeltaListModel(QAbstractTableModel):
                 else:
                     return self._fields[section]['caption']
             if role == Qt.ItemDataRole.TextAlignmentRole:
-                return int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight) if orientation == Qt.Orientation.Horizontal else int(Qt.AlignmentFlag.AlignCenter)
+                return (
+                    int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+                    if orientation == Qt.Orientation.Horizontal
+                    else int(Qt.AlignmentFlag.AlignCenter)
+                )
 
             if role == Qt.ItemDataRole.BackgroundRole and orientation == Qt.Orientation.Horizontal:
                 ft = self._fields[section]['field-type']
@@ -694,8 +716,7 @@ class PopFieldsModel(QAbstractListModel):
     def __init__(self, plan: RdsPlan, parent: Optional[QObject] = None):
         super().__init__(parent)
         self._data: list[RdsField] = list(plan.popFields)
-        self._data.insert(0, RdsField(plan.popLayer, plan.popField,
-                          DistrictColumns.POPULATION.comment))  # pylint: disable=no-member
+        self._data.insert(0, RdsField(plan.popLayer, plan.popField, DistrictColumns.POPULATION.comment))  # pylint: disable=no-member
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self._data)
@@ -785,8 +806,10 @@ class RdsMetricsModel(QAbstractTableModel):
         return 1 if not parent.isValid() else 0
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
-        if orientation == Qt.Orientation.Vertical and role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.SizeHintRole):
-
+        if orientation == Qt.Orientation.Vertical and role in (
+            Qt.ItemDataRole.DisplayRole,
+            Qt.ItemDataRole.SizeHintRole,
+        ):
             m = list(self._data.values())[section]
             if m is None:
                 # it's a group or a geographic metric header
@@ -852,9 +875,13 @@ class RdsMetricsModel(QAbstractTableModel):
         return ['text/csv', 'text/plain']
 
     def mimeData(self, indexes: Iterable[QModelIndex]) -> QMimeData:
-        data = {self.headerData(idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole):
-                self.data(idx, Qt.ItemDataRole.DisplayRole) or ''
-                for idx in indexes}
+        data = {
+            self.headerData(idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole): self.data(
+                idx, Qt.ItemDataRole.DisplayRole
+            )
+            or ''
+            for idx in indexes
+        }
         mime = QMimeData()
         mime.setData('text/csv', '\n'.join(','.join(r) for r in data.items()).encode())
         mime.setText('\n'.join('\t'.join(r) for r in data.items()))
@@ -868,7 +895,8 @@ class RdsSplitsModel(QAbstractItemModel):
         self._splits.splitUpdating.connect(self.beginResetModel)
         self._splits.splitUpdated.connect(self.endResetModel)
         self._data: pd.DataFrame = splits.data
-        self._header = [self._splits.caption, tr("Districts"), tr('Population')]
+        self._summary_cols = [self._splits.caption, tr('Districts'), tr(DistrictColumns.POPULATION)]
+        self._header = self._summary_cols[:]
         self._header.extend(f.caption for f in fields)
 
     def rowCount(self, parent: QModelIndex = ...) -> int:
@@ -907,7 +935,7 @@ class RdsSplitsModel(QAbstractItemModel):
         item: RdsSplitBase = index.internalPointer()
         col = index.column()
         if isinstance(item, RdsSplitGeography):
-            if col >= 2:
+            if col > len(self._summary_cols):
                 return QVariant()
         else:
             if col == 0:
@@ -927,7 +955,7 @@ class RdsSplitsModel(QAbstractItemModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
-                return self._header[section] if section < len(self._header) else ""
+                return self._header[section] if section < len(self._header) else ''
 
         return QVariant()
 

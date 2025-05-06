@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - District classes
 
         begin                : 2022-01-15
@@ -22,40 +21,27 @@
  *                                                                         *
  ***************************************************************************/
 """
-from itertools import repeat
-from typing import (
-    Annotated,
-    Any,
-    Iterable,
-    Literal,
-    Optional,
-    Union,
-    overload
-)
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from itertools import repeat
+from typing import Annotated, Any, Iterable, Literal, Optional, Union, overload
+
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 from ..utils import tr
 from .base.lists import SortedKeyedList
-from .base.model import (
-    in_range,
-    not_empty,
-    rds_property
-)
-from .consts import (
-    DistrictColumns,
-    MetricsColumns
-)
+from .base.prop import in_range, not_empty, rds_property
+from .consts import DistrictColumns, MetricsColumns
 
 
 class RdsDistrict(QObject):
     BASE_COLUMNS = list(DistrictColumns)
     STATS_COLUMNS = list(MetricsColumns)
-    WRITABLE_ATTRIBUTES = (DistrictColumns.NAME, int(DistrictColumns.NAME),
-                           DistrictColumns.MEMBERS, int(DistrictColumns.MEMBERS))
+    WRITABLE_ATTRIBUTES = (
+        DistrictColumns.NAME,
+        int(DistrictColumns.NAME),
+        DistrictColumns.MEMBERS,
+        int(DistrictColumns.MEMBERS),
+    )
 
     nameChanged = pyqtSignal()
     membersChanged = pyqtSignal()
@@ -70,7 +56,15 @@ class RdsDistrict(QObject):
     description: str = rds_property(private=True, notify=descriptionChanged)
     fid: int = -1
 
-    def __init__(self, district: int, name: Optional[str] = None, members: Optional[int] = 1, description: str = '', fid=-1, **kwargs):
+    def __init__(
+        self,
+        district: int,
+        name: Optional[str] = None,
+        members: Optional[int] = 1,
+        description: str = "",
+        fid=-1,
+        **kwargs,
+    ):
         super().__init__()
         self.fid = fid
         self._data = {
@@ -96,12 +90,10 @@ class RdsDistrict(QObject):
         return index in self._data
 
     @overload
-    def __getitem__(self, index: Union[str, int]) -> Any:
-        ...
+    def __getitem__(self, index: Union[str, int]) -> Any: ...
 
     @overload
-    def __getitem__(self, index: slice) -> dict[str, Any]:
-        ...
+    def __getitem__(self, index: slice) -> dict[str, Any]: ...
 
     def __getitem__(self, key: Union[int, str, slice]):
         if isinstance(key, str) and key in self._data:
@@ -198,12 +190,10 @@ class RdsDistrict(QObject):
         self._data.update(data)
 
     @overload
-    def update(self, data: "RdsDistrict"):
-        ...
+    def update(self, data: "RdsDistrict"): ...
 
     @overload
-    def update(self, data: dict[str, Any]):
-        ...
+    def update(self, data: dict[str, Any]): ...
 
     def update(self, data: Union["RdsDistrict", dict[str, Any]]):
         if isinstance(data, RdsDistrict):
@@ -248,7 +238,7 @@ class RdsUnassigned(RdsDistrict):
 
 class DistrictList(SortedKeyedList[RdsDistrict]):  # pylint: disable=abstract-method
     def clear(self):
-        addUnassigned = '0000' in self._keys
+        addUnassigned = "0000" in self._keys
 
         super().clear()
 

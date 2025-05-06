@@ -1,5 +1,7 @@
 """QGIS Redistricting Plugin - unit tests for PlanImport class
 
+Copyright (C) 2025, Stuart C. Naifeh
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -16,6 +18,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import pathlib
 import re
 
@@ -28,36 +31,36 @@ import redistricting.services.planimport
 class TestPlanImport:
     @pytest.fixture
     def shapefile(self, datadir: pathlib.Path):
-        return str((datadir / 'test_plan.shp').resolve())
+        return str((datadir / "test_plan.shp").resolve())
 
     @pytest.fixture
     def assignmentfile(self, datadir: pathlib.Path):
-        return str((datadir / 'tuscaloosa_be.csv').resolve())
+        return str((datadir / "tuscaloosa_be.csv").resolve())
 
     def test_import_shapefile_non_existent_file_sets_error(self, new_plan):
         p = redistricting.services.planimport.ShapefileImporter()
-        p.setSourceFile('/notafile.txt')
-        p.setDistField('district')
+        p.setSourceFile("/notafile.txt")
+        p.setDistField("district")
         result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
-        assert msg is not None and re.search('not exist', msg)
+        assert msg is not None and re.search("not exist", msg)
 
     def test_import_shapefile_bad_shapefile_sets_error(self, new_plan, datadir):
         p = redistricting.services.planimport.ShapefileImporter()
-        p.setSourceFile(datadir / 'tuscaloosa_be.csv')
-        p.setDistField('district')
+        p.setSourceFile(datadir / "tuscaloosa_be.csv")
+        p.setDistField("district")
         result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
-        assert re.search('Invalid shapefile', msg)
+        assert re.search("Invalid shapefile", msg)
 
     def test_import_shapefile(self, new_plan, shapefile, mocker: MockerFixture):
-        task = mocker.patch('redistricting.services.planimport.ImportShapeFileTask')
-        add = mocker.patch.object(redistricting.services.planimport.QgsApplication.taskManager(), 'addTask')
+        task = mocker.patch("redistricting.services.planimport.ImportShapeFileTask")
+        add = mocker.patch.object(redistricting.services.planimport.QgsApplication.taskManager(), "addTask")
         p = redistricting.services.planimport.ShapefileImporter()
         p.setSourceFile(shapefile)
-        p.setDistField('district')
+        p.setDistField("district")
         p.importPlan(new_plan)
         task.assert_called_once()
         add.assert_called_once()
@@ -65,16 +68,16 @@ class TestPlanImport:
 
     def test_import_assignments_non_existent_file_sets_error(self, new_plan):
         p = redistricting.services.planimport.AssignmentImporter()
-        p.setSourceFile('/notafile.txt')
+        p.setSourceFile("/notafile.txt")
         result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
-        assert re.search('not exist', msg)
+        assert re.search("not exist", msg)
         p.deleteLater()
 
     def test_import_assignments(self, new_plan, assignmentfile, mocker: MockerFixture):
-        task = mocker.patch('redistricting.services.planimport.ImportAssignmentFileTask')
-        add = mocker.patch.object(redistricting.services.planimport.QgsApplication.taskManager(), 'addTask')
+        task = mocker.patch("redistricting.services.planimport.ImportAssignmentFileTask")
+        add = mocker.patch.object(redistricting.services.planimport.QgsApplication.taskManager(), "addTask")
         p = redistricting.services.planimport.AssignmentImporter()
         p.setSourceFile(assignmentfile)
         p.importPlan(new_plan)

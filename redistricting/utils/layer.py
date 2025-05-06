@@ -22,31 +22,17 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import re
 import shlex
-from typing import (
-    Any,
-    Iterator,
-    Literal,
-    Optional,
-    Union,
-    overload
-)
-from urllib.parse import (
-    parse_qs,
-    urlsplit
-)
+from typing import Any, Iterator, Literal, Optional, Union, overload
+from urllib.parse import parse_qs, urlsplit
 
 import geopandas as gpd
 import pandas as pd
-from qgis.core import (
-    QgsFeature,
-    QgsFeatureRequest,
-    QgsFeedback,
-    QgsVectorLayer
-)
+from qgis.core import QgsFeature, QgsFeatureRequest, QgsFeedback, QgsVectorLayer
 
-from .. import CanceledError
+from ..errors import CanceledError
 from .intl import tr
 from .io import gpd_io_engine
 from .sql import SqlAccess
@@ -64,7 +50,7 @@ class LayerReader(SqlAccess):
     def updateProgress(self, total, count):
         if not self._feedback:
             return
-        self._feedback.setProgress(min(100, 100 * count/total))
+        self._feedback.setProgress(min(100, 100 * count / total))
         if self._feedback.isCanceled():
             raise CanceledError()
 
@@ -83,14 +69,14 @@ class LayerReader(SqlAccess):
             yield n
 
     def split_provider_url(self):
-        uri_parts = self._layer.dataProvider().dataSourceUri().split('|')
+        uri_parts = self._layer.dataProvider().dataSourceUri().split("|")
         if len(uri_parts) <= 1:
             raise ValueError("Could not determine table name from URI")
         database = uri_parts[0]
         lexer = shlex.shlex(uri_parts[1])
         lexer.whitespace_split = True
-        lexer.whitespace = '&'
-        params = dict(pair.split('=', 1) for pair in lexer)
+        lexer.whitespace = "&"
+        params = dict(pair.split("=", 1) for pair in lexer)
         return database, params
 
     def read_qgis(
@@ -99,7 +85,7 @@ class LayerReader(SqlAccess):
         order: Optional[str] = None,
         read_geometry=True,
         chunksize: Optional[int] = None,
-        filt: Optional[dict[str, Any]] = None
+        filt: Optional[dict[str, Any]] = None,
     ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         def prog_attributes(f: QgsFeature):
             attrs = [f.attribute(i) for i in indices]
@@ -134,7 +120,7 @@ class LayerReader(SqlAccess):
             req.setOrderBy(orderby)
 
         if read_geometry:
-            columns.append('geometry')
+            columns.append("geometry")
             df = gpd.GeoDataFrame.from_features(self._layer.getFeatures(req), self._layer.crs().authid(), columns)
         else:
             gen = (prog_attributes(f) for f in self._layer.getFeatures(req))
@@ -143,12 +129,7 @@ class LayerReader(SqlAccess):
         return df
 
     def gpd_read(
-            self,
-            source=None,
-            fc: int = 0,
-            chunksize: Optional[int] = None,
-            filt: Optional[dict[str, Any]] = None,
-            **kwargs
+        self, source=None, fc: int = 0, chunksize: Optional[int] = None, filt: Optional[dict[str, Any]] = None, **kwargs
     ) -> gpd.GeoDataFrame:
         df: gpd.GeoDataFrame = None
 
@@ -160,7 +141,7 @@ class LayerReader(SqlAccess):
         if filt is not None:
             kwargs["where"] = " AND ".join(f"({f} = {v!r})" for f, v in filt.items())
 
-        if (fc or chunksize):
+        if fc or chunksize:
             if chunksize is None:
                 divisions = 10
                 chunksize = fc // divisions
@@ -173,9 +154,9 @@ class LayerReader(SqlAccess):
                 lastchunk = 0
 
             if chunksize != -1:
-                chunks = [slice(n * chunksize, (n+1) * chunksize) for n in range(divisions)]
+                chunks = [slice(n * chunksize, (n + 1) * chunksize) for n in range(divisions)]
                 if lastchunk:
-                    chunks += [slice(fc-lastchunk, fc)]
+                    chunks += [slice(fc - lastchunk, fc)]
 
                 df = pd.concat(
                     self.iterateWithProgress((gpd.read_file(source, rows=s, **kwargs) for s in chunks), len(chunks))
@@ -197,9 +178,8 @@ class LayerReader(SqlAccess):
         filt: Optional[dict[str, Any]] = ...,
         read_geometry: Literal[False] = ...,
         chunksize: int = ...,
-        **kwargs
-    ) -> pd.DataFrame:
-        ...
+        **kwargs,
+    ) -> pd.DataFrame: ...
 
     @overload
     def read_layer(
@@ -209,18 +189,17 @@ class LayerReader(SqlAccess):
         filt: Optional[dict[str, Any]] = ...,
         read_geometry: Literal[True] = ...,
         chunksize: int = ...,
-        **kwargs
-    ) -> gpd.GeoDataFrame:
-        ...
+        **kwargs,
+    ) -> gpd.GeoDataFrame: ...
 
-    def read_layer(
-            self,
-            columns=None,
-            order=None,
-            filt=None,
-            read_geometry=True,
-            chunksize=0,
-            **kwargs
+    def read_layer(  # noqa: PLR0915, PLR0912
+        self,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        filt: Optional[dict[str, Any]] = None,
+        read_geometry: bool = True,
+        chunksize: int = 0,
+        **kwargs,
     ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         def makeSqlQuery():
             nonlocal filt
@@ -228,14 +207,15 @@ class LayerReader(SqlAccess):
             if columns is None:
                 cols = "*"
             else:
-                cols = ",".join(columns)
+                quoted_columns = [f'"{c}"' for c in columns if c.isidentifier()]
+                cols = ",".join(quoted_columns)
                 if read_geometry and (g := self.getGeometryColumn(self._layer)):
                     cols += f",{g}"
-            sql = f"SELECT {cols} FROM {self.getTableName(self._layer)}"
+            sql = f"SELECT {cols} FROM {self.getTableName(self._layer)}"  # noqa: S608
             if filt or self._layer.subsetString():
                 filters = []
                 if filt:
-                    filters.extend(f'{f} = {v!r}' for f, v in filt.items())
+                    filters.extend(f"{f} = {v!r}" for f, v in filt.items())
                 if self._layer.subsetString():
                     filters.append(self._layer.subsetString())
 
@@ -264,24 +244,38 @@ class LayerReader(SqlAccess):
         if self._layer.storageType() in ("GPKG", "OpenFileGDB"):
             if read_geometry:
                 database, params = self.split_provider_url()
-                df = self.gpd_read(database, self._layer.featureCount(), chunksize, filt,
-                                   layer=params['layername'], columns=columns, **kwargs)
+                df = self.gpd_read(
+                    database,
+                    self._layer.featureCount(),
+                    chunksize,
+                    filt,
+                    layer=params["layername"],
+                    columns=columns,
+                    **kwargs,
+                )
                 if order:
                     df = df.set_index(order).sort_index()
             else:
                 with self._connectSqlOgrSqlite(self._layer.dataProvider()) as db:
-                    df = pd.read_sql(makeSqlQuery(), db, index_col=order,
-                                     columns=columns, chunksize=chunksize, **kwargs)
+                    df = pd.read_sql(
+                        makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
+                    )
                 if isinstance(df, Iterator):
                     df = pd.concat(self.iterateWithProgress(df, total))
-        elif self._layer.dataProvider().name() in ('spatialite', 'SQLite'):
+        elif self._layer.dataProvider().name() in ("spatialite", "SQLite"):
             if read_geometry:
                 params = dict(
-                    pair.split('=', 1) for pair in
-                    shlex.split(re.sub(r' \(\w+\)', '', self._layer.dataProvider().dataSourceUri(True)))
+                    pair.split("=", 1)
+                    for pair in shlex.split(re.sub(r" \(\w+\)", "", self._layer.dataProvider().dataSourceUri(True)))
                 )
-                df = self.gpd_read(params['dbname'], self._layer.featureCount(),
-                                   chunksize, layer=params['table'], columns=columns, **kwargs)
+                df = self.gpd_read(
+                    params["dbname"],
+                    self._layer.featureCount(),
+                    chunksize,
+                    layer=params["table"],
+                    columns=columns,
+                    **kwargs,
+                )
                 if order:
                     df = df.set_index(order).sort_index()
             else:
@@ -289,7 +283,7 @@ class LayerReader(SqlAccess):
                     df = pd.read_sql(makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize)
                 if isinstance(df, Iterator):
                     df = pd.concat(self.iterateWithProgress(df, total))
-        elif self._layer.dataProvider().name() in ('postgis', 'postgres'):
+        elif self._layer.dataProvider().name() in ("postgis", "postgres"):
             with self._connectSqlPostgres(self._layer.dataProvider(), as_dict=False) as db:
                 if read_geometry:
                     df = gpd.read_postgis(
@@ -298,16 +292,11 @@ class LayerReader(SqlAccess):
                         self.getGeometryColumn(self._layer),
                         index_col=order,
                         chunksize=chunksize,
-                        **kwargs
+                        **kwargs,
                     )
                 else:
                     df = pd.read_sql(
-                        makeSqlQuery(),
-                        db,
-                        index_col=order,
-                        columns=columns,
-                        chunksize=chunksize,
-                        **kwargs
+                        makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
                     )
 
             if isinstance(df, Iterator):
@@ -319,7 +308,7 @@ class LayerReader(SqlAccess):
                 columns=columns,
                 chunksize=chunksize,
                 read_geometry=read_geometry,
-                **kwargs
+                **kwargs,
             )
             if order:
                 df = df.set_index(order).sort_index()
@@ -346,7 +335,7 @@ class LayerReader(SqlAccess):
                         header=header,
                         usecols=usecols,
                         chunksize=chunksize,
-                        **kwargs
+                        **kwargs,
                     )
                     df = pd.concat(self.iterateWithProgress(reader.get_chunk(), total))
                 else:

@@ -1,9 +1,10 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - district compactness score calculations
+"""QGIS Redistricting Plugin
 
-        begin                : 2024-10-03
+        Exception classes
+
+        begin                : 2025-05-06
         git sha              : $Format:%H$
-        copyright            : (C) 2024 by Cryptodira
+        copyright            : (C)  2025 by Stuart C. Naifeh
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -22,34 +23,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-import math
-from typing import Callable
-
-import geopandas as gpd
-import pandas as pd
-from packaging import version
-from qgis.core import QgsGeometry
-
-from ..models import MetricsColumns
 
 
-def PolsbyPopper(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
-    return 4 * math.pi * area / (cea.length**2)
-
-
-def Reock(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
-    if version.parse(gpd.__version__) < version.parse('1.0.0'):
-        return cea.apply(lambda g: g.area / QgsGeometry.fromWkt(g.wkt).minimalEnclosingCircle()[0].area())
-
-    return area / cea.minimum_bounding_circle().area
-
-
-def ConvexHull(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
-    return area / cea.convex_hull.area
-
-
-MetricsFunctions: dict[str, Callable[[gpd.GeoSeries, pd.Series], pd.Series]] = {
-    MetricsColumns.POLSBYPOPPER: PolsbyPopper,
-    MetricsColumns.REOCK: Reock,
-    MetricsColumns.CONVEXHULL: ConvexHull
-}
+class CanceledError(Exception): ...

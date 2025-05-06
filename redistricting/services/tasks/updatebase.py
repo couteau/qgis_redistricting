@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to aggregate district data
 
         begin                : 2022-06-01
@@ -22,44 +21,22 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Literal,
-    Optional,
-    Sequence,
-    Union,
-    overload
-)
+
+from typing import Literal, Optional, Sequence, Union, overload
 
 import geopandas as gpd
 import pandas as pd
-from qgis.core import (
-    Qgis,
-    QgsExpressionContext,
-    QgsExpressionContextUtils,
-    QgsMessageLog,
-    QgsTask,
-    QgsVectorLayer
-)
+from qgis.core import Qgis, QgsExpressionContext, QgsExpressionContextUtils, QgsMessageLog, QgsTask, QgsVectorLayer
 
-from ...models import (
-    DistrictColumns,
-    MetricTriggers,
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    RdsPlan
-)
-from ...utils import (
-    LayerReader,
-    SqlAccess,
-    tr
-)
+from ...errors import CanceledError
+from ...models import DistrictColumns, MetricTriggers, RdsDataField, RdsField, RdsGeoField, RdsPlan
+from ...utils import LayerReader, SqlAccess, tr
 from ._debug import debug_thread
 
 
 class UpdateMetricsTask(QgsTask):
     def __init__(self, plan: RdsPlan, trigger: MetricTriggers, populationData: pd.DataFrame, geometry: gpd.GeoSeries):
-        super().__init__(tr("Updating metrics"),  QgsTask.Flag.AllFlags)
+        super().__init__(tr("Updating metrics"), QgsTask.Flag.AllFlags)
         self.plan = plan
         self.trigger = trigger
         self.populationData = populationData
@@ -104,17 +81,21 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.populationData: pd.DataFrame = None
         self.geometry: gpd.GeoSeries = None
 
+    def checkCanceled(self):
+        if self.isCanceled():
+            raise CanceledError()
+
     def setProgressIncrement(self, start: int, stop: int):
         super().setProgress(start)
         self._prog_start = start
         self._prog_stop = stop
 
     def setProgress(self, progress: float):
-        super().setProgress(self._prog_start + progress*(self._prog_stop-self._prog_start)/100)
+        super().setProgress(self._prog_start + progress * (self._prog_stop - self._prog_start) / 100)
 
     def updateProgress(self, total, count):
         if total != 0:
-            self.setProgress(min(100, 100*count/total))
+            self.setProgress(min(100, 100 * count / total))
 
     @overload
     def read_layer(
@@ -123,9 +104,8 @@ class AggregateDataTask(SqlAccess, QgsTask):
         columns: Optional[list[str]] = ...,
         order: Optional[str] = ...,
         read_geometry: Literal[False] = ...,
-        chunksize: int = ...
-    ) -> pd.DataFrame:
-        ...
+        chunksize: int = ...,
+    ) -> pd.DataFrame: ...
 
     @overload
     def read_layer(
@@ -134,17 +114,16 @@ class AggregateDataTask(SqlAccess, QgsTask):
         columns: Optional[list[str]] = ...,
         order: Optional[str] = ...,
         read_geometry: Literal[True] = ...,
-        chunksize: int = ...
-    ) -> gpd.GeoDataFrame:
-        ...
+        chunksize: int = ...,
+    ) -> gpd.GeoDataFrame: ...
 
     def read_layer(
-            self,
-            layer: QgsVectorLayer,
-            columns: Optional[list[str]] = None,
-            order: Optional[str] = None,
-            read_geometry: bool = True,
-            chunksize: int = 0
+        self,
+        layer: QgsVectorLayer,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        read_geometry: bool = True,
+        chunksize: int = 0,
     ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         reader = LayerReader(layer, self)
         return reader.read_layer(columns=columns, order=order, read_geometry=read_geometry, chunksize=chunksize)
@@ -174,12 +153,9 @@ class AggregateDataTask(SqlAccess, QgsTask):
 
             cols.extend(new_cols)
 
-        df = self.read_layer(
-            self.popLayer,
-            columns=cols,
-            order=self.popJoinField,
-            read_geometry=False
-        ).rename(columns={self.popField: str(DistrictColumns.POPULATION)})
+        df = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField, read_geometry=False).rename(
+            columns={self.popField: str(DistrictColumns.POPULATION)}
+        )
 
         for f in self.popFields:
             if f.isExpression():
@@ -194,5 +170,4 @@ class AggregateDataTask(SqlAccess, QgsTask):
         super().finished(result)
         if not result:
             if self.exception is not None:
-                QgsMessageLog.logMessage(
-                    f'{self.exception!r}', 'Redistricting', Qgis.MessageLevel.Critical)
+                QgsMessageLog.logMessage(f"{self.exception!r}", "Redistricting", Qgis.MessageLevel.Critical)

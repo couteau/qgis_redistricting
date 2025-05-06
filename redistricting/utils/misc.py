@@ -22,12 +22,10 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import re
-from random import choice
-from typing import (
-    Optional,
-    Union
-)
+from secrets import choice
+from typing import Optional, Union
 
 from qgis.core import QgsVectorLayer
 
@@ -39,7 +37,7 @@ def makeFieldName(expr: str, caption: Optional[str]):
     if caption and caption.isidentifier():
         return caption.lower()
 
-    return re.sub(r'[^\w]+', '_', (caption or expr).lower())
+    return re.sub(r"[^\w]+", "_", (caption or expr).casefold())
 
 
 def getDefaultField(layer: QgsVectorLayer, fieldList: list[Union[str, re.Pattern]]):
@@ -71,4 +69,22 @@ DFLT_ALLOWED_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345
 
 
 def random_id(length, allowed_chars=DFLT_ALLOWED_CHARS):
-    return ''.join(choice(allowed_chars) for _ in range(length))
+    return "".join(choice(allowed_chars) for _ in range(length))
+
+
+def camel_to_snake(s: str):
+    return re.sub(r"([A-Z])", r"_\1", s).lower()
+
+
+def snake_to_camel(s: str):
+    f = "".join(c.capitalize() for c in s.split("_"))
+    return f[0].lower() + f[1:]
+
+
+def camel_to_kebab(s: str):
+    return re.sub(r"([A-Z])", r"-\1", s).lower()
+
+
+def kebab_to_camel(s: str):
+    f = "".join(c.capitalize() for c in s.split("-"))
+    return f[0].lower() + f[1:]

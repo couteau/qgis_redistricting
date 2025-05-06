@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to aggregate district data
 
         begin                : 2022-06-01
@@ -22,33 +21,20 @@
  *                                                                         *
  ***************************************************************************/
 """
-from collections.abc import (
-    Iterable,
-    Sequence
-)
-from typing import (
-    TYPE_CHECKING,
-    Union
-)
+
+from collections.abc import Iterable, Sequence
+from itertools import repeat
+from typing import TYPE_CHECKING, Union
 
 import geopandas as gpd
 import pandas as pd
 import shapely.ops
-from qgis.PyQt.QtCore import (
-    QRunnable,
-    QThreadPool
-)
+from qgis.PyQt.QtCore import QRunnable, QThreadPool
 from shapely import wkt
-from shapely.geometry import (
-    MultiPolygon,
-    Polygon
-)
+from shapely.geometry import MultiPolygon, Polygon
 
 from ...models import DistrictColumns
-from ...utils import (
-    spatialite_connect,
-    tr
-)
+from ...utils import spatialite_connect, tr
 from ..districtio import DistrictReader
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
@@ -67,12 +53,10 @@ class DissolveWorker(QRunnable):
 
     def run(self):
         debug_thread()
-        try:
-            self.merged = shapely.ops.unary_union(self.geoms)
-            if isinstance(self.merged, Polygon):
-                self.merged = MultiPolygon([self.merged])
-        except:  # pylint: disable=bare-except
-            pass
+
+        self.merged = shapely.ops.unary_union(self.geoms)
+        if isinstance(self.merged, Polygon):
+            self.merged = MultiPolygon([self.merged])
 
         if self.callback:
             self.callback()
@@ -82,31 +66,51 @@ class AggregateDistrictDataTask(AggregateDataTask):
     """Task to aggregate the plan summary data and geometry in the background"""
 
     def __init__(
-        self,
-        plan: 'RdsPlan',
-        updateDistricts: Iterable[int] = None,
-        includeDemographics=True,
-        includeGeometry=True
+        self, plan: "RdsPlan", updateDistricts: Iterable[int] = None, includeDemographics=True, includeGeometry=True
     ):
-        super().__init__(plan, tr('Calculating district geometry and metrics'))
+        super().__init__(plan, tr("Calculating district geometry and metrics"))
         self.setDependentLayers([plan.distLayer, plan.assignLayer, plan.popLayer])
         self.geoPackagePath = plan.geoPackagePath
 
-        self.updateDistricts: set[int] = None \
-            if not updateDistricts or set(updateDistricts) == set(range(0, self.numDistricts+1)) \
+        self.updateDistricts: set[int] = (
+            None
+            if not updateDistricts or set(updateDistricts) == set(range(0, self.numDistricts + 1))
             else set(updateDistricts)
+        )
 
         self.includeGeometry = includeGeometry
         self.includeDemographics = includeDemographics
 
         self.districtData: Union[pd.DataFrame, gpd.GeoDataFrame] = None
 
-    def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+    def disolveGeometry(self, update: gpd.GeoDataFrame):
         def dissolve_progress():
             nonlocal count, total
             count += 1
             self.updateProgress(total, count)
 
+        g_geom = update[[self.distField, "geometry"]].groupby(self.distField)
+        total = len(g_geom) + 1
+        count = 0
+        geoms: dict[int, shapely.MultiPolygon] = {}
+        pool = QThreadPool()
+        tasks: list[DissolveWorker] = []
+        for g, v in g_geom["geometry"]:
+            if g == 0:
+                geoms[g] = None
+                count += 1
+                self.updateProgress(total, count)
+            else:
+                task = DissolveWorker(int(g), v.array, dissolve_progress)
+                task.setAutoDelete(False)
+                tasks.append(task)
+                pool.start(task)
+
+        pool.waitForDone()
+        geoms |= {t.dist: t.merged for t in tasks}
+        return geoms
+
+    def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         debug_thread()
 
         try:
@@ -119,8 +123,11 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 self.setProgressIncrement(20, 40)
                 popdf = self.loadPopData()
                 self.populationData: gpd.GeoDataFrame = self.populationData.join(popdf)
-                cols += [DistrictColumns.POPULATION] + [f.fieldName for f in self.popFields] + \
-                    [f.fieldName for f in self.dataFields]
+                cols += (
+                    [DistrictColumns.POPULATION]
+                    + [f.fieldName for f in self.popFields]
+                    + [f.fieldName for f in self.dataFields]
+                )
                 self.totalPopulation = int(self.populationData[DistrictColumns.POPULATION].sum())
 
             self.setProgressIncrement(40, 90)
@@ -130,40 +137,20 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 update = self.populationData
 
             if self.includeGeometry:
-                data = update[cols].groupby(by=self.distField).sum()
-                g_geom = update[[self.distField, "geometry"]].groupby(self.distField)
-                total = len(g_geom) + 1
-                count = 0
-                geoms: dict[int, shapely.MultiPolygon] = {}
-                pool = QThreadPool()
-                tasks: list[DissolveWorker] = []
-                for g, v in g_geom["geometry"]:
-                    if g == 0:
-                        geoms[g] = None
-                        count += 1
-                        self.updateProgress(total, count)
-                    else:
-                        task = DissolveWorker(int(g), v.array, dissolve_progress)
-                        task.setAutoDelete(False)
-                        tasks.append(task)
-                        pool.start(task)
-
-                pool.waitForDone()
-                geoms |= {t.dist: t.merged for t in tasks}
-
-                data["geometry"] = pd.Series(geoms)
-                data = gpd.GeoDataFrame(data, geometry="geometry", crs=self.populationData.crs)
-
-                count += 1
-                self.updateProgress(total, count)
+                geoms = self.disolveGeometry(update)
+                update = update[cols].groupby(by=self.distField).sum()
+                update["geometry"] = pd.Series(geoms)
+                update = gpd.GeoDataFrame(update, geometry="geometry", crs=self.populationData.crs)
 
                 # self.data = data.to_wkt()
-                self.geometry = data["geometry"]
-                data["wkt_geom"] = data["geometry"].apply(wkt.dumps)
-                data = data.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
-                self.districtData = data
+                self.geometry = update["geometry"]
+                update["wkt_geom"] = update["geometry"].apply(wkt.dumps)
+                update = update.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
+                self.districtData = update
+
+                self.updateProgress(1, 1)
             else:
-                update.drop(columns="geometry", inplace=True)
+                update = update.drop(columns="geometry")
                 total = len(update)
                 self.districtData = update[cols].groupby(by=self.distField).sum()
 
@@ -172,20 +159,15 @@ class AggregateDistrictDataTask(AggregateDataTask):
             self.setProgressIncrement(90, 100)
 
             name = pd.Series(
-                [
-                    self.districts[d].name if d in self.districts else str(d)
-                    for d in self.districtData.index
-                ],
-                index=self.districtData.index
+                [self.districts[d].name if d in self.districts else str(d) for d in self.districtData.index],
+                index=self.districtData.index,
             )
             members = pd.Series(
                 [
-                    None if d == 0
-                    else self.districts[d].members if d in self.districts
-                    else 1
+                    None if d == 0 else self.districts[d].members if d in self.districts else 1
                     for d in self.districtData.index
                 ],
-                index=self.districtData.index
+                index=self.districtData.index,
             )
 
             if self.includeDemographics:
@@ -217,30 +199,35 @@ class AggregateDistrictDataTask(AggregateDataTask):
             return
 
         with spatialite_connect(self.geoPackagePath) as db:
-            fields = {f: f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districtData.columns)}
-
             # Account for districts with no assignments --
             # otherwise, they will never be updated in the database
             if self.updateDistricts is None:
-                zero = set(range(0, self.numDistricts+1)) - set(self.districtData.index)
+                zero = set(range(0, self.numDistricts + 1)) - set(self.districtData.index)
             else:
                 zero = self.updateDistricts - set(self.districtData.index)
 
             if zero:
-                sql = f"DELETE FROM districts WHERE {self.distField} IN ({','.join(str(d) for d in zero)})"
-                db.execute(sql)
+                params = ",".join(repeat("?", len(zero)))
+                sql = f'DELETE FROM districts WHERE "{self.distField}" IN ({params})'  # noqa: S608
+                db.execute(sql, (str(d) for d in zero))
                 db.commit()
 
+            # Update existing dictricts
+            fields = {
+                f'"{f}"': f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districtData.columns)
+            }
             data = [d._asdict() for d in self.districtData.itertuples()]
-            sql = "UPDATE districts " \
-                f"SET {','.join([f'{field} = {param}' for field, param in fields.items()])} " \
-                f"WHERE {self.distField} = :Index"
+            params = ",".join(f"{field} = {param}" for field, param in fields.items())
+            sql = (
+                "UPDATE districts "  # noqa: S608
+                f"SET {params} "
+                f'WHERE "{self.distField}" = :Index'
+            )
             db.executemany(sql, data)
             db.commit()
 
-            fields = {self.distField: ':Index'} | fields
-            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields)}) " \
-                f"VALUES ({','.join(fields.values())})"
+            fields = {self.distField: ":Index"} | fields
+            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields)}) VALUES ({','.join(fields.values())})"  # noqa: S608
             db.executemany(sql, data)
             db.commit()
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - thread debug utility
 
         begin                : 2022-01-15
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import os
 import sys
 
@@ -33,22 +33,25 @@ def debug_thread():
         # Don't debug if not in DEBUG mode or if running pytest
         return
 
-    if 'unittest' in sys.modules:
+    if "unittest" in sys.modules:
         try:
-            import debugpy  # pylint: disable=import-outside-toplevel
+            import debugpy  # type: ignore  # pylint: disable=import-outside-toplevel
+
             if debugpy.is_client_connected():
                 debugpy.debug_this_thread()
-        except:  # pylint: disable=bare-except
+        except ImportError:
             pass
     else:
         try:
-            import debugpy  # pylint: disable=import-outside-toplevel
+            import debugpy  # type: ignore  # pylint: disable=import-outside-toplevel
+
             if debugpy.is_client_connected():
                 debugpy.debug_this_thread()
-        except:  # pylint: disable=bare-except
+        except ImportError:
             try:
-                import ptvsd  # pylint: disable=import-outside-toplevel
+                import ptvsd  # type: ignore  # pylint: disable=import-outside-toplevel
+
                 if ptvsd.is_attached():
                     ptvsd.debug_this_thread()
-            except:  # pylint: disable=bare-except
+            except ImportError:  # pylint: disable=bare-except
                 pass

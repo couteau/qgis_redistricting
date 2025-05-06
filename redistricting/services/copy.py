@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - copy plans
 
         begin                : 2022-06-01
@@ -22,24 +21,17 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
 import pathlib
 import shutil
 import sqlite3
 from contextlib import closing
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Optional,
-    Union
-)
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 from qgis.core import Qgis
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.utils import spatialite_connect
 
 from ..utils import tr
@@ -53,12 +45,9 @@ if TYPE_CHECKING:
 
 class PlanCopier(ErrorListMixin, QObject):
     progressChanged = pyqtSignal(int)
-    copyComplete = pyqtSignal('PyQt_PyObject')
+    copyComplete = pyqtSignal("PyQt_PyObject")
 
-    def __init__(
-        self,
-        sourcePlan: RdsPlan
-    ):
+    def __init__(self, sourcePlan: RdsPlan):
         super().__init__()
         self._plan = sourcePlan
         self._builder: PlanBuilder = None
@@ -73,13 +62,13 @@ class PlanCopier(ErrorListMixin, QObject):
         description: str,
         destGpkgPath: Union[str, pathlib.Path],
         copyAssignments: bool = True,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         def planCreated(plan):
             self.copyComplete.emit(plan)
 
         if not destGpkgPath:
-            raise ValueError(tr('Destination GeoPackage path required'))
+            raise ValueError(tr("Destination GeoPackage path required"))
 
         self.clearErrors()
 
@@ -104,10 +93,7 @@ class PlanCopier(ErrorListMixin, QObject):
             plan.addLayersFromGeoPackage(destGpkgPath)
 
             reader = DistrictReader(
-                plan.distLayer,
-                distField=plan.distField,
-                popField=plan.popField,
-                columns=plan.districtColumns
+                plan.distLayer, distField=plan.distField, popField=plan.popField, columns=plan.districtColumns
             )
             reader.loadDistricts(plan)
 
@@ -137,22 +123,23 @@ class PlanCopier(ErrorListMixin, QObject):
 
         if not target.assignLayer:
             self.setError(
-                tr('Copy assignments: Target plan {name} has no assignment layer to copy into').format(
-                    name=target.name),
-                Qgis.MessageLevel.Critical
+                tr("Copy assignments: Target plan {name} has no assignment layer to copy into").format(
+                    name=target.name
+                ),
+                Qgis.MessageLevel.Critical,
             )
             return
 
         if not self._plan.assignLayer:
             self.setError(
-                tr('Copy assignments: Source plan {name} has no assignment layer to copy from').format(
-                    name=self._plan.name),
-                Qgis.MessageLevel.Critical
+                tr("Copy assignments: Source plan {name} has no assignment layer to copy from").format(
+                    name=self._plan.name
+                ),
+                Qgis.MessageLevel.Critical,
             )
             return
 
         if autocommit and self._plan.assignLayer.isEditable():
-            # self.setError(tr('Committing unsaved changes before copy'))
             self._plan.assignLayer.commitChanges(True)
 
         with closing(spatialite_connect(target.geoPackagePath)) as db:
@@ -160,8 +147,10 @@ class PlanCopier(ErrorListMixin, QObject):
             count = 0
             db.execute(f"ATTACH DATABASE '{self._plan.geoPackagePath}' AS source")
             db.set_progress_handler(progress, 1)
-            sql = f"UPDATE assignments SET {target.distField} = s.{self._plan.distField} " \
-                f"FROM source.assignments s WHERE assignments.{target.geoIdField} = s.{self._plan.geoIdField}"
+            sql = (
+                f'UPDATE assignments SET "{target.distField}" = s."{self._plan.distField}" '  # noqa: S608
+                f'FROM source.assignments s WHERE assignments."{target.geoIdField}" = s."{self._plan.geoIdField}"'
+            )
             db.execute(sql)
             db.set_progress_handler(None, 1)
             db.commit()

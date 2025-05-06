@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - split geography models
 
         begin                : 2024-09-15
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from abc import abstractmethod
 from functools import partial
 from typing import Any, Optional, Sequence, Union
@@ -29,11 +29,14 @@ from typing import Any, Optional, Sequence, Union
 import pandas as pd
 from qgis.PyQt.QtCore import pyqtSignal
 
-from .base.model import Factory, RdsBaseModel, rds_property
+from .base.model import RdsBaseModel
+from .base.prop import Factory, rds_property
 
 
 class RdsSplitBase:
-    def __init__(self, parent: Union['RdsSplitBase', 'RdsSplits'], data: pd.DataFrame, idx: Union[str, tuple[str, int]]):
+    def __init__(
+        self, parent: Union["RdsSplitBase", "RdsSplits"], data: pd.DataFrame, idx: Union[str, tuple[str, int]]
+    ):
         self._parent = parent
         self._data = data
         self._idx = idx
@@ -57,7 +60,7 @@ class RdsSplitDistrict(RdsSplitBase):
             return self.district
 
         if 0 < index < len(self._data.columns):
-            col = self._data.columns[index-1]
+            col = self._data.columns[index - 1]
             return self._data.loc[self._idx, col]
 
         raise IndexError()
@@ -79,15 +82,13 @@ class RdsSplitDistrict(RdsSplitBase):
 
 
 class RdsSplitGeography(RdsSplitBase):
-    def __init__(self, parent: 'RdsSplits', data: pd.DataFrame, idx: str):
+    def __init__(self, parent: "RdsSplits", data: pd.DataFrame, idx: str):
         super().__init__(parent, data, idx)
         self._districts = list(data.loc[idx].index)
-        self._splits = [
-            RdsSplitDistrict(self, data, (idx, d)) for d in self._districts
-        ]
+        self._splits = [RdsSplitDistrict(self, data, (idx, d)) for d in self._districts]
         self._attributes = [
             f"{self.name} ({self.geoid})" if "__name" in self._data.columns else self.geoid,
-            ", ".join(data.loc[idx].index.astype(str))
+            ", ".join(data.loc[idx].index.astype(str)),
         ]
 
     def __len__(self):
@@ -107,7 +108,9 @@ class RdsSplitGeography(RdsSplitBase):
     @property
     def name(self):
         if "__name" in self._data.columns:
-            i = self._data.columns.get_loc("__name",)
+            i = self._data.columns.get_loc(
+                "__name",
+            )
             return self._data.loc[self._idx].iat[0, i]
 
         return ""
@@ -139,11 +142,11 @@ class RdsSplits(RdsBaseModel):
 
     def __key__(self):
         return self.field
-    
+
     @caption.getter
     def caption(self):
         return self._caption or self.field.capitalize()
-    
+
     @caption.setter
     def caption(self, value: Optional[str]):
         if value is None or value == self.field:
@@ -170,8 +173,7 @@ class RdsSplits(RdsBaseModel):
             return
 
         self.splits = [
-            RdsSplitGeography(self, self.data, geoid)
-            for geoid in self.data.index.get_level_values(0).unique()
+            RdsSplitGeography(self, self.data, geoid) for geoid in self.data.index.get_level_values(0).unique()
         ]
 
     def setData(self, data: pd.DataFrame):

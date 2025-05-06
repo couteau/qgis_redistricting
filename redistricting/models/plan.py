@@ -1,3 +1,26 @@
+"""QGIS Redistricting Plugin - redistrictin plan model
+
+        begin                : 2022-01-15
+        git sha              : $Format:%H$
+        copyright            : (C) 2022 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
 
 import pathlib
 from contextlib import contextmanager
@@ -11,8 +34,9 @@ from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
 from .base.lists import KeyedList
-from .base.model import RdsBaseModel, in_range, not_empty, rds_property
-from .consts import DeviationType, DistrictColumns, MetricsColumns
+from .base.model import RdsBaseModel, rds_property
+from .base.prop import in_range, isidentifier, not_empty
+from .consts import MAX_DISTRICTS, MIN_DISTRICTS, DeviationType, DistrictColumns, MetricsColumns
 from .district import DistrictList, RdsDistrict, RdsUnassigned
 from .field import RdsDataField, RdsField, RdsGeoField
 from .metricslist import RdsMetrics
@@ -44,15 +68,13 @@ class RdsPlan(RdsBaseModel):
 
     name: Annotated[str, not_empty] = rds_property(private=True, notify=nameChanged)
     numDistricts: Annotated[int, in_range(2, 2000)] = rds_property(private=True, notify=numDistrictsChanged)
-    numSeats:  int = None
+    numSeats: int = None
     deviation: Annotated[float, in_range(0.0)] = rds_property(private=True, default=0.0, notify=deviationChanged)
     deviationType: DeviationType = rds_property(
         private=True, default=DeviationType.OverUnder, notify=deviationTypeChanged
     )
 
-    districts: DistrictList = rds_property(
-        private=True, serialize=False, factory=DistrictList
-    )
+    districts: DistrictList = rds_property(private=True, serialize=False, factory=DistrictList)
     metrics: RdsMetrics = rds_property(private=True, factory=RdsMetrics)
 
     @property
@@ -60,25 +82,27 @@ class RdsPlan(RdsBaseModel):
         return self.metrics.totalPopulation or 0
 
     geoLayer: QgsVectorLayer = rds_property(private=True, fvalid=_validLayer, default=None)
-    geoJoinField: str = None
+    geoJoinField: Annotated[str, isidentifier] = None
 
     def _setGeoFields(self, geoFields: Iterable[RdsGeoField]):
-        self._geoFields.clear()
-        self._geoFields.extend(geoFields)
+        self._geoFields.clear()  # pylint: disable=no-member
+        self._geoFields.extend(geoFields)  # pylint: disable=no-member
 
     geoFields: KeyedList[RdsGeoField] = rds_property(
         private=True, fset=_setGeoFields, finit=_setGeoFields, notify=geoFieldsChanged, factory=KeyedList[RdsGeoField]
     )
 
     popLayer: QgsVectorLayer = None
-    popJoinField: str = None
-    popField: str
+    popJoinField: Annotated[str, isidentifier] = None
+    popField: Annotated[str, isidentifier]
     popFields: KeyedList[RdsField] = rds_property(private=True, factory=KeyedList[RdsField], notify=popFieldsChanged)
-    dataFields: KeyedList[RdsDataField] = rds_property(private=True, factory=KeyedList[RdsDataField], notify=dataFieldsChanged)
+    dataFields: KeyedList[RdsDataField] = rds_property(
+        private=True, factory=KeyedList[RdsDataField], notify=dataFieldsChanged
+    )
 
     assignLayer: QgsVectorLayer = None
-    geoIdField: str = rds_property(private=True, default=None)
-    distField: str = rds_property(private=True, default="district")
+    geoIdField: Annotated[str, isidentifier] = rds_property(private=True, default=None)
+    distField: Annotated[str, isidentifier] = rds_property(private=True, default="district")
     geoIdCaption: str = None
 
     distLayer: QgsVectorLayer = None
@@ -102,10 +126,10 @@ class RdsPlan(RdsBaseModel):
     def name(self, value: str):
         self._name = value
         if self.assignLayer:
-            self.assignLayer.setName(f'{self.name}_assignments')
+            self.assignLayer.setName(f"{self.name}_assignments")
 
         if self.distLayer:
-            self.distLayer.setName(f'{self.name}_districts')
+            self.distLayer.setName(f"{self.name}_districts")
 
     @numDistricts.setter
     def numDistricts(self, value: int):
@@ -244,9 +268,9 @@ class RdsPlan(RdsBaseModel):
     def geoPackagePath(self):
         if self.assignLayer:
             uri = self.assignLayer.dataProvider().dataSourceUri()
-            return uri.split('|')[0]
+            return uri.split("|")[0]
 
-        return ''
+        return ""
 
     @property
     def districtColumns(self):
@@ -258,9 +282,9 @@ class RdsPlan(RdsBaseModel):
         cols.extend(list(MetricsColumns))
         return cols
 
-    def createDistrict(self, district: int, name: str = '', members: int = 1, description: str = ''):
+    def createDistrict(self, district: int, name: str = "", members: int = 1, description: str = ""):
         cols = dict(zip(self.districtColumns, repeat(0)))
-        cols['description'] = description
+        cols["description"] = description
 
         if district == 0:
             del cols[DistrictColumns.DISTRICT]
@@ -283,14 +307,14 @@ class RdsPlan(RdsBaseModel):
         self.districtDataChanged.emit(district)
 
     @overload
-    def addDistrict(self, district: int, name: str = '', members: int = 1, description: str = '') -> RdsDistrict:
-        ...
+    def addDistrict(self, district: int, name: str = "", members: int = 1, description: str = "") -> RdsDistrict: ...
 
     @overload
-    def addDistrict(self, district: RdsDistrict) -> RdsDistrict:
-        ...
+    def addDistrict(self, district: RdsDistrict) -> RdsDistrict: ...
 
-    def addDistrict(self, district: Union[int, RdsDistrict], name: str = '', members: int = 1, description: str = '') -> RdsDistrict:
+    def addDistrict(
+        self, district: Union[int, RdsDistrict], name: str = "", members: int = 1, description: str = ""
+    ) -> RdsDistrict:
         if not isinstance(district, RdsDistrict):
             district = self.createDistrict(district, name, members, description)
 
@@ -311,15 +335,13 @@ class RdsPlan(RdsBaseModel):
 
     def isValid(self):
         """Test whether plan meets minimum specifications for use"""
-        return self.assignLayer is not None and \
-            self.distLayer is not None and \
-            self.geoLayer is not None and \
-            bool(
-                self._name and
-                self._popField and
-                self._geoIdField and
-                self._distField
-            ) and 2 <= self.numDistricts <= 2000
+        return (
+            self.assignLayer is not None
+            and self.distLayer is not None
+            and self.geoLayer is not None
+            and bool(self._name and self._popField and self._geoIdField and self._distField)
+            and MIN_DISTRICTS <= self.numDistricts <= MAX_DISTRICTS
+        )
 
     def isDistrictValid(self, district: RdsDistrict):
         maxDeviation = district.members * int(self.totalPopulation * self.deviation / self.numDistricts)
@@ -376,11 +398,11 @@ class RdsPlan(RdsBaseModel):
                     idx = self.assignLayer.fields().lookupField(self.geoIdField)
                     if idx == -1:
                         raise ValueError(
-                            tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                                fieldname=tr('Geo ID'),
+                            tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                                fieldname=tr("Geo ID"),
                                 field=self._geoIdField,
-                                layertype=tr('assignments'),
-                                layername=self.assignLayer.name()
+                                layertype=tr("assignments"),
+                                layername=self.assignLayer.name(),
                             )
                         )
 
@@ -392,11 +414,11 @@ class RdsPlan(RdsBaseModel):
                     idx = self.assignLayer.fields().lookupField(self._distField)
                     if idx == -1:
                         raise ValueError(
-                            tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                                fieldname=tr('district').capitalize(),
+                            tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                                fieldname=tr("district").capitalize(),
                                 field=self._distField,
-                                layertype=tr('assignments'),
-                                layername=self.assignLayer.name()
+                                layertype=tr("assignments"),
+                                layername=self.assignLayer.name(),
                             )
                         )
 
@@ -413,20 +435,20 @@ class RdsPlan(RdsBaseModel):
                     idx = self.distLayer.fields().lookupField(self._distField)
                     if idx == -1:
                         raise ValueError(
-                            tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                                fieldname=tr('district').capitalize(),
+                            tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                                fieldname=tr("district").capitalize(),
                                 field=self._distField,
-                                layertype=tr('district'),
-                                layername=self.distLayer.name()
+                                layertype=tr("district"),
+                                layername=self.distLayer.name(),
                             )
                         )
 
     def addLayersFromGeoPackage(self, gpkgPath: Union[str, pathlib.Path]):
         if not pathlib.Path(gpkgPath).resolve().exists():
-            raise ValueError(tr('File {gpkgPath} does not exist').format(gpkgPath=str(gpkgPath)))
+            raise ValueError(tr("File {gpkgPath} does not exist").format(gpkgPath=str(gpkgPath)))
 
-        assignLayer = QgsVectorLayer(f'{gpkgPath}|layername=assignments', f'{self.name}_assignments', 'ogr')
-        distLayer = QgsVectorLayer(f'{gpkgPath}|layername=districts', f'{self.name}_districts', 'ogr')
+        assignLayer = QgsVectorLayer(f"{gpkgPath}|layername=assignments", f"{self.name}_assignments", "ogr")
+        distLayer = QgsVectorLayer(f"{gpkgPath}|layername=districts", f"{self.name}_districts", "ogr")
 
         self._setAssignLayer(assignLayer)
         self._setDistLayer(distLayer)

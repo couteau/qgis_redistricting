@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - dict/list hybrid collection class
 
         begin                : 2024-09-15
@@ -22,39 +21,23 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import bisect
 import sys
-from collections.abc import (
-    Iterable,
-    Iterator,
-    Mapping,
-    MutableMapping,
-    MutableSequence,
-    Sized
-)
+from collections.abc import Iterable, Iterator, Mapping, MutableMapping, MutableSequence, Sized
 from copy import copy
 from itertools import groupby
-from operator import (
-    attrgetter,
-    itemgetter
-)
+from operator import attrgetter, itemgetter
 from types import GenericAlias
-from typing import (
-    Callable,
-    Generic,
-    TypeVar,
-    Union,
-    overload
-)
+from typing import Callable, Generic, TypeVar, Union, overload
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QObject, pyqtSignal
+
+_REPR_MAX_STRING_LENGTH = 23
 
 
 def truncate_str(s: str):
-    if len(s) > 23:
+    if len(s) > _REPR_MAX_STRING_LENGTH:
         return f"{s[:10]}...{s[-10:]}"
 
     return s
@@ -79,7 +62,7 @@ class KeyedListKeyView(KeyedListView[_T]):
     def __iter__(self) -> Iterator[str]:
         yield from self._reflist._keys
 
-    def __contains__(self, key: str):  # pylint: disable=redefined-outer-name
+    def __contains__(self, key: str):
         return key in self._reflist._items
 
     def __repr__(self):
@@ -97,9 +80,9 @@ class KeyedListValueView(KeyedListView[_T]):
         return item in self._reflist._items.values()
 
     def __repr__(self):
-        return f"KeyedListValueView([{truncate_str(
-            ', '.join(repr(self._reflist._items[k]) for k in self._reflist._keys)
-        )}])"
+        return f"KeyedListValueView([{
+            truncate_str(', '.join(repr(self._reflist._items[k]) for k in self._reflist._keys))
+        }])"
 
     __class_getitem__ = classmethod(GenericAlias)
 
@@ -121,9 +104,9 @@ class KeyedListItemsView(KeyedListView[_T]):
         return v is value or v == value
 
     def __repr__(self):
-        return f"KeyedListItemsView([{truncate_str(
-            ', '.join(f'({k}, {repr(self._reflist._items[k])})' for k in self._reflist._keys)
-        )}])"
+        return f"KeyedListItemsView([{
+            truncate_str(', '.join(f'({k}, {repr(self._reflist._items[k])})' for k in self._reflist._keys))
+        }])"
 
 
 list_type_cache: dict[str, type] = {}
@@ -143,35 +126,29 @@ class KeyedList(Generic[_T], QObject):
         if not all(isinstance(arg, TypeVar) for arg in args):
             name = repr(generic)
             if name not in list_type_cache:
-                list_type_cache[name] = type(cls.__name__, (cls,), {'__args__': args})
-            
+                list_type_cache[name] = type(cls.__name__, (cls,), {"__args__": args})
+
             generic.__origin__ = list_type_cache[name]
 
         return generic
-            
-    @overload
-    def __init__(self, key: Callable[[_T], str]):
-        ...
 
     @overload
-    def __init__(self, key: str):
-        ...
+    def __init__(self, key: Callable[[_T], str]): ...
 
     @overload
-    def __init__(self, key: int):
-        ...
+    def __init__(self, key: str): ...
 
     @overload
-    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: Callable[[_T], str]):
-        ...
+    def __init__(self, key: int): ...
 
     @overload
-    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: str):
-        ...
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: Callable[[_T], str]): ...
 
     @overload
-    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: int):
-        ...
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: str): ...
+
+    @overload
+    def __init__(self, iterable: Union[Iterable[_T], Mapping[str, _T]], key: int): ...
 
     def __init__(self, iterable=None, key=None):
         super().__init__()
@@ -181,7 +158,11 @@ class KeyedList(Generic[_T], QObject):
             iterable = None
 
         if key is None:
-            if hasattr(type(self), "__args__") and len(type(self).__args__) > 0 and hasattr(type(self).__args__[0], "__key__"):
+            if (
+                hasattr(type(self), "__args__")
+                and len(type(self).__args__) > 0
+                and hasattr(type(self).__args__[0], "__key__")
+            ):
                 key = type(self).__args__[0].__key__
             else:
                 raise ValueError("Key function must be supplied to KeyedList")
@@ -233,11 +214,11 @@ class KeyedList(Generic[_T], QObject):
         """return a list of ranges of indices from a list of indices"""
         gb = groupby(enumerate(sorted(indices)), key=lambda x: x[0] - x[1])
         groups = [list(g[1]) for g in gb]
-        return (range(s[0][1], s[-1][1]+1) for s in groups)
+        return (range(s[0][1], s[-1][1] + 1) for s in groups)
 
     def _addkey(self, key: str) -> int:
         if key in self._keys:
-            raise KeyError('Key already in list')
+            raise KeyError("Key already in list")
         self._keys.append(key)
         return len(self._keys) - 1
 
@@ -255,13 +236,13 @@ class KeyedList(Generic[_T], QObject):
 
     def _insertkey(self, index: int, key: str) -> int:
         if key in self._keys:
-            raise KeyError('Key already in list')
+            raise KeyError("Key already in list")
         self._keys.insert(index, key)
         return index
 
     def _replacekey(self, index: int, key: str) -> int:
         if key in self._keys and self._keys.index(key) != index:
-            raise KeyError('Key already in list')
+            raise KeyError("Key already in list")
 
         self._keys[index] = key
         return index
@@ -269,10 +250,10 @@ class KeyedList(Generic[_T], QObject):
     def _replacekeys(self, index: slice, keys: Iterable[str]):
         newkeys = copy(self._keys)
         newkeys[index] = keys
-        
+
         if len(set(newkeys)) != len(newkeys):
             raise KeyError("Keys overlap")
-        
+
         self._keys = newkeys
         return (range(*index.indices(len(self._keys))),)
 
@@ -321,12 +302,12 @@ class KeyedList(Generic[_T], QObject):
 
         if len(olditems) > 0:
             self._items = {k: v for k, v in self._items.items() if k not in oldkeys}
-            self.itemsRemoved.emit(oldrange.start, oldrange.stop-1, olditems)
+            self.itemsRemoved.emit(oldrange.start, oldrange.stop - 1, olditems)
 
         if len(value) > 0:
             self._items.update(value)
             for g in newranges:
-                self.itemsAdded.emit(g.start, g.stop-1, (value[self._keys[i]] for i in g))
+                self.itemsAdded.emit(g.start, g.stop - 1, (value[self._keys[i]] for i in g))
 
     def _delitem(self, index: Union[str, int]):
         if isinstance(index, int):
@@ -349,24 +330,21 @@ class KeyedList(Generic[_T], QObject):
         del self._keys[index]
         self._items = {k: v for k, v in self._items.items() if k not in keys}
 
-        self.itemsRemoved(r.start, r.stop-1, items)
+        self.itemsRemoved(r.start, r.stop - 1, items)
 
     @overload
-    def __getitem__(self, index: int) -> _T:
-        ...
+    def __getitem__(self, index: int) -> _T: ...
 
     @overload
-    def __getitem__(self, index: str) -> _T:
-        ...
+    def __getitem__(self, index: str) -> _T: ...
 
     @overload
-    def __getitem__(self, index: slice) -> Iterable[_T]:
-        ...
+    def __getitem__(self, index: slice) -> Iterable[_T]: ...
 
     def __getitem__(self, index):
         if isinstance(index, slice):
             return type(self)([self._items[i] for i in self._keys[index]], self._keyfunc)
-        
+
         if isinstance(index, int):
             return self._items[self._keys[index]]
 
@@ -376,25 +354,22 @@ class KeyedList(Generic[_T], QObject):
         raise IndexError("Index must be string, integer, or slice")
 
     @overload
-    def __setitem__(self, index: int, value: _T):
-        ...
+    def __setitem__(self, index: int, value: _T): ...
 
     @overload
-    def __setitem__(self, index: str, value: _T):
-        ...
+    def __setitem__(self, index: str, value: _T): ...
 
     @overload
-    def __setitem__(self, index: slice, value: Union[Iterable[_T], Mapping[str, _T]]):
-        ...
+    def __setitem__(self, index: slice, value: Union[Iterable[_T], Mapping[str, _T]]): ...
 
     def __setitem__(self, index: Union[int, str, slice], value: Union[_T, Iterable[_T]]):
         if isinstance(index, slice):
             if not isinstance(value, Iterable):
                 raise TypeError("can only assign an iterable")
-            
+
             if isinstance(value, Mapping):
                 value = value.values()
-                
+
             self._replaceitems(index, value)
         elif isinstance(index, int):
             if index < 0 or index >= len(self._keys):
@@ -410,16 +385,13 @@ class KeyedList(Generic[_T], QObject):
             raise IndexError("invalid index")
 
     @overload
-    def __delitem__(self, index: int):
-        ...
+    def __delitem__(self, index: int): ...
 
     @overload
-    def __delitem__(self, index: str):
-        ...
+    def __delitem__(self, index: str): ...
 
     @overload
-    def __delitem__(self, index: slice):
-        ...
+    def __delitem__(self, index: slice): ...
 
     def __delitem__(self, index: Union[int, str, slice]):
         if isinstance(index, (str, int)):
@@ -491,10 +463,7 @@ class KeyedList(Generic[_T], QObject):
             self.itemsAdded.emit(newranges[0].start, newranges[0].stop, items.values())
         else:
             for g in newranges:
-                self.itemsAdded.emit(
-                    g.start, g.stop,
-                    (self._items[self._keys[i]] for i in g)
-                )
+                self.itemsAdded.emit(g.start, g.stop, (self._items[self._keys[i]] for i in g))
 
     def update(self, values: Union[Iterable[_T], Mapping[str, _T]]):
         if isinstance(values, Mapping):
@@ -507,16 +476,11 @@ class KeyedList(Generic[_T], QObject):
         self._items.update(values)
         for g in updateranges:
             self.itemsReplaced.emit(
-                g.start, g.stop,
-                (self._items[self._keys[i]] for i in g),
-                (olditems[self._keys[i]] for i in g)
+                g.start, g.stop, (self._items[self._keys[i]] for i in g), (olditems[self._keys[i]] for i in g)
             )
         for g in newranges:
             if g:
-                self.itemsAdded.emit(
-                    g.start, g.stop,
-                    (self._items[self._keys[i]] for i in g)
-                )
+                self.itemsAdded.emit(g.start, g.stop, (self._items[self._keys[i]] for i in g))
 
     def index(self, item: _T, start=0, stop=sys.maxsize):
         key = self._keyfunc(item)
@@ -545,7 +509,7 @@ class SortedKeyedList(KeyedList[_T]):
 
     def _addkey(self, key: str) -> int:
         if key in self._keys:
-            raise KeyError('Key already in list')
+            raise KeyError("Key already in list")
         index = bisect.bisect(self._keys, key)
         self._keys.insert(index, key)
         return index
@@ -560,14 +524,14 @@ class SortedKeyedList(KeyedList[_T]):
             self._keys.insert(index, k)
             indices.append(index)
 
-        return self._getranges(indices)
+        return self._getranges(indices)  # pylint: disable=no-member
 
     def _insertkey(self, index: int, key: str) -> int:
         raise NotImplementedError("Cannot insert key into sorted list at arbitrary point")
 
     def _replacekey(self, index: int, key: str) -> int:
         if key in self._keys and bisect.bisect_left(self._keys, key) != index:
-            raise KeyError('Key already in list')
+            raise KeyError("Key already in list")
 
         del self._keys[index]
         newindex = bisect.bisect(self._keys, key)
@@ -587,13 +551,12 @@ class SortedKeyedList(KeyedList[_T]):
             newkeys.insert(index, k)
             indices.append(index)
 
-        return self._getranges(indices)
+        return self._getranges(indices)  # pylint: disable=no-member
 
     def _updatekeys(self, keys: Iterable[str]):
         updateindices = []
         newindices = []
         for k in keys:
-
             if k in self._keys:
                 updateindices.append(bisect.bisect_left(self._keys, k))
             else:
@@ -601,8 +564,8 @@ class SortedKeyedList(KeyedList[_T]):
                 self._keys.insert(index, k)
                 newindices.append(index)
 
-        return self._getranges(updateindices), self._getranges(newindices)
-    
+        return self._getranges(updateindices), self._getranges(newindices)  # pylint: disable=no-member
+
     def _setitembyindex(self, index, item):
         raise NotImplementedError("Cannot set item at arbitrary point in sorted list")
 

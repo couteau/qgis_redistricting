@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - import assignment file or shapefile to plan
 
         begin                : 2022-06-01
@@ -22,27 +21,15 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
 import mimetypes
 import pathlib
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-    Union
-)
+from typing import TYPE_CHECKING, Optional, Union
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsTask,
-    QgsVectorLayer
-)
-from qgis.PyQt.QtCore import (
-    NULL,
-    QObject,
-    pyqtSignal
-)
+from qgis.core import Qgis, QgsApplication, QgsTask, QgsVectorLayer
+from qgis.PyQt.QtCore import NULL, QObject, pyqtSignal
 
 from ..utils import tr
 from .errormixin import ErrorListMixin
@@ -66,22 +53,22 @@ class PlanImporter(ErrorListMixin, QObject):
 
         self._error = None
         self._errorLevel = None
-        self._importTask: QgsTask = None
+        self._importTask: Union[ImportAssignmentFileTask, ImportShapeFileTask] = None
 
     def isValid(self) -> bool:
         result = True
         if not self._plan:
-            self.pushError(tr('No plan provided to import service'), Qgis.MessageLevel.Critical)
+            self.pushError(tr("No plan provided to import service"), Qgis.MessageLevel.Critical)
             result = False
         elif not self._plan.isValid():
-            self.pushError(tr('Plan must be valid for import'), Qgis.MessageLevel.Critical)
+            self.pushError(tr("Plan must be valid for import"), Qgis.MessageLevel.Critical)
             result = False
 
         if not self._file:
-            self.pushError(tr('Source file is required for import'), Qgis.MessageLevel.Critical)
+            self.pushError(tr("Source file is required for import"), Qgis.MessageLevel.Critical)
             result = False
         elif not self._file.exists():
-            self.pushError(tr('{file!s} does not exist').format(file=self._file), Qgis.MessageLevel.Critical)
+            self.pushError(tr("{file!s} does not exist").format(file=self._file), Qgis.MessageLevel.Critical)
             result = False
 
         return result
@@ -92,7 +79,7 @@ class PlanImporter(ErrorListMixin, QObject):
         elif isinstance(value, pathlib.Path):
             self._file = value.resolve()
         else:
-            raise ValueError(tr('Invalid type for source path'))
+            raise ValueError(tr("Invalid type for source path"))
 
         return self
 
@@ -113,9 +100,9 @@ class PlanImporter(ErrorListMixin, QObject):
 
     def taskTerminated(self):
         if self._importTask.exception:
-            self.pushError(f'{self._importTask.exception!r}')
+            self.pushError(f"{self._importTask.exception!r}")
         elif self._importTask.isCanceled():
-            self.setError(tr('Import cancelled'), Qgis.UserCanceled)
+            self.setError(tr("Import cancelled"), Qgis.MessageLevel.UserCanceled)
         self._importTask = None
         self.importTerminated.emit(self._plan)
 
@@ -128,7 +115,7 @@ class PlanImporter(ErrorListMixin, QObject):
             return None
 
         if self._plan.assignLayer.isEditable():
-            self.setError(tr('Committing unsaved changes before import'))
+            self.setError(tr("Committing unsaved changes before import"))
             self._plan.assignLayer.commitChanges(True)
 
         self._importTask = self._createImportTask()
@@ -146,7 +133,6 @@ class PlanImporter(ErrorListMixin, QObject):
 
 
 class AssignmentImporter(PlanImporter):
-
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
         self._joinField: str = None
@@ -187,24 +173,33 @@ class AssignmentImporter(PlanImporter):
                 self._joinField = self._plan.geoIdField
 
             mimetype, _ = mimetypes.guess_type(self._file)
-            result = mimetype.startswith((
-                'text/plain',
-                'text/csv',
-                'application/vnd.ms-excel',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml',
-                'application/vnd.oasis.opendocument.spreadsheet'
-            ))
+            result = mimetype.startswith(
+                (
+                    "text/plain",
+                    "text/csv",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml",
+                    "application/vnd.oasis.opendocument.spreadsheet",
+                )
+            )
 
         return result
 
     def _createImportTask(self):
         if self._plan.assignLayer.isEditable():
-            self.pushError(tr('Committing unsaved changes before import'))
+            self.pushError(tr("Committing unsaved changes before import"))
             self._plan.assignLayer.commitChanges(True)
 
         return ImportAssignmentFileTask(
-            self._plan, self._file, self._headerRow, self._geoColumn, self._distColumn,
-            self._delimiter, self._quotechar, self._joinField)
+            self._plan,
+            self._file,
+            self._headerRow,
+            self._geoColumn,
+            self._distColumn,
+            self._delimiter,
+            self._quotechar,
+            self._joinField,
+        )
 
 
 class ShapefileImporter(PlanImporter):
@@ -219,26 +214,37 @@ class ShapefileImporter(PlanImporter):
         result = super().isValid()
 
         if result:
-            self._layer = QgsVectorLayer(str(self._file), '__import_layer')
+            self._layer = QgsVectorLayer(str(self._file), "__import_layer")
             self._layer.setParent(self)
-            if not self._layer.isValid() or self._layer.dataProvider().storageType() != 'ESRI Shapefile':
-                self.pushError(tr('Invalid shapefile for import: {file!s}').format(
-                    file=self._file), Qgis.MessageLevel.Critical)
+            if not self._layer.isValid() or self._layer.dataProvider().storageType() != "ESRI Shapefile":
+                self.pushError(
+                    tr("Invalid shapefile for import: {file!s}").format(file=self._file), Qgis.MessageLevel.Critical
+                )
                 result = False
             elif not self._distField or self._layer.fields().lookupField(self._distField) == -1:
-                self.pushError(tr('Field {field} not found in shapefile {file!s}').format(
-                    field=self._distField, file=self._file), Qgis.MessageLevel.Critical)
+                self.pushError(
+                    tr("Field {field} not found in shapefile {file!s}").format(field=self._distField, file=self._file),
+                    Qgis.MessageLevel.Critical,
+                )
                 result = False
 
         if result:
             if self._nameField and self._layer.fields().lookupField(self._nameField) == -1:
-                self.pushError((tr('Field {field} not found in shapefile {file}') + tr('--Ignoring.')).format(
-                    field=self._nameField, file=self._file), Qgis.MessageLevel.Warning)
+                self.pushError(
+                    (tr("Field {field} not found in shapefile {file}") + tr("--Ignoring.")).format(
+                        field=self._nameField, file=self._file
+                    ),
+                    Qgis.MessageLevel.Warning,
+                )
                 self._nameField = None
 
             if self._membersField and self._layer.fields().lookupField(self._membersField) == -1:
-                self.pushError((tr('Field {field} not found in shapefile {file}') + tr('--Ignoring.')).format(
-                    field=self._membersField, file=self._file), Qgis.MessageLevel.Warning)
+                self.pushError(
+                    (tr("Field {field} not found in shapefile {file}") + tr("--Ignoring.")).format(
+                        field=self._membersField, file=self._file
+                    ),
+                    Qgis.MessageLevel.Warning,
+                )
                 self._membersField = None
 
         return result
@@ -266,7 +272,7 @@ class ShapefileImporter(PlanImporter):
             elif isinstance(dist, str) and dist.isnumeric():
                 dist = int(dist)
             elif not isinstance(dist, int):
-                dist = f.id()+1
+                dist = f.id() + 1
 
             name = f[self._nameField] if self._nameField else None
             members = f[self._membersField] if self._membersField else 1
@@ -297,7 +303,7 @@ class PlanImportService(QObject):
         self.removeTask(plan)
         self.importTerminated.emit(plan)
 
-    def importEquivalencyFile(
+    def importEquivalencyFile(  # noqa: PLR0913
         self,
         plan: RdsPlan,
         source: Union[str, pathlib.Path],
@@ -308,7 +314,7 @@ class PlanImportService(QObject):
         delimiter: str = None,
         quotechar: str = None,
         progress: Feedback = None,
-        startTask: bool = True
+        startTask: bool = True,
     ):
         if plan in self._tasks and self._tasks[plan].status() < QgsTask.Complete:
             return None
@@ -320,11 +326,9 @@ class PlanImportService(QObject):
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
 
-        importer.setSourceFile(source)\
-            .setJoinField(joinField)\
-            .setHeaderRow(headerRow)\
-            .setGeoColumn(geoColumn)\
-            .setDistColumn(distColumn)
+        importer.setSourceFile(source).setJoinField(joinField).setHeaderRow(headerRow).setGeoColumn(
+            geoColumn
+        ).setDistColumn(distColumn)
 
         if delimiter is not None:
             importer.setDelimiter(delimiter)
@@ -336,7 +340,7 @@ class PlanImportService(QObject):
 
         return importer
 
-    def importShapeFile(
+    def importShapeFile(  # noqa: PLR0913
         self,
         plan,
         source: Union[str, pathlib.Path],
@@ -344,7 +348,7 @@ class PlanImportService(QObject):
         nameField: str,
         membersField: str,
         progress: Feedback = None,
-        startTask: bool = True
+        startTask: bool = True,
     ):
         if plan in self._tasks and self._tasks[plan].status() < QgsTask.Complete:
             return None
@@ -356,10 +360,7 @@ class PlanImportService(QObject):
             importer.progressChanged.connect(progress.setValue)
             progress.canceled.connect(importer.cancel)
 
-        importer.setSourceFile(source)\
-            .setDistField(distField)\
-            .setNameField(nameField)\
-            .setMembersField(membersField)
+        importer.setSourceFile(source).setDistField(distField).setNameField(nameField).setMembersField(membersField)
 
         if plan is not None and startTask:
             self.startImport(plan, importer)

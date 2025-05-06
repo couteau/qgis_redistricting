@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - export plans
 
         begin                : 2022-06-01
@@ -22,21 +21,13 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
-from qgis.core import (
-    Qgis,
-    QgsApplication
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.core import Qgis, QgsApplication
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
-from ..models import (
-    RdsField,
-    RdsPlan
-)
+from ..models import RdsField, RdsPlan
 from ..utils import tr
 from .errormixin import ErrorListMixin
 from .tasks.exportplan import ExportRedistrictingPlanTask
@@ -47,7 +38,7 @@ class PlanExporter(ErrorListMixin, QObject):
     exportTerminated = pyqtSignal()
     progressChanged = pyqtSignal(int)
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         plan: RdsPlan,
         equivalencyFile=None,
@@ -56,15 +47,15 @@ class PlanExporter(ErrorListMixin, QObject):
         includeUnassigned=False,
         includeDemographics=False,
         includeMetrics=False,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(parent)
         self._plan = plan
         self.equivalencyFile = equivalencyFile
         self.shapeFile = shapeFile
-        self.assignGeography = \
-            None if assignGeography is None or assignGeography.field == plan.geoIdField \
-            else assignGeography
+        self.assignGeography = (
+            None if assignGeography is None or assignGeography.field == plan.geoIdField else assignGeography
+        )
         self.includeUnassigned = includeUnassigned
         self.includeDemographics = includeDemographics
         self.includeMetrics = includeMetrics
@@ -86,7 +77,7 @@ class PlanExporter(ErrorListMixin, QObject):
             if self._exportTask.exception:
                 self.setError(str(self._exportTask.exception))
             elif self._exportTask.isCanceled():
-                self.setError(tr('Export cancelled'), Qgis.UserCanceled)
+                self.setError(tr("Export cancelled"), Qgis.MessageLevel.UserCanceled)
             self._exportTask = None
             self.exportTerminated.emit()
 
@@ -101,7 +92,7 @@ class PlanExporter(ErrorListMixin, QObject):
             self.includeUnassigned,
             bool(self.equivalencyFile),
             self.equivalencyFile,
-            self.assignGeography
+            self.assignGeography,
         )
 
         self._exportTask.progressChanged.connect(self.setProgress)

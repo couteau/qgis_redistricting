@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - table model wrapping plan manager list
 
         begin                : 2024-03-20
@@ -22,16 +21,9 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import (
-    QAbstractTableModel,
-    QModelIndex,
-    QSize,
-    Qt
-)
-from qgis.PyQt.QtGui import (
-    QColor,
-    QFont
-)
+
+from qgis.PyQt.QtCore import QAbstractTableModel, QModelIndex, QSize, Qt
+from qgis.PyQt.QtGui import QColor, QFont
 
 from ..models import RdsPlan
 from ..utils import tr
@@ -48,11 +40,7 @@ class PlanListModel(QAbstractTableModel):
         self.planList.planRemoved.connect(self.planRemoved)
         self.planList.cleared.connect(self.planListUpdated)
 
-        self.header = [
-            tr('Plan'),
-            tr('Districts'),
-            tr('Description')
-        ]
+        self.header = [tr("Plan"), tr("Districts"), tr("Description")]
 
     def rowCount(self, parent: QModelIndex = ...) -> int:  # pylint: disable=unused-argument
         return len(self.planList)
@@ -100,13 +88,10 @@ class PlanListModel(QAbstractTableModel):
         return self.planList.activePlan
 
     def indexFromPlan(self, plan: RdsPlan):
-        try:
-            row = self.planList.index(plan)
-            return self.createIndex(row, 0)
-        except:  # pylint: disable=bare-except
-            pass
+        if plan not in self.planList:
+            return QModelIndex()
 
-        return QModelIndex()
+        return self.createIndex(self.planList.index(plan), 0)
 
     def activePlanIndex(self) -> QModelIndex:
         if self.activePlan is None:

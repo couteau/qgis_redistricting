@@ -22,10 +22,10 @@ import pytest
 from pytestqt.plugin import QtBot
 from qgis.PyQt.QtCore import Qt
 
-from redistricting.models import RdsMetricsModel, RdsPlan
-from redistricting.services import PlanEditor
-
-# pylint: disable=no-self-use
+from redistricting.models import (
+    RdsMetricsModel,
+    RdsPlan
+)
 
 
 class TestMetricsModel:

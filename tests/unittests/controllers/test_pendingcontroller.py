@@ -18,18 +18,14 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pandas as pd
 import pytest
 from pytest_mock import MockerFixture
 from qgis.PyQt.QtCore import pyqtBoundSignal
 
 from redistricting.controllers import PendingChangesController
-from redistricting.models import (
-    DeltaFieldFilterProxy,
-    DeltaList,
-    DeltaListModel,
-    RdsPlan
-)
+from redistricting.models import DeltaFieldFilterProxy, DeltaList, DeltaListModel, RdsPlan
 from redistricting.services import DeltaUpdateService
 
 # pylint: disable=unused-argument, protected-access
@@ -39,25 +35,27 @@ class TestPendingChangesController:
     @pytest.fixture
     def mock_delta(self, mocker: MockerFixture):
         df = pd.DataFrame.from_records(
-            [{
-                'district': 1,
-                'pop_total': 7,
-                'new_pop_total': 95,
-                'deviation': 5,
-                'pct_deviation': 0.05,
-                'vap_total': 5,
-                'new_vap_total': 80,
-                'vap_apblack': -5,
-                'new_vap_apblack': 25,
-                'pct_vap_apblack': 0.3125,
-                'vap_nh_white': 3,
-                'new_vap_nh_white': 40,
-                'pct_vap_nh_white': 0.5,
-                'vap_hispanic': 0,
-                'new_vap_hispanic': 10,
-                'pct_vap_hispanic': 0.125
-            }],
-            index='district'
+            [
+                {
+                    "district": 1,
+                    "pop_total": 7,
+                    "new_pop_total": 95,
+                    "deviation": 5,
+                    "pct_deviation": 0.05,
+                    "vap_total": 5,
+                    "new_vap_total": 80,
+                    "vap_apblack": -5,
+                    "new_vap_apblack": 25,
+                    "pct_vap_apblack": 0.3125,
+                    "vap_nh_white": 3,
+                    "new_vap_nh_white": 40,
+                    "pct_vap_nh_white": 0.5,
+                    "vap_hispanic": 0,
+                    "new_vap_hispanic": 10,
+                    "pct_vap_hispanic": 0.125,
+                }
+            ],
+            index="district",
         )
         delta = mocker.create_autospec(spec=DeltaList)
         delta.__bool__.return_value = True
@@ -74,20 +72,40 @@ class TestPendingChangesController:
 
     @pytest.fixture
     def mock_model(self, mocker: MockerFixture) -> type[DeltaListModel]:
-        mocker.patch('redistricting.controllers.pending.DeltaFieldFilterProxy', spec=DeltaFieldFilterProxy)
-        cls = mocker.patch('redistricting.controllers.pending.DeltaListModel', spec=DeltaListModel)
+        mocker.patch("redistricting.controllers.pending.DeltaFieldFilterProxy", spec=DeltaFieldFilterProxy)
+        cls = mocker.patch("redistricting.controllers.pending.DeltaListModel", spec=DeltaListModel)
         cls.return_value = mocker.create_autospec(spec=DeltaListModel())
         return cls
 
     @pytest.fixture
-    def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_model, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.pending.DockPendingChanges')
+    def controller(  # noqa: PLR0913
+        self,
+        qgis_iface,
+        mock_planmanager,
+        mock_project,
+        mock_toolbar,
+        mock_update_service,
+        mock_model,
+        mocker: MockerFixture,
+    ):
+        mocker.patch("redistricting.controllers.pending.DockPendingChanges")
         return PendingChangesController(qgis_iface, mock_project, mock_planmanager, mock_toolbar, mock_update_service)
 
     @pytest.fixture
-    def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_model, mocker: MockerFixture):
-        mocker.patch('redistricting.controllers.pending.DockPendingChanges')
-        return PendingChangesController(qgis_iface, mock_project, mock_planmanager_with_active_plan, mock_toolbar, mock_update_service)
+    def controller_with_active_plan(  # noqa: PLR0913
+        self,
+        qgis_iface,
+        mock_planmanager_with_active_plan,
+        mock_project,
+        mock_toolbar,
+        mock_update_service,
+        mock_model,
+        mocker: MockerFixture,
+    ):
+        mocker.patch("redistricting.controllers.pending.DockPendingChanges")
+        return PendingChangesController(
+            qgis_iface, mock_project, mock_planmanager_with_active_plan, mock_toolbar, mock_update_service
+        )
 
     def test_create(self, controller: PendingChangesController, mock_model):
         mock_model.assert_called_once()
@@ -109,7 +127,13 @@ class TestPendingChangesController:
         mock_update_service.updateCompleted.disconnect.assert_called_once()
         mock_update_service.updateTerminated.disconnect.assert_called_once()
 
-    def test_active_plan_changed(self, controller_with_active_plan: PendingChangesController, mock_update_service: DeltaUpdateService, mock_plan, mocker: MockerFixture):
+    def test_active_plan_changed(
+        self,
+        controller_with_active_plan: PendingChangesController,
+        mock_update_service: DeltaUpdateService,
+        mock_plan,
+        mocker: MockerFixture,
+    ):
         controller_with_active_plan.load()
         plan = mocker.PropertyMock(spec=RdsPlan)
         type(controller_with_active_plan.dockwidget).plan = plan
@@ -117,9 +141,16 @@ class TestPendingChangesController:
         plan.assert_called_once_with(mock_plan)
         mock_update_service.getDelta.assert_called_once_with(mock_plan)
         controller_with_active_plan.model.setPlan.assert_called_once_with(
-            mock_plan, mock_update_service.getDelta.return_value)
+            mock_plan, mock_update_service.getDelta.return_value
+        )
 
-    def test_active_plan_changed_none(self, controller_with_active_plan: PendingChangesController, mock_update_service: DeltaUpdateService, mock_plan, mocker: MockerFixture):
+    def test_active_plan_changed_none(
+        self,
+        controller_with_active_plan: PendingChangesController,
+        mock_update_service: DeltaUpdateService,
+        mock_plan,
+        mocker: MockerFixture,
+    ):
         controller_with_active_plan.load()
         plan = mocker.PropertyMock(spec=RdsPlan)
         type(controller_with_active_plan.dockwidget).plan = plan
@@ -129,7 +160,13 @@ class TestPendingChangesController:
         mock_update_service.getDelta.assert_not_called()
         controller_with_active_plan.model.setPlan.assert_called_once_with(None, None)
 
-    def test_update_delta(self, controller_with_active_plan: PendingChangesController, mock_update_service: DeltaUpdateService, mock_plan, mock_delta):
+    def test_update_delta(
+        self,
+        controller_with_active_plan: PendingChangesController,
+        mock_update_service: DeltaUpdateService,
+        mock_plan,
+        mock_delta,
+    ):
         controller_with_active_plan.load()
         controller_with_active_plan.startDelta(mock_plan)
         controller_with_active_plan.model.setDelta.assert_called_once_with(mock_delta)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to add a new geofield
 
         begin                : 2022-06-01
@@ -22,14 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
 import csv
 from contextlib import closing
-from typing import (
-    TYPE_CHECKING,
-    Union
-)
+from typing import TYPE_CHECKING, Union
 
 from qgis.core import (
     QgsExpression,
@@ -44,7 +41,7 @@ from qgis.core import (
     QgsTask,
     QgsVectorFileWriter,
     QgsVectorLayer,
-    QgsWkbTypes
+    QgsWkbTypes,
 )
 from qgis.PyQt.QtCore import QMetaType
 from qgis.utils import spatialite_connect
@@ -54,11 +51,7 @@ from ...utils import tr
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from ...models import (
-        RdsDataField,
-        RdsField,
-        RdsPlan
-    )
+    from ...models import RdsDataField, RdsField, RdsPlan
 
 
 def makeDbfFieldName(fieldName, fields: QgsFields):
@@ -70,13 +63,13 @@ def makeDbfFieldName(fieldName, fields: QgsFields):
     while fields.lookupField(fn) != -1:
         i += 1
         suff = str(i)
-        fn = fieldName[:10-len(suff)] + suff
+        fn = fieldName[: 10 - len(suff)] + suff
 
     return fn
 
 
 class ExportRedistrictingPlanTask(QgsTask):
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         plan: RdsPlan,
         exportShape: bool = True,
@@ -86,9 +79,9 @@ class ExportRedistrictingPlanTask(QgsTask):
         includeUnassigned: bool = False,
         exportEquivalency: bool = True,
         equivalencyFileName: str = None,
-        assignGeography: RdsField = None
+        assignGeography: RdsField = None,
     ):
-        super().__init__(tr('Export assignments'), QgsTask.AllFlags)
+        super().__init__(tr("Export assignments"), QgsTask.Flag.AllFlags)
         self.exportShape = exportShape and shapeFileName and plan.distLayer
         self.shapeFileName = shapeFileName
         self.includeDemographics = includeDemographics
@@ -115,24 +108,16 @@ class ExportRedistrictingPlanTask(QgsTask):
 
     def _createFields(self, context: QgsExpressionContext):
         fields = QgsFields()
-        fieldNames = {
-            self.distField: makeDbfFieldName(self.distField, fields),
-            'name': 'name',
-            'members': 'members'
-        }
+        fieldNames = {self.distField: makeDbfFieldName(self.distField, fields), "name": "name", "members": "members"}
         fields.append(QgsField(fieldNames[self.distField], QMetaType.Type.Int))
-        fields.append(QgsField('name', QMetaType.Type.QString, 'QString', 127))
+        fields.append(QgsField("name", QMetaType.Type.QString, "QString", 127))
         fields.append(QgsField("members", QMetaType.Type.Int))
 
         if self.includeDemographics:
-            fieldNames |= {
-                'population': 'population',
-                'deviation': 'deviation',
-                'pct_deviation': 'pct_dev'
-            }
-            fields.append(QgsField('population', QMetaType.Type.LongLong, 'Integer64', 18, 0))
-            fields.append(QgsField('deviation', QMetaType.Type.Double))
-            fields.append(QgsField('pct_dev', QMetaType.Type.Double))
+            fieldNames |= {"population": "population", "deviation": "deviation", "pct_deviation": "pct_dev"}
+            fields.append(QgsField("population", QMetaType.Type.LongLong, "Integer64", 18, 0))
+            fields.append(QgsField("deviation", QMetaType.Type.Double))
+            fields.append(QgsField("pct_dev", QMetaType.Type.Double))
 
             for f in self.popFields:
                 f.prepare(context)
@@ -140,7 +125,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 fieldNames[fn] = makeDbfFieldName(fn, fields)
                 field = f.makeQgsField(fieldNames[fn])
                 if field.type() in (QMetaType.Type.LongLong, QMetaType.Type.ULongLong, QMetaType.Type.Long):
-                    field.setTypeName('Integer64')
+                    field.setTypeName("Integer64")
                     field.setLength(20)
                     field.setPrecision(0)
                 fields.append(field)
@@ -151,24 +136,20 @@ class ExportRedistrictingPlanTask(QgsTask):
                 fieldNames[fn] = makeDbfFieldName(fn, fields)
                 field = f.makeQgsField(fieldNames[fn])
                 if field.type() in (QMetaType.Type.LongLong, QMetaType.Type.ULongLong, QMetaType.Type.Long):
-                    field.setTypeName('Integer64')
+                    field.setTypeName("Integer64")
                     field.setLength(20)
                     field.setPrecision(0)
                 fields.append(field)
                 if f.pctBase:
-                    fn = f'pct_{f.fieldName}'
-                    fieldNames[fn] = makeDbfFieldName(f'p_{f.fieldName}', fields)
+                    fn = f"pct_{f.fieldName}"
+                    fieldNames[fn] = makeDbfFieldName(f"p_{f.fieldName}", fields)
                     fields.append(QgsField(fieldNames[fn], QMetaType.Type.Double))
 
         if self.includeMetrics:
-            fieldNames |= {
-                'polsbypopper': 'polsbypop',
-                'reock': 'reock',
-                'convexhull': 'convexhull'
-            }
-            fields.append(QgsField('polsbypop', QMetaType.Type.Double))
-            fields.append(QgsField('reock', QMetaType.Type.Double))
-            fields.append(QgsField('convexhull', QMetaType.Type.Double))
+            fieldNames |= {"polsbypopper": "polsbypop", "reock": "reock", "convexhull": "convexhull"}
+            fields.append(QgsField("polsbypop", QMetaType.Type.Double))
+            fields.append(QgsField("reock", QMetaType.Type.Double))
+            fields.append(QgsField("convexhull", QMetaType.Type.Double))
         return fields, fieldNames
 
     def _createDistrictsMemoryLayer(self):
@@ -179,11 +160,11 @@ class ExportRedistrictingPlanTask(QgsTask):
             return None
 
         if not self.includeUnassigned:
-            flt = f'{self.distField} != 0 AND {self.distField} IS NOT NULL'
+            flt = f"{self.distField} != 0 AND {self.distField} IS NOT NULL"
         else:
             flt = None
 
-        layer = QgsVectorLayer(f'MultiPolygon?crs={self.distLayer.crs()}&index=yes', 'tempshape', 'memory')
+        layer = QgsVectorLayer(f"MultiPolygon?crs={self.distLayer.crs()}&index=yes", "tempshape", "memory")
         layer.setCrs(self.distLayer.crs())
 
         context = QgsExpressionContext()
@@ -205,7 +186,7 @@ class ExportRedistrictingPlanTask(QgsTask):
 
         features = []
         for f in self.distLayer.getFeatures(request):
-            if (dist := self.districts[f['district']]) is not None:
+            if (dist := self.districts[f["district"]]) is not None:
                 feat = QgsFeature()
                 data = []
                 for srcFld in fieldNames:
@@ -228,9 +209,7 @@ class ExportRedistrictingPlanTask(QgsTask):
         if success:
             layer.updateExtents()
         else:
-            self.exception = RuntimeError(
-                tr("Error when creating shapefile: {}").format(pr.lastError())
-            )
+            self.exception = RuntimeError(tr("Error when creating shapefile: {}").format(pr.lastError()))
 
         return layer if success else None
 
@@ -266,22 +245,24 @@ class ExportRedistrictingPlanTask(QgsTask):
 
     def _exportEquivalency(self):
         if self.assignGeography:
-            geoPackagePath = self.assignLayer.dataProvider().dataSourceUri().split('|')[0]
+            geoPackagePath = self.assignLayer.dataProvider().dataSourceUri().split("|")[0]
             with closing(spatialite_connect(geoPackagePath)) as db:
-                sql = f'SELECT DISTINCT {self.assignGeography.fieldName}, {self.distField} ' \
-                    f'FROM assignments ORDER BY {self.assignGeography.fieldName}'
+                sql = (
+                    f'SELECT DISTINCT "{self.assignGeography.fieldName}", "{self.distField}" '  # noqa: S608
+                    f'FROM assignments ORDER BY "{self.assignGeography.fieldName}"'
+                )
                 c = db.execute(sql)
                 total = c.rowcount
                 count = 0
                 chunkSize = total // 100
 
-                with open(self.equivalencyFileName, 'w+', encoding='utf-8') as f:
+                with open(self.equivalencyFileName, "w+", encoding="utf-8") as f:
                     writer = csv.writer(f)
-                    writer.writerow([self.assignGeography.fieldName, tr('district')])
+                    writer.writerow([self.assignGeography.fieldName, tr("district")])
                     while chunk := c.fetchmany(chunkSize):
                         writer.writerows(chunk)
                         count += 1
-                        self.setProgress(count/total)
+                        self.setProgress(count / total)
         else:
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()
             saveOptions.driverName = "csv"
@@ -290,7 +271,7 @@ class ExportRedistrictingPlanTask(QgsTask):
             saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
             saveOptions.attributes = [
                 self.assignLayer.fields().indexFromName(self.geoIdField),
-                self.assignLayer.fields().indexFromName(self.distField)
+                self.assignLayer.fields().indexFromName(self.distField),
             ]
             feedback = QgsFeedback()
             feedback.progressChanged.connect(self.setProgress)
@@ -302,7 +283,7 @@ class ExportRedistrictingPlanTask(QgsTask):
                 layer=self.assignLayer,
                 fileName=self.equivalencyFileName,
                 transformContext=QgsProject.instance().transformContext(),
-                options=saveOptions
+                options=saveOptions,
             )
 
             if error != QgsVectorFileWriter.NoError:

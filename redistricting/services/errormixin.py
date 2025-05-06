@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to calculate pending changes
 
         begin                : 2022-01-15
@@ -22,15 +21,10 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Iterable,
-    Union
-)
 
-from qgis.core import (
-    Qgis,
-    QgsMessageLog
-)
+from typing import Iterable, Union
+
+from qgis.core import Qgis, QgsMessageLog
 
 
 class ErrorListMixin:
@@ -51,8 +45,7 @@ class ErrorListMixin:
         return self._errors
 
     def hasErrors(self) -> bool:
-        """Whether the object has encountered any errors
-        """
+        """Whether the object has encountered any errors"""
         return bool(self._errors)
 
     def setError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
@@ -71,10 +64,8 @@ class ErrorListMixin:
         :param level: the message level for the error: Info, Warning, Critical, etc.
         """
         for error in errors:
-            if isinstance(error, Exception):
-                error = str(error)
-            self._errors.append((error, level))
-            QgsMessageLog.logMessage(error, 'Redistricting', level)
+            self._errors.append((str(error) if isinstance(error, Exception) else error, level))
+            QgsMessageLog.logMessage(error, "Redistricting", level)
 
     def pushError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
         """

@@ -1,6 +1,6 @@
 """QGIS Redistricting Plugin - unit tests for model classes
 
-Copyright 2022-2024, Stuart C. Naifeh
+Copyright (C) 2022-2024, Stuart C. Naifeh
 
 /***************************************************************************
  *                                                                         *
@@ -18,29 +18,15 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Annotated,
-    Union
-)
+
+from typing import Annotated, Union
 
 import pytest
 from qgis.PyQt.QtCore import QObject
 
-from redistricting.models.base.model import (
-    Factory,
-    PrivateVar,
-    RdsBaseModel,
-    field,
-    get_real_type,
-    in_range,
-    not_empty,
-    rds_property,
-    set_list
-)
-from redistricting.models.base.serialization import (
-    deserialize,
-    serialize
-)
+from redistricting.models.base.model import Factory, RdsBaseModel
+from redistricting.models.base.prop import field, get_real_type, in_range, not_empty, rds_property
+from redistricting.models.base.serialization import deserialize, serialize
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 
@@ -72,34 +58,6 @@ class TestBaseModel:
 
         assert l == [1]
         assert l is m.f4
-
-    def test_base_model_rebind(self):
-        class M(RdsBaseModel):
-            _dumdum: PrivateVar[list[int]]
-            f1: list[int]
-
-            @rds_property(fset=set_list)
-            def f1(self) -> list[int]:
-                return self._dumdum
-
-            @f1.factory
-            def f1(self) -> list[int]:
-                return []
-
-            @f1.initializer
-            def f1(self, value: list[int]):
-                self._dumdum = value
-
-        assert len(M.__fields__) == 1
-        assert M.f1.fset.__self__ == M.f1  # pylint: disable=no-member
-        assert M.f1.fset.__func__ == set_list.faccessor  # pylint: disable=no-member
-
-        m = M()
-        # pylint: disable=comparison-with-callable,protected-access
-        assert m.f1 == []
-        m.f1 = [1]
-        assert m.f1 == [1]
-        assert m._dumdum == [1]
 
     def test_init(self):
         inst = TestBaseModel.ModelTest()
@@ -179,7 +137,7 @@ class TestBaseModel:
             return []
 
         class Owned:
-            def __init__(self, p: 'ModelTest7'):
+            def __init__(self, p: "ModelTest7"):
                 self.owner = p
 
         class ModelTest7(RdsBaseModel):
@@ -210,27 +168,21 @@ class TestBaseModel:
         assert isinstance(c.field5, Owned)
         assert c.parent() is parent
 
-        c = ModelTest7("Test4", 10, ['a'], [2], None, parent)
+        c = ModelTest7("Test4", 10, ["a"], [2], None, parent)
         assert c.field1 == "Test4"
         assert c.field2 == 10
-        assert c.field3 == ['a']
+        assert c.field3 == ["a"]
         assert c.field4 == [2]
         assert c.field5 is None
         assert c.parent() is parent
 
-    @pytest.mark.parametrize('minmax,value', [
-        [(1, 5), 7],
-        [('a', 'd'), 'e']
-    ])
+    @pytest.mark.parametrize("minmax,value", [[(1, 5), 7], [("a", "d"), "e"]])
     def test_range_outofrange_raises_valueerror(self, minmax, value):
         r = in_range(*minmax)
         with pytest.raises(ValueError):
             r(None, value)
 
-    @pytest.mark.parametrize('minmax,value', [
-        [(1, 2), 'a'],
-        [('a', 'z'), 1]
-    ])
+    @pytest.mark.parametrize("minmax,value", [[(1, 2), "a"], [("a", "z"), 1]])
     def test_range_incompatible_types_raises_typeerror(self, minmax, value):
         r = in_range(*minmax)
         with pytest.raises(TypeError):
@@ -250,7 +202,7 @@ class TestRdsProperty:
 
     def test_get_real_type_annotated_list_returns_annotated_list(self):
         t, v = get_real_type(list[str])
-        assert t == list
+        assert t is list
         assert v is None
 
     def test_not_empty_validator(self):

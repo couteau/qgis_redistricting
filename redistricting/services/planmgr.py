@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - manage a list of plans
 
         begin                : 2024-03-20
@@ -22,23 +21,13 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import sys
-from typing import (
-    Iterable,
-    Optional,
-    SupportsIndex,
-    Union
-)
+from typing import Iterable, Optional, SupportsIndex, Union
 from uuid import UUID
 
-from qgis.core import (
-    Qgis,
-    QgsMessageLog
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.core import Qgis, QgsMessageLog
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 from ..models import RdsPlan
 
@@ -87,25 +76,33 @@ class PlanManager(QObject):
                 plan = UUID(plan)
             except ValueError:
                 QgsMessageLog.logMessage(
-                    self.tr('Plan id {uuid} not found').format(uuid=plan), 'Redistricting', Qgis.MessageLevel.Warning)
+                    self.tr("Plan id {uuid} not found").format(uuid=plan), "Redistricting", Qgis.MessageLevel.Warning
+                )
                 return
 
         if isinstance(plan, UUID):
             p = self._plansById.get(plan)
             if not p:
                 QgsMessageLog.logMessage(
-                    self.tr('Plan id {uuid} not found').format(uuid=str(plan)), 'Redistricting', Qgis.MessageLevel.Warning)
+                    self.tr("Plan id {uuid} not found").format(uuid=str(plan)),
+                    "Redistricting",
+                    Qgis.MessageLevel.Warning,
+                )
                 return
             plan = p
 
         if plan is not None and not isinstance(plan, RdsPlan):
             QgsMessageLog.logMessage(
-                self.tr('Invalid plan: {plan}').format(plan=repr(plan)), 'Redistricting', Qgis.MessageLevel.Critical)
+                self.tr("Invalid plan: {plan}").format(plan=repr(plan)), "Redistricting", Qgis.MessageLevel.Critical
+            )
             return
 
         if plan is not None and not plan.isValid():
             QgsMessageLog.logMessage(
-                self.tr('Cannot activate incomplete plan {plan}').format(plan=plan.name), 'Redistricting', Qgis.MessageLevel.Critical)
+                self.tr("Cannot activate incomplete plan {plan}").format(plan=plan.name),
+                "Redistricting",
+                Qgis.MessageLevel.Critical,
+            )
             return
 
         if self._activePlan != plan:
@@ -114,7 +111,9 @@ class PlanManager(QObject):
             self.activePlanChanged.emit(plan)
 
     def appendPlan(self, plan: RdsPlan, makeActive=True):
-        assert isinstance(plan, RdsPlan)
+        if not isinstance(plan, RdsPlan):
+            raise ValueError("Attempt to add non-plan to plan list")
+
         self._plans.append(plan)
         self._plansById[plan.id] = plan
         self.planAdded.emit(plan)
@@ -122,7 +121,9 @@ class PlanManager(QObject):
             self.setActivePlan(plan)
 
     def removePlan(self, plan: RdsPlan):
-        assert isinstance(plan, RdsPlan)
+        if not isinstance(plan, RdsPlan):
+            raise ValueError("Attempt to remove non-plan from plan list")
+
         if plan in self._plans:
             if self._activePlan is plan:
                 self.setActivePlan(None)

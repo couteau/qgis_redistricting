@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - serialization/deserialization functions
 
         begin                : 2024-09-15
@@ -22,11 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import datetime
 import inspect
 import json
 import logging
-import re
 from functools import partial, reduce, wraps
 from io import StringIO
 from types import GenericAlias
@@ -50,6 +49,8 @@ from uuid import UUID
 import pandas as pd
 from qgis.core import QgsProject, QgsVectorLayer
 
+from ...utils import camel_to_kebab
+
 _ST = TypeVar("_ST")
 
 ScalarType = Union[str, bytes, int, float, bool, None]
@@ -70,6 +71,7 @@ def wrap_simple_serializer(f):
 def wrap_simple_deserializer(f):
     def wrapper(cls, data: Any, **kw):  # pylint: disable=unused-argument
         return f(data)
+
     return wrapper
 
 
@@ -91,7 +93,7 @@ serializers: dict[type, SerializerFunction] = {
     datetime.time: wrap_simple_serializer(datetime.time.isoformat),
     UUID: wrap_simple_serializer(str),
     QgsVectorLayer: wrap_simple_serializer(QgsVectorLayer.id),
-    pd.DataFrame: wrap_simple_serializer(serialize_dataframe)
+    pd.DataFrame: wrap_simple_serializer(serialize_dataframe),
 }
 
 deserializers: dict[type, DeserializerFunction] = {
@@ -100,14 +102,14 @@ deserializers: dict[type, DeserializerFunction] = {
     datetime.time: wrap_simple_deserializer(datetime.time.fromisoformat),
     UUID: wrap_simple_deserializer(UUID),
     QgsVectorLayer: wrap_simple_deserializer(QgsProject.instance().mapLayer),
-    pd.DataFrame: wrap_simple_deserializer(deserialize_dataframe)
+    pd.DataFrame: wrap_simple_deserializer(deserialize_dataframe),
 }
 
 
 def register_serializer(
     dtype: Type[_ST],
     serializer: Union[SimpleSerializeFunction[_ST], SerializerFunction[_ST]],
-    deserializer: Union[SimpleDeserializeFunction[_ST], DeserializerFunction[_ST]]
+    deserializer: Union[SimpleDeserializeFunction[_ST], DeserializerFunction[_ST]],
 ):
     if len(inspect.signature(serializer).parameters) == 1:
         serializers[dtype] = wrap_simple_serializer(serializer)
@@ -120,24 +122,6 @@ def register_serializer(
         deserializers[dtype] = deserializer
 
 
-def camel_to_snake(s: str):
-    return re.sub(r'([A-Z])', r'_\1', s).lower()
-
-
-def snake_to_camel(s: str):
-    f = "".join(c.capitalize() for c in s.split("_"))
-    return f[0].lower() + f[1:]
-
-
-def camel_to_kebab(s: str):
-    return re.sub(r'([A-Z])', r'-\1', s).lower()
-
-
-def kebab_to_camel(s: str):
-    f = "".join(c.capitalize() for c in s.split("-"))
-    return f[0].lower() + f[1:]
-
-
 def kebab_dict(kw: Iterable[tuple[str, Any]]):
     return {camel_to_kebab(k): v for k, v in kw}
 
@@ -146,7 +130,7 @@ _memo = object()
 
 
 def serialize_value(value, memo: dict[int, Any], exclude_none=True):
-    if not id(value) in memo:
+    if id(value) not in memo:
         if type(value) in serializers:
             memo[id(value)] = serializers[type(value)](value, memo, exclude_none)
         else:
@@ -176,7 +160,7 @@ def deserialize_iterable(value: Iterable, *args):
     if len(args) == 0:
         key_type = Any
         elem_type = Any
-    elif isinstance(value, Mapping) and len(args) >= 2:
+    elif isinstance(value, Mapping) and len(args) > 1:
         key_type = args[0]
         elem_type = args[1]
     else:
@@ -184,7 +168,7 @@ def deserialize_iterable(value: Iterable, *args):
         elem_type = args[-1]
 
     if not isinstance(key_type, type) or key_type is Any:
-        key_type = (lambda x: x)  # pylint: disable=unnecessary-lambda-assignment
+        key_type = lambda x: x  # noqa: E731 # pylint: disable=unnecessary-lambda-assignment
 
     if isinstance(elem_type, TypeVar):
         if elem_type.__bound__ is not None:
@@ -205,10 +189,7 @@ def deserialize_iterable(value: Iterable, *args):
     return value
 
 
-def deserialize_value(dtype: type, value: Any, **kw):
-    if value is None:
-        return None
-
+def _get_type_and_args(dtype: type, value: Any):
     # find base type
     args = ()
     dtype = t = _strip_annotations(dtype)
@@ -225,6 +206,15 @@ def deserialize_value(dtype: type, value: Any, **kw):
         else:
             t = get_origin(t)
 
+    return dtype, t, args
+
+
+def deserialize_value(dtype: type, value: Any, **kw):
+    if value is None:
+        return None
+
+    dtype, t, args = _get_type_and_args(dtype, value)
+
     if t in deserializers:
         # if the exact type is in the deserializers dict, use the deserializer for that type
         value = deserializers[t](dtype, value, **kw)
@@ -239,9 +229,7 @@ def deserialize_value(dtype: type, value: Any, **kw):
                     value = None
                 break
         else:
-            if issubclass(t, Mapping):
-                value = dtype(deserialize_iterable(value, *args))
-            elif issubclass(t, Iterable) and t not in (str, bytes):
+            if issubclass(t, Iterable) and t not in (str, bytes):
                 value = dtype(deserialize_iterable(value, *args))
 
     return value

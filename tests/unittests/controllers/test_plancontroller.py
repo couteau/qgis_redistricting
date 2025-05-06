@@ -18,35 +18,25 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
 from pytest_mock import MockerFixture
-from qgis.core import (
-    Qgis,
-    QgsRasterLayer,
-    QgsVectorLayer
-)
+from qgis.core import Qgis, QgsRasterLayer, QgsVectorLayer
 from qgis.PyQt.QtCore import pyqtBoundSignal
-from qgis.PyQt.QtWidgets import (
-    QAction,
-    QDialog
-)
+from qgis.PyQt.QtWidgets import QAction, QDialog
 
-from redistricting import (
-    controllers,
-    gui,
-    services
-)
+from redistricting import controllers, gui, services
 from redistricting.models import RdsPlan
-from redistricting.resources import *  # pylint: disable=wildcard-import, unused-wildcard-import
+from redistricting.resources import *  # noqa: F403  # pylint: disable=wildcard-import, unused-wildcard-import
 
 
 class TestPlanController:
     @pytest.fixture
     def mock_builder(self, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.controllers.plan.PlanBuilder', spec=services.PlanBuilder)
+        builder_class = mocker.patch("redistricting.controllers.plan.PlanBuilder", spec=services.PlanBuilder)
         builder = builder_class.return_value
         builder.setName.return_value = builder
         builder.setNumDistricts.return_value = builder
@@ -69,7 +59,7 @@ class TestPlanController:
 
     @pytest.fixture
     def mock_editor(self, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.controllers.plan.PlanEditor', spec=services.PlanEditor)
+        builder_class = mocker.patch("redistricting.controllers.plan.PlanEditor", spec=services.PlanEditor)
 
         builder = builder_class.fromPlan.return_value
         builder.setName.return_value = builder
@@ -91,29 +81,29 @@ class TestPlanController:
 
     @pytest.fixture
     def mock_edit_dlg(self, mocker: MockerFixture, datadir):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgEditPlan', spec=gui.DlgEditPlan)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgEditPlan", spec=gui.DlgEditPlan)
         dlg = dlg_class.return_value
-        dlg.planName.return_value = 'mocked'
+        dlg.planName.return_value = "mocked"
         dlg.numDistricts.return_value = 5
         dlg.numSeats.return_value = 5
-        dlg.description.return_value = 'mocked edit dialog plan'
+        dlg.description.return_value = "mocked edit dialog plan"
         dlg.deviation.return_value = 0.03
         dlg.geoLayer.return_value = None
         dlg.popLayer.return_value = None
-        dlg.geoIdField.return_value = 'geoid20'
-        dlg.geoIdCaption.return_value = 'Block'
-        dlg.joinField.return_value = 'geoid20'
-        dlg.popField.return_value = 'pop_total'
+        dlg.geoIdField.return_value = "geoid20"
+        dlg.geoIdCaption.return_value = "Block"
+        dlg.joinField.return_value = "geoid20"
+        dlg.popField.return_value = "pop_total"
         dlg.popFields.return_value = []
         dlg.dataFields.return_value = []
         dlg.geoFields.return_value = []
-        dlg.gpkgPath.return_value = datadir / 'test_plan.gpkg'
+        dlg.gpkgPath.return_value = datadir / "test_plan.gpkg"
 
         dlg.importPlan.return_value = False
-        dlg.importPath.return_value = datadir / 'tuscaloosa_be.csv'
-        dlg.importField.return_value = 'geoid20'
+        dlg.importPath.return_value = datadir / "tuscaloosa_be.csv"
+        dlg.importField.return_value = "geoid20"
         dlg.importHeaderRow.return_value = True
-        dlg.importDelim.return_value = ','
+        dlg.importDelim.return_value = ","
         dlg.importQuote.return_value = '"'
         dlg.importGeoCol.return_value = 0
         dlg.importDistCol.return_value = 1
@@ -140,11 +130,27 @@ class TestPlanController:
         return styler
 
     @pytest.fixture
-    def controller(self, qgis_iface, mock_planmanager, mock_project, mock_toolbar, mock_update_service, mock_styler, mock_import_service, mocker: MockerFixture):
+    def controller(  # noqa: PLR0913
+        self,
+        qgis_iface,
+        mock_planmanager,
+        mock_project,
+        mock_toolbar,
+        mock_update_service,
+        mock_styler,
+        mock_import_service,
+        mocker: MockerFixture,
+    ):
         layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
         controller = controllers.PlanController(
-            qgis_iface, mock_project, mock_planmanager,
-            mock_toolbar, layerTreeManager, mock_styler, mock_update_service, mock_import_service
+            qgis_iface,
+            mock_project,
+            mock_planmanager,
+            mock_toolbar,
+            layerTreeManager,
+            mock_styler,
+            mock_update_service,
+            mock_import_service,
         )
         mocker.patch.object(controller, "startProgress")
 
@@ -153,11 +159,27 @@ class TestPlanController:
         controller.unload()
 
     @pytest.fixture
-    def controller_with_active_plan(self, qgis_iface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_update_service, mock_styler, mock_import_service, mocker: MockerFixture):
+    def controller_with_active_plan(  # noqa: PLR0913
+        self,
+        qgis_iface,
+        mock_planmanager_with_active_plan,
+        mock_project,
+        mock_toolbar,
+        mock_update_service,
+        mock_styler,
+        mock_import_service,
+        mocker: MockerFixture,
+    ):
         layerTreeManager = mocker.create_autospec(spec=services.LayerTreeManager)
         controller = controllers.PlanController(
-            qgis_iface, mock_project, mock_planmanager_with_active_plan,
-            mock_toolbar, layerTreeManager, mock_styler, mock_update_service, mock_import_service
+            qgis_iface,
+            mock_project,
+            mock_planmanager_with_active_plan,
+            mock_toolbar,
+            layerTreeManager,
+            mock_styler,
+            mock_update_service,
+            mock_import_service,
         )
         mocker.patch.object(controller, "startProgress")
         controller.load()
@@ -170,7 +192,13 @@ class TestPlanController:
         controller.addPlanToMenu(mock_plan)
         assert len(controller.planMenu.actions()) == 1
 
-    def test_plan_added(self, controller: controllers.PlanController, mock_plan, mock_update_service: services.DistrictUpdater, mock_planmanager):
+    def test_plan_added(
+        self,
+        controller: controllers.PlanController,
+        mock_plan,
+        mock_update_service: services.DistrictUpdater,
+        mock_planmanager,
+    ):
         assert len(controller.planMenu.actions()) == 0
         assert not controller.actionSelectPlan.isEnabled()
         mock_planmanager.__len__.return_value = 1
@@ -195,7 +223,12 @@ class TestPlanController:
         controller_with_active_plan.removePlanFromMenu(mock_plan)
         assert len(controller_with_active_plan.planMenu.actions()) == 0
 
-    def test_plan_removed(self, controller_with_active_plan: controllers.PlanController, mock_plan, mock_update_service: services.DistrictUpdater):
+    def test_plan_removed(
+        self,
+        controller_with_active_plan: controllers.PlanController,
+        mock_plan,
+        mock_update_service: services.DistrictUpdater,
+    ):
         assert len(controller_with_active_plan.planMenu.actions()) == 1
         controller_with_active_plan.planRemoved(mock_plan)
         assert len(controller_with_active_plan.planMenu.actions()) == 0
@@ -237,7 +270,9 @@ class TestPlanController:
         assert not controller.actionCopyPlan.isEnabled()
         assert not controller.planActions.findChild(QAction, "test").isChecked()
 
-    def test_enable_new_plan_has_vector_layer_enables(self, controller: controllers.PlanController, mocker: MockerFixture):
+    def test_enable_new_plan_has_vector_layer_enables(
+        self, controller: controllers.PlanController, mocker: MockerFixture
+    ):
         assert not controller.actionNewPlan.isEnabled()
         controller.project.mapLayers.return_value = {
             uuid4(): mocker.create_autospec(spec=QgsVectorLayer, instance=True)
@@ -261,16 +296,11 @@ class TestPlanController:
         controller.enableNewPlan()
         assert not controller.actionNewPlan.isEnabled()
 
-    @pytest.mark.parametrize(('remove_layers', 'delete_gpkg'), [(False, False), (True, False), (True, True)])
+    @pytest.mark.parametrize(("remove_layers", "delete_gpkg"), [(False, False), (True, False), (True, True)])
     def test_delete_plan(
-        self,
-        controller: controllers.PlanController,
-        mock_plan,
-        remove_layers,
-        delete_gpkg,
-        mocker: MockerFixture
+        self, controller: controllers.PlanController, mock_plan, remove_layers, delete_gpkg, mocker: MockerFixture
     ):
-        dlg = mocker.patch('redistricting.controllers.plan.DlgConfirmDelete')
+        dlg = mocker.patch("redistricting.controllers.plan.DlgConfirmDelete")
         dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
         dlg.return_value.removeLayers.return_value = remove_layers
         dlg.return_value.deleteGeoPackage.return_value = delete_gpkg
@@ -300,14 +330,14 @@ class TestPlanController:
         controller_with_active_plan: controllers.PlanController,
         mock_edit_dlg: MagicMock,
         mock_editor: MagicMock,
-        mock_plan: RdsPlan
+        mock_plan: RdsPlan,
     ):
         builder = mock_editor.fromPlan.return_value
 
         controller_with_active_plan.editPlan()
         mock_edit_dlg.assert_called_once_with(mock_plan, controller_with_active_plan.iface.mainWindow())
         mock_editor.fromPlan.assert_called_once()
-        builder.setName.assert_called_once_with('mocked')
+        builder.setName.assert_called_once_with("mocked")
         builder.updatePlan.assert_called_once()
 
     def test_edit_plan_with_param_uses_param(
@@ -315,13 +345,13 @@ class TestPlanController:
         controller: controllers.PlanController,
         mock_edit_dlg: MagicMock,
         mock_editor: MagicMock,
-        mock_plan: RdsPlan
+        mock_plan: RdsPlan,
     ):
         builder = mock_editor.fromPlan.return_value
         controller.editPlan(mock_plan)
         mock_edit_dlg.assert_called_once_with(mock_plan, controller.iface.mainWindow())
         mock_editor.fromPlan.assert_called_once()
-        builder.setName.assert_called_once_with('mocked')
+        builder.setName.assert_called_once_with("mocked")
         builder.updatePlan.assert_called_once()
         controller.styler.stylePlan.assert_not_called()
 
@@ -338,10 +368,10 @@ class TestPlanController:
         controller_with_active_plan: controllers.PlanController,
         mock_edit_dlg: MagicMock,
         mock_editor: MagicMock,
-        mock_plan: RdsPlan
+        mock_plan: RdsPlan,
     ):
         builder = mock_editor.fromPlan.return_value
-        builder.modifiedFields = ['num-districts']
+        builder.modifiedFields = ["num-districts"]
         controller_with_active_plan.editPlan()
         mock_edit_dlg.assert_called_once_with(mock_plan, controller_with_active_plan.iface.mainWindow())
         mock_editor.fromPlan.assert_called_once()
@@ -364,7 +394,7 @@ class TestPlanController:
         controller.newPlan()
         mock_edit_dlg.assert_called_once()
         mock_builder.assert_called_once()
-        builder.setName.assert_called_once_with('mocked')
+        builder.setName.assert_called_once_with("mocked")
         builder.createPlan.assert_called_once()
         controller.importService.importEquivalencyFile.assert_not_called()
 
@@ -382,77 +412,71 @@ class TestPlanController:
         controller.newPlan()
         mock_edit_dlg.assert_not_called()
         mock_builder.assert_not_called()
-        assert "Oops!:Cannot create a redistricting plan for an empty project. Try adding some layers." \
+        assert (
+            "Oops!:Cannot create a redistricting plan for an empty project. Try adding some layers."
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
+        )
 
     def test_copy_plan_no_active_plan_warns(
-        self,
-        controller: controllers.PlanController,
-        mocker: MockerFixture,
-        qgis_iface
+        self, controller: controllers.PlanController, mocker: MockerFixture, qgis_iface
     ):
-        dlg = mocker.patch('redistricting.controllers.plan.DlgCopyPlan', spec=gui.dlgcopy)
+        dlg = mocker.patch("redistricting.controllers.plan.DlgCopyPlan", spec=gui.dlgcopy)
 
         controller.copyPlan()
         dlg.assert_not_called()
-        assert "Oops!:Cannot copy: no active redistricting plan. Try creating a new plan." \
+        assert (
+            "Oops!:Cannot copy: no active redistricting plan. Try creating a new plan."
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
+        )
 
-    @pytest.mark.parametrize('copy_assignments', [True, False])
+    @pytest.mark.parametrize("copy_assignments", [True, False])
     def test_copy_plan_active_plan_executes_copy(
-        self,
-        controller_with_active_plan: controllers.PlanController,
-        copy_assignments,
-        datadir,
-        mocker: MockerFixture
+        self, controller_with_active_plan: controllers.PlanController, copy_assignments, datadir, mocker: MockerFixture
     ):
-        dlg = mocker.patch('redistricting.controllers.plan.DlgCopyPlan', spec=gui.DlgCopyPlan)
-        dlg.return_value.planName = 'copied'
-        dlg.return_value.description = 'copy of plan'
-        dlg.return_value.geoPackagePath = str(datadir / 'test_plan.gpkg')
+        dlg = mocker.patch("redistricting.controllers.plan.DlgCopyPlan", spec=gui.DlgCopyPlan)
+        dlg.return_value.planName = "copied"
+        dlg.return_value.description = "copy of plan"
+        dlg.return_value.geoPackagePath = str(datadir / "test_plan.gpkg")
         dlg.return_value.copyAssignments = copy_assignments
         dlg.return_value.exec.return_value = QDialog.DialogCode.Accepted
 
-        cpy = mocker.patch('redistricting.controllers.plan.PlanCopier', spec=services.PlanCopier)
+        cpy = mocker.patch("redistricting.controllers.plan.PlanCopier", spec=services.PlanCopier)
 
         controller_with_active_plan.copyPlan()
         dlg.assert_called_once()
         cpy.assert_called_once()
         dlg.return_value.exec.assert_called_once()
         cpy.return_value.copyPlan.assert_called_once_with(
-            'copied', 'copy of plan', str(datadir / 'test_plan.gpkg'), copy_assignments)
+            "copied", "copy of plan", str(datadir / "test_plan.gpkg"), copy_assignments
+        )
 
     def test_import_plan_no_active_plan_warns(
-        self,
-        controller: controllers.PlanController,
-        mocker: MockerFixture,
-        qgis_iface
+        self, controller: controllers.PlanController, mocker: MockerFixture, qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportPlan', spec=gui.dlgimportequivalency)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgImportPlan", spec=gui.dlgimportequivalency)
 
         controller.importPlan()
         dlg_class.assert_not_called()
-        assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
+        assert (
+            "Oops!:Cannot import: no active redistricting plan. Try creating a new plan."
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
+        )
 
     def test_import_plan_with_active_plan_executes_import(
-        self,
-        controller_with_active_plan: controllers.PlanController,
-        datadir,
-        mocker: MockerFixture
+        self, controller_with_active_plan: controllers.PlanController, datadir, mocker: MockerFixture
     ):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportPlan', spec=gui.DlgImportPlan)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgImportPlan", spec=gui.DlgImportPlan)
         dlgImportPlan = dlg_class.return_value
-        dlgImportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
-        dlgImportPlan.joinField = 'geoid20'
+        dlgImportPlan.equivalencyFileName = str(datadir / "tuscaloosa_be.csv")
+        dlgImportPlan.joinField = "geoid20"
         dlgImportPlan.headerRow = True
         dlgImportPlan.geoColumn = 0
         dlgImportPlan.distColumn = 1
-        dlgImportPlan.delimiter = ','
+        dlgImportPlan.delimiter = ","
         dlgImportPlan.quotechar = '"'
         dlgImportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
-        importService = mocker.patch.object(controller_with_active_plan, 'importService')
+        importService = mocker.patch.object(controller_with_active_plan, "importService")
 
         controller_with_active_plan.importPlan()
         dlg_class.assert_called_once()
@@ -460,33 +484,29 @@ class TestPlanController:
         dlgImportPlan.exec.assert_called_once()
 
     def test_import_shapefile_no_active_plan_warns(
-        self,
-        controller: controllers.PlanController,
-        mocker: MockerFixture,
-        qgis_iface
+        self, controller: controllers.PlanController, mocker: MockerFixture, qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportShape', spec=gui.DlgImportShape)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgImportShape", spec=gui.DlgImportShape)
 
         controller.importShapefile()
         dlg_class.assert_not_called()
-        assert "Oops!:Cannot import: no active redistricting plan. Try creating a new plan." \
+        assert (
+            "Oops!:Cannot import: no active redistricting plan. Try creating a new plan."
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
+        )
 
     def test_import_shapefile_with_active_plan_executes_import(
-        self,
-        controller_with_active_plan: controllers.PlanController,
-        datadir,
-        mocker: MockerFixture
+        self, controller_with_active_plan: controllers.PlanController, datadir, mocker: MockerFixture
     ):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgImportShape', spec=gui.DlgImportShape)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgImportShape", spec=gui.DlgImportShape)
         dlgImportPlan = dlg_class.return_value
-        dlgImportPlan.shapefileFileName = str(datadir / 'tuscaloosa.shp')
-        dlgImportPlan.distField = 'GEOID20'
+        dlgImportPlan.shapefileFileName = str(datadir / "tuscaloosa.shp")
+        dlgImportPlan.distField = "GEOID20"
         dlgImportPlan.nameField = None
         dlgImportPlan.membersField = None
         dlgImportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
-        importService = mocker.patch.object(controller_with_active_plan, 'importService')
+        importService = mocker.patch.object(controller_with_active_plan, "importService")
 
         controller_with_active_plan.importShapefile()
         dlg_class.assert_called_once()
@@ -494,46 +514,43 @@ class TestPlanController:
         dlgImportPlan.exec.assert_called_once()
 
     def test_export_plan_no_active_plan_warns(
-        self,
-        controller: controllers.PlanController,
-        mocker: MockerFixture,
-        qgis_iface
+        self, controller: controllers.PlanController, mocker: MockerFixture, qgis_iface
     ):
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgExportPlan', spec=gui.dlgexport)
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgExportPlan", spec=gui.dlgexport)
 
         controller.exportPlan()
         dlg_class.assert_not_called()
-        assert "Oops!:Cannot export: no active redistricting plan. Try creating a new plan." \
+        assert (
+            "Oops!:Cannot export: no active redistricting plan. Try creating a new plan."
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
+        )
 
     def test_export_plan_with_active_plan_executes_export(
-        self,
-        controller_with_active_plan: controllers.PlanController,
-        datadir,
-        mocker: MockerFixture
+        self, controller_with_active_plan: controllers.PlanController, datadir, mocker: MockerFixture
     ):
-        mocker.patch('redistricting.controllers.plan.GeoFieldsModel')
-        dlg_class = mocker.patch('redistricting.controllers.plan.DlgExportPlan')
+        mocker.patch("redistricting.controllers.plan.GeoFieldsModel")
+        dlg_class = mocker.patch("redistricting.controllers.plan.DlgExportPlan")
         dlgExportPlan = dlg_class.return_value
 
         dlgExportPlan.exportEquivalency = True
-        dlgExportPlan.equivalencyFileName = str(datadir / 'tuscaloosa_be.csv')
+        dlgExportPlan.equivalencyFileName = str(datadir / "tuscaloosa_be.csv")
         dlgExportPlan.equivalencyGeography = controller_with_active_plan.planManager.activePlan.geoFields[0]
         dlgExportPlan.exportShapefile = True
-        dlgExportPlan.shapefileFileName = str(datadir / 'tuscaloosa.shp')
+        dlgExportPlan.shapefileFileName = str(datadir / "tuscaloosa.shp")
         dlgExportPlan.includeUnassigned = False
         dlgExportPlan.includeDemographics = True
         dlgExportPlan.includeMetrics = True
         dlgExportPlan.exec.return_value = QDialog.DialogCode.Accepted
 
-        exporter_class = mocker.patch('redistricting.controllers.plan.PlanExporter',
-                                      spec=services.PlanExporter)
+        exporter_class = mocker.patch("redistricting.controllers.plan.PlanExporter", spec=services.PlanExporter)
 
         controller_with_active_plan.exportPlan()
         dlg_class.assert_called_once()
         exporter_class.assert_called_once()
         dlgExportPlan.exec.assert_called_once()
 
-    def test_trigger_update(self, controller_with_active_plan: controllers.PlanController, mock_update_service, mock_plan):
+    def test_trigger_update(
+        self, controller_with_active_plan: controllers.PlanController, mock_update_service, mock_plan
+    ):
         controller_with_active_plan.triggerUpdate(mock_plan)
         mock_update_service.updateDistricts.assert_called_once()

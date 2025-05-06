@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-""" QGIS Redistricting - A QGIS plugin for building districts from geographic units
+"""QGIS Redistricting - A QGIS plugin for building districts from geographic units
 
         begin                : 2022-01-15
         copyright            : (C) 2022 by Cryptodira
@@ -22,15 +22,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import os
 import sys
 import typing
-from typing import (
-    Any,
-    Callable,
-    TypeVar,
-    Union
-)
+from typing import Any, Callable, TypeVar, Union
 
 from qgis.core import QgsSettings
 from qgis.PyQt.QtCore import QT_VERSION
@@ -46,23 +42,19 @@ __version__ = "0.0.5"
 # noinspection PyPep8Naming
 
 
-class CanceledError(Exception):
-    ...
-
-
 class Settings:
     enableCutEdges: bool
     enableSplits: bool
 
     def __init__(self):
         self._settings = QgsSettings()
-        self._settings.beginGroup('redistricting', QgsSettings.Section.Plugins)
+        self._settings.beginGroup("redistricting", QgsSettings.Section.Plugins)
         self.enableCutEdges = self._settings.value("enable_cut_edges", False, bool)
         self.enableSplits = self._settings.value("enable_split_detail", True, bool)
         self._settings.endGroup()
 
     def saveSettings(self):
-        self._settings.beginGroup('redistricting', QgsSettings.Section.Plugins)
+        self._settings.beginGroup("redistricting", QgsSettings.Section.Plugins)
         self._settings.setValue("enable_cut_edges", self.enableCutEdges)
         self._settings.setValue("enable_split_detail", self.enableSplits)
         self._settings.endGroup()
@@ -76,6 +68,7 @@ if QT_VERSION <= 0x060000:
 
     def typeId(self):
         return QVariant.type(self)
+
     QVariant.typeId = typeId
 
 # patch typing to maintain compatibility with python 3.9
@@ -83,8 +76,8 @@ if not hasattr(typing, "Self"):
     try:
         from typing_extensions import Self  # type: ignore[import]
     except ImportError:
-        class Self:
-            ...
+
+        class Self: ...
 
     setattr(typing, "Self", Self)
 
@@ -92,13 +85,14 @@ if not hasattr(typing, "Self"):
 if not hasattr(typing, "dataclass_transform"):
     T = TypeVar("T")
 
-    def dataclass_transform(*,
-                            eq_default: bool = True,
-                            order_default: bool = False,
-                            kw_only_default: bool = False,
-                            field_specifiers: tuple[Union[type[Any], Callable[..., Any], Any]] = (),
-                            **kwargs: Any,
-                            ) -> Callable[[T], T]:
+    def dataclass_transform(
+        *,
+        eq_default: bool = True,
+        order_default: bool = False,
+        kw_only_default: bool = False,
+        field_specifiers: tuple[Union[type[Any], Callable[..., Any], Any]] = (),
+        **kwargs: Any,
+    ) -> Callable[[T], T]:
         def decorator(cls_or_fn):
             cls_or_fn.__dataclass_transform__ = {
                 "eq_default": eq_default,
@@ -108,6 +102,7 @@ if not hasattr(typing, "dataclass_transform"):
                 "kwargs": kwargs,
             }
             return cls_or_fn
+
         return decorator
 
     setattr(typing, "dataclass_transform", dataclass_transform)
@@ -122,7 +117,7 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :param iface: A QGIS interface instance.
     :type iface: QgsInterface
     """
-    #
-    from .redistricting import \
-        Redistricting  # pylint: disable=import-outside-toplevel
+
+    from .redistricting import Redistricting  # pylint: disable=import-outside-toplevel
+
     return Redistricting(iface)

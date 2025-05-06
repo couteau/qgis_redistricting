@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-'''QGIS Redistricting Plugin - models
+"""QGIS Redistricting Plugin - models
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
@@ -21,34 +20,18 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
-'''
+"""
+
 from .base import lists
-from .base.serialization import (
-    camel_to_kebab,
-    camel_to_snake,
-    deserialize,
-    kebab_to_camel,
-    serialize,
-    snake_to_camel,
-)
+from .base.serialization import deserialize, serialize
 from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
 from .delta import Delta, DeltaList
 from .district import DistrictList, RdsDistrict, RdsUnassigned
 from .field import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
-from .metricslist import (
-    MetricLevel,
-    MetricTriggers,
-    RdsMetric,
-    RdsMetrics,
-    register_metrics,
-)
+from .metricslist import MetricLevel, MetricTriggers, RdsMetric, RdsMetrics, register_metrics
 from .plan import DeviationType, RdsPlan
 from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
-from .validators import (
-    BaseDeviationValidator,
-    MaxDeviationValidator,
-    PlusMinusDeviationValidator,
-)
+from .validators import BaseDeviationValidator, MaxDeviationValidator, PlusMinusDeviationValidator
 from .viewmodels import (
     DeltaFieldFilterProxy,
     DeltaListModel,
@@ -64,49 +47,45 @@ from .viewmodels import (
 )
 
 __all__ = (
-    'lists',
-    'DeviationType',
-    'DistrictColumns',
-    'MetricsColumns',
-    'FieldCategory',
-    'FieldColors',
-    'RdsField',
-    'RdsGeoField',
-    'RdsRelatedField',
-    'RdsDataField',
-    'GeoFieldsModel',
-    'PopFieldsModel',
-    'Delta',
-    'DeltaList',
-    'DeltaListModel',
-    'DeltaFieldFilterProxy',
-    'BaseDeviationValidator',
-    'PlusMinusDeviationValidator',
-    'MaxDeviationValidator',
-    'RdsDistrict',
-    'RdsUnassigned',
-    'DistrictList',
-    'RdsDistrictDataModel',
-    'RdsDistrictFilterFieldsProxyModel',
-    'DistrictSelectModel',
-    'SourceDistrictModel',
-    'TargetDistrictModel',
-    'RdsMetric',
-    'RdsMetrics',
-    'RdsMetricsModel',
-    'RdsSplits',
-    'RdsSplitBase',
-    'RdsSplitDistrict',
-    'RdsSplitGeography',
-    'RdsSplitsModel',
-    'RdsPlan',
-    'serialize',
-    'deserialize',
-    'register_metrics',
-    'MetricLevel',
-    'MetricTriggers',
-    'camel_to_kebab',
-    'camel_to_snake',
-    'kebab_to_camel',
-    'snake_to_camel',
+    "lists",
+    "DeviationType",
+    "DistrictColumns",
+    "MetricsColumns",
+    "FieldCategory",
+    "FieldColors",
+    "RdsField",
+    "RdsGeoField",
+    "RdsRelatedField",
+    "RdsDataField",
+    "GeoFieldsModel",
+    "PopFieldsModel",
+    "Delta",
+    "DeltaList",
+    "DeltaListModel",
+    "DeltaFieldFilterProxy",
+    "BaseDeviationValidator",
+    "PlusMinusDeviationValidator",
+    "MaxDeviationValidator",
+    "RdsDistrict",
+    "RdsUnassigned",
+    "DistrictList",
+    "RdsDistrictDataModel",
+    "RdsDistrictFilterFieldsProxyModel",
+    "DistrictSelectModel",
+    "SourceDistrictModel",
+    "TargetDistrictModel",
+    "RdsMetric",
+    "RdsMetrics",
+    "RdsMetricsModel",
+    "RdsSplits",
+    "RdsSplitBase",
+    "RdsSplitDistrict",
+    "RdsSplitGeography",
+    "RdsSplitsModel",
+    "RdsPlan",
+    "serialize",
+    "deserialize",
+    "register_metrics",
+    "MetricLevel",
+    "MetricTriggers",
 )

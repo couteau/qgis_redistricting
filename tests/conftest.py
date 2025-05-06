@@ -58,7 +58,7 @@ from qgis.PyQt.QtWidgets import (
     QToolBar,
     QWidget,
 )
-from qgis.utils import iface  # pylint: disable=unused-import
+from qgis.utils import iface  # noqa: F401  # pylint: disable=unused-import
 
 # pylint: disable=redefined-outer-name
 
@@ -486,8 +486,6 @@ unittest.mock.patch("qgis.utils.iface", _IFACE).start()
 @pytest.fixture(scope='session', autouse=True)
 def qgis_app():
     """QGIS application fixture."""
-    global _CANVAS, _PARENT, _IFACE  # pylint: disable=global-statement
-
     QgsProject.instance().legendLayersAdded.connect(_APP.processEvents)
 
     yield _APP
@@ -611,11 +609,11 @@ def dist_layer(plan_gpkg_path):
 
 
 # pylint: disable=wrong-import-position
-from redistricting.services.planbuilder import PlanBuilder  # isort:skip # nopep8
-from redistricting.services.districtio import DistrictReader  # isort:skip # nopep8
-from redistricting.models.plan import RdsPlan  # isort: skip # nopep8
-from redistricting.models.base.serialization import deserialize  # isort: skip # nopep8
-from redistricting.models import metrics, splitsmetric  # isort: skip # nopep8; pylint: disable=unused-import
+from redistricting.services.planbuilder import PlanBuilder  # noqa: E402 # isort:skip
+from redistricting.services.districtio import DistrictReader   # noqa: E402 # isort:skip
+from redistricting.models.plan import RdsPlan  # isort: skip  # noqa: E402
+from redistricting.models.base.serialization import deserialize   # noqa: E402 # isort: skip
+from redistricting.models import metrics, splitsmetric   # noqa: F401, E402 # isort: skip; pylint: disable=unused-import
 
 
 @pytest.fixture
@@ -734,7 +732,7 @@ def new_plan(block_layer: QgsVectorLayer, datadir: pathlib.Path):
 
     p.addLayersFromGeoPackage(dst)
     QgsProject.instance().addMapLayers([p.distLayer, p.assignLayer], False)
-    p.metrics['totalPopulation']._value = 227036
+    p.metrics['totalPopulation']._value = 227036 # pylint: disable=protected-access
 
     yield p
 

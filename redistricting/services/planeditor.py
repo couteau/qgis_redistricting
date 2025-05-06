@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to calculate pending changes
 
         begin                : 2022-01-15
@@ -22,33 +21,13 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Iterable,
-    Optional,
-    overload
-)
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsField,
-    QgsProject,
-    QgsVectorDataProvider,
-    QgsVectorLayer
-)
-from qgis.PyQt.QtCore import (
-    QMetaType,
-    QObject,
-    pyqtSignal
-)
+from typing import Iterable, Optional, overload
 
-from ..models import (
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    deserialize,
-    serialize
-)
+from qgis.core import Qgis, QgsApplication, QgsField, QgsProject, QgsVectorDataProvider, QgsVectorLayer
+from qgis.PyQt.QtCore import QMetaType, QObject, pyqtSignal
+
+from ..models import RdsDataField, RdsField, RdsGeoField, deserialize, serialize
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
 from .district import DistrictUpdater
@@ -80,39 +59,37 @@ class PlanEditor(BasePlanBuilder):
             self._updateAssignLayerTask.cancel()
 
     def RaiseChangedReadonlyFieldError(self, attribute: str):
-        raise RuntimeError(tr("Cannot change {attribute} after plan creation").format(attribute=attribute))
+        raise RuntimeError(tr('Cannot change {attribute} after plan creation').format(attribute=attribute))
 
     def setGeoIdField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("GeoID RdsField")
+        self.RaiseChangedReadonlyFieldError('GeoID RdsField')
 
     def setDistField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("District RdsField")
+        self.RaiseChangedReadonlyFieldError('District RdsField')
 
     def setGeoLayer(self, value: QgsVectorLayer):
-        self.RaiseChangedReadonlyFieldError("Geography Layer")
+        self.RaiseChangedReadonlyFieldError('Geography Layer')
 
     def setGeoJoinField(self, value: str):
-        self.RaiseChangedReadonlyFieldError("Geography Join RdsField")
+        self.RaiseChangedReadonlyFieldError('Geography Join RdsField')
 
     @overload
-    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QMetaType.Type):
-        ...
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QMetaType.Type): ...
 
     @overload
-    def _addFieldToLayer(self, layer: QgsVectorLayer, field: QgsField):
-        ...
+    def _addFieldToLayer(self, layer: QgsVectorLayer, field: QgsField): ...
 
     @overload
-    def _addFieldToLayer(self, layer: QgsVectorLayer, fields: Iterable[QgsField]):
-        ...
+    def _addFieldToLayer(self, layer: QgsVectorLayer, fields: Iterable[QgsField]): ...
 
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldOrFieldName, fieldType=None):
         if isinstance(fieldOrFieldName, str):
             if layer.fields().lookupField(fieldOrFieldName) != -1:
                 # fieldName undefined or field already exists
                 self.setError(
-                    tr('Error creating new field: field {field} already exits in layer {layer}').
-                    format(field=fieldOrFieldName, layer=layer.name())
+                    tr('Error creating new field: field {field} already exits in layer {layer}').format(
+                        field=fieldOrFieldName, layer=layer.name()
+                    )
                 )
                 return
             if fieldType is None:
@@ -125,9 +102,9 @@ class PlanEditor(BasePlanBuilder):
         elif isinstance(fieldOrFieldName, Iterable):
             fields = list(fieldOrFieldName)
             if not all(isinstance(f, QgsField) for f in fields):
-                raise ValueError("Argument must be an iterable of QgsField")
+                raise ValueError('Argument must be an iterable of QgsField')
         else:
-            raise ValueError("Argument must be a string, QgsField, or iterable of QgsField")
+            raise ValueError('Argument must be a string, QgsField, or iterable of QgsField')
 
         provider = layer.dataProvider()
         if not QgsVectorDataProvider.AddAttributes & provider.capabilities():
@@ -137,9 +114,10 @@ class PlanEditor(BasePlanBuilder):
             # ignore fields with conflicting names
             if provider.fields().lookupField(field.name()) != -1:
                 self.pushError(
-                    tr('A field named {field} already exists in layer {layer}. Omitting.').
-                    format(field=field.name(), layer=layer.name()),
-                    Qgis.MessageLevel.Warning
+                    tr('A field named {field} already exists in layer {layer}. Omitting.').format(
+                        field=field.name(), layer=layer.name()
+                    ),
+                    Qgis.MessageLevel.Warning,
                 )
                 fields.remove(field)
         if fields:
@@ -181,9 +159,7 @@ class PlanEditor(BasePlanBuilder):
                 provider = self._assignLayer.dataProvider()
                 fields = self._assignLayer.fields()
                 removeidx = [
-                    fields.lookupField(f.fieldName)
-                    for f in removedFields
-                    if fields.lookupField(f.fieldName) != -1
+                    fields.lookupField(f.fieldName) for f in removedFields if fields.lookupField(f.fieldName) != -1
                 ]
                 provider.deleteAttributes(removeidx)
                 self._assignLayer.updateFields()
@@ -226,7 +202,7 @@ class PlanEditor(BasePlanBuilder):
                 self._geoLayer,
                 addedFields,
                 self._geoJoinField,
-                self._geoIdField
+                self._geoIdField,
             )
             self._updateAssignLayerTask.taskCompleted.connect(completed)
             self._updateAssignLayerTask.taskTerminated.connect(terminated)
@@ -279,31 +255,26 @@ class PlanEditor(BasePlanBuilder):
 
     def endPlanUpdate(self):
         newvalues = serialize(self._plan)
-        modifiedFields = {
-            k for k in newvalues if k not in self._oldvalues or newvalues[k] != self._oldvalues[k]
-        }
+        modifiedFields = {k for k in newvalues if k not in self._oldvalues or newvalues[k] != self._oldvalues[k]}
         modifiedFields |= {k for k in self._oldvalues if k not in newvalues}
         self._oldvalues = None
         self._modifiedFields = modifiedFields
 
         if self._updater:
             updateGeometry = updateSplits = updateDemographics = False
-            if "geo-fields" in modifiedFields:
+            if 'geo-fields' in modifiedFields:
                 updateSplits = True
 
-            if modifiedFields & {"data-fields", "pop-fields", "pop-field", "pop-layer"}:
+            if modifiedFields & {'data-fields', 'pop-fields', 'pop-field', 'pop-layer'}:
                 updateSplits = True
                 updateDemographics = True
 
-            if "num-districts" in modifiedFields:
+            if 'num-districts' in modifiedFields:
                 updateGeometry = True
 
             if updateSplits or updateDemographics or updateGeometry:
                 self._updater.updateDistricts(
-                    self._plan,
-                    needDemographics=updateDemographics,
-                    needGeometry=updateGeometry,
-                    force=True
+                    self._plan, needDemographics=updateDemographics, needGeometry=updateGeometry, force=True
                 )
 
     def cancelPlanUpdate(self):

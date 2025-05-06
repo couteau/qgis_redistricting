@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to create plan layers
 
         begin                : 2022-01-15
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -35,11 +35,11 @@ from qgis.core import (
     QgsProject,
     QgsSpatialIndex,
     QgsTask,
-    QgsVectorLayer
+    QgsVectorLayer,
 )
 from qgis.PyQt.QtCore import NULL
 
-from ... import CanceledError
+from ...errors import CanceledError
 from ...utils import tr
 from ._debug import debug_thread
 
@@ -48,13 +48,8 @@ if TYPE_CHECKING:
 
 
 class ImportShapeFileTask(QgsTask):
-    def __init__(
-        self,
-        plan: RdsPlan,
-        shapeFile,
-        importDistField
-    ):
-        super().__init__(tr('Import districts from shapefile'), QgsTask.AllFlags)
+    def __init__(self, plan: RdsPlan, shapeFile, importDistField):
+        super().__init__(tr("Import districts from shapefile"), QgsTask.AllFlags)
         self.assignLayer = plan.assignLayer
         self.distField = plan.distField
         self.shapeFile = shapeFile
@@ -69,7 +64,7 @@ class ImportShapeFileTask(QgsTask):
         if crsSrc.authid() != crsDest.authid():
             transformContext = QgsProject.instance().transformContext()
             xform = QgsCoordinateTransform(crsSrc, crsDest, transformContext)
-            l = QgsVectorLayer(f"multipolygon?crs={crsDest}", "xformlayer",  "memory")
+            l = QgsVectorLayer(f"multipolygon?crs={crsDest}", "xformlayer", "memory")
             pv = l.dataProvider()
             pv.addAttributes(layer.fields().toList())
             l.updateFields()
@@ -93,11 +88,11 @@ class ImportShapeFileTask(QgsTask):
             layer = QgsVectorLayer(self.shapeFile)
             sindex = layer.fields().lookupField(self.importDistField)
             if sindex == -1:
-                self.exception = ValueError('invalid source field for shapefile import')
+                self.exception = ValueError("invalid source field for shapefile import")
                 return False
             dindex = assignLayer.fields().lookupField(self.distField)
             if dindex == -1:
-                self.exception = ValueError('invalid district field for shapefile import')
+                self.exception = ValueError("invalid district field for shapefile import")
                 return False
 
             layer = self.makeProjection(layer)
@@ -112,7 +107,7 @@ class ImportShapeFileTask(QgsTask):
                 elif isinstance(dist, str) and dist.isnumeric():
                     dist = int(dist)
                 elif not isinstance(dist, int):
-                    dist = d.id()+1
+                    dist = d.id() + 1
                 distmap[d[sindex]] = dist
 
             total = assignLayer.featureCount()
@@ -132,7 +127,7 @@ class ImportShapeFileTask(QgsTask):
                 count += 1
                 if self.isCanceled():
                     raise CanceledError()
-                self.setProgress(100*count/total)
+                self.setProgress(100 * count / total)
             assignLayer.commitChanges(True)
 
         except CanceledError:
@@ -147,6 +142,4 @@ class ImportShapeFileTask(QgsTask):
         if result:
             self.assignLayer.reload()
         elif self.exception:
-            QgsMessageLog.logMessage(
-                f'{self.exception!r}', 'Redistricting', Qgis.MessageLevel.Critical
-            )
+            QgsMessageLog.logMessage(f"{self.exception!r}", "Redistricting", Qgis.MessageLevel.Critical)

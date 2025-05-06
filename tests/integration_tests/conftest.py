@@ -18,12 +18,13 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pytest
 from qgis.core import QgsProject
 from qgis.PyQt.QtWidgets import QToolBar
 
 from redistricting import services
-from redistricting.resources import *  # pylint: disable=wildcard-import, unused-wildcard-import
+from redistricting.resources import *  # noqa: F403 # pylint: disable=wildcard-import, unused-wildcard-import
 
 # pylint: disable=unused-argument, redefined-outer-name
 
@@ -75,6 +76,6 @@ def district_update_service():
 @pytest.fixture
 def import_service(district_update_service: services.DistrictUpdater):
     svc = services.PlanImportService()
-    svc.importComplete.connect(lambda plan: district_update_service.updateDistricts(
-        plan, needDemographics=True, needGeometry=True, force=True
-    ))
+    svc.importComplete.connect(
+        lambda plan: district_update_service.updateDistricts(plan, needDemographics=True, needGeometry=True, force=True)
+    )

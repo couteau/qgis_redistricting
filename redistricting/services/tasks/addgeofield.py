@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to add a new geofield
 
         begin                : 2022-06-01
@@ -22,11 +21,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from contextlib import closing
-from typing import (
-    TYPE_CHECKING,
-    List
-)
+
+from typing import TYPE_CHECKING, List
 
 from qgis.core import (
     Qgis,
@@ -35,7 +31,7 @@ from qgis.core import (
     QgsFeatureRequest,
     QgsMessageLog,
     QgsTask,
-    QgsVectorLayer
+    QgsVectorLayer,
 )
 from qgis.utils import spatialite_connect
 
@@ -47,16 +43,16 @@ if TYPE_CHECKING:
 
 
 class AddGeoFieldToAssignmentLayerTask(QgsTask):
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         geoPackagePath: str,
         assignLayer: QgsVectorLayer,
         srcLayer: QgsVectorLayer,
         geoFields: List["RdsField"],
         srcIdField: str,
-        geoIdField: str
+        geoIdField: str,
     ):
-        super().__init__(tr('Add geography field to assignment layer'), QgsTask.AllFlags)
+        super().__init__(tr("Add geography field to assignment layer"), QgsTask.Flag.AllFlags)
         self.geoPackagePath = geoPackagePath
         self.assignLayer = assignLayer
         self.srcLayer = srcLayer
@@ -70,10 +66,9 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
             if not field.isExpression():
                 findex = self.srcLayer.fields().lookupField(field.field)
                 if findex == -1:
-                    raise RuntimeError(tr('Could not find {field} in {source} layer').format(
-                        field=field.field,
-                        source=tr('source')
-                    ))
+                    raise RuntimeError(
+                        tr("Could not find {field} in {source} layer").format(field=field.field, source=tr("source"))
+                    )
 
                 return lambda f: f[findex]
             else:
@@ -87,10 +82,9 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
 
             gindex = self.srcLayer.fields().lookupField(self.srcIdField)
             if gindex == -1:
-                self.exception = RuntimeError(tr('Could not find {field} in {source} layer').format(
-                    field=self.srcIdField,
-                    source=tr('source')
-                ))
+                self.exception = RuntimeError(
+                    tr("Could not find {field} in {source} layer").format(field=self.srcIdField, source=tr("source"))
+                )
                 return False
 
             getters = [makeGetter(geoField) for geoField in self.geoFields]
@@ -98,10 +92,9 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
             request = QgsFeatureRequest()
             request.setFlags(QgsFeatureRequest.NoGeometry)
 
-            with closing(spatialite_connect(self.geoPackagePath)) as db:
-                sql = f'UPDATE assignments SET ' \
-                    f'{",".join(geoField.fieldName + " = ?" for geoField in self.geoFields)} ' \
-                    f'WHERE {self.geoIdField} = ?'
+            with spatialite_connect(self.geoPackagePath) as db:
+                params = ",".join(geoField.fieldName + " = ?" for geoField in self.geoFields)
+                sql = f'UPDATE assignments SET {params} WHERE "{self.geoIdField}" = ?'  # noqa: S608
                 chunk = []
                 chunkSize = 1000
                 total = self.srcLayer.featureCount() or 1
@@ -112,7 +105,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
                     if len(chunk) == chunkSize:
                         db.executemany(sql, chunk)
                         count += chunkSize
-                        self.setProgress(100*count/total)
+                        self.setProgress(100 * count / total)
                         chunk = []
 
                 if len(chunk) > 0:
@@ -130,7 +123,6 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
     def finished(self, result: bool):
         if not result:
             if self.exception is not None:
-                QgsMessageLog.logMessage(
-                    f'{self.exception!r}', 'Redistricting', Qgis.MessageLevel.Critical)
+                QgsMessageLog.logMessage(f"{self.exception!r}", "Redistricting", Qgis.MessageLevel.Critical)
         else:
             self.assignLayer.reload()

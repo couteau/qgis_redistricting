@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Utility to copy extract district data
         for copy/paste
 
@@ -23,28 +22,21 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Iterable
 
 import pandas as pd
-from qgis.PyQt.QtCore import (
-    QAbstractTableModel,
-    Qt
-)
+from qgis.PyQt.QtCore import QAbstractTableModel, Qt
 from qgis.PyQt.QtGui import QBrush
 
-from ..models import (
-    RdsDistrictDataModel,
-    RdsPlan
-)
+from ..models import RdsDistrictDataModel, RdsPlan
 from ..utils import tr
 
 
 class DistrictClipboardAccess:
     def getSelectionData(self, model: QAbstractTableModel, selection: Iterable[tuple[int, int]]) -> pd.DataFrame:
         data = {}
-        index = [
-            model.data(model.createIndex(d, 0), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())
-        ]
+        index = [model.data(model.createIndex(d, 0), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())]
         for c in range(1, model.columnCount()):
             data[model.headerData(c, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)] = [
                 model.data(model.createIndex(d, c), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())
@@ -54,7 +46,7 @@ class DistrictClipboardAccess:
 
         if selection is not None:
             # create a dataframe of bools with the same dimensions as data
-            s = (df != df).fillna(False)
+            s = (df != df).fillna(False)  # noqa: PLR0124
             # set elements to True if in selection
             for row, col in selection:
                 s.iloc[row, col] = True
@@ -71,7 +63,8 @@ class DistrictClipboardAccess:
         def colorRowHeader(row):
             r = 0 if row == tr("Unassigned") else int(row)
             clr: QBrush = model.data(model.index(r, 0), Qt.ItemDataRole.BackgroundRole)
-            return f'background-color: #{clr.color().rgb() & 0xFFFFFF:x};'
+            return f"background-color: #{clr.color().rgb() & 0xFFFFFF:x};"
+
         model = RdsDistrictDataModel(plan)
         df = self.getSelectionData(model, selection)
         return df.style.map_index(colorRowHeader).to_html(doctype_html=True)

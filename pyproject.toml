@@ -5,3 +5,27 @@ max_line_length = 120
 filterwarnings = "ignore:distutils:DeprecationWarning"
 qt_api = "pyqt6"
 addopts = "-nauto --import-mode=importlib -vv --dist loadgroup"
+
+[tool.ruff]
+indent-width = 4
+line-length = 120
+show-fixes = true
+fix = true
+unfixable = ["F401"]
+target-version = "py39"
+
+[tool.ruff.lint]
+ignore = ["E741", "F811", "PLR2004"]
+extend-select = [
+    "PL", # pylint
+    "S",
+]
+
+[tool.ruff.lint.pylint]
+max-branches = 15
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR0915"]

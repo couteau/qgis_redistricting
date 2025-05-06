@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin
 
         QGIS plugin for building political districts from geographic units
-        (Originally generated using Plugin Builder bygsherman@geoapt.com
-        and then heavily modified)
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
-        copyright            : (C) 2022-2024 by Cryptodira
+        copyright            : (C) 2022-2025 by Stuart C. Naifeh
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -26,6 +23,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import pathlib
 
 from qgis.core import Qgis, QgsApplication, QgsProject, QgsProjectDirtyBlocker
@@ -34,7 +32,7 @@ from qgis.PyQt.QtCore import QCoreApplication, QSettings, QTranslator
 from qgis.PyQt.QtWidgets import QMenu, QMessageBox, QToolBar
 from qgis.PyQt.QtXml import QDomDocument
 
-from .resources import *  # pylint: disable=wildcard-import,unused-wildcard-import
+from .resources import *  # noqa # pylint: disable=wildcard-import,unused-wildcard-import
 
 # pylint: disable=wrong-import-position
 # isort: off
@@ -45,10 +43,10 @@ from .controllers import (
     EditAssignmentsController,
     MetricsController,
     PendingChangesController,
-    PlanController
+    PlanController,
 )
-from .gui import metrics_handlers  # pylint: disable=unused-import
-from .models import metrics, splitsmetric  # pylint: disable=unused-import
+from .gui import metrics_handlers  # noqa: F401 # pylint: disable=unused-import
+from .models import metrics, splitsmetric  # noqa: F401 # pylint: disable=unused-import
 from .services import (
     ActionRegistry,
     AssignmentsService,
@@ -59,7 +57,7 @@ from .services import (
     PlanImportService,
     PlanManager,
     PlanStylerService,
-    ProjectStorage
+    ProjectStorage,
 )
 
 
@@ -80,12 +78,12 @@ class Redistricting:
         # initialize plugin directory
         self.pluginDir = pathlib.Path(__file__).parent
 
-        if not hasattr(Qgis, 'UserCanceled'):
-            Qgis.UserCanceled = Qgis.MessageLevel.Success + 0x100
+        if not hasattr(Qgis.MessageLevel, "UserCanceled"):
+            Qgis.MessageLevel.UserCanceled = Qgis.MessageLevel.Success + 0x100
 
         # initialize locale
-        locale = QSettings().value('locale/userLocale')[0:2]
-        localePath = self.pluginDir / 'i18n' / f'{self.name}_{locale}.qm'
+        locale = QSettings().value("locale/userLocale")[0:2]
+        localePath = self.pluginDir / "i18n" / f"{self.name}_{locale}.qm"
 
         if localePath.exists():
             self.translator = QTranslator()
@@ -102,9 +100,7 @@ class Redistricting:
         self.updaterService = DistrictUpdater()
         self.importService = PlanImportService()
         self.importService.importComplete.connect(
-            lambda plan: self.updaterService.updateDistricts(
-                plan, needDemographics=True, needGeometry=True, force=True
-            )
+            lambda plan: self.updaterService.updateDistricts(plan, needDemographics=True, needGeometry=True, force=True)
         )
         self.assignmentsService = AssignmentsService()
         self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService)
@@ -122,23 +118,15 @@ class Redistricting:
             self.layerTreeManger,
             self.planStyler,
             self.updaterService,
-            self.importService
+            self.importService,
         )
 
         self.editController = EditAssignmentsController(
-            self.iface,
-            self.project,
-            self.planManager,
-            self.toolbar,
-            self.assignmentsService
+            self.iface, self.project, self.planManager, self.toolbar, self.assignmentsService
         )
 
         self.metricsController = MetricsController(
-            self.iface,
-            self.project,
-            self.planManager,
-            self.toolbar,
-            self.updaterService
+            self.iface, self.project, self.planManager, self.toolbar, self.updaterService
         )
 
         self.districtController = DistrictController(
@@ -148,29 +136,21 @@ class Redistricting:
             self.toolbar,
             self.assignmentsService,
             self.districtCopier,
-            self.updaterService
+            self.updaterService,
         )
 
         self.pendingController = PendingChangesController(
-            self.iface,
-            self.project,
-            self.planManager,
-            self.toolbar,
-            self.deltaService
+            self.iface, self.project, self.planManager, self.toolbar, self.deltaService
         )
 
         self.contextConroller = ContextMenuController(
-            self.iface,
-            self.project,
-            self.planManager,
-            self.toolbar,
-            self.planController
+            self.iface, self.project, self.planManager, self.toolbar, self.planController
         )
 
     @staticmethod
     def tr(message):
         # noinspection PyTypeChecker,PyArgumentList,PyCallByClass
-        return QCoreApplication.translate('redistricting', message)
+        return QCoreApplication.translate("redistricting", message)
 
     def initGui(self):
         """Create the menu entries, toolbar buttons, actions, and dock widgets."""
@@ -240,7 +220,7 @@ class Redistricting:
 
         # iface.addToolBar adds the toolbar to the View|Toolbars menu,
         # but iface has no removeToolBar method, so we need another way
-        toolbarMenu = self.iface.mainWindow().findChild(QMenu, 'mToolbarMenu')
+        toolbarMenu = self.iface.mainWindow().findChild(QMenu, "mToolbarMenu")
         if toolbarMenu is not None:
             toolbarMenu.removeAction(self.toolbar.toggleViewAction())
         self.iface.mainWindow().removeToolBar(self.toolbar)
@@ -258,22 +238,27 @@ class Redistricting:
 
         if storage.needsMigration():
             # confirm migration
-            if QMessageBox.warning(
-                self.iface.mainWindow(),
-                self.tr('Redistricting Plugin'),
-                self.tr('The project was created with an older version of the Redistricting plugin. '
-                        'All plans will be updated to the current version. This cannot be undone. '
-                        'Please ensure you have a backup of your project before proceeding.'),
-                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
-            ) == QMessageBox.StandardButton.Cancel:
+            if (
+                QMessageBox.warning(
+                    self.iface.mainWindow(),
+                    self.tr("Redistricting Plugin"),
+                    self.tr(
+                        "The project was created with an older version of the Redistricting plugin. "
+                        "All plans will be updated to the current version. This cannot be undone. "
+                        "Please ensure you have a backup of your project before proceeding."
+                    ),
+                    QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                )
+                == QMessageBox.StandardButton.Cancel
+            ):
                 return
 
             oldVersion = storage.version
             storage.migrate()
             self.iface.messageBar().pushMessage(
-                self.tr('Redistricting Plugin'),
-                self.tr(f'Plans migrated from schema version {oldVersion} to {storage.version}.'),
-                level=Qgis.MessageLevel.Success
+                self.tr("Redistricting Plugin"),
+                self.tr(f"Plans migrated from schema version {oldVersion} to {storage.version}."),
+                level=Qgis.MessageLevel.Success,
             )
 
         self.planManager.extend(storage.readRedistrictingPlans())
@@ -324,7 +309,8 @@ class Redistricting:
 
         layer = self.project.mapLayer(layerid)
         deletePlans = {
-            plan for plan in self.planManager
+            plan
+            for plan in self.planManager
             if layer in (plan.geoLayer, plan.popLayer, plan.assignLayer, plan.distLayer)
         }
 

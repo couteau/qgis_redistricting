@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin New/Edit Plan Wizard - Import Page
 
         begin                : 2022-01-15
@@ -22,40 +21,32 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import csv
 import os
 from io import IOBase
 from itertools import islice
-from typing import (
-    Iterable,
-    Union
-)
+from typing import Iterable, Union
 
 from osgeo import gdal
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QLabel,
-    QTableWidgetItem,
-    QWizardPage
-)
+from qgis.PyQt.QtWidgets import QLabel, QTableWidgetItem, QWizardPage
 
 from .ui.WzpEditPlanImportPage import Ui_wzpImport
 
 
 class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
-        self.registerField('importPath', self.fileImportFrom,
-                           'path', self.fileImportFrom.fileChanged)
-        self.registerField('importField', self.cmbJoinField)
-        self.registerField('headerRow', self.cbxHeaderRow)
-        self.registerField('geoCol', self.sbxGeographyCol)
-        self.registerField('distCol', self.sbxDistrictCol)
-        self.registerField('delimiter', delim := QLabel(self), 'text')
-        self.registerField('quote',  quote := QLabel(self), 'text')
+        self.registerField("importPath", self.fileImportFrom, "path", self.fileImportFrom.fileChanged)
+        self.registerField("importField", self.cmbJoinField)
+        self.registerField("headerRow", self.cbxHeaderRow)
+        self.registerField("geoCol", self.sbxGeographyCol)
+        self.registerField("distCol", self.sbxDistrictCol)
+        self.registerField("delimiter", delim := QLabel(self), "text")
+        self.registerField("quote", quote := QLabel(self), "text")
         delim.setVisible(False)
         quote.setVisible(False)
 
@@ -81,7 +72,7 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
         self.cmbDistrictCol.setVisible(False)
         self.useFieldNames = False
 
-        flt = '*.csv;*.txt;*.xls;*.xlsx;*.xlsm;*.ods'
+        flt = "*.csv;*.txt;*.xls;*.xlsx;*.xlsm;*.ods"
         self.fileImportFrom.setFilter(flt)
 
         self.setFinalPage(True)
@@ -89,24 +80,37 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
     def initializePage(self):
         super().initializePage()
         self.blockSignals(True)
-        self.cmbJoinField.setLayer(self.field('sourceLayer'))
-        self.cmbJoinField.setField(self.field('geoIdField'))
+        self.cmbJoinField.setLayer(self.field("sourceLayer"))
+        self.cmbJoinField.setField(self.field("geoIdField"))
         self.updateDelimiter()
         self.updateQuote()
         self.blockSignals(False)
 
     @property
     def delimiter(self):
-        return ',' if self.rbComma.isChecked() else \
-            '\t' if self.rbTab.isChecked() else \
-            ' ' if self.rbSpace.isChecked() else \
-            self.edOther.text() if self.edOther.text() else ','
+        return (
+            ","
+            if self.rbComma.isChecked()
+            else "\t"
+            if self.rbTab.isChecked()
+            else " "
+            if self.rbSpace.isChecked()
+            else self.edOther.text()
+            if self.edOther.text()
+            else ","
+        )
 
     @property
     def quotechar(self):
-        return '"' if self.rbDoubleQuote.isChecked() else \
-            '\'' if self.rbSingleQuote.isChecked() else \
-            self.edOtherQuote.text() if self.edOtherQuote.text() else '"'
+        return (
+            '"'
+            if self.rbDoubleQuote.isChecked()
+            else "'"
+            if self.rbSingleQuote.isChecked()
+            else self.edOtherQuote.text()
+            if self.edOtherQuote.text()
+            else '"'
+        )
 
     @property
     def headerRow(self):
@@ -129,16 +133,16 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
         return self.cmbDistrictCol.currentIndex() if self.useFieldNames else (self.sbxDistrictCol.value() - 1)
 
     def updateDelimiter(self):
-        self.setField('delimiter', self.delimiter)
+        self.setField("delimiter", self.delimiter)
         self.updatePreview()
 
     def updateQuote(self):
-        self.setField('quote', self.quotechar)
+        self.setField("quote", self.quotechar)
         self.updatePreview()
 
     def updateFields(self):
-        self.setField('geoCol', self.cmbGeographyCol.currentIndex() + 1)
-        self.setField('distCol', self.cmbDistrictCol.currentIndex() + 1)
+        self.setField("geoCol", self.cmbGeographyCol.currentIndex() + 1)
+        self.setField("distCol", self.cmbDistrictCol.currentIndex() + 1)
 
     def updatePreview(self):
         if self.signalsBlocked():
@@ -152,7 +156,7 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
 
         _, ext = os.path.splitext(self.fileImportFrom.path)
 
-        if ext in ('.xls', '.xlsx', '.xlsm', '.ods'):
+        if ext in (".xls", ".xlsx", ".xlsm", ".ods"):
             self.updatePreviewExcel(ext)
         else:
             self.updatePreviewCsv()
@@ -182,8 +186,7 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
         close = not isinstance(csvfile, IOBase)
         if close:
             csvfile = open(  # pylint: disable=unspecified-encoding,consider-using-with
-                self.fileImportFrom.path,
-                newline=''
+                self.fileImportFrom.path, newline=""
             )
         try:
             if header is None:
@@ -202,13 +205,11 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
             if header:
                 self.tbPreview.setHorizontalHeaderLabels(fields)
             else:
-                self.tbPreview.setHorizontalHeaderLabels(
-                    (str(n+1) for n in range(0, len(fields))))
+                self.tbPreview.setHorizontalHeaderLabels((str(n + 1) for n in range(0, len(fields))))
                 csvfile.seek(0)  # rewind the file
 
             for i in range(0, len(fields)):
-                self.tbPreview.horizontalHeaderItem(
-                    i).setTextAlignment(Qt.AlignLeft)
+                self.tbPreview.horizontalHeaderItem(i).setTextAlignment(Qt.AlignmentFlag.AlignLeft)
 
             for row, line in enumerate(islice(reader, 0, 2)):
                 for k, v in enumerate(line):
@@ -221,24 +222,25 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
                 csvfile.close()
 
     def updatePreviewExcel(self, ext):
-        headerConfigKey = 'OGR_XLS_HEADERS' if ext == '.xls' \
-            else 'OGR_XLSX_HEADERS' if ext in ('.xlsx', '.xlsm') \
-            else 'OGR_ODS_HEADERS'
+        headerConfigKey = (
+            "OGR_XLS_HEADERS"
+            if ext == ".xls"
+            else "OGR_XLSX_HEADERS"
+            if ext in (".xlsx", ".xlsm")
+            else "OGR_ODS_HEADERS"
+        )
         oldHeaders = gdal.GetConfigOption(headerConfigKey)
         try:
-            gdal.SetConfigOption(
-                headerConfigKey, 'FORCE' if self.cbxHeaderRow.isChecked() else 'DISABLE')
-            l = QgsVectorLayer(self.fileImportFrom.path, '__import', 'ogr')
+            gdal.SetConfigOption(headerConfigKey, "FORCE" if self.cbxHeaderRow.isChecked() else "DISABLE")
+            l = QgsVectorLayer(self.fileImportFrom.path, "__import", "ogr")
             if l.isValid():
                 fields = [f.name() for f in l.fields()]
-                self.updateWidgets(
-                    fields if self.cbxHeaderRow.isChecked() else len(fields))
+                self.updateWidgets(fields if self.cbxHeaderRow.isChecked() else len(fields))
                 self.tbPreview.setColumnCount(len(fields))
                 self.tbPreview.setHorizontalHeaderLabels(fields)
                 self.tbPreview.setRowCount(2)
                 for i in range(0, len(fields)):
-                    self.tbPreview.horizontalHeaderItem(
-                        i).setTextAlignment(Qt.AlignLeft)
+                    self.tbPreview.horizontalHeaderItem(i).setTextAlignment(Qt.AlignLeft)
 
                 i = l.getFeatures()
                 for n in range(0, min(2, l.featureCount())):
@@ -256,13 +258,13 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
             return
 
         _, ext = os.path.splitext(self.fileImportFrom.path)
-        if ext in ('.xls', '.xlsx', '.xlsm', '.ods'):
+        if ext in (".xls", ".xlsx", ".xlsm", ".ods"):
             self.updatePreviewExcel(ext)
             self.gbDelimiter.setEnabled(False)
             self.gbQuote.setEnabled(False)
             return
 
-        with open(self.fileImportFrom.path, newline='', encoding="utf-8-sig") as csvfile:  # pylint: disable=unspecified-encoding,consider-using-with
+        with open(self.fileImportFrom.path, newline="", encoding="utf-8-sig") as csvfile:  # pylint: disable=unspecified-encoding,consider-using-with
             sample = csvfile.read(1024)
             sniffer = csv.Sniffer()
             dialect = sniffer.sniff(sample)
@@ -273,11 +275,11 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
             self.blockSignals(True)
             self.cbxHeaderRow.setChecked(header)
 
-            if dialect.delimiter == ',':
+            if dialect.delimiter == ",":
                 self.rbComma.setChecked(True)
-            elif dialect.delimiter == '\t':
+            elif dialect.delimiter == "\t":
                 self.rbTab.setChecked(True)
-            elif dialect.delimiter == ' ':
+            elif dialect.delimiter == " ":
                 self.rbSpace.setChecked(True)
             else:
                 self.rbOther.setChecked(True)
@@ -285,7 +287,7 @@ class dlgEditPlanImportPage(Ui_wzpImport, QWizardPage):
 
             if dialect.quotechar == '"':
                 self.rbDoubleQuote.setChecked(True)
-            elif dialect.quotechar == '\'':
+            elif dialect.quotechar == "'":
                 self.rbSingleQuote.setChecked(True)
             else:
                 self.rbOtherQuote.setChecked(True)

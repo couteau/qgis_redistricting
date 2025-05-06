@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - action registry
 
         begin                : 2022-01-15
@@ -22,29 +21,18 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Callable,
-    Optional,
-    Union
-)
 
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
-from qgis.PyQt.QtGui import (
-    QAction,
-    QIcon,
-    QKeySequence
-)
+from typing import TYPE_CHECKING, Callable, Optional, Union
+
+from qgis.PyQt.QtCore import QObject, pyqtSignal
+from qgis.PyQt.QtGui import QAction, QIcon, QKeySequence
 
 if TYPE_CHECKING:
     from ..models import RdsPlan
 
 
 class PlanAction(QAction):
-    triggeredForPlan = pyqtSignal('PyQt_PyObject')
+    triggeredForPlan = pyqtSignal("PyQt_PyObject")
 
     def __init__(self, p1=..., p2=..., p3=...):
         if p3 is ...:
@@ -87,7 +75,7 @@ class ActionRegistry:
 
         return cls._instance
 
-    def _createAction(
+    def _createAction(  # noqa: PLR0913
         self,
         name: str,
         icon: Union[str, QIcon],
@@ -97,7 +85,7 @@ class ActionRegistry:
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         parent: Optional[QObject] = None,
-        actionCls=QAction
+        actionCls=QAction,
     ) -> QAction:
         if isinstance(icon, str):
             icon = QIcon(icon)
@@ -116,7 +104,7 @@ class ActionRegistry:
 
         return action
 
-    def createAction(
+    def createAction(  # noqa: PLR0913
         self,
         name: str,
         icon: Union[str, QIcon],
@@ -126,14 +114,14 @@ class ActionRegistry:
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         callback: Optional[Callable[[], None]] = None,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ) -> QAction:
         action = self._createAction(name, icon, text, tooltip, statustip, shortcut, checkable, parent)
         if callback is not None:
             action.triggered.connect(callback)
         return action
 
-    def createPlanAction(
+    def createPlanAction(  # noqa: PLR0913
         self,
         name: str,
         icon: Union[str, QIcon],
@@ -143,7 +131,7 @@ class ActionRegistry:
         shortcut: Optional[Union[QKeySequence, QKeySequence.StandardKey, str, int]] = None,
         checkable: bool = False,
         callback: Optional[Callable[[], None]] = None,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ) -> PlanAction:
         action: PlanAction = self._createAction(
             name, icon, text, tooltip, statustip, shortcut, checkable, parent, actionCls=PlanAction

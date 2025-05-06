@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - base str enum class and enums
 
         begin                : 2024-09-15
@@ -22,15 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from enum import IntEnum
-from typing import (
-    Any,
-    Iterable
-)
+from typing import Any, Iterable
 
 from qgis.PyQt.QtGui import QColor
 
 from ..utils import tr
+
+MIN_DISTRICTS = 2
+MAX_DISTRICTS = 1001
 
 
 class FieldCategory(IntEnum):
@@ -42,15 +42,15 @@ class FieldCategory(IntEnum):
 
 
 FieldColors = {
-    FieldCategory.Population: QColor(0x566f9fff),
-    FieldCategory.Geography: QColor(0xcfeb9fff),
-    FieldCategory.Demographic: QColor(0x5c98a9ff),
-    FieldCategory.Metrics: QColor(0x83df86ff),
-    FieldCategory.User: QColor(0x9189d7ff),
-    FieldCategory.User + 1: QColor(0xab89d7ff),
-    FieldCategory.User + 2: QColor(0xcc94e3ff),
-    FieldCategory.User + 3: QColor(0xdda6d8ff),
-    FieldCategory.User + 4: QColor(0xf594c6ff)
+    FieldCategory.Population: QColor(0x566F9FFF),
+    FieldCategory.Geography: QColor(0xCFEB9FFF),
+    FieldCategory.Demographic: QColor(0x5C98A9FF),
+    FieldCategory.Metrics: QColor(0x83DF86FF),
+    FieldCategory.User: QColor(0x9189D7FF),
+    FieldCategory.User + 1: QColor(0xAB89D7FF),
+    FieldCategory.User + 2: QColor(0xCC94E3FF),
+    FieldCategory.User + 3: QColor(0xDDA6D8FF),
+    FieldCategory.User + 4: QColor(0xF594C6FF),
 }
 
 
@@ -70,10 +70,11 @@ class ConstStr(str):
 
 class ConstantsMeta(type):
     """Simplified Enum type class where members are strings, not instances of the Enum"""
+
     _members: dict[str, ConstStr]
 
     def __new__(cls, name, bases, classdict: dict[str, Any]):
-        ignore = classdict.get('_ignore', [])
+        ignore = classdict.get("_ignore", [])
         cls._nextindex_ = 0
 
         members = {}
@@ -86,14 +87,14 @@ class ConstantsMeta(type):
             if f.startswith("_") or f in ignore or isinstance(v, type):
                 continue
 
-            if hasattr(v, '__qualname__') and v.__qualname__.startswith(f'{name}.'):
+            if hasattr(v, "__qualname__") and v.__qualname__.startswith(f"{name}."):
                 continue
 
             if f in members:
-                raise TypeError(f'{f!r} already defined as {members[f]!r}')
+                raise TypeError(f"{f!r} already defined as {members[f]!r}")
 
             if isinstance(v, tuple):
-                v, comment = v
+                v, comment = v  # noqa: PLW2901
             else:
                 comment = None
 
@@ -111,7 +112,7 @@ class ConstantsMeta(type):
 
                 cls._nextindex_ += 1
 
-        classdict['_members'] = members
+        classdict["_members"] = members
         return super().__new__(cls, name, bases, classdict)
 
     def __iter__(cls):

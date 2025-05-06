@@ -23,32 +23,35 @@
  ***************************************************************************/
 """
 
-from .gpkg import (
-    createGeoPackage,
-    createGpkgTable,
-    getTableName,
-    spatialite_connect
-)
+from .gpkg import createGeoPackage, createGpkgTable, getTableName, spatialite_connect
 from .intl import tr
 from .layer import LayerReader
 from .misc import (
+    camel_to_kebab,
+    camel_to_snake,
     getDefaultField,
+    kebab_to_camel,
     makeFieldName,
     matchField,
-    random_id
+    random_id,
+    snake_to_camel,
 )
 from .sql import SqlAccess
 
 __all__ = (
-    'createGeoPackage',
-    'createGpkgTable',
-    'getDefaultField',
-    'getTableName',
-    'LayerReader',
-    'makeFieldName',
-    'matchField',
-    'random_id',
-    'spatialite_connect',
-    'SqlAccess',
-    'tr',
+    "createGeoPackage",
+    "createGpkgTable",
+    "getDefaultField",
+    "getTableName",
+    "LayerReader",
+    "makeFieldName",
+    "matchField",
+    "random_id",
+    "camel_to_kebab",
+    "camel_to_snake",
+    "kebab_to_camel",
+    "snake_to_camel",
+    "spatialite_connect",
+    "SqlAccess",
+    "tr",
 )

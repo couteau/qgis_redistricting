@@ -1,6 +1,6 @@
 """QGIS Redistricting Plugin - unit tests
 
-Copyright 2022-2024, Stuart C. Naifeh
+Copyright (C) 2022-2024, Stuart C. Naifeh
 
 /***************************************************************************
  *                                                                         *
@@ -18,6 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pandas as pd
 import pytest
 from qgis.PyQt.QtCore import QModelIndex
@@ -28,7 +29,6 @@ from redistricting.models.viewmodels import RdsSplitsModel
 
 
 class TestSplitsModel:
-
     @pytest.fixture
     def splits_data(self):
         return pd.read_json(
@@ -118,17 +118,17 @@ class TestSplitsModel:
                      "__name": "Tuscaloosa"}
                 ]
             }""",
-            orient="table"
+            orient="table",
         )
 
     def test_create(self, plan: RdsPlan, qtmodeltester):
-        s = RdsSplitsModel(plan.metrics.splits['vtdid'], (*plan.popFields, *plan.dataFields))
+        s = RdsSplitsModel(plan.metrics.splits["vtdid"], (*plan.popFields, *plan.dataFields))
         assert s.rowCount(QModelIndex()) == 0
         assert s.columnCount(QModelIndex()) == 2
         qtmodeltester.check(s)
 
-    def test_create_with_data(self, splits_data, block_layer, qtmodeltester):
-        split = RdsSplits('vtdid', 'VTD', splits_data)
+    def test_create_with_data(self, splits_data, qtmodeltester):
+        split = RdsSplits("vtdid", "VTD", splits_data)
         model = RdsSplitsModel(split, [])
         assert model.rowCount(QModelIndex()) == 4
         assert model.columnCount(QModelIndex()) == 16

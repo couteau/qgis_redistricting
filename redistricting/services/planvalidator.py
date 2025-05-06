@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to calculate pending changes
 
         begin                : 2022-01-15
@@ -22,27 +21,17 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from numbers import Number
-from typing import Optional
+from typing import Optional, cast
 
 import pandas as pd
-from qgis.core import (
-    Qgis,
-    QgsVectorLayer
-)
+from qgis.core import Qgis, QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
-from ..models import (
-    DeviationType,
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    RdsPlan
-)
-from ..utils import (
-    defaults,
-    tr
-)
+from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, RdsSplits
+from ..models.base.lists import KeyedList
+from ..utils import defaults, tr
 from .errormixin import ErrorListMixin
 
 
@@ -51,8 +40,8 @@ class PlanValidator(ErrorListMixin, QObject):
         super().__init__(parent)
         self._plan: RdsPlan = None
 
-        self._name = ''
-        self._description = ''
+        self._name = ""
+        self._description = ""
         self._numDistricts = 0
         self._numSeats = 0
         self._deviation = 0.0
@@ -62,8 +51,8 @@ class PlanValidator(ErrorListMixin, QObject):
         self._splits: dict[str, pd.DataFrame] = {}
 
         self._geoIdField = None
-        self._geoIdCaption = ''
-        self._distField = 'district'
+        self._geoIdCaption = ""
+        self._distField = "district"
 
         self._geoLayer: QgsVectorLayer = None
         self._geoJoinField = None
@@ -105,7 +94,7 @@ class PlanValidator(ErrorListMixin, QObject):
 
         instance._totalPopulation = plan.totalPopulation
         instance._cutEdges = plan.metrics.cutEdges
-        instance._splits = {s.field: s.data for s in plan.metrics.splits}
+        instance._splits = {s.field: s.data for s in cast(KeyedList[RdsSplits], plan.metrics.splits)}
 
         instance._assignLayer = plan.assignLayer
         instance._distLayer = plan.distLayer
@@ -116,38 +105,33 @@ class PlanValidator(ErrorListMixin, QObject):
         if layer:
             if not layer.isValid():
                 self.pushError(
-                    tr('{layer} layer is invalid').
-                    format(layer=layerName.capitalize()),
-                    Qgis.MessageLevel.Critical
+                    tr("{layer} layer is invalid").format(layer=layerName.capitalize()), Qgis.MessageLevel.Critical
                 )
                 result = False
             elif geometryRequired and not layer.isSpatial():
                 self.pushError(
-                    tr('{layer} layer must be a spatial layer').
-                    format(layer=layerName.capitalize()),
-                    Qgis.MessageLevel.Critical
+                    tr("{layer} layer must be a spatial layer").format(layer=layerName.capitalize()),
+                    Qgis.MessageLevel.Critical,
                 )
                 result = False
         elif required:
             self.pushError(
-                tr('{layer} layer is required').
-                format(layer=layerName.capitalize()),
-                Qgis.MessageLevel.Critical
+                tr("{layer} layer is required").format(layer=layerName.capitalize()), Qgis.MessageLevel.Critical
             )
             result = False
 
         return result
 
     def _validateGeoLayer(self):
-        if result := self._validateLayer(self._geoLayer, tr('geogrpahy')):
+        if result := self._validateLayer(self._geoLayer, tr("geogrpahy")):
             if self._geoJoinField:
                 if self._geoLayer.fields().lookupField(self._geoJoinField) == -1:
                     self.pushError(
-                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                            fieldname=tr('join').capitalize(),
+                        tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                            fieldname=tr("join").capitalize(),
                             field=self._geoJoinField,
-                            layertype=tr('geography'),
-                            layername=self._geoLayer.name()
+                            layertype=tr("geography"),
+                            layername=self._geoLayer.name(),
                         )
                     )
                     result = False
@@ -165,46 +149,39 @@ class PlanValidator(ErrorListMixin, QObject):
 
         if (idx := self._popLayer.fields().lookupField(field)) == -1:
             self.pushError(
-                tr('{fieldname} field {field} not found in {layertype} layer {layername}').
-                format(
-                    fieldname=fieldname,
-                    field=field,
-                    layertype=tr('population'),
-                    layername=self._popLayer.name()
+                tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                    fieldname=fieldname, field=field, layertype=tr("population"), layername=self._popLayer.name()
                 ),
-                Qgis.MessageLevel.Critical
+                Qgis.MessageLevel.Critical,
             )
             return False
 
         f = self._popLayer.fields().field(idx)
         if not f.isNumeric():
             self.pushError(
-                tr('{fieldname} field {field} must be numeric').format(
-                    fieldname=fieldname,
-                    field=field
-                ),
-                Qgis.MessageLevel.Critical
+                tr("{fieldname} field {field} must be numeric").format(fieldname=fieldname, field=field),
+                Qgis.MessageLevel.Critical,
             )
             return False
 
         return True
 
     def _validatePopLayer(self):
-        if result := self._validateLayer(self._popLayer, tr('population'), geometryRequired=False):
+        if result := self._validateLayer(self._popLayer, tr("population"), geometryRequired=False):
             if self._popJoinField and self._popLayer.fields().lookupField(self._popJoinField) == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('join').capitalize(),
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("join").capitalize(),
                         field=self._popJoinField,
-                        layertype=tr('population'),
-                        layername=self._popLayer.name()
+                        layertype=tr("population"),
+                        layername=self._popLayer.name(),
                     ),
-                    Qgis.MessageLevel.Critical
+                    Qgis.MessageLevel.Critical,
                 )
                 result = False
 
             if self._popField:
-                result = result and self._validatePopField(self._popField, tr('population').capitalize())
+                result = result and self._validatePopField(self._popField, tr("population").capitalize())
 
             for f in self._popFields:
                 result = result and self._validatePopField(f.field, f.caption)
@@ -220,43 +197,43 @@ class PlanValidator(ErrorListMixin, QObject):
         return result
 
     def _validateAssignLayer(self, strict):
-        result = self._validateLayer(self._assignLayer, tr('assignments'), self._plan is not None)
+        result = self._validateLayer(self._assignLayer, tr("assignments"), self._plan is not None)
 
         if result and self._assignLayer:
             if self._assignLayer.fields().lookupField(self._geoIdField) == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('Geo ID'),
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("Geo ID"),
                         field=self._geoIdField,
-                        layertype=tr('assignments'),
-                        layername=self._assignLayer.name()
+                        layertype=tr("assignments"),
+                        layername=self._assignLayer.name(),
                     ),
-                    Qgis.MessageLevel.Critical
+                    Qgis.MessageLevel.Critical,
                 )
                 result = False
 
             if self._assignLayer.fields().lookupField(self._distField) == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('district').capitalize(),
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("district").capitalize(),
                         field=self._distField,
-                        layertype=tr('assignment'),
-                        layername=self._assignLayer.name()
+                        layertype=tr("assignment"),
+                        layername=self._assignLayer.name(),
                     ),
-                    Qgis.MessageLevel.Critical
+                    Qgis.MessageLevel.Critical,
                 )
                 result = False
 
             for f in self._geoFields:
                 if self._assignLayer.fields().lookupField(f.fieldName) == -1:
                     self.pushError(
-                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                            fieldname=tr('geography').capitalize(),
+                        tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                            fieldname=tr("geography").capitalize(),
                             field=f.fieldName,
-                            layertype=tr('assignment'),
-                            layername=self._assignLayer.name()
+                            layertype=tr("assignment"),
+                            layername=self._assignLayer.name(),
                         ),
-                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning
+                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning,
                     )
                     if strict:
                         result = False
@@ -264,65 +241,65 @@ class PlanValidator(ErrorListMixin, QObject):
         return result
 
     def _validateDistLayer(self, strict):
-        result = self._validateLayer(self._distLayer, tr('district'), self._plan is not None)
+        result = self._validateLayer(self._distLayer, tr("district"), self._plan is not None)
         if result and self._distLayer:
             if self._distLayer.fields().lookupField(self._distField) == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('district').capitalize(),
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("district").capitalize(),
                         field=self._distField,
-                        layertype=tr('district'),
-                        layername=self._distLayer.name()
+                        layertype=tr("district"),
+                        layername=self._distLayer.name(),
                     ),
-                    Qgis.MessageLevel.Critical
+                    Qgis.MessageLevel.Critical,
                 )
                 result = False
 
             for f in self._dataFields:
                 if self._distLayer.fields().lookupField(f.fieldName) == -1:
                     self.pushError(
-                        tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                            fieldname=tr('geography').capitalize(),
+                        tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                            fieldname=tr("geography").capitalize(),
                             field=f.fieldName,
-                            layertype=tr('district'),
-                            layername=self._distLayer.name()
+                            layertype=tr("district"),
+                            layername=self._distLayer.name(),
                         ),
-                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning
+                        Qgis.MessageLevel.Critical if strict else Qgis.MessageLevel.Warning,
                     )
                     if strict:
                         result = False
 
-            if self._distLayer.fields().lookupField('polsbypopper') == -1:
+            if self._distLayer.fields().lookupField("polsbypopper") == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('metric').capitalize(),
-                        field='polsbypopper',
-                        layertype=tr('district'),
-                        layername=self._distLayer.name()
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("metric").capitalize(),
+                        field="polsbypopper",
+                        layertype=tr("district"),
+                        layername=self._distLayer.name(),
                     ),
-                    Qgis.MessageLevel.Warning
+                    Qgis.MessageLevel.Warning,
                 )
 
-            if self._distLayer.fields().lookupField('reock') == -1:
+            if self._distLayer.fields().lookupField("reock") == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('metric').capitalize(),
-                        field='reock',
-                        layertype=tr('district'),
-                        layername=self._distLayer.name()
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("metric").capitalize(),
+                        field="reock",
+                        layertype=tr("district"),
+                        layername=self._distLayer.name(),
                     ),
-                    Qgis.MessageLevel.Warning
+                    Qgis.MessageLevel.Warning,
                 )
 
-            if self._distLayer.fields().lookupField('convexhull') == -1:
+            if self._distLayer.fields().lookupField("convexhull") == -1:
                 self.pushError(
-                    tr('{fieldname} field {field} not found in {layertype} layer {layername}').format(
-                        fieldname=tr('metric').capitalize(),
-                        field='convexhull',
-                        layertype=tr('district'),
-                        layername=self._distLayer.name()
+                    tr("{fieldname} field {field} not found in {layertype} layer {layername}").format(
+                        fieldname=tr("metric").capitalize(),
+                        field="convexhull",
+                        layertype=tr("district"),
+                        layername=self._distLayer.name(),
                     ),
-                    Qgis.MessageLevel.Warning
+                    Qgis.MessageLevel.Warning,
                 )
 
         return result
@@ -330,56 +307,65 @@ class PlanValidator(ErrorListMixin, QObject):
     def validate(self, strict=False):
         result = True
 
-        result = self._name \
-            and self._geoLayer \
-            and self._popLayer \
-            and self._geoJoinField \
-            and self._popJoinField \
-            and self._geoIdField \
-            and self._distField \
-            and self._popField \
-            and self._numDistricts > 1 \
+        result = (
+            self._name
+            and self._geoLayer
+            and self._popLayer
+            and self._geoJoinField
+            and self._popJoinField
+            and self._geoIdField
+            and self._distField
+            and self._popField
+            and self._numDistricts > 1
             and self._numSeats >= self._numDistricts
+        )
 
         if self._numDistricts < 2 or self._numDistricts > defaults.MAX_DISTRICTS:
-            self.pushError(tr('Invalid number of districts for plan: {value}').format(
-                value=self._numDistricts), Qgis.MessageLevel.Critical)
+            self.pushError(
+                tr("Invalid number of districts for plan: {value}").format(value=self._numDistricts),
+                Qgis.MessageLevel.Critical,
+            )
 
         if self._numSeats < self._numDistricts:
             self.pushError(
-                tr('Number of seats ({seats}) must equal or exceed number of districts ({districts})').
-                format(seats=self._numSeats, districts=self._numDistricts),
-                Qgis.MessageLevel.Critical
+                tr("Number of seats ({seats}) must equal or exceed number of districts ({districts})").format(
+                    seats=self._numSeats, districts=self._numDistricts
+                ),
+                Qgis.MessageLevel.Critical,
             )
 
         if not isinstance(self._deviation, Number) or self._deviation < 0:
-            self.pushError(tr('Deviation must be 0 or a positive number'))
+            self.pushError(tr("Deviation must be 0 or a positive number"))
             result = False
 
         if not self._name:
-            self.pushError(tr('Plan name must be set'), Qgis.MessageLevel.Critical)
+            self.pushError(tr("Plan name must be set"), Qgis.MessageLevel.Critical)
 
         if not self._geoIdField:
-            self.pushError(tr('{field} field is required').format(field=tr('Geography ID')), Qgis.MessageLevel.Critical)
+            self.pushError(tr("{field} field is required").format(field=tr("Geography ID")), Qgis.MessageLevel.Critical)
 
         if not self._distField:
-            self.pushError(tr('{field} field is required').format(field=tr('District')), Qgis.MessageLevel.Critical)
+            self.pushError(tr("{field} field is required").format(field=tr("District")), Qgis.MessageLevel.Critical)
 
         if not self._geoJoinField:
-            self.pushError(tr('{field} field is required').format(
-                field=tr('Geograph Join')), Qgis.MessageLevel.Critical)
+            self.pushError(
+                tr("{field} field is required").format(field=tr("Geograph Join")), Qgis.MessageLevel.Critical
+            )
 
         if not self._popJoinField:
-            self.pushError(tr('{field} field is required').format(
-                field=tr('Population Join')), Qgis.MessageLevel.Critical)
+            self.pushError(
+                tr("{field} field is required").format(field=tr("Population Join")), Qgis.MessageLevel.Critical
+            )
 
         if not self._popField:
-            self.pushError(tr('{field} field is required').format(field=tr('Population')), Qgis.MessageLevel.Critical)
+            self.pushError(tr("{field} field is required").format(field=tr("Population")), Qgis.MessageLevel.Critical)
 
-        result = result \
-            and self._validateGeoLayer() \
-            and self._validatePopLayer() \
-            and self._validateAssignLayer(strict) \
+        result = (
+            result
+            and self._validateGeoLayer()
+            and self._validatePopLayer()
+            and self._validateAssignLayer(strict)
             and self._validateDistLayer(strict)
+        )
 
         return result
