@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Custom QgsDockWidget with plan property
 
         begin                : 2024-09-20
@@ -21,7 +20,8 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
- """
+"""
+
 from qgis.gui import QgsDockWidget
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtWidgets import QLabel
@@ -39,7 +39,7 @@ class RdsDockWidget(QgsDockWidget):
         self._plan: RdsPlan = None
         self.lblWaiting = OverlayWidget()
         self.lblWaiting.setVisible(False)
-        self.helpContext: str = 'index.html'
+        self.helpContext: str = "index.html"
         self.dockLocationChanged.connect(self.dockChanged)
 
     @property
@@ -55,7 +55,7 @@ class RdsDockWidget(QgsDockWidget):
 
         if self.lblPlanName is not None:
             if self._plan is None:
-                self.lblPlanName.setText(tr('No plan selected'))
+                self.lblPlanName.setText(tr("No plan selected"))
             else:
                 self._plan.nameChanged.connect(self.planNameChanged)
                 self.lblPlanName.setText(self._plan.name)

@@ -21,31 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
-import pathlib
-from typing import (
-    Iterable,
-    Optional
-)
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsProject,
-    QgsVectorLayer
-)
+import pathlib
+from collections.abc import Iterable
+from typing import Optional
+
+from qgis.core import Qgis, QgsApplication, QgsProject, QgsVectorLayer
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
-from qgis.PyQt.QtGui import (
-    QAction,
-    QActionGroup,
-    QIcon
-)
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QMenu,
-    QToolBar,
-    QToolButton
-)
+from qgis.PyQt.QtGui import QAction, QActionGroup, QIcon
+from qgis.PyQt.QtWidgets import QDialog, QMenu, QToolBar, QToolButton
 
 from ..gui import (
     DlgConfirmDelete,
@@ -54,12 +39,9 @@ from ..gui import (
     DlgExportPlan,
     DlgImportPlan,
     DlgImportShape,
-    DlgSelectPlan
+    DlgSelectPlan,
 )
-from ..models import (
-    GeoFieldsModel,
-    RdsPlan
-)
+from ..models import GeoFieldsModel, RdsPlan
 from ..services import (  # ShapefileImporter
     DistrictUpdater,
     LayerTreeManager,
@@ -71,7 +53,7 @@ from ..services import (  # ShapefileImporter
     PlanImportService,
     PlanListModel,
     PlanManager,
-    PlanStylerService
+    PlanStylerService,
 )
 from ..services.actions import PlanAction
 from ..services.tasks.autoassign import AutoAssignUnassignedUnits
@@ -90,7 +72,7 @@ class PlanController(BaseController):
         planStyler: PlanStylerService,
         updateService: DistrictUpdater,
         importService: PlanImportService,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.layerTreeManager = layerTreeManager
@@ -98,8 +80,8 @@ class PlanController(BaseController):
         self.updateService = updateService
         self.importService = importService
 
-        self.icon = QIcon(':/plugins/redistricting/icon.png')
-        self.menuName = tr('&Redistricting')
+        self.icon = QIcon(":/plugins/redistricting/icon.png")
+        self.menuName = tr("&Redistricting")
 
         self.menu = QMenu(self.menuName)
         self.menu.setIcon(self.icon)
@@ -108,7 +90,7 @@ class PlanController(BaseController):
         self.menuButton.setMenu(self.menu)
         self.menuButton.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
         self.menuButton.setIcon(self.icon)
-        self.menuButton.setToolTip(tr('Redistricting Utilities'))
+        self.menuButton.setToolTip(tr("Redistricting Utilities"))
 
         self.toolBtnAction: QAction = None
 
@@ -135,7 +117,7 @@ class PlanController(BaseController):
 
         self.toolBtnAction: QAction = self.toolbar.addWidget(self.menuButton)
 
-        self.planMenu = self.menu.addMenu(self.icon, tr('&Redistricting Plans'))
+        self.planMenu = self.menu.addMenu(self.icon, tr("&Redistricting Plans"))
         self.planActions = QActionGroup(self.iface.mainWindow())
 
         self.vectorSubMenu: QAction = self.iface.vectorMenu().addMenu(self.menuButton.menu())
@@ -167,116 +149,116 @@ class PlanController(BaseController):
 
     def createActions(self):
         self.actionShowPlanManager = self.actions.createAction(
-            'actionShowPlanManager',
-            QIcon(':/plugins/redistricting/planmanager.svg'),
-            tr('Plan Manager'),
+            "actionShowPlanManager",
+            QIcon(":/plugins/redistricting/planmanager.svg"),
+            tr("Plan Manager"),
             callback=self.showPlanManager,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.menu.addAction(self.actionShowPlanManager)
         self.menuButton.clicked.connect(self.actionShowPlanManager.trigger)
 
         self.actionNewPlan = self.actions.createAction(
-            'actionNewPlan',
-            QIcon(':/plugins/redistricting/addplan.svg'),
-            tr('New Plan'),
-            tooltip=tr('Create a new redistricting plan'),
+            "actionNewPlan",
+            QIcon(":/plugins/redistricting/addplan.svg"),
+            tr("New Plan"),
+            tooltip=tr("Create a new redistricting plan"),
             callback=self.newPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionNewPlan.setEnabled(False)
         self.menu.addAction(self.actionNewPlan)
 
         self.actionEditActivePlan = self.actions.createPlanAction(
-            'actionEditActivePlan',
-            QIcon(':/plugins/redistricting/editplan.svg'),
-            tr('Edit Active Plan'),
+            "actionEditActivePlan",
+            QIcon(":/plugins/redistricting/editplan.svg"),
+            tr("Edit Active Plan"),
             callback=self.editPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionEditActivePlan.setEnabled(False)
         self.menu.addAction(self.actionEditActivePlan)
 
         self.actionCopyPlan = self.actions.createPlanAction(
-            'actionCopyPlan',
-            QIcon(':/plugins/redistricting/copyplan.svg'),
-            tr('Copy Active Plan'),
-            tooltip=tr('Copy the active plan to a new redistricting plan'),
+            "actionCopyPlan",
+            QIcon(":/plugins/redistricting/copyplan.svg"),
+            tr("Copy Active Plan"),
+            tooltip=tr("Copy the active plan to a new redistricting plan"),
             callback=self.copyPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionCopyPlan.setEnabled(False)
         self.menu.addAction(self.actionCopyPlan)
 
         self.actionImportAssignments = self.actions.createPlanAction(
-            'actionImportAssignments',
-            QIcon(':/plugins/redistricting/importplan.svg'),
-            tr('Import Equivalency File'),
-            tooltip=tr('Import assignments to active plan from equivalency file'),
+            "actionImportAssignments",
+            QIcon(":/plugins/redistricting/importplan.svg"),
+            tr("Import Equivalency File"),
+            tooltip=tr("Import assignments to active plan from equivalency file"),
             callback=self.importPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionImportAssignments.setEnabled(False)
         self.menu.addAction(self.actionImportAssignments)
 
         self.actionImportShapefile = self.actions.createPlanAction(
-            'actionImportShapefile',
-            QIcon(':/plugins/redistricting/importplan.svg'),
-            tr('Import Shapefile'),
-            tooltip=tr('Import assignments to active plan from shapefile'),
+            "actionImportShapefile",
+            QIcon(":/plugins/redistricting/importplan.svg"),
+            tr("Import Shapefile"),
+            tooltip=tr("Import assignments to active plan from shapefile"),
             callback=self.importShapefile,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionImportShapefile.setEnabled(False)
         self.menu.addAction(self.actionImportShapefile)
 
         self.actionExportPlan = self.actions.createPlanAction(
-            'actionExportPlan',
-            QIcon(':/plugins/redistricting/exportplan.svg'),
-            tr('Export Active Plan'),
-            tooltip=tr('Export plan as equivalency and/or shapefile'),
+            "actionExportPlan",
+            QIcon(":/plugins/redistricting/exportplan.svg"),
+            tr("Export Active Plan"),
+            tooltip=tr("Export plan as equivalency and/or shapefile"),
             callback=self.exportPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionExportPlan.setEnabled(False)
         self.menu.addAction(self.actionExportPlan)
 
         self.actionSelectPlan = self.actions.createPlanAction(
-            'actionSelectPlan',
-            QIcon(':/plugins/redistricting/activateplan.svg'),
-            tr('Select Plan'),
-            tooltip=tr('Make the selected plan the active plan'),
+            "actionSelectPlan",
+            QIcon(":/plugins/redistricting/activateplan.svg"),
+            tr("Select Plan"),
+            tooltip=tr("Make the selected plan the active plan"),
             callback=self.selectPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionSelectPlan.setEnabled(False)
 
         self.actionEditPlan = self.actions.createPlanAction(
-            'actionEditPlan',
-            QIcon(':/plugins/redistricting/icon.png'),
-            tr('Edit Plan'),
+            "actionEditPlan",
+            QIcon(":/plugins/redistricting/icon.png"),
+            tr("Edit Plan"),
             callback=self.editPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionEditPlan.setEnabled(False)
 
         self.actionDeletePlan = self.actions.createPlanAction(
-            'actionDeletePlan',
-            QIcon(':/plugins/redistricting/deleteplan.svg'),
-            tr('Delete Plan'),
-            tooltip=tr('Remove the selected plan from the project'),
+            "actionDeletePlan",
+            QIcon(":/plugins/redistricting/deleteplan.svg"),
+            tr("Delete Plan"),
+            tooltip=tr("Remove the selected plan from the project"),
             callback=self.deletePlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionDeletePlan.setEnabled(False)
 
         self.actionAutoAssign = self.actions.createAction(
             "actionAutoAssign",
-            QgsApplication.getThemeIcon('/algorithms/mAlgorithmVoronoi.svg'),
-            tr('Auto-assign Units'),
-            tooltip=tr('Attempt to automatically assign unassigned units to districts in the active plan'),
+            QgsApplication.getThemeIcon("/algorithms/mAlgorithmVoronoi.svg"),
+            tr("Auto-assign Units"),
+            tooltip=tr("Attempt to automatically assign unassigned units to districts in the active plan"),
             callback=self.autoassign,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionAutoAssign.setEnabled(False)
         self.menu.addAction(self.actionAutoAssign)
@@ -300,8 +282,11 @@ class PlanController(BaseController):
         )
         self.actionExportPlan.setTarget(plan)
         self.actionAutoAssign.setEnabled(
-            plan is not None and plan.assignLayer is not None and plan.distField is not None
-            and not plan.metrics.complete and len(plan.districts) > 1
+            plan is not None
+            and plan.assignLayer is not None
+            and plan.distField is not None
+            and not plan.metrics.complete
+            and len(plan.districts) > 1
         )
 
         if plan is not None:
@@ -315,7 +300,7 @@ class PlanController(BaseController):
 
     def enableNewPlan(self):
         self.actionNewPlan.setEnabled(
-            any(isinstance(layer, QgsVectorLayer)for layer in self.project.mapLayers(True).values())
+            any(isinstance(layer, QgsVectorLayer) for layer in self.project.mapLayers(True).values())
         )
 
     def updatePlanManagerActions(self, index: int):
@@ -330,8 +315,7 @@ class PlanController(BaseController):
         del self.planActions
         self.planActions = QActionGroup(self.iface.mainWindow())
         self.actionNewPlan.setEnabled(
-            any(isinstance(layer, QgsVectorLayer)
-                for layer in self.project.mapLayers(True).values())
+            any(isinstance(layer, QgsVectorLayer) for layer in self.project.mapLayers(True).values())
         )
         self.actionSelectPlan.setEnabled(False)
 
@@ -386,31 +370,33 @@ class PlanController(BaseController):
         if len(self.project.mapLayers()) == 0:
             self.iface.messageBar().pushMessage(
                 tr("Oops!"),
-                tr("Cannot create a redistricting plan for an "
-                   "empty project. Try adding some layers."),
+                tr("Cannot create a redistricting plan for an empty project. Try adding some layers."),
                 level=Qgis.MessageLevel.Warning,
-                duration=5)
+                duration=5,
+            )
             return
 
         dlgNewPlan = DlgEditPlan(parent=self.iface.mainWindow())
         if dlgNewPlan.exec() == QDialog.DialogCode.Accepted:
-            builder = PlanBuilder() \
-                .setName(dlgNewPlan.planName()) \
-                .setNumDistricts(dlgNewPlan.numDistricts()) \
-                .setNumSeats(dlgNewPlan.numSeats()) \
-                .setDescription(dlgNewPlan.description()) \
-                .setDeviation(dlgNewPlan.deviation()) \
-                .setDeviationType(dlgNewPlan.deviationType()) \
-                .setGeoIdField(dlgNewPlan.geoIdField()) \
-                .setGeoDisplay(dlgNewPlan.geoIdCaption()) \
-                .setGeoLayer(dlgNewPlan.geoLayer()) \
-                .setPopLayer(dlgNewPlan.popLayer()) \
-                .setPopJoinField(dlgNewPlan.joinField()) \
-                .setPopField(dlgNewPlan.popField()) \
-                .setPopFields(dlgNewPlan.popFields()) \
-                .setDataFields(dlgNewPlan.dataFields()) \
-                .setGeoFields(dlgNewPlan.geoFields()) \
+            builder = (
+                PlanBuilder()
+                .setName(dlgNewPlan.planName())
+                .setNumDistricts(dlgNewPlan.numDistricts())
+                .setNumSeats(dlgNewPlan.numSeats())
+                .setDescription(dlgNewPlan.description())
+                .setDeviation(dlgNewPlan.deviation())
+                .setDeviationType(dlgNewPlan.deviationType())
+                .setGeoIdField(dlgNewPlan.geoIdField())
+                .setGeoDisplay(dlgNewPlan.geoIdCaption())
+                .setGeoLayer(dlgNewPlan.geoLayer())
+                .setPopLayer(dlgNewPlan.popLayer())
+                .setPopJoinField(dlgNewPlan.joinField())
+                .setPopField(dlgNewPlan.popField())
+                .setPopFields(dlgNewPlan.popFields())
+                .setDataFields(dlgNewPlan.dataFields())
+                .setGeoFields(dlgNewPlan.geoFields())
                 .setGeoPackagePath(dlgNewPlan.gpkgPath())
+            )
 
             if dlgNewPlan.importPlan():
                 importer = self.importService.importEquivalencyFile(
@@ -422,7 +408,7 @@ class PlanController(BaseController):
                     dlgNewPlan.importQuote(),
                     dlgNewPlan.importGeoCol(),
                     dlgNewPlan.importDistCol(),
-                    startTask=False
+                    startTask=False,
                 )
             else:
                 importer = None
@@ -439,28 +425,30 @@ class PlanController(BaseController):
 
         dlgEditPlan = DlgEditPlan(plan, self.iface.mainWindow())
         if dlgEditPlan.exec() == QDialog.DialogCode.Accepted:
-            builder = PlanEditor.fromPlan(plan) \
-                .setName(dlgEditPlan.planName()) \
-                .setNumDistricts(dlgEditPlan.numDistricts()) \
-                .setNumSeats(dlgEditPlan.numSeats()) \
-                .setDescription(dlgEditPlan.description()) \
-                .setDeviation(dlgEditPlan.deviation()) \
-                .setDeviationType(dlgEditPlan.deviationType()) \
-                .setGeoDisplay(dlgEditPlan.geoIdCaption()) \
-                .setPopLayer(dlgEditPlan.popLayer()) \
-                .setPopField(dlgEditPlan.popField()) \
-                .setPopFields(dlgEditPlan.popFields()) \
-                .setDataFields(dlgEditPlan.dataFields()) \
+            builder = (
+                PlanEditor.fromPlan(plan)
+                .setName(dlgEditPlan.planName())
+                .setNumDistricts(dlgEditPlan.numDistricts())
+                .setNumSeats(dlgEditPlan.numSeats())
+                .setDescription(dlgEditPlan.description())
+                .setDeviation(dlgEditPlan.deviation())
+                .setDeviationType(dlgEditPlan.deviationType())
+                .setGeoDisplay(dlgEditPlan.geoIdCaption())
+                .setPopLayer(dlgEditPlan.popLayer())
+                .setPopField(dlgEditPlan.popField())
+                .setPopFields(dlgEditPlan.popFields())
+                .setDataFields(dlgEditPlan.dataFields())
                 .setGeoFields(dlgEditPlan.geoFields())
+            )
 
             if builder.updatePlan():
                 self.project.setDirty()
-                if 'num-districts' in builder.modifiedFields:
+                if "num-districts" in builder.modifiedFields:
                     self.styler.stylePlan(plan)
 
     def copyPlan(self, plan=None):
         if not isinstance(plan, RdsPlan):
-            if not self.checkActivePlan(tr('copy')):
+            if not self.checkActivePlan(tr("copy")):
                 return
 
         dlgCopyPlan = DlgCopyPlan(self.planManager.activePlan, self.iface.mainWindow())
@@ -469,7 +457,7 @@ class PlanController(BaseController):
 
             # if copying assignments, we don't need a background task, so no need for a progress dialog
             if not dlgCopyPlan.copyAssignments:
-                progress = self.startProgress(tr('Creating plan layers...'))
+                progress = self.startProgress(tr("Creating plan layers..."))
                 progress.canceled.connect(copier.cancel)
                 copier.progressChanged.connect(progress.setValue)
             else:
@@ -477,10 +465,7 @@ class PlanController(BaseController):
 
             copier.copyComplete.connect(self.appendPlan)
             copier.copyPlan(
-                dlgCopyPlan.planName,
-                dlgCopyPlan.description,
-                dlgCopyPlan.geoPackagePath,
-                dlgCopyPlan.copyAssignments
+                dlgCopyPlan.planName, dlgCopyPlan.description, dlgCopyPlan.geoPackagePath, dlgCopyPlan.copyAssignments
             )
 
     def importComplete(self, plan):
@@ -491,12 +476,12 @@ class PlanController(BaseController):
 
     def importPlan(self, plan=None):
         if not isinstance(plan, RdsPlan):
-            if not self.checkActivePlan(tr('import')):
+            if not self.checkActivePlan(tr("import")):
                 return
 
         dlgImportPlan = DlgImportPlan(self.activePlan, self.iface.mainWindow())
         if dlgImportPlan.exec() == QDialog.DialogCode.Accepted:
-            progress = self.startProgress(tr('Importing assignments...'))
+            progress = self.startProgress(tr("Importing assignments..."))
             importer = self.importService.importEquivalencyFile(
                 self.activePlan,
                 dlgImportPlan.equivalencyFileName,
@@ -513,7 +498,7 @@ class PlanController(BaseController):
 
     def importShapefile(self, plan=None):
         if not isinstance(plan, RdsPlan):
-            if not self.checkActivePlan(self.tr('import')):
+            if not self.checkActivePlan(self.tr("import")):
                 return
 
         dlgImportPlan = DlgImportShape(self.iface.mainWindow())
@@ -524,14 +509,14 @@ class PlanController(BaseController):
             #     .setNameField(dlgImportPlan.nameField) \
             #     .setMembersField(dlgImportPlan.membersField)
 
-            progress = self.startProgress(self.tr('Importing shapefile...'))
+            progress = self.startProgress(self.tr("Importing shapefile..."))
             importer = self.importService.importShapeFile(
                 self.activePlan,
                 dlgImportPlan.shapefileFileName,
                 dlgImportPlan.distField,
                 dlgImportPlan.nameField,
                 dlgImportPlan.membersField,
-                progress
+                progress,
             )
 
             # progress.canceled.connect(importer.cancel)
@@ -544,14 +529,15 @@ class PlanController(BaseController):
     def exportPlan(self, plan=None):
         def planExported():
             self.iface.messageBar().pushMessage(
-                "Success", f"Export of {plan.name} complete!", level=Qgis.MessageLevel.Success)
+                "Success", f"Export of {plan.name} complete!", level=Qgis.MessageLevel.Success
+            )
 
         def exportError():
             for msg, level in export.errors():  # pylint: disable=used-before-assignment
                 self.iface.messageBar().pushMessage("Error", msg, level=level)
 
         if not isinstance(plan, RdsPlan):
-            if not self.checkActivePlan(tr('export')):
+            if not self.checkActivePlan(tr("export")):
                 return
             plan = self.activePlan
 
@@ -567,10 +553,10 @@ class PlanController(BaseController):
                     dlgExportPlan.equivalencyGeography,
                     dlgExportPlan.includeUnassigned,
                     dlgExportPlan.includeDemographics,
-                    dlgExportPlan.includeMetrics
+                    dlgExportPlan.includeMetrics,
                 )
 
-                progress = self.startProgress(tr('Exporting redistricting plan...'))
+                progress = self.startProgress(tr("Exporting redistricting plan..."))
                 progress.canceled.connect(export.cancel)
                 export.progressChanged.connect(progress.setValue)
                 export.exportComplete.connect(planExported)
@@ -605,7 +591,7 @@ class PlanController(BaseController):
                 del plan
                 if dlg.removeLayers() and dlg.deleteGeoPackage():
                     d = pathlib.Path(path).parent  # pylint: disable=used-before-assignment
-                    g = str(pathlib.Path(path).name) + '*'
+                    g = str(pathlib.Path(path).name) + "*"
                     for f in d.glob(g):
                         f.unlink()
 
@@ -633,7 +619,7 @@ class PlanController(BaseController):
             self.endProgress(progress)
 
             if importer is not None:
-                progress = self.startProgress(tr('Importing assignments...'))
+                progress = self.startProgress(tr("Importing assignments..."))
                 importer.importComplete.connect(self.triggerUpdate)
                 importer.importTerminated.connect(self.endProgress)
                 self.importService.startImport(plan, importer)
@@ -644,7 +630,7 @@ class PlanController(BaseController):
                 self.endProgress(progress)
                 self.pushErrors(builder.errors())
 
-        progress = self.startProgress(tr('Creating plan layers...'))
+        progress = self.startProgress(tr("Creating plan layers..."))
         progress.canceled.connect(builder.cancel)
         builder.progressChanged.connect(progress.setValue)
         builder.layersCreated.connect(layersCreated)
@@ -661,16 +647,16 @@ class PlanController(BaseController):
     def autoassign(self):
         def assignComplete():
             self.iface.messageBar().pushInfo(
-                "Success!", f"Auto-assign completed succesfully: {len(task.update)} units were assigned to districts; {len(task.indeterminate)} units could not be assigned."
+                "Success!",
+                f"Auto-assign completed succesfully: {len(task.update)} units were assigned to districts; "
+                f"{len(task.indeterminate)} units could not be assigned.",
             )
 
         def assignError():
             if task.isCanceled():
                 return
 
-            self.iface.messageBar().pushWarning(
-                "Error assigning units to districts", str(task.exception)
-            )
+            self.iface.messageBar().pushWarning("Error assigning units to districts", str(task.exception))
 
         task = AutoAssignUnassignedUnits(self.activePlan.assignLayer, self.activePlan.distField)
         task.taskCompleted.connect(assignComplete)

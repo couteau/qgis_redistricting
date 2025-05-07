@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - New/Edit Plan Wizard - Details Page
 
         begin                : 2022-01-15
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import os
 import re
 
@@ -32,18 +32,15 @@ from .ui.WzpEditPlanDetailsPage import Ui_wzpPlanDetails
 
 
 class dlgEditPlanDetailsPage(Ui_wzpPlanDetails, QWizardPage):
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
 
-        self.registerField('planName*', self.inpPlanName)
-        self.registerField('gpkgPath*', self.fileGpkg,
-                           'path', self.fileGpkg.fileChanged)
-        self.registerField('description', self.txtDescription,
-                           'plainText', self.txtDescription.textChanged)
-        self.registerField('numDistricts', self.sbxNumDistricts)
-        self.registerField('numSeats', self.sbxNumSeats)
+        self.registerField("planName*", self.inpPlanName)
+        self.registerField("gpkgPath*", self.fileGpkg, "path", self.fileGpkg.fileChanged)
+        self.registerField("description", self.txtDescription, "plainText", self.txtDescription.textChanged)
+        self.registerField("numDistricts", self.sbxNumDistricts)
+        self.registerField("numSeats", self.sbxNumSeats)
 
         self.inpPlanName.editingFinished.connect(self.planNameChanged)
         self.setTabOrder(self.inpPlanName, self.fileGpkg.lineEdit())
@@ -53,31 +50,31 @@ class dlgEditPlanDetailsPage(Ui_wzpPlanDetails, QWizardPage):
 
     def initializePage(self):
         super().initializePage()
-        self.linkSeats = self.field('numDistricts') == self.field('numSeats')
+        self.linkSeats = self.field("numDistricts") == self.field("numSeats")
         self.inpPlanName.setFocus()
         if not self.wizard().new and self.fileGpkg.filePath():
             self.fileGpkg.setEnabled(False)
         self.setFinalPage(self.wizard().isComplete())
 
     def planNameChanged(self):
-        if self.inpPlanName.text() and not self.fileGpkg.path and QgsProject.instance().absolutePath() != ' ':
-            self.fileGpkg.path = \
-                os.path.join(QgsProject.instance().absolutePath(),
-                             re.sub(r'[^\w]+', '_', self.inpPlanName.text()) + '.gpkg')
+        if self.inpPlanName.text() and not self.fileGpkg.path and QgsProject.instance().absolutePath() != " ":
+            self.fileGpkg.path = os.path.join(
+                QgsProject.instance().absolutePath(), re.sub(r"[^\w]+", "_", self.inpPlanName.text()) + ".gpkg"
+            )
 
     def numDistrictsChanged(self, value: int):
         self.sbxNumSeats.setMinimum(value)
-        if self.linkSeats or self.field('numSeats') < value:
+        if self.linkSeats or self.field("numSeats") < value:
             self.sbxNumSeats.setValue(value)
             self.linkSeats = True
         self.completeChanged.emit()
 
     def numSeatsChanged(self, value: int):
-        if value < self.field('numDistricts'):
-            self.sbxNumSeats.setValue(self.field('numDistricts'))
+        if value < self.field("numDistricts"):
+            self.sbxNumSeats.setValue(self.field("numDistricts"))
         else:
-            self.linkSeats = value == self.field('numDistricts')
+            self.linkSeats = value == self.field("numDistricts")
 
     def isComplete(self) -> bool:
         complete = super().isComplete()
-        return complete and self.field('numDistricts') > 1
+        return complete and self.field("numDistricts") > 1

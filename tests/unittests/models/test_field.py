@@ -16,21 +16,14 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import pytest
 from pytestqt.qtbot import QtBot
 from qgis.core import QgsField
 from qgis.PyQt.QtCore import QVariant
 
-from redistricting.models import (
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    RdsRelatedField
-)
-from redistricting.models.base.serialization import (
-    deserialize,
-    serialize
-)
+from redistricting.models import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
+from redistricting.models.base.serialization import deserialize, serialize
 
 # pylint: disable=comparison-with-callable, protected-access, unused-argument
 
@@ -38,17 +31,17 @@ from redistricting.models.base.serialization import (
 class TestField:
     @pytest.fixture
     def field(self, block_layer) -> RdsField:
-        return RdsField(block_layer, 'vtdid')
+        return RdsField(block_layer, "vtdid")
 
     @pytest.fixture
     def expr(self, block_layer) -> RdsField:
-        return RdsField(block_layer, 'statefp || countyfp || tractce')
+        return RdsField(block_layer, "statefp || countyfp || tractce")
 
     def test_create(self, block_layer):
-        field = RdsField(block_layer, 'vtdid')
-        assert field.field == 'vtdid'
+        field = RdsField(block_layer, "vtdid")
+        assert field.field == "vtdid"
         assert field.expression.isField()
-        assert field.caption == 'vtdid'
+        assert field.caption == "vtdid"
 
         field = RdsField(block_layer, "pop_total", "Total Pop.")
         assert field.field == "pop_total"
@@ -64,7 +57,7 @@ class TestField:
         assert f.errors() == ["Field 'foo_total' not found"]
 
     def test_invalid_expr(self, block_layer):
-        f = RdsField(block_layer, 'not_a_field + still_not')
+        f = RdsField(block_layer, "not_a_field + still_not")
         assert not f.isValid()
 
     def test_no_layer_raises_error(self):
@@ -80,16 +73,16 @@ class TestField:
         assert f.field == "pop_black/pop_total"
         assert f.isValid()
 
-        field = RdsField(block_layer, 'statefp || countyfp || tractce')
+        field = RdsField(block_layer, "statefp || countyfp || tractce")
         assert field.isValid()
-        assert field.field == 'statefp || countyfp || tractce'
-        assert field.caption == 'statefp || countyfp || tractce'
-        assert field.fieldName == 'statefp_countyfp_tractce'
+        assert field.field == "statefp || countyfp || tractce"
+        assert field.caption == "statefp || countyfp || tractce"
+        assert field.fieldName == "statefp_countyfp_tractce"
 
     def test_create_withcaption(self, block_layer):
-        field = RdsField(block_layer, 'vtdid', caption='VTD')
-        assert field.field == 'vtdid'
-        assert field.caption == 'VTD'
+        field = RdsField(block_layer, "vtdid", caption="VTD")
+        assert field.field == "vtdid"
+        assert field.caption == "VTD"
 
     def test_fieldname_expression(self, block_layer):
         f = RdsField(block_layer, "pop_black/pop_total")
@@ -109,7 +102,9 @@ class TestField:
     def test_getvalue_field(self, block_layer, field):
         f = next(block_layer.getFeatures())
         v = field.getValue(f)
-        assert not field.errors() and isinstance(v, str) and len(v) == 11
+        assert not field.errors()
+        assert isinstance(v, str)
+        assert len(v) == 11
 
     def test_prepare_field(self, block_layer):
         f = RdsField(block_layer, "pop_total")
@@ -132,7 +127,7 @@ class TestField:
         f.prepare()
         assert f._prepared
         assert f._context is not None
-        assert f.getValue(feat) == 1/3
+        assert f.getValue(feat) == 1 / 3
 
     def test_makeqgsfield_field(self, field):
         qf = field.makeQgsField()
@@ -144,17 +139,14 @@ class TestField:
 
     def test_serialize(self, block_layer, field: RdsField):
         data = serialize(field)
-        assert data == {'layer': block_layer.id(),
-                        'field': 'vtdid',
-                        'caption': 'vtdid',
-                        'category': 1}
+        assert data == {"layer": block_layer.id(), "field": "vtdid", "caption": "vtdid", "category": 1}
 
     def test_deserialize(self, block_layer):
-        data = {'layer': block_layer.id(), 'field': 'vtdid'}
+        data = {"layer": block_layer.id(), "field": "vtdid"}
         field = deserialize(RdsField, data)
-        assert field.field == 'vtdid'
+        assert field.field == "vtdid"
         assert field.layer == block_layer
-        assert field.caption == 'vtdid'
+        assert field.caption == "vtdid"
 
 
 class TestGeoField:
@@ -175,9 +167,9 @@ class TestGeoField:
         f = RdsGeoField(block_layer, "vtdid", nameField=vtd_name)
         feat = block_layer.getFeature(746)
         f.prepare()
-        assert f.getValue(feat) == '01125000021'
+        assert f.getValue(feat) == "01125000021"
         vtd_name.prepare()
-        assert f.getName(feat) == 'Northport City Hall'
+        assert f.getName(feat) == "Northport City Hall"
 
     def test_data_field(self, block_layer):
         f = RdsDataField(block_layer, "pop_black")
@@ -231,49 +223,48 @@ class TestGeoField:
 class TestDataField:
     @pytest.fixture
     def data_field(self, block_layer) -> RdsDataField:
-        return RdsDataField(block_layer, 'vap_ap_black', pctBase='vap_total')
+        return RdsDataField(block_layer, "vap_ap_black", pctBase="vap_total")
 
     @pytest.fixture
     def data_field_expr(self, block_layer) -> RdsDataField:
         return RdsDataField(
             block_layer,
-            'vap_nh_ap_black + vap_nh_asian + vap_nh_aiakn + vap_hispanic',
-            caption='Dream Team',
-            pctBase='vap_total'
+            "vap_nh_ap_black + vap_nh_asian + vap_nh_aiakn + vap_hispanic",
+            caption="Dream Team",
+            pctBase="vap_total",
         )
 
     def test_create(self, block_layer):
-        field = RdsDataField(block_layer, 'vap_ap_black', pctBase='vap_total')
-        assert field.field == 'vap_ap_black' and field.sumField and field.pctBase == 'vap_total'
+        field = RdsDataField(block_layer, "vap_ap_black", pctBase="vap_total")
+        assert field.field == "vap_ap_black"
+        assert field.sumField
+        assert field.pctBase == "vap_total"
 
     def test_create_expr(self, block_layer):
-        field = RdsDataField(block_layer, 'vap_nh_ap_black + vap_hispanic')
-        assert field.field == 'vap_nh_ap_black + vap_hispanic' and field.sumField and field.pctBase is None
+        field = RdsDataField(block_layer, "vap_nh_ap_black + vap_hispanic")
+        assert field.field == "vap_nh_ap_black + vap_hispanic"
+        assert field.sumField
+        assert field.pctBase is None
 
     def test_serialize(self, block_layer, data_field):
         data = serialize(data_field)
         assert data == {
-            'layer': block_layer.id(),
-            'field': 'vap_ap_black',
-            'caption': 'vap_ap_black',
-            'category': 3,
-            'sum-field': True,
-            'pct-base': 'vap_total'
+            "layer": block_layer.id(),
+            "field": "vap_ap_black",
+            "caption": "vap_ap_black",
+            "category": 3,
+            "sum-field": True,
+            "pct-base": "vap_total",
         }
 
     def test_deserialize(self, block_layer):
-        data = {
-            'layer': block_layer.id(),
-            'field': 'vap_ap_black',
-            'caption': 'APBVAP',
-            'pct-base': 'vap_total'
-        }
+        data = {"layer": block_layer.id(), "field": "vap_ap_black", "caption": "APBVAP", "pct-base": "vap_total"}
         field = deserialize(RdsDataField, data)
-        assert field.field == 'vap_ap_black'
+        assert field.field == "vap_ap_black"
         assert field.layer == block_layer
-        assert field.caption == 'APBVAP'
+        assert field.caption == "APBVAP"
         assert field.sumField  # pylint: disable=no-member
-        assert field.pctBase == 'vap_total'  # pylint: disable=no-member
+        assert field.pctBase == "vap_total"  # pylint: disable=no-member
 
     def test_makeqgsfield_field(self, data_field):
         qf = data_field.makeQgsField()

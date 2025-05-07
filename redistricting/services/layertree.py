@@ -52,16 +52,16 @@ class LayerTreeManager(QObject):
     @property
     def planRoot(self):
         for group in self._root.findGroups(False):
-            if group.customProperty('redistricting-plan-root', False) is True:
+            if group.customProperty("redistricting-plan-root", False) is True:
                 break
-            if group.customProperty('redistricting-plan-id', None) is not None:
+            if group.customProperty("redistricting-plan-id", None) is not None:
                 return self._root
         else:
             name = tr("Redistricting Plans")
             if self._root.findGroup(name) is not None:
                 name = f"{name}-{str(uuid4())}"
             group = self._root.addGroup(name)
-            group.setCustomProperty('redistricting-plan-root', True)
+            group.setCustomProperty("redistricting-plan-root", True)
 
         return group
 
@@ -71,7 +71,7 @@ class LayerTreeManager(QObject):
 
         self._project.addMapLayers([plan.assignLayer, plan.distLayer], False)
         group = QgsLayerTreeGroup(plan.name)
-        group.setCustomProperty('redistricting-plan-id', str(plan.id))
+        group.setCustomProperty("redistricting-plan-id", str(plan.id))
         group.addLayer(plan.assignLayer)
         group.addLayer(plan.distLayer)
         self.planRoot.addChildNode(group)
@@ -85,19 +85,19 @@ class LayerTreeManager(QObject):
     def planGroups(self) -> list[QgsLayerTreeGroup]:
         return [
             g for g in self.planRoot.findGroups(False)
-            if g.customProperty('redistricting-plan-id', None) is not None
+            if g.customProperty("redistricting-plan-id", None) is not None
         ]
 
     def getGroupForPlan(self, plan: "RdsPlan"):
         if plan.id:
             for g in self.planRoot.findGroups():
-                if g.customProperty('redistricting-plan-id', None) == str(plan.id):
+                if g.customProperty("redistricting-plan-id", None) == str(plan.id):
                     return g
 
         return None
 
     def planIdFromGroup(self, group: QgsLayerTreeGroup):
-        planid = group.customProperty('redistricting-plan-id', None)
+        planid = group.customProperty("redistricting-plan-id", None)
         if planid is None:
             return None
 
@@ -136,5 +136,5 @@ class LayerTreeManager(QObject):
         group = self.getGroupForPlan(plan)
         if group is not None:
             group.setName(plan.name)
-            plan.assignLayer.setName(f'{plan.name}_assignments')
-            plan.distLayer.setName(f'{plan.name}_districts')
+            plan.assignLayer.setName(f"{plan.name}_assignments")
+            plan.distLayer.setName(f"{plan.name}_districts")

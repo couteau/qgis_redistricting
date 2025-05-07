@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - A QgsFileWidget with a property that can be 
+"""QGIS Redistricting Plugin - A QgsFileWidget with a property that can be
         used for a QWizard field
 
         begin                : 2022-01-15
@@ -23,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from qgis.gui import QgsFileWidget
 from qgis.PyQt.QtCore import pyqtProperty
 

@@ -96,9 +96,9 @@ class PendingChangesController(DockWidgetController):
     def createToggleAction(self) -> QAction:
         action = super().createToggleAction()
         if action is not None:
-            action.setIcon(QIcon(':/plugins/redistricting/preview.svg'))
-            action.setText(tr('Pending Changes'))
-            action.setStatusTip(tr('Show/hide pending changes dock widget'))
+            action.setIcon(QIcon(":/plugins/redistricting/preview.svg"))
+            action.setText(tr("Pending Changes"))
+            action.setStatusTip(tr("Show/hide pending changes dock widget"))
 
         return action
 

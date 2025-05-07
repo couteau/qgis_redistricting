@@ -22,7 +22,8 @@
  ***************************************************************************/
 """
 
-from typing import Literal, Optional, Sequence, Union, overload
+from typing import Literal, Optional, Union, overload
+from collections.abc import Sequence
 
 import geopandas as gpd
 import pandas as pd
@@ -153,18 +154,18 @@ class AggregateDataTask(SqlAccess, QgsTask):
 
             cols.extend(new_cols)
 
-        df = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField, read_geometry=False).rename(
+        popData = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField, read_geometry=False).rename(
             columns={self.popField: str(DistrictColumns.POPULATION)}
         )
 
         for f in self.popFields:
             if f.isExpression():
-                df.loc[:, f.fieldName] = df.eval(f.field)
+                popData.loc[:, f.fieldName] = popData.eval(f.field)
         for f in self.dataFields:
             if f.isExpression():
-                df.loc[:, f.fieldName] = df.eval(f.field)
+                popData.loc[:, f.fieldName] = popData.eval(f.field)
 
-        return df.drop(columns=remove)
+        return popData.drop(columns=remove)
 
     def finished(self, result: bool):
         super().finished(result)

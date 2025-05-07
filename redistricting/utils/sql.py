@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - sql utilities and mixin
 
         begin                : 2022-01-15
@@ -22,24 +21,15 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import re
 import shlex
 import sqlite3
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    Literal,
-    Sequence,
-    Union,
-    overload
-)
+from typing import Any, Dict, Literal, Union, overload
+from collections.abc import Iterable, Sequence
 
 import psycopg2
-from osgeo import (
-    gdal,
-    ogr
-)
+from osgeo import gdal, ogr
 from psycopg2.extensions import cursor
 from psycopg2.extras import RealDictConnection
 from qgis.core import (
@@ -49,7 +39,7 @@ from qgis.core import (
     QgsProject,
     QgsVectorDataProvider,
     QgsVectorLayer,
-    QgsVirtualLayerDefinition
+    QgsVirtualLayerDefinition,
 )
 
 from .gpkg import spatialite_connect
@@ -66,26 +56,27 @@ class SqlAccess:
 
     def getTableName(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr':
-            if provider.storageType() in ('GPKG', 'SQLite'):
-                uri_parts = provider.dataSourceUri().split('|')
+        if provider.name() == "ogr":
+            if provider.storageType() in ("GPKG", "SQLite"):
+                uri_parts = provider.dataSourceUri().split("|")
                 if len(uri_parts) <= 1:
                     raise ValueError("Could not determine table name from URI")
                 lexer = shlex.shlex(uri_parts[1])
                 lexer.whitespace_split = True
-                lexer.whitespace = '&'
-                params = dict(pair.split('=', 1) for pair in lexer)
-                return params['layername']
+                lexer.whitespace = "&"
+                params = dict(pair.split("=", 1) for pair in lexer)
+                return params["layername"]
 
             # for other drivers, get the name of the first layer from gdal
             # -- shoud work for single layer formats - shapefile and GeoJSON
             ds = gdal.OpenEx(provider.dataSourceUri(), gdal.OF_ALL)
             return ds.GetLayer().GetName()
 
-        if provider.name() in ('spatialite', 'postgis', 'postgres'):
-            params = dict(pair.split('=', 1) for pair in shlex.split(
-                re.sub(r' \(\w+\)', '', provider.dataSourceUri(True))))
-            return params['table']
+        if provider.name() in ("spatialite", "postgis", "postgres"):
+            params = dict(
+                pair.split("=", 1) for pair in shlex.split(re.sub(r" \(\w+\)", "", provider.dataSourceUri(True)))
+            )
+            return params["table"]
 
         return None
 
@@ -94,7 +85,7 @@ class SqlAccess:
             table = self.getTableName(layer)
         provider = layer.dataProvider()
 
-        if provider.storageType() in ('GPKG', 'SQLite') or provider.name() in ('spatialite', 'postgis', 'postgres'):
+        if provider.storageType() in ("GPKG", "SQLite") or provider.name() in ("spatialite", "postgis", "postgres"):
             if "." in table:
                 schema, table = table.split(".")
             else:
@@ -104,8 +95,8 @@ class SqlAccess:
                 if col := conn.table(schema, table).geometryColumn():
                     return col
 
-        if provider.name() == 'ogr':
-            database = provider.dataSourceUri().split('|')[0]
+        if provider.name() == "ogr":
+            database = provider.dataSourceUri().split("|")[0]
             ds: gdal.Dataset = gdal.OpenEx(database, gdal.OF_ALL)
             lyr: ogr.Layer = ds.GetLayerByName(table)
             col = lyr.GetGeometryColumn()
@@ -115,51 +106,50 @@ class SqlAccess:
             # test whether the drivers support the GetGeometryColumn method -
             # use GetGeomType == wkbNone to test
             if not col and lyr.GetGeomType() not in (ogr.wkbUnknown, ogr.wkbNone):
-                col = 'GEOMETRY'
+                col = "GEOMETRY"
             return col
 
-        if provider.name() in ('spatialite', 'postgis', 'postgres'):
-            if '.' in table:
+        if provider.name() in ("spatialite", "postgis", "postgres"):
+            if "." in table:
                 # remove the schema name and assume there's only one schema
-                _, table = table.split('.', 1)
+                _, table = table.split(".", 1)
             r = self.executeSql(
                 layer,
-                f'select f_geometry_column from geometry_columns '
-                f'where f_table_name=\'{table}\''
+                f"SELECT f_geometry_column FROM geometry_columns WHERE f_table_name='{table.replace("'", "''")}'",  # noqa: S608
             )
             if r:
-                return next(r)['f_geometry_column']
+                return next(r)["f_geometry_column"]
 
-        return ''
+        return ""
 
     def _executeSqlSqlite(
-        self, db: sqlite3.Connection, sql, as_dict
+        self, db: sqlite3.Connection, sql, parameters, *, as_dict: bool
     ) -> Union[Iterable[Union[Iterable, sqlite3.Row]], None]:
         if as_dict:
             db.row_factory = sqlite3.Row
-        cur = db.execute(sql)
+        cur = db.execute(sql, parameters)
         if cur.rowcount == 0:
             return None
 
         return cur
 
     def _connectSqlNativeSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
-        conndata = dict(tuple(a.split('=')) for a in shlex.split(provider.uri().connectionInfo(True)))
-        return spatialite_connect(conndata['dbname'])
+        conndata = dict(tuple(a.split("=")) for a in shlex.split(provider.uri().connectionInfo(True)))
+        return spatialite_connect(conndata["dbname"])
 
     def _connectSqlOgrSqlite(self, provider: QgsVectorDataProvider) -> sqlite3.Connection:
-        database, _ = provider.dataSourceUri().split('|', 1)
+        database, _ = provider.dataSourceUri().split("|", 1)
         return spatialite_connect(database)
 
     def _connectSqlPostgres(
-        self, provider: QgsVectorDataProvider, as_dict: bool = True
+        self, provider: QgsVectorDataProvider, dict_connection: bool = True
     ) -> Union[RealDictConnection, psycopg2.extensions.connection]:
         if self._uri != provider.uri():
             self._uri = provider.uri()
             self._connInfo = self._uri.connectionInfo(True)
-            connDict = dict(tuple(a.split('=')) for a in shlex.split(self._connInfo))
-            self._user = connDict['user']
-            self._passwd = connDict['password']
+            connDict = dict(tuple(a.split("=")) for a in shlex.split(self._connInfo))
+            self._user = connDict["user"]
+            self._passwd = connDict["password"]
             if not self._user or not self._passwd:
                 c = QgsCredentials.instance()
                 c.lock()
@@ -172,72 +162,68 @@ class SqlAccess:
                     self._connInfo = self._uri.connectionInfo(True)
                 finally:
                     c.unlock()
-        params = {'dsn': self._connInfo}
-        if as_dict:
-            params['connection_factory'] = RealDictConnection if as_dict else None
+        params = {"dsn": self._connInfo}
+        if dict_connection:
+            params["connection_factory"] = RealDictConnection
         return psycopg2.connect(**params)
 
-    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+    def _executeSqlNativeSqlite(self, provider: QgsVectorDataProvider, sql: str, parameters, *, as_dict: bool):
         with self._connectSqlNativeSqlite(provider) as db:
-            return self._executeSqlSqlite(db, sql, as_dict)
+            return self._executeSqlSqlite(db, sql, parameters, as_dict=as_dict)
 
-    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, as_dict: bool):
+    def _executeSqlOgrSqlite(self, provider: QgsVectorDataProvider, sql: str, parameters, *, as_dict: bool):
         with self._connectSqlOgrSqlite(provider) as db:
-            return self._executeSqlSqlite(db, sql, as_dict)
+            return self._executeSqlSqlite(db, sql, parameters, as_dict=as_dict)
 
     def _executeSqlPostgre(
-        self, provider: QgsVectorDataProvider, sql: str, as_dict: bool
+        self, provider: QgsVectorDataProvider, sql: str, parameters, *, as_dict: bool
     ) -> Union[Iterable[Union[Iterable, Dict[str, Any]]], None]:
-        with self._connectSqlPostgres(provider, as_dict) as db:
+        with self._connectSqlPostgres(provider, dict_connection=as_dict) as db:
             cur = db.cursor()
-            cur.execute(sql)
+            cur.execute(sql, parameters)
             if cur.rowcount == 0:
                 return None
 
             return cur
 
     def createVirtualLayer(
-        self,
-        srcLayer: Union[QgsVectorLayer, Iterable[QgsVectorLayer]],
-        sql: str,
-        table=None
+        self, srcLayer: Union[QgsVectorLayer, Iterable[QgsVectorLayer]], sql: str, table=None
     ) -> QgsVectorLayer:
-        try:
-            iter(srcLayer)
-        except TypeError:
+        if isinstance(srcLayer, QgsVectorLayer):
             srcLayer = [srcLayer]
 
         # virtual layer only supports SELECT statements
-        if not re.match(r'\s*select', sql, re.IGNORECASE):
+        if not re.match(r"\s*select", sql, re.IGNORECASE):
             return None
 
         try:
             if table is None:
-                if m := re.search(r'from\s+(?: \w +\.)?(\w+)', sql, re.IGNORECASE):
+                if m := re.search(r"from\s+(?: \w +\.)?(\w+)", sql, re.IGNORECASE):
                     table = m.groups()[1]
 
             layers = []
-            df = QgsVirtualLayerDefinition()
+            defn = QgsVirtualLayerDefinition()
             for lyr in srcLayer:
-                lyr = lyr.clone()
+                lyr = lyr.clone()  # noqa: PLW2901
 
                 QgsProject.instance().addMapLayer(lyr, False)
                 layers.append(lyr)
 
                 if table is None:
                     table = lyr.name()
-                df.addSource(table, lyr.id())
+                defn.addSource(table, lyr.id())
                 table = None
 
-            df.setQuery(sql)
+            defn.setQuery(sql)
 
-            return QgsVectorLayer(df.toString(), f'tmp_{random_id(6)}', 'virtual')
+            return QgsVectorLayer(defn.toString(), f"tmp_{random_id(6)}", "virtual")
         finally:
             for lyr in layers:
                 QgsProject.instance().removeMapLayer(lyr.id())
 
-    def _executeSqlVirtualLayer(self, layer: QgsVectorLayer, sql: str,
-                                as_dict: bool, table=None) -> Iterable[Union[dict[str, Any], QgsFeature]]:
+    def _executeSqlVirtualLayer(
+        self, layer: QgsVectorLayer, sql: str, as_dict: bool, table=None
+    ) -> Iterable[Union[dict[str, Any], QgsFeature]]:
         # virtual layer only supports SELECT statements
         vl = self.createVirtualLayer(layer, sql, table)
         if as_dict:
@@ -247,42 +233,41 @@ class SqlAccess:
 
     def dbconnect(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
+        if provider.name() == "ogr" and provider.storageType() in ("GPKG", "SQLite"):
             return self._connectSqlOgrSqlite(provider)
-        elif provider.name() == 'spatialite':
+        elif provider.name() == "spatialite":
             return self._connectSqlNativeSqlite(provider)
-        elif provider.name() in ('postgis', 'postgres'):
+        elif provider.name() in ("postgis", "postgres"):
             return self._connectSqlPostgres(provider)
 
         return None
 
     @overload
-    def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict: Literal[True]) -> Iterable[dict[str, Any]]:
-        ...
+    def executeSql(
+        self, layer: QgsVectorLayer, sql: str, parameters=None, *, as_dict: Literal[True]
+    ) -> Iterable[dict[str, Any]]: ...
 
     @overload
     def executeSql(
-        self,
-        layer: QgsVectorLayer,
-        sql: str,
-        as_dict: Literal[False]
-    ) -> Union[cursor, Iterable[Sequence], Iterable[sqlite3.Row], Iterable[QgsFeature]]:
-        ...
+        self, layer: QgsVectorLayer, sql: str, parameters=None, *, as_dict: Literal[False]
+    ) -> Union[cursor, Iterable[Sequence], Iterable[sqlite3.Row], Iterable[QgsFeature]]: ...
 
-    def executeSql(self, layer: QgsVectorLayer, sql: str, as_dict=True):
+    def executeSql(self, layer: QgsVectorLayer, sql: str, parameters=None, *, as_dict=True):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr' and provider.storageType() in ('GPKG', 'SQLite'):
-            return self._executeSqlOgrSqlite(provider, sql, as_dict)
-        elif provider.name() == 'spatialite':
-            return self._executeSqlNativeSqlite(provider, sql, as_dict)
-        elif provider.name() in ('postgis', 'postgres'):
-            return self._executeSqlPostgre(provider, sql, as_dict)
+        if provider.name() == "ogr" and provider.storageType() in ("GPKG", "SQLite"):
+            return self._executeSqlOgrSqlite(provider, sql, parameters, as_dict=as_dict)
+        elif provider.name() == "spatialite":
+            return self._executeSqlNativeSqlite(provider, sql, parameters, as_dict=as_dict)
+        elif provider.name() in ("postgis", "postgres"):
+            return self._executeSqlPostgre(provider, sql, parameters, as_dict=as_dict)
+        elif parameters is not None:
+            raise ValueError(f"{provider.name()} does not support parameterized query")
 
-        return self._executeSqlVirtualLayer(layer, sql, as_dict)
+        return self._executeSqlVirtualLayer(layer, sql, as_dict=as_dict)
 
     def isSQLCapable(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
-        if provider.name() == 'ogr':
-            return provider.storageType() in ('GPKG', 'SQLite')
+        if provider.name() == "ogr":
+            return provider.storageType() in ("GPKG", "SQLite")
 
-        return provider.name() in ('spatialite', 'postgis', 'postgres')
+        return provider.name() in ("spatialite", "postgis", "postgres")

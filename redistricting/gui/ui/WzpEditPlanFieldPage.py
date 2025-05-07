@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 # Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/WzpEditPlanFieldPage.ui'
 #
@@ -8,12 +7,13 @@
 
 
 from qgis import gui
-from .RedistrictingWidgets import RdsFieldTableView
 from qgis.PyQt import (
     QtCore,
     QtGui,
     QtWidgets
 )
+
+from .RedistrictingWidgets import RdsFieldTableView
 
 
 class Ui_wzpDisplayFields(object):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - New/Edit Plan Wizard - Extra Demographics Page
 
         begin                : 2022-01-15
@@ -22,33 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    QAbstractListModel,
-    QModelIndex,
-    QObject,
-    Qt,
-    QVariant
-)
-from qgis.PyQt.QtWidgets import (
-    QComboBox,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
-    QWidget,
-    QWizardPage
-)
+from qgis.PyQt.QtCore import QAbstractListModel, QModelIndex, QObject, Qt, QVariant
+from qgis.PyQt.QtWidgets import QComboBox, QStyledItemDelegate, QStyleOptionViewItem, QWidget, QWizardPage
 
-from ..models import (
-    RdsDataField,
-    RdsField
-)
-from ..utils import (
-    defaults,
-    matchField,
-    tr
-)
+from .. import settings
+from ..models import RdsDataField, RdsField
+from ..utils import matchField, tr
 from .ui.WzpEditPlanFieldPage import Ui_wzpDisplayFields
 
 
@@ -97,18 +79,17 @@ class PopFieldDelegate(QStyledItemDelegate):
 class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
     fields = None
 
-    def __init__(self,  parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
         self.fieldsModel = self.tblDataFields.model()
         self.fieldsModel.fieldType = RdsDataField
         self.tblDataFields.setItemDelegateForColumn(3, PopFieldDelegate(self))
 
-        self.registerField('dataFields', self.tblDataFields, 'fields', self.tblDataFields.fieldsChanged)
+        self.registerField("dataFields", self.tblDataFields, "fields", self.tblDataFields.fieldsChanged)
         self.tblDataFields.setEnableDragRows(True)
 
-        self.btnAddField.setIcon(
-            QgsApplication.getThemeIcon('/mActionAdd.svg'))
+        self.btnAddField.setIcon(QgsApplication.getThemeIcon("/mActionAdd.svg"))
         self.fexDataField.fieldChanged.connect(self.fieldChanged)
         self.btnAddField.clicked.connect(self.addField)
 
@@ -133,12 +114,12 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         else:
             self.setFinalPage(True)
 
-    def cleanupPage(self):
-        ...
+    def cleanupPage(self): ...
 
     def fieldChanged(self, field):
-        self.btnAddField.setEnabled(field != '' and (
-            not self.fexDataField.isExpression() or self.fexDataField.isValidExpression()))
+        self.btnAddField.setEnabled(
+            field != "" and (not self.fexDataField.isExpression() or self.fexDataField.isValidExpression())
+        )
 
     def addField(self):
         field, isExpression, isValid = self.fexDataField.currentField()
@@ -147,14 +128,14 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
 
         f = self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
         if f and f.isNumeric and not isExpression:
-            if matchField(f.field, self.fexDataField.layer(), defaults.VAP_FIELDS):
+            if matchField(f.field, self.fexDataField.layer(), settings.vapFieldPatterns):
                 for p in self.fieldsModel.popFields:
-                    if matchField(p.field, None, defaults.VAP_TOTAL_FIELDS):
+                    if matchField(p.field, None, settings.vapTotalFields):
                         f.pctbase = p.fieldName
 
-            elif matchField(f.field, self.fexDataField.layer(), defaults.CVAP_FIELDS):
+            elif matchField(f.field, self.fexDataField.layer(), settings.cvapFieldPatterns):
                 for p in self.fieldsModel.popFields:
-                    if matchField(p.field, None, defaults.CVAP_TOTAL_FIELDS):
+                    if matchField(p.field, None, settings.cvapTotalFields):
                         f.pctbase = p.fieldName
 
             else:

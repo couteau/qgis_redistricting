@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - manage list of pending assignments
 
         begin                : 2022-01-15
@@ -22,17 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union,
-    overload
-)
+
+from typing import Optional, Union, overload
 
 import pandas as pd
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 
 class Delta:
@@ -88,7 +81,7 @@ class DeltaList(QObject):
 
         if isinstance(index, tuple):
             row, col = index
-            value = self._data.iat[row, col]
+            value = self._data.iat[row, col]  # noqa: PD009
             return value if not pd.isna(value) else None
 
         if isinstance(index, str):
@@ -113,7 +106,7 @@ class DeltaList(QObject):
     def __bool__(self):
         return self._data is not None and not self._data.empty
 
-    def __eq__(self, other: 'DeltaList'):
+    def __eq__(self, other: "DeltaList"):
         if other is None:
             return False
 

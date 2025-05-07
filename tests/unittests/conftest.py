@@ -18,6 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 from unittest.mock import PropertyMock
 
 import pytest
@@ -40,7 +41,7 @@ def active_plan(mocker: MockerFixture):
 @pytest.fixture
 def mock_district(mocker: MockerFixture):
     district = mocker.create_autospec(spec=RdsDistrict, instance=True)
-    type(district).district = mocker.PropertyMock(return_value=1, )
+    type(district).district = mocker.PropertyMock(return_value=1)
     type(district).name = mocker.PropertyMock(return_value="District Name")
     type(district).description = mocker.PropertyMock(return_value="District description")
     return district
@@ -67,7 +68,9 @@ def mock_planmanager(qgis_iface, active_plan, mocker: MockerFixture):  # pylint:
 
 
 @pytest.fixture
-def mock_planmanager_with_active_plan(qgis_iface, mock_district, active_plan: PropertyMock, mock_plan, mocker: MockerFixture):  # pylint: disable=unused-argument
+def mock_planmanager_with_active_plan(
+    qgis_iface, mock_district, active_plan: PropertyMock, mock_plan, mocker: MockerFixture
+):  # pylint: disable=unused-argument
     qgis_iface.addCustomActionForLayerType = mocker.MagicMock()
     qgis_iface.addCustomActionForLayer = mocker.MagicMock()
     qgis_iface.vectorMenu = mocker.MagicMock()

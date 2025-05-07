@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - online help utilities
 
         begin                : 2024-03-20
@@ -22,11 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from qgis.PyQt.QtCore import QUrl
 from qgis.PyQt.QtGui import QDesktopServices
 
 
-def showHelp(helpPage='index.html'):
+def showHelp(helpPage="index.html"):
     """Display application help to the user."""
-    helpfile = f'https://couteau.github.io/qgis_redistricting/{helpPage}'
+    helpfile = f"https://couteau.github.io/qgis_redistricting/{helpPage}"
     QDesktopServices.openUrl(QUrl(helpfile))

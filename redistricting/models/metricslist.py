@@ -24,24 +24,12 @@
 
 from abc import abstractmethod
 from collections import defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from copy import copy
 from enum import Enum, IntFlag, auto
 from numbers import Integral, Real
 from types import GenericAlias
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Mapping,
-    Optional,
-    TypeVar,
-    Union,
-    _GenericAlias,
-    get_args,
-    get_origin,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, Union, _GenericAlias, get_args, get_origin, overload
 
 import geopandas as gpd
 import pandas as pd
@@ -102,7 +90,7 @@ class RdsMetric(Generic[T], RdsBaseModel):
 
         if cls.value.type != cls._type:
             cls.__annotations__["value"] = cls._type
-            setattr(cls, "value", copy(cls.value))
+            cls.value = copy(cls.value)
             if isinstance(cls._type, (_GenericAlias, GenericAlias)):
                 cls.value.type = get_origin(cls._type)
             else:
@@ -252,7 +240,7 @@ def get_batches(metrics: Mapping[str, RdsMetric], ready: dict[str, RdsMetric] = 
     if ready is None:
         ready = {}
 
-    name_to_deps = {name: set(m.name() for m in metric.depends()) for name, metric in metrics.items()}
+    name_to_deps = {name: {m.name() for m in metric.depends()} for name, metric in metrics.items()}
 
     # remove the dependencies that have already been calculated
     if ready:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - New/Edit Plan Wizard - Population Page
 
         begin                : 2022-01-15
@@ -22,36 +21,27 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import (
-    QgsApplication,
-    QgsFieldProxyModel,
-    QgsVectorLayer
-)
-from qgis.PyQt.QtWidgets import (
-    QHeaderView,
-    QWizardPage
-)
 
+from qgis.core import QgsApplication, QgsFieldProxyModel, QgsVectorLayer
+from qgis.PyQt.QtWidgets import QHeaderView, QWizardPage
+
+from .. import settings
 from ..models import RdsField
-from ..utils import (
-    defaults,
-    getDefaultField
-)
+from ..utils import getDefaultField
 from .ui.WzpEditPlanPopPage import Ui_wzpPopulation
 
 
 class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
 
-        self.registerField('popLayer', self.cmbPopLayer)
-        self.registerField('joinField', self.cmbJoinField)
-        self.registerField('popField*', self.cmbPopField)
-        self.registerField('deviation', self.sbxMaxDeviation, 'value', self.sbxMaxDeviation.valueChanged)
-        self.registerField('deviationType', self.rbDeviationOverUnder)
-        self.registerField('popFields', self.tblAddlPopulation, 'fields', self.tblAddlPopulation.fieldsChanged)
+        self.registerField("popLayer", self.cmbPopLayer)
+        self.registerField("joinField", self.cmbJoinField)
+        self.registerField("popField*", self.cmbPopField)
+        self.registerField("deviation", self.sbxMaxDeviation, "value", self.sbxMaxDeviation.valueChanged)
+        self.registerField("deviationType", self.rbDeviationOverUnder)
+        self.registerField("popFields", self.tblAddlPopulation, "fields", self.tblAddlPopulation.fieldsChanged)
 
         self.fieldsModel = self.tblAddlPopulation.model()
 
@@ -68,7 +58,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.cmbPopField.setFilters(QgsFieldProxyModel.Numeric)
         self.cmbAddlPopField.setFilters(QgsFieldProxyModel.Numeric)
         self.cmbAddlPopField.fieldChanged.connect(self.fieldChanged)
-        self.btnAddAddlPopField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
+        self.btnAddAddlPopField.setIcon(QgsApplication.getThemeIcon("/mActionAdd.svg"))
         self.btnAddAddlPopField.clicked.connect(self.addField)
 
         self.tblAddlPopulation.setEnableDragRows(True)
@@ -80,8 +70,8 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
 
     def initializePage(self):
         super().initializePage()
-        popLayer = self.field('popLayer') or None
-        geoLayer = self.field('sourceLayer') or None
+        popLayer = self.field("popLayer") or None
+        geoLayer = self.field("sourceLayer") or None
         if popLayer is None:
             popLayer = geoLayer
 
@@ -96,12 +86,11 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
         self.cmbPopField.setFocus()
         self.setFinalPage(self.wizard().isComplete())
 
-    def cleanupPage(self):
-        ...
+    def cleanupPage(self): ...
 
     def updatePopLayer(self):
         if self.btnUseGeoLayer.isChecked():
-            geoLayer = self.field('sourceLayer') or None
+            geoLayer = self.field("sourceLayer") or None
             self.cmbPopLayer.setLayer(geoLayer)
 
     def setPopLayer(self, layer: QgsVectorLayer):
@@ -112,36 +101,37 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
             return
 
         if layer != self.cmbJoinField.layer():
-            joinField = self.field('joinField')
-            geoIdField = self.field('geoIdField')
+            joinField = self.field("joinField")
+            geoIdField = self.field("geoIdField")
             self.cmbJoinField.setLayer(layer)
             if joinField and layer.fields().lookupField(joinField) != -1:
                 self.cmbJoinField.setField(joinField)
             elif layer.fields().lookupField(geoIdField) != -1:
                 self.cmbJoinField.setField(geoIdField)
 
-            popField = self.field('popField')
+            popField = self.field("popField")
             self.cmbPopField.setLayer(layer)
             if popField and layer.fields().lookupField(popField) != -1:
                 self.cmbPopField.setField(popField)
             else:
-                self.cmbPopField.setField(getDefaultField(layer, defaults.POP_TOTAL_FIELDS))
+                self.cmbPopField.setField(getDefaultField(layer, settings.popTotalFields))
 
             self.cmbAddlPopField.setLayer(layer)
-            popFields: list[RdsField] = self.field('popFields')
+            popFields: list[RdsField] = self.field("popFields")
             for f in popFields:
                 f.setLayer(layer)
 
     def fieldChanged(self, field):
-        self.btnAddAddlPopField.setEnabled(field != '' and (
-            not self.cmbAddlPopField.isExpression() or self.cmbAddlPopField.isValidExpression()))
+        self.btnAddAddlPopField.setEnabled(
+            field != "" and (not self.cmbAddlPopField.isExpression() or self.cmbAddlPopField.isValidExpression())
+        )
 
     def addField(self):
         field, isExpression, isValid = self.cmbAddlPopField.currentField()
         if not isValid:
             return
 
-        layer = self.field('popLayer')
+        layer = self.field("popLayer")
         self.fieldsModel.appendField(layer, field, isExpression)
 
     def deviationTypeChanged(self, overUnder: bool):

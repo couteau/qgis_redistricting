@@ -7,19 +7,32 @@ qt_api = "pyqt6"
 addopts = "-nauto --import-mode=importlib -vv --dist loadgroup"
 
 [tool.ruff]
+exclude = ["redistricting/gui/ui/*"]
 indent-width = 4
 line-length = 120
 show-fixes = true
 fix = true
-unfixable = ["F401"]
 target-version = "py39"
 
 [tool.ruff.lint]
-ignore = ["E741", "F811", "PLR2004"]
 extend-select = [
-    "PL", # pylint
-    "S",
+    "E",
+    "W",
+    "PL",  # pylint
+    "S",   # bandit
+    "COM", # comma
+    "C4",  # comprehensions
+    "PT",  # pytest
+    "NPY", # numpy
+    "PD",  # pandas
+    "B",   # bugbear
+    "ICN",
+    "ISC",
+    "Q",
 ]
+ignore = ["E741", "F811", "PLR2004", "COM812"]
+# don't fix unused imports -- some modules are imported for their side effects
+unfixable = ["F401"]
 
 [tool.ruff.lint.pylint]
 max-branches = 15
@@ -28,4 +41,5 @@ max-branches = 15
 quote-style = "double"
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "PLR0915"]
+"tests/**" = ["S101", "PLR0915", "E501"]
+"redistricting/controllers/*" = ["PLR0913"]

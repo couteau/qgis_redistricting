@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""QGIS Reidstricting Plugin - constants and default values
+"""QGIS Redistricting Plugin - district compactness score calculations
 
-        begin                : 2022-01-15
+        begin                : 2024-10-03
         git sha              : $Format:%H$
-        copyright            : (C) 2022 by Cryptodira
+        copyright            : (C) 2024 by Cryptodira
         email                : stuart@cryptodira.org
 
 /***************************************************************************
@@ -22,25 +22,34 @@
  *                                                                         *
  ***************************************************************************/
 """
-import re
+import math
+from typing import Callable
 
-from . import tr
+import geopandas as gpd
+import pandas as pd
+from packaging import version
+from qgis.core import QgsGeometry
 
-MAX_DISTRICTS = 1000
+from ..models import MetricsColumns
 
-POP_TOTAL_FIELDS = ['pop_total', 'p0010001', 'tot_pop', 'total_pop']
-VAP_TOTAL_FIELDS = ['vap_total', 'p0030001', 'tot_vap', 'total_vap']
-CVAP_TOTAL_FIELDS = ['cvap_total', re.compile(r'^cvap_(?:\d{4}_)total$')]
 
-CVAP_FIELDS = [re.compile(r'^cvap_(?:\d{4}_)?\w+$'), re.compile(r'^\w+(?:\d{4}_)?cvap(?:_\d{4})?$')]
-VAP_FIELDS = [re.compile(r'^vap_(?:\d{4}_)?\w+$'), re.compile(r'^\w+(?:\d{4}_)?vap(?:_\d{4})?$')]
+def PolsbyPopper(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
+    return 4 * math.pi * area / (cea.length**2)
 
-GEOID_FIELDS = ['geoid20', 'geoid30', 'geoid10', 'geoid', 'block', 'block_id']
 
-GEOID_LABELS = [
-    tr('Block'),
-    tr('Block Group'),
-    tr('Tract'),
-    tr('Precinct/VTD'),
-    tr('County/Parish'),
-]
+def Reock(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
+    if version.parse(gpd.__version__) < version.parse('1.0.0'):
+        return cea.apply(lambda g: g.area / QgsGeometry.fromWkt(g.wkt).minimalEnclosingCircle()[0].area())
+
+    return area / cea.minimum_bounding_circle().area
+
+
+def ConvexHull(cea: gpd.GeoSeries, area: pd.Series) -> pd.Series:
+    return area / cea.convex_hull.area
+
+
+MetricsFunctions: dict[str, Callable[[gpd.GeoSeries, pd.Series], pd.Series]] = {
+    MetricsColumns.POLSBYPOPPER: PolsbyPopper,
+    MetricsColumns.REOCK: Reock,
+    MetricsColumns.CONVEXHULL: ConvexHull
+}

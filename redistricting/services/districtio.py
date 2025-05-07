@@ -1,4 +1,4 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 from qgis.core import (
     QgsFeature,
@@ -50,8 +50,8 @@ class DistrictReader:
                 del data[self._popField]
 
             data[DistrictColumns.POPULATION] = data[DistrictColumns.POPULATION] or 0
-            if data.get('description', '') is None:
-                data['description'] = ''
+            if data.get("description", "") is None:
+                data["description"] = ""
 
             if f[str(self._distField)] == 0:
                 result.append(RdsUnassigned(fid=f.id(), **data))

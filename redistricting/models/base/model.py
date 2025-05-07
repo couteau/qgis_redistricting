@@ -25,17 +25,7 @@
 import functools
 import inspect
 from reprlib import recursive_repr
-from typing import (  # pylint: disable=no-name-in-module
-    Any,
-    ClassVar,
-    Optional,
-    Type,
-    TypeVar,
-    Union,
-    _GenericAlias,
-    dataclass_transform,
-    get_type_hints,
-)
+from typing import Any, ClassVar, Optional, TypeVar, Union, _GenericAlias, dataclass_transform, get_type_hints
 
 from qgis.PyQt.QtCore import QObject
 
@@ -173,10 +163,10 @@ class RdsBaseModel(QObject):
 
             flds[n] = fld
 
-        setattr(cls, "__fields__", flds)
-        setattr(cls, "__init__", wrap_init(getattr(cls, "__init__")))
+        setattr(cls, "__fields__", flds)  # noqa: B010
+        setattr(cls, "__init__", wrap_init(getattr(cls, "__init__")))  # noqa: B009, B010
         if cls.__dataclass_transform__["eq_default"]:
-            setattr(cls, "__eq__", compare_models)
+            setattr(cls, "__eq__", compare_models)  # noqa: B010
 
     def __pre_init__(self): ...
 
@@ -251,7 +241,8 @@ class RdsBaseModel(QObject):
 
     @recursive_repr()
     def __repr__(self):
-        return f"{self.__class__.__name__}({', '.join(f'{f.name}={getattr(self, f.name)!r}' for f in self.__fields__.values() if f._field_type == FieldType.FIELD and f.repr)})"
+        repr_fields = (f for f in self.__fields__.values() if f._field_type == FieldType.FIELD and f.repr)
+        return f"{self.__class__.__name__}({', '.join(f'{f.name}={getattr(self, f.name)!r}' for f in repr_fields)})"
 
 
 def field_dict(cls: Union[RdsBaseModel, type[RdsBaseModel]]) -> dict[str, Field]:
@@ -292,7 +283,7 @@ def serialize_model(obj, memo=None, exclude_none=True):
 _ModelType = TypeVar("_ModelType", bound=RdsBaseModel)
 
 
-def deserialize_model(cls: Type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
+def deserialize_model(cls: type[_ModelType], data: dict[str, Any], parent: Optional[QObject] = None) -> _ModelType:
     kw = {}
 
     flds = get_type_hints(cls)

@@ -18,7 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Iterable
+from collections.abc import Iterable
 from uuid import uuid4
 
 import pytest

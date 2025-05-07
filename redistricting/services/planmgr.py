@@ -23,7 +23,8 @@
 """
 
 import sys
-from typing import Iterable, Optional, SupportsIndex, Union
+from typing import Optional, SupportsIndex, Union
+from collections.abc import Iterable
 from uuid import UUID
 
 from qgis.core import Qgis, QgsMessageLog

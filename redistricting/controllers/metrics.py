@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Controller for Metrics Table functions
 
         begin                : 2024-09-20
@@ -21,48 +20,34 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
- """
+"""
+
 import csv
 import io
 from typing import Optional
 
-from qgis.core import (
-    QgsApplication,
-    QgsProject
-)
+from qgis.core import QgsApplication, QgsProject
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import (
-    QModelIndex,
-    QObject,
-    Qt
-)
-from qgis.PyQt.QtGui import (
-    QIcon,
-    QKeySequence
-)
+from qgis.PyQt.QtCore import QModelIndex, QObject, Qt
+from qgis.PyQt.QtGui import QIcon, QKeySequence
 from qgis.PyQt.QtWidgets import QToolBar
 
-from ..gui import (
-    DockPlanMetrics,
-    RdsMetricGuiHandler,
-    TableViewKeyEventFilter,
-    get_metric_handler
-)
-from ..models import (
-    RdsMetric,
-    RdsMetricsModel,
-    RdsPlan
-)
-from ..services import (
-    ActionRegistry,
-    DistrictUpdater,
-    PlanManager
-)
+from ..gui import DockPlanMetrics, RdsMetricGuiHandler, TableViewKeyEventFilter, get_metric_handler
+from ..models import RdsMetric, RdsMetricsModel, RdsPlan
+from ..services import ActionRegistry, DistrictUpdater, PlanManager
 from .base import DockWidgetController
 
 
 class MetricsController(DockWidgetController):
-    def __init__(self, iface: QgisInterface, project: QgsProject, planManager: PlanManager, toolbar: QToolBar, updateService: DistrictUpdater, parent: Optional[QObject] = None):
+    def __init__(
+        self,
+        iface: QgisInterface,
+        project: QgsProject,
+        planManager: PlanManager,
+        toolbar: QToolBar,
+        updateService: DistrictUpdater,
+        parent: Optional[QObject] = None,
+    ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.updateService = updateService
 
@@ -73,20 +58,20 @@ class MetricsController(DockWidgetController):
 
         self.actionCopyMetrics = self.actions.createAction(
             name="actionCopyMetrics",
-            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            icon=QgsApplication.getThemeIcon("/mActionEditCopy.svg"),
             text=self.tr("Copy Metrics"),
             tooltip=self.tr("Copy metrics to clipboard"),
             callback=self.copyMetrics,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionCopySelectedMetrics = self.actions.createAction(
             name="actionCopyselectedMetrics",
-            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            icon=QgsApplication.getThemeIcon("/mActionEditCopy.svg"),
             text=self.tr("Copy Metrics"),
             tooltip=self.tr("Copy selected metrics to clipboard"),
             callback=self.copySelection,
             shortcut=QKeySequence.StandardKey.Copy,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.handler_cache: dict[type[RdsMetric], RdsMetricGuiHandler] = {}
@@ -102,9 +87,9 @@ class MetricsController(DockWidgetController):
     def createToggleAction(self):
         action = super().createToggleAction()
         if action is not None:
-            action.setIcon(QIcon(':/plugins/redistricting/planmetrics.svg'))
-            action.setText('Plan metrics')
-            action.setToolTip('Show/hide plan metrics')
+            action.setIcon(QIcon(":/plugins/redistricting/planmetrics.svg"))
+            action.setText("Plan metrics")
+            action.setToolTip("Show/hide plan metrics")
 
         return action
 
@@ -167,10 +152,14 @@ class MetricsController(DockWidgetController):
             selection.sort(key=lambda idx: idx.row())
             table = []
             for idx in selection:
-                table.append([self.metricsModel.headerData(
-                    idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole), idx.data()])
+                table.append(
+                    [
+                        self.metricsModel.headerData(idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole),
+                        idx.data(),
+                    ]
+                )
             stream = io.StringIO()
-            csv.writer(stream, delimiter='\t').writerows(table)
+            csv.writer(stream, delimiter="\t").writerows(table)
             QgsApplication.instance().clipboard().setText(stream.getvalue())
 
     def showMetricsDetail(self, index: QModelIndex):
@@ -201,12 +190,12 @@ class MetricsController(DockWidgetController):
 
         if handler in self.handler_cache.values():
             if handler.metric is not None:
-                k = type(handler.metric)
+                del self.handler_cache[type(handler.metric)]
             else:
-                for k, v in self.handler_cache.items():
+                for k, v in self.handler_cache.items():  # noqa: B007
                     if v is handler:
                         break
                 else:
                     return
 
-            del self.handler_cache[k]
+                del self.handler_cache[k]

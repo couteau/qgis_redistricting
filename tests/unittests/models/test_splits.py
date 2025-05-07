@@ -18,6 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pandas as pd
 import pytest
 
@@ -114,38 +115,55 @@ class TestSplits:
                      "__name": "Tuscaloosa"}
                 ]
             }""",
-            orient="table"
+            orient="table",
         )
 
     def test_create_splits_no_data(self):
-        s = RdsSplits('vtdid')
-        assert s.field == 'vtdid'
-        assert isinstance(s.data, pd.DataFrame) and s.data.empty
+        s = RdsSplits("vtdid")
+        assert s.field == "vtdid"
+        assert isinstance(s.data, pd.DataFrame)
+        assert s.data.empty
 
     def test_create_splits_with_data(self, splits_data):
-        s = RdsSplits('vtdid', data=splits_data)
-        assert s.field == 'vtdid'
-        assert isinstance(s.data, pd.DataFrame) and len(s.data) == 12
+        s = RdsSplits("vtdid", data=splits_data)
+        assert s.field == "vtdid"
+        assert isinstance(s.data, pd.DataFrame)
+        assert len(s.data) == 12
         assert len(s.splits) == 4
         assert s.attrCount == 16
 
     def test_create_split_geography(self, splits_data):
-        s = RdsSplits('vtdid', data=splits_data)
-        g = RdsSplitGeography(s, splits_data, '0155200')
+        s = RdsSplits("vtdid", data=splits_data)
+        g = RdsSplitGeography(s, splits_data, "0155200")
         assert len(g) == 3
-        assert g.name == 'Northport'
-        assert g.geoid == '0155200'
+        assert g.name == "Northport"
+        assert g.geoid == "0155200"
         assert g.districts == [1, 3, 5]
-        assert g.attributes == ['Northport (0155200)', '1, 3, 5']
+        assert g.attributes == ["Northport (0155200)", "1, 3, 5"]
 
     def test_create_split_district(self, splits_data):
-        s = RdsSplits('vtdid', data=splits_data)
-        g = RdsSplitGeography(s, splits_data, '0155200')
-        d = RdsSplitDistrict(g, splits_data, ('0155200', 3))
-        assert d.geoid == '0155200'
+        s = RdsSplits("vtdid", data=splits_data)
+        g = RdsSplitGeography(s, splits_data, "0155200")
+        d = RdsSplitDistrict(g, splits_data, ("0155200", 3))
+        assert d.geoid == "0155200"
         assert d.district == 3
         assert d.parent == g
         assert len(d) == 15
         assert len(list(d.attributes)) == 15
-        assert list(d.attributes) == [3, 3098, 2152, 2319.743482263867, 1973, 1908, 681, 390, 1262, 1219, 609, 235,
-                                      1707.3620228766558, 521.6544782826682, 79.72727272727273]
+        assert list(d.attributes) == [
+            3,
+            3098,
+            2152,
+            2319.743482263867,
+            1973,
+            1908,
+            681,
+            390,
+            1262,
+            1219,
+            609,
+            235,
+            1707.3620228766558,
+            521.6544782826682,
+            79.72727272727273,
+        ]

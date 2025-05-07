@@ -34,6 +34,7 @@ from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
 
 from ..utils import spatialite_connect, tr
+from ..utils.misc import quote_identifier
 from .consts import ConstStr, DeviationType, DistrictColumns, MetricsColumns
 from .metricslist import MetricLevel, MetricTriggers, RdsAggregateMetric, RdsMetric, register_metrics
 from .validators import validators
@@ -283,7 +284,7 @@ class RdsCompactnessMetric(RdsMetric[pd.Series], mname="__compactness"):
     def __init_subclass__(
         cls,
         score: ConstStr,
-        group=tr("Compactness"),
+        group=tr("Compactness"),  # noqa: B008
         level=MetricLevel.DISTRICT,
         triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
         depends=(CeaProjMetric,),
@@ -317,7 +318,7 @@ class RdsCompactnessAggregate(RdsAggregateMetric[float], mname="__compactnessagg
         mname,
         values: RdsCompactnessMetric,
         triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
-        group=tr("Compactness"),
+        group=tr("Compactness"),  # noqa: B008
         **kwargs,
     ):
         super().__init_subclass__(mname=mname, group=group, triggers=triggers, values=values, **kwargs)
@@ -373,7 +374,11 @@ class RdsMaxPolsbyPopper(
 
 class RdsAggScores(RdsMetric, mname="__agg_compactness", level=MetricLevel.PLANWIDE):
     def __init_subclass__(
-        cls, score: ConstStr, triggers=MetricTriggers.ON_UPDATE_GEOMETRY, group=tr("Compactness"), **kwargs
+        cls,
+        score: ConstStr,
+        triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
+        group=tr("Compactness"),  # noqa: B008
+        **kwargs,
     ):
         super().__init_subclass__(
             mname=f"agg{score.capitalize()}", group=group, triggers=triggers, serialize=False, **kwargs
@@ -501,7 +506,8 @@ class RdsCutEdges(
             #   4) units are adjacent at more than a point
             sql = f"""SELECT count(*)
                 FROM assignments a JOIN assignments b
-                ON b."{plan.distField}" != a."{plan.distField}" AND b."{plan.geoIdField}" > a."{plan.geoIdField}"
+                ON b.{quote_identifier(plan.distField)} != a.{quote_identifier(plan.distField)} AND
+                   b.{quote_identifier(plan.geoIdField)} > a.{quote_identifier(plan.geoIdField)}
                 AND b.fid IN (
                     SELECT id FROM rtree_assignments_geometry r
                     WHERE r.minx <= st_maxx(a.geometry) and r.maxx >= st_minx(a.geometry)

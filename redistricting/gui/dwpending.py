@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - QDockWidget showing pending district changes
 
         begin                : 2024-09-20
@@ -22,11 +21,9 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QTransposeProxyModel
-)
+from qgis.PyQt.QtCore import QAbstractItemModel, QTransposeProxyModel
 from qgis.PyQt.QtGui import QIcon
 
 from .rdsdockwidget import RdsDockWidget
@@ -42,8 +39,8 @@ class DockPendingChanges(Ui_qdwPendingChanges, RdsDockWidget):
         self._model = QTransposeProxyModel(self)
         self.tblPending.setModel(self._model)
 
-        self.helpContext = 'usage/preview.html'
-        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.helpContext = "usage/preview.html"
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon("/mActionHelpContents.svg"))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
 
         self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))

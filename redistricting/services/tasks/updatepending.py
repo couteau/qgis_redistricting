@@ -29,6 +29,7 @@ import pandas as pd
 from ...errors import CanceledError
 from ...models import DistrictColumns
 from ...utils import tr
+from ...utils.misc import quote_identifier
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
@@ -55,7 +56,8 @@ class AggregatePendingChangesTask(AggregateDataTask):
     def loadAssignments(self):
         with self._connectSqlOgrSqlite(self.assignLayer.dataProvider()) as db:
             self.assignments: pd.DataFrame = pd.read_sql(
-                f'SELECT fid, "{self.geoIdField}", "{self.distField}" as old_{self.distField} FROM assignments',  # noqa: S608
+                f"SELECT fid, {quote_identifier(self.geoIdField)}, "  # noqa: S608
+                f"{quote_identifier(self.distField)} as {quote_identifier(f'old_{self.distField}')} FROM assignments",
                 db,
                 index_col="fid",
             )

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - A QDockWidget that shows selected demographic
         data for the active Redistricting Plan
 
@@ -23,6 +22,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
 from qgis.core import QgsApplication
@@ -30,10 +30,7 @@ from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QWidget
 
-from ..models import (
-    RdsField,
-    RdsPlan
-)
+from ..models import RdsField, RdsPlan
 from .dlgeditdatafields import DlgEditFields
 from .rdsdockwidget import RdsDockWidget
 from .ui.DistrictDataTable import Ui_qdwDistrictData
@@ -43,20 +40,19 @@ class DockDistrictDataTable(Ui_qdwDistrictData, RdsDockWidget):
     def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
         self.setupUi(self)
-        self.helpContext = 'usage/data_table.html'
+        self.helpContext = "usage/data_table.html"
         self.fieldStats: dict[RdsField, QWidget] = {}
 
         self.lblWaiting.setParent(self.tblDataTable)
 
-        self.btnAddFields.setIcon(
-            QgsApplication.getThemeIcon('/mActionAddManualTable.svg'))
+        self.btnAddFields.setIcon(QgsApplication.getThemeIcon("/mActionAddManualTable.svg"))
         self.btnAddFields.clicked.connect(self.addFieldDlg)
 
-        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon("/mActionHelpContents.svg"))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
 
         self.btnDemographics.setIcon(QIcon(":/plugins/redistricting/demographics.svg"))
-        self.btnMetrics.setIcon(QgsApplication.getThemeIcon('/mActionMeasureArea.svg'))
+        self.btnMetrics.setIcon(QgsApplication.getThemeIcon("/mActionMeasureArea.svg"))
 
         self._plan: RdsPlan = None
 

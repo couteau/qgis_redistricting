@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - pandas and geopandas i/o
 
         begin                : 2024-03-20
@@ -22,32 +21,31 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import os
 import pathlib
 import tempfile
 import zipfile
+from collections.abc import Iterable
+from numbers import Number
 
 import geopandas as gpd
 import pandas as pd
 import psycopg2
-from osgeo import (
-    gdal,
-    ogr
-)
+from osgeo import gdal, ogr
 from packaging.version import parse as parse_version
 from shapely import wkb
 from shapely.geometry import shape
 from shapely.geometry.base import BaseGeometry
 
 from .gpkg import spatialite_connect
+from .misc import quote_list
 
 if hasattr(pd.options.mode, "copy_on_write"):
     pd.options.mode.copy_on_write = "warn"
 
 DEC2FLOAT = psycopg2.extensions.new_type(
-    psycopg2.extensions.DECIMAL.values,
-    'DEC2FLOAT',
-    lambda value, curs: float(value) if value is not None else None
+    psycopg2.extensions.DECIMAL.values, "DEC2FLOAT", lambda value, curs: float(value) if value is not None else None
 )
 
 psycopg2.extensions.register_type(DEC2FLOAT)
@@ -69,7 +67,7 @@ def ogr_type_to_dtype(ogr_type):
 def is_shapezip(path: pathlib.Path):
     with zipfile.ZipFile(path, "r") as z:
         for f in z.namelist():
-            if f.endswith('.shp'):
+            if f.endswith(".shp"):
                 return True
 
     return False
@@ -102,48 +100,44 @@ try:
                 max_features = None
 
             return pyogrio.read_dataframe(
-                filename, bbox=bbox, mask=mask,
-                skip_features=skip_features, max_features=max_features,
-                **kwargs
+                filename, bbox=bbox, mask=mask, skip_features=skip_features, max_features=max_features, **kwargs
             )
 
-        setattr(gpd, "read_file",  read_file_pygrio)
+        gpd.read_file = read_file_pygrio
 
 except ImportError:
     gpd_io_engine = "fiona"
     gpd_read_file = gpd.read_file
 
-    HeaderSize = {
-        0: 8,
-        1: 40,
-        2: 56,
-        3: 46,
-        4: 72
-    }
+    HeaderSize = {0: 8, 1: 40, 2: 56, 3: 46, 4: 72}
 
-    def _read_sqlite(path: pathlib.Path, bbox=None, mask=None, rows=None, **kwargs):
+    def _read_sqlite(path: pathlib.Path, bbox=None, mask=None, rows=None, **kwargs):  # noqa: PLR0915, PLR0912
         def sql_to_wkb(geom: bytes):
-            if geom[:2] == b'GP':
+            if geom[:2] == b"GP":
                 s = HeaderSize[geom[3] >> 1 & 0b111]
                 ofs = slice(s, None)
             else:
                 ofs = slice(38, -1)
             return wkb.loads(geom[ofs])
 
-        with spatialite_connect(path) as db:
-            table = kwargs["layer"]
-            cols = kwargs.get("columns")
+        table = kwargs["layer"]
+        if not table.isidentifier():
+            raise ValueError(f"Invalid table name: {table!r}")
+        cols = kwargs.get("columns")
+        if cols is not None and not isinstance(cols, Iterable):
+            raise TypeError("Invalid value for columns")
 
+        with spatialite_connect(path) as db:
             c = db.execute("SELECT name FROM sqlite_schema WHERE type = 'table'")
             c.row_factory = lambda cursor, row: row[0]
             l = c.fetchall()
-            if 'gpkg_geometry_columns' in l:
+            if "gpkg_geometry_columns" in l:
                 fmt = "gpkg"
                 geom_tbl = "gpkg_geometry_columns"
                 tbl_col = "table_name"
                 geom_col = "column_name"
                 srsid_col = "srs_id"
-            elif 'geometry_columns' in l:
+            elif "geometry_columns" in l:
                 fmt = "spatialite"
                 geom_tbl = "geometry_columns"
                 tbl_col = "f_table_name"
@@ -156,15 +150,15 @@ except ImportError:
                 table = kwargs["layer"]
 
                 # pylint: disable-next=possibly-used-before-assignment
-                c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))
+                c = db.execute(f"SELECT {geom_col}, {srsid_col} FROM {geom_tbl} WHERE {tbl_col} = ?", (table,))  # noqa: S608
                 geometry_column, srs_id = c.fetchone()
 
                 if cols is None:
                     cols = ["*"]  # doesn't work with mask
                 else:
-                    cols = [*cols, geometry_column]
+                    cols = [*quote_list(cols), geometry_column]
 
-                sql = f"SELECT {','.join(cols)} FROM {table}"
+                sql = f"SELECT {','.join(cols)} FROM {table}"  # noqa: S608
 
                 # NOTE: no support for GeoSeries or GeoDataFrame bbox constraints
                 bbox_where = mask_where = ""
@@ -215,9 +209,19 @@ except ImportError:
 
                     if pkey:
                         minx, miny, maxx, maxy = bbox
-                        bbox_where = f"{pkey} IN (SELECT {idx_id} FROM {idx} r " \
-                            f"WHERE r.minx < {maxx} and r.maxx >= {minx} " \
+                        if (
+                            not isinstance(minx, Number)
+                            or not isinstance(miny, Number)
+                            or not isinstance(maxx, Number)
+                            or not isinstance(maxy, Number)
+                        ):
+                            raise ValueError("Invalid bbox")
+
+                        bbox_where = (
+                            f"{pkey} IN (SELECT {idx_id} FROM {idx} r "  # noqa: S608
+                            f"WHERE r.minx < {maxx} and r.maxx >= {minx} "
                             f"AND r.miny < {maxy} and r.maxy >= {miny}"
+                        )
 
                 if mask_where and bbox_where:
                     where = f"{bbox_where} AND {mask_where}"
@@ -232,25 +236,27 @@ except ImportError:
                 elif isinstance(rows, int):
                     sql = f"{sql} LIMIT {rows}"
 
-                df = pd.read_sql(sql, db)
-                df[geometry_column] = df[geometry_column].apply(sql_to_wkb)
-                df = gpd.GeoDataFrame(df, geometry=geometry_column, crs=srs_id)
+                result = pd.read_sql(sql, db)
+                result[geometry_column] = result[geometry_column].apply(sql_to_wkb)
+                result = gpd.GeoDataFrame(result, geometry=geometry_column, crs=srs_id)
             else:
                 # plain sqlite database
                 if cols is None:
                     cols = ["*"]
+                else:
+                    cols = quote_list(cols)
 
-                sql = f"SELECT {','.join(cols)} FROM {table}"
-                df = pd.read_sql(sql, db)
+                sql = f"SELECT {','.join(cols)} FROM {table}"  # noqa: S608
+                result = pd.read_sql(sql, db)
 
-        return df
+        return result
 
     def read_file_no_fiona(filename, bbox=None, mask=None, rows=None, engine=None, **kwargs):
         if bbox is not None and mask is not None:
             raise ValueError("bbox and mask cannot both be provided")
 
         path = pathlib.Path(filename)
-        if path.suffix in ('.gpkg', '.sqlite', '.db') and "layer" in kwargs:
+        if path.suffix in (".gpkg", ".sqlite", ".db") and "layer" in kwargs:
             return _read_sqlite(path, bbox, mask, rows, **kwargs)
 
         if path.suffix == ".zip" and is_shapezip(path):
@@ -261,12 +267,13 @@ except ImportError:
 
         return gpd_read_file(filename, bbox, mask, rows, engine=engine, **kwargs)
 
-    setattr(gpd, "read_file", read_file_no_fiona)
+    gpd.read_file = read_file_no_fiona
 
 if parse_version(gdal.__version__) > parse_version("3.6"):
     try:
         # pylint: disable-next=unused-import
-        import pyarrow  # type: ignore
+        import pyarrow  # type: ignore  # noqa
+
         os.environ["PYOGRIO_USE_ARROW"] = "1"
     except ImportError:
         pass

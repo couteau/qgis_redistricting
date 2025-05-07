@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - background task to calculate pending changes
 
         begin                : 2022-01-15
@@ -22,31 +21,15 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import pathlib
 from copy import deepcopy
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional, Union
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsProject
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    pyqtSignal
-)
+from qgis.core import Qgis, QgsApplication, QgsProject
+from qgis.PyQt.QtCore import QObject, pyqtSignal
 
-from ..models import (
-    MetricTriggers,
-    RdsDataField,
-    RdsField,
-    RdsGeoField,
-    RdsMetrics,
-    RdsPlan
-)
+from ..models import MetricTriggers, RdsDataField, RdsField, RdsGeoField, RdsMetrics, RdsPlan
 from ..models.base.lists import KeyedList
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
@@ -56,8 +39,8 @@ from .tasks.updatebase import UpdateMetricsTask
 
 class PlanBuilder(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
-    layersCreated = pyqtSignal('PyQt_PyObject')
-    builderError = pyqtSignal('PyQt_PyObject')
+    layersCreated = pyqtSignal("PyQt_PyObject")
+    builderError = pyqtSignal("PyQt_PyObject")
 
     def __init__(self, parent: QObject = None):
         super().__init__(parent)
@@ -89,10 +72,10 @@ class PlanBuilder(BasePlanBuilder):
         if isinstance(value, str):
             value = pathlib.Path(value)
         elif not isinstance(value, pathlib.Path):
-            raise ValueError(tr('Invalid GeoPackage path'))
+            raise ValueError(tr("Invalid GeoPackage path"))
 
         if value.resolve().exists():
-            self.pushError(tr('GeoPackage already exists at location {path}').format(path=value))
+            self.pushError(tr("GeoPackage already exists at location {path}").format(path=value))
 
         self._geoPackagePath = value
         return self
@@ -105,7 +88,7 @@ class PlanBuilder(BasePlanBuilder):
                     plan,
                     MetricTriggers.ON_CREATE_PLAN,
                     self._createLayersTask.populationData,
-                    self._createLayersTask.geometry
+                    self._createLayersTask.geometry,
                 )
                 QgsApplication.taskManager().addTask(self.updateMetricsTask)
             self._createLayersTask = None
@@ -113,12 +96,11 @@ class PlanBuilder(BasePlanBuilder):
 
         def taskTerminated():
             if self._createLayersTask.isCanceled():
-                self.setError(tr('Create layers canceled'), Qgis.UserCanceled)
+                self.setError(tr("Create layers canceled"), Qgis.UserCanceled)
             elif self._createLayersTask.exception:
                 self.pushError(
-                    tr('Error creating new {} layer: {}').format(
-                        tr('assignment'), self._createLayersTask.exception),
-                    Qgis.MessageLevel.Critical
+                    tr("Error creating new {} layer: {}").format(tr("assignment"), self._createLayersTask.exception),
+                    Qgis.MessageLevel.Critical,
                 )
             self._createLayersTask = None
             self.builderError.emit(self)
@@ -126,9 +108,7 @@ class PlanBuilder(BasePlanBuilder):
         if not plan:
             return None
 
-        self._createLayersTask = CreatePlanLayersTask(
-            plan,
-            str(self._geoPackagePath))
+        self._createLayersTask = CreatePlanLayersTask(plan, str(self._geoPackagePath))
         self._createLayersTask.taskCompleted.connect(taskCompleted)
         self._createLayersTask.taskTerminated.connect(taskTerminated)
         self._createLayersTask.progressChanged.connect(self.setProgress)
@@ -138,18 +118,23 @@ class PlanBuilder(BasePlanBuilder):
         return self._createLayersTask
 
     def createAttributeIndices(self):
-        if self._geoLayer is not None and self._geoLayer.storageType() == 'ESRI Shapefile':
+        if self._geoLayer is not None and self._geoLayer.storageType() == "ESRI Shapefile":
             f = self._geoLayer.fields().lookupField(self._geoJoinField)
             if f != -1:
                 self._geoLayer.dataProvider().createAttributeIndex(f)
 
-        if self._popLayer is not None and self._popLayer != self._geoLayer and \
-                self._popLayer.storageType() == 'ESRI Shapefile':
+        if (
+            self._popLayer is not None
+            and self._popLayer != self._geoLayer
+            and self._popLayer.storageType() == "ESRI Shapefile"
+        ):
             f = self._popLayer.fields().lookupField(self._popJoinField)
             if f != -1:
                 self._popLayer.dataProvider().createAttributeIndex(f)
 
-    def createPlan(self, createLayers=True, updateMetrics: bool = True, planParent: Optional[QObject] = None) -> RdsPlan:
+    def createPlan(
+        self, createLayers=True, updateMetrics: bool = True, planParent: Optional[QObject] = None
+    ) -> RdsPlan:
         self.clearErrors()
         self._isCancelled = False
         self._updateMetrics = updateMetrics
@@ -157,8 +142,7 @@ class PlanBuilder(BasePlanBuilder):
         if createLayers:
             if not self._geoPackagePath:
                 self.pushError(
-                    tr('GeoPackage path must be specified to create plan layers'),
-                    Qgis.MessageLevel.Critical
+                    tr("GeoPackage path must be specified to create plan layers"), Qgis.MessageLevel.Critical
                 )
                 return None
 
@@ -166,22 +150,21 @@ class PlanBuilder(BasePlanBuilder):
                 self._geoPackagePath.touch()
             except FileExistsError:
                 self.pushError(
-                    tr('GeoPackage {path} already exists').format(path=self._geoPackagePath),
-                    Qgis.MessageLevel.Critical
+                    tr("GeoPackage {path} already exists").format(path=self._geoPackagePath), Qgis.MessageLevel.Critical
                 )
                 return None
             except PermissionError:
                 self.pushError(
-                    tr('Cannot create GeoPackage at {path}: insufficient permissions').format(
-                        path=self._geoPackagePath),
-                    Qgis.MessageLevel.Critical
+                    tr("Cannot create GeoPackage at {path}: insufficient permissions").format(
+                        path=self._geoPackagePath
+                    ),
+                    Qgis.MessageLevel.Critical,
                 )
                 return None
             except OSError as e:
                 self.pushError(
-                    tr('Cannot create GeoPackage at {path}: {error}')
-                    .format(path=self._geoPackagePath, error=e),
-                    Qgis.MessageLevel.Critical
+                    tr("Cannot create GeoPackage at {path}: {error}").format(path=self._geoPackagePath, error=e),
+                    Qgis.MessageLevel.Critical,
                 )
                 return None
 
@@ -207,7 +190,7 @@ class PlanBuilder(BasePlanBuilder):
             geoFields=KeyedList[RdsGeoField](self._geoFields),
             description=self._description,
             metrics=RdsMetrics(totalPopulation=self._totalPopulation),
-            parent=planParent
+            parent=planParent,
         )
 
         self.createAttributeIndices()

@@ -21,56 +21,31 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-    Union
-)
 
-from qgis.core import (
-    QgsApplication,
-    QgsProject
-)
-from qgis.gui import (
-    QgisInterface,
-    QgsMapMouseEvent
-)
-from qgis.PyQt.QtCore import (
-    QEvent,
-    QMimeData,
-    QModelIndex,
-    QObject,
-    QPoint,
-    Qt
-)
-from qgis.PyQt.QtGui import (
-    QContextMenuEvent,
-    QKeySequence
-)
-from qgis.PyQt.QtWidgets import (
-    QMenu,
-    QToolBar
-)
+from typing import TYPE_CHECKING, Optional, Union
+
+from qgis.core import QgsApplication, QgsProject
+from qgis.gui import QgisInterface, QgsMapMouseEvent
+from qgis.PyQt.QtCore import QEvent, QMimeData, QModelIndex, QObject, QPoint, Qt
+from qgis.PyQt.QtGui import QContextMenuEvent, QKeySequence
+from qgis.PyQt.QtWidgets import QMenu, QToolBar
 
 from ..gui import DockDistrictDataTable
-from ..models import (
-    RdsDistrictDataModel,
-    RdsDistrictFilterFieldsProxyModel,
-    RdsPlan
-)
+from ..models import RdsDistrictDataModel, RdsDistrictFilterFieldsProxyModel, RdsPlan
 from ..services import (
     ActionRegistry,
     AssignmentsService,
     DistrictClipboardAccess,
     DistrictCopier,
     DistrictUpdater,
-    PlanManager
+    PlanManager,
 )
 from ..utils import tr
 from .base import DockWidgetController
 
 if TYPE_CHECKING:
     from qgis.PyQt.QtCore import QT_VERSION
+
     if QT_VERSION >= 0x060000:
         from PyQt6.QtGui import QAction  # type: ignore[import]
     else:
@@ -90,7 +65,7 @@ class DistrictController(DockWidgetController):
         assignmentsService: AssignmentsService,
         districtCopier: DistrictCopier,
         updateService: DistrictUpdater,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.canvas = iface.mapCanvas()
@@ -104,65 +79,65 @@ class DistrictController(DockWidgetController):
         self.dockwidget: DockDistrictDataTable
 
         self.actionCopyDistrict = self.actions.createAction(
-            name='actionCopyDistrict',
-            icon=':/plugins/redistricting/copydistrict.svg',
-            text=str('Copy District'),
-            tooltip=tr('Copy district to clipboard'),
+            name="actionCopyDistrict",
+            icon=":/plugins/redistricting/copydistrict.svg",
+            text=tr("Copy District"),
+            tooltip=tr("Copy district to clipboard"),
             callback=self.districtCopier.copyDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionPasteDistrict = self.actions.createAction(
-            name='actionPasteDistrict',
-            icon=QgsApplication.getThemeIcon('/mActionDuplicateFeature.svg'),
-            text=tr('Paste District'),
-            tooltip=tr('Paste district from clipboard'),
+            name="actionPasteDistrict",
+            icon=QgsApplication.getThemeIcon("/mActionDuplicateFeature.svg"),
+            text=tr("Paste District"),
+            tooltip=tr("Paste district from clipboard"),
             callback=self.districtCopier.pasteDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionZoomToDistrict = self.actions.createAction(
             name="actionZoomToDistrict",
-            icon=':/plugins/redistricting/zoomdistrict.svg',
+            icon=":/plugins/redistricting/zoomdistrict.svg",
             text=tr("Zoom to District"),
             callback=self.zoomToDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionFlashDistrict = self.actions.createAction(
-            name='actionFlashDistrict',
-            icon=':/plugins/redistricting/flashdistrict.svg',
+            name="actionFlashDistrict",
+            icon=":/plugins/redistricting/flashdistrict.svg",
             text=self.tr("Flash District"),
             callback=self.flashDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionCopyDistrictData = self.actions.createAction(
             name="actionCopyDistrictData",
-            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            icon=QgsApplication.getThemeIcon("/mActionEditCopy.svg"),
             text=self.tr("Copy Data"),
             tooltip=self.tr("Copy demographic data to clipboard"),
             callback=self.copyToClipboard,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionCopySelectedData = self.actions.createAction(
             name="actionCopySelectedData",
-            icon=QgsApplication.getThemeIcon('/mActionEditCopy.svg'),
+            icon=QgsApplication.getThemeIcon("/mActionEditCopy.svg"),
             text=self.tr("Copy Data"),
             tooltip=self.tr("Copy selected demographic data to clipboard"),
             callback=self.copySelection,
             shortcut=QKeySequence.StandardKey.Copy,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionRecalculate = self.actions.createAction(
             name="actionRecalculate",
-            icon=QgsApplication.getThemeIcon('/mActionRefresh.svg'),
+            icon=QgsApplication.getThemeIcon("/mActionRefresh.svg"),
             text=self.tr("Recalculate"),
             tooltip=self.tr("Recalculate"),
             statustip=self.tr("Reaggregate all demographics"),
-            callback=self.recalculate
+            callback=self.recalculate,
         )
 
         self.dataTableContextMenu: QMenu = None
@@ -218,9 +193,9 @@ class DistrictController(DockWidgetController):
     def createToggleAction(self) -> QAction:
         action = super().createToggleAction()
         if action is not None:
-            action.setIcon(QgsApplication.getThemeIcon('/mActionOpenTable.svg'))
-            action.setText(tr('District Data'))
-            action.setToolTip(tr('Show/hide district demographic data/metrics table'))
+            action.setIcon(QgsApplication.getThemeIcon("/mActionOpenTable.svg"))
+            action.setText(tr("District Data"))
+            action.setToolTip(tr("Show/hide district demographic data/metrics table"))
 
         return action
 
@@ -248,8 +223,9 @@ class DistrictController(DockWidgetController):
             return False
 
         menu = QMenu()
-        menu.addActions([self.actionCopyDistrict, self.actionPasteDistrict,
-                        self.actionZoomToDistrict, self.actionFlashDistrict])
+        menu.addActions(
+            [self.actionCopyDistrict, self.actionPasteDistrict, self.actionZoomToDistrict, self.actionFlashDistrict]
+        )
         menu.exec(event.globalPos())
 
         return True
@@ -283,10 +259,10 @@ class DistrictController(DockWidgetController):
                 district = action.data()
 
         if not isinstance(district, int):
-            raise TypeError()
+            raise TypeError("Invalid district")
 
         if district < 1 or district > self.planManager.activePlan.numDistricts:
-            raise ValueError()
+            raise ValueError("No such district")
 
         fid = self.planManager.activePlan.districts[district].fid
         if fid != -1:

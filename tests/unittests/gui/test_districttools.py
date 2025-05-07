@@ -30,7 +30,7 @@ class TestDistrictTools:
         mocker.patch.object(dockwidget, "btnRedo")
         dockwidget.plan = mock_plan
         assert dockwidget.plan is mock_plan
-        assert dockwidget.lblPlanName.text() == 'test'
+        assert dockwidget.lblPlanName.text() == "test"
         assert dockwidget.cmbGeoSelect.isEnabled()
 
     def test_set_plan_none_clears_widget(self, mock_plan, mocker):
@@ -42,5 +42,5 @@ class TestDistrictTools:
         dockwidget.plan = None
         assert dockwidget.plan is None
         assert dockwidget._undoStack is None
-        assert dockwidget.lblPlanName.text() == 'No plan selected'
+        assert dockwidget.lblPlanName.text() == "No plan selected"
         assert not dockwidget.cmbGeoSelect.isEnabled()

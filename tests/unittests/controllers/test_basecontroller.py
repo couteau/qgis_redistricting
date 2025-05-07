@@ -49,45 +49,45 @@ class TestBaseController:
         controller = BaseController(qgis_iface, QgsProject.instance(), planManager, toolbar)
         return controller
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress(self, controller: BaseController, qtbot: QtBot):
-        d: QProgressDialog = controller.startProgress('Progress test')
+        d: QProgressDialog = controller.startProgress("Progress test")
         with qtbot.waitActive(d):
             d.show()
         assert d is not None
-        assert d.labelText() == 'Progress test'
+        assert d.labelText() == "Progress test"
         assert d.findChild(QPushButton) is not None
-        assert d.findChild(QPushButton).text() == 'Cancel'
+        assert d.findChild(QPushButton).text() == "Cancel"
         d.hide()
         del d
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress_no_cancel(self, controller: BaseController, qtbot: QtBot):
-        d: QProgressDialog = controller.startProgress('Progress test', canCancel=False)
+        d: QProgressDialog = controller.startProgress("Progress test", canCancel=False)
         with qtbot.waitActive(d):
             d.show()
         assert d is not None
-        assert d.labelText() == 'Progress test'
+        assert d.labelText() == "Progress test"
         assert d.findChild(QPushButton) is None
         d.hide()
         del d
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress_cancel(self, controller: BaseController, qtbot: QtBot, qgis_iface):
-        d: QProgressDialog = controller.startProgress('Progress test')
+        d: QProgressDialog = controller.startProgress("Progress test")
         with qtbot.waitActive(d):
             d.show()
         with qtbot.waitSignal(d.canceled):
             b = d.findChild(QPushButton)
             qtbot.mouseClick(b, Qt.MouseButton.LeftButton)
         m = qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
-        assert 'Canceled:Progress test canceled' in m
+        assert "Canceled:Progress test canceled" in m
         d.hide()
         del d
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress_set_value_after_cancel_returns(self, controller: BaseController, qtbot: QtBot, qgis_iface):
-        d: QProgressDialog = controller.startProgress('Progress test')
+        d: QProgressDialog = controller.startProgress("Progress test")
         with qtbot.waitActive(d):
             d.show()
         d.setValue(50)
@@ -97,22 +97,22 @@ class TestBaseController:
             qtbot.mouseClick(b, Qt.MouseButton.LeftButton)
             d.setValue(100)
         m = qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
-        assert 'Canceled:Progress test canceled' in m
+        assert "Canceled:Progress test canceled" in m
         assert d.value() == -1
         d.hide()
         del d
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress_create_new_dialog_closes_old_dialog(self, controller: BaseController, qtbot: QtBot):
-        d1: QProgressDialog = controller.startProgress('Progress test1')
+        d1: QProgressDialog = controller.startProgress("Progress test1")
         with qtbot.wait_exposed(d1):
             d1.show()
-        d2: QProgressDialog = controller.startProgress('Progress test2', canCancel=False)
+        d2: QProgressDialog = controller.startProgress("Progress test2", canCancel=False)
         assert d1.isHidden()
         assert d2 != d1
         with qtbot.wait_exposed(d2):
             d2.show()
-        d3: QProgressDialog = controller.startProgress('Progress test3')
+        d3: QProgressDialog = controller.startProgress("Progress test3")
         with qtbot.waitActive(d3):
             d3.show()
         assert d2.isHidden()
@@ -124,25 +124,25 @@ class TestBaseController:
         del d3
 
     def test_check_active_plan(self, controller: BaseController, mock_plan, qgis_iface):
-        result = controller.checkActivePlan('test')
+        result = controller.checkActivePlan("test")
         assert not result
         assert "Oops!:Cannot test: no active redistricting plan. Try creating a new plan." \
             in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
         controller.planManager.activePlan = mock_plan
 
-        result = controller.checkActivePlan('test')
+        result = controller.checkActivePlan("test")
         assert result
 
     def test_push_errors(self, controller: BaseController, qgis_iface):
         controller.pushErrors([("Error message", Qgis.MessageLevel.Critical)], "Error!", Qgis.MessageLevel.Warning)
         assert "Error!:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Warning)
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_progress_error_mixin_supplies_error_list(self, controller: BaseController, qtbot: QtBot, qgis_iface):
         mixin = ErrorListMixin()
         mixin.setError("Error message", Qgis.MessageLevel.Warning)
-        d: QProgressDialog = controller.startProgress('Progress test', errorList=mixin)
+        d: QProgressDialog = controller.startProgress("Progress test", errorList=mixin)
         with qtbot.waitActive(d):
             d.show()
         with qtbot.waitSignal(d.canceled):
@@ -168,9 +168,9 @@ class TestBaseController:
                               ("Warning message", Qgis.MessageLevel.Warning)])
         assert "Error:Error message" in qgis_iface.messageBar().get_messages(Qgis.MessageLevel.Critical)
 
-    @pytest.mark.xdist_group(name='gui')
+    @pytest.mark.xdist_group(name="gui")
     def test_end_progress(self, controller: BaseController, qtbot: QtBot):
-        d: QProgressDialog = controller.startProgress('Progress test')
+        d: QProgressDialog = controller.startProgress("Progress test")
         with qtbot.waitActive(d):
             d.show()
         controller.endProgress()
@@ -178,7 +178,7 @@ class TestBaseController:
         assert d.isHidden()
 
         del d
-        d: QProgressDialog = controller.startProgress('Progress test')
+        d: QProgressDialog = controller.startProgress("Progress test")
         with qtbot.waitActive(d):
             d.show()
         controller.endProgress(d)

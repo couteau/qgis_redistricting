@@ -29,9 +29,9 @@ import pandas as pd
 from qgis.core import Qgis, QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
-from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, RdsSplits
+from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, RdsSplits, consts
 from ..models.base.lists import KeyedList
-from ..utils import defaults, tr
+from ..utils import tr
 from .errormixin import ErrorListMixin
 
 
@@ -320,7 +320,7 @@ class PlanValidator(ErrorListMixin, QObject):
             and self._numSeats >= self._numDistricts
         )
 
-        if self._numDistricts < 2 or self._numDistricts > defaults.MAX_DISTRICTS:
+        if self._numDistricts < consts.MIN_DISTRICTS or self._numDistricts > consts.MAX_DISTRICTS:
             self.pushError(
                 tr("Invalid number of districts for plan: {value}").format(value=self._numDistricts),
                 Qgis.MessageLevel.Critical,

@@ -1,4 +1,4 @@
-"""QGIS Redistricting Plugin - utility functions
+"""QGIS Reidstricting Plugin - constants and default values
 
         begin                : 2022-01-15
         git sha              : $Format:%H$
@@ -22,35 +22,23 @@
  ***************************************************************************/
 """
 
-from .gpkg import createGeoPackage, createGpkgTable, getTableName, spatialite_connect
-from .intl import tr
-from .layer import LayerReader
-from .misc import (
-    camel_to_kebab,
-    camel_to_snake,
-    getDefaultField,
-    kebab_to_camel,
-    makeFieldName,
-    matchField,
-    random_id,
-    snake_to_camel,
-)
-from .sql import SqlAccess
+import re
 
-__all__ = (
-    "createGeoPackage",
-    "createGpkgTable",
-    "getDefaultField",
-    "getTableName",
-    "LayerReader",
-    "makeFieldName",
-    "matchField",
-    "random_id",
-    "camel_to_kebab",
-    "camel_to_snake",
-    "kebab_to_camel",
-    "snake_to_camel",
-    "spatialite_connect",
-    "SqlAccess",
-    "tr",
-)
+from .utils import tr
+
+POP_TOTAL_FIELDS = ["pop_total", "p0010001", "tot_pop", "total_pop"]
+VAP_TOTAL_FIELDS = ["vap_total", "p0030001", "tot_vap", "total_vap"]
+CVAP_TOTAL_FIELDS = ["cvap_total", re.compile(r"^cvap_(?:\d{4}_)total$")]
+
+CVAP_FIELDS = [re.compile(r"^cvap_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?cvap(?:_\d{4})?$")]
+VAP_FIELDS = [re.compile(r"^vap_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?vap(?:_\d{4})?$")]
+
+GEOID_FIELDS = ["geoid20", "geoid30", "geoid10", "geoid", "block", "block_id"]
+
+GEOID_LABELS = [
+    tr("Block"),
+    tr("Block Group"),
+    tr("Tract"),
+    tr("Precinct/VTD"),
+    tr("County/Parish"),
+]

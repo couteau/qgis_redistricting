@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - internationalization utilities
 
         begin                : 2024-03-20
@@ -22,10 +21,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    overload
-)
+
+from typing import Optional, overload
 
 from qgis.PyQt.QtCore import QCoreApplication
 
@@ -43,16 +40,16 @@ def tr(context: str, message: str) -> str:
 def tr(ctx_or_msg: str, message: Optional[str] = None) -> str:
     """Get the translation for a string using Qt translation API.
 
-            :param ctx_or_msg: Translation context or string for translation.
-            :type message: str, QString
+    :param ctx_or_msg: Translation context or string for translation.
+    :type message: str, QString
 
-            :param message: String for translation.
-            :type message: str, QString
+    :param message: String for translation.
+    :type message: str, QString
 
-            :returns: Translated version of message.
-            :rtype: QString
-            """
+    :returns: Translated version of message.
+    :rtype: QString
+    """
     if message is None:
         message = ctx_or_msg
-        ctx_or_msg = 'redistricting'
+        ctx_or_msg = "redistricting"
     return QCoreApplication.translate(ctx_or_msg, message)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - New/Edit Plan Wizard - Geography Page
 
         begin                : 2022-01-15
@@ -22,29 +21,13 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.core import (
-    QgsApplication,
-    QgsMapLayerProxyModel,
-    QgsVectorLayer
-)
-from qgis.PyQt.QtCore import (
-    QModelIndex,
-    Qt,
-    QVariant
-)
-from qgis.PyQt.QtWidgets import (
-    QComboBox,
-    QHeaderView,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
-    QWidget,
-    QWizardPage
-)
 
-from ..utils import (
-    defaults,
-    getDefaultField
-)
+from qgis.core import Qgis, QgsApplication, QgsVectorLayer
+from qgis.PyQt.QtCore import QModelIndex, Qt, QVariant
+from qgis.PyQt.QtWidgets import QComboBox, QHeaderView, QStyledItemDelegate, QStyleOptionViewItem, QWidget, QWizardPage
+
+from .. import settings
+from ..utils import getDefaultField
 from .rdsfieldtableview import FieldListModel
 from .ui.WzpEditPlanGeoPage import Ui_wzpAddlGeography
 
@@ -57,7 +40,7 @@ class GeoFieldDelegate(QStyledItemDelegate):
             rect = option.rect
             editor.setGeometry(rect)
             editor.setEditable(True)
-            editor.addItems(defaults.GEOID_LABELS)
+            editor.addItems(settings.geoidFields.values())
             return editor
         return super().createEditor(parent, option, index)
 
@@ -84,17 +67,16 @@ class GeoFieldDelegate(QStyledItemDelegate):
 
 
 class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setupUi(self)
 
         self.fieldsModel = self.tblAddlGeography.model()
 
-        self.registerField('sourceLayer*', self.cmbSourceLayer)
-        self.registerField('geoIdField*', self.cmbGeoIDField)
-        self.registerField('geoCaption', self.cmbGeoCaption, 'currentText', self.cmbGeoCaption.currentTextChanged)
-        self.registerField('geoFields', self.tblAddlGeography, 'fields', self.tblAddlGeography.fieldsChanged)
+        self.registerField("sourceLayer*", self.cmbSourceLayer)
+        self.registerField("geoIdField*", self.cmbGeoIDField)
+        self.registerField("geoCaption", self.cmbGeoCaption, "currentText", self.cmbGeoCaption.currentTextChanged)
+        self.registerField("geoFields", self.tblAddlGeography, "fields", self.tblAddlGeography.fieldsChanged)
 
         # Annoyingly, loading the UI sets the layer property of a QgsLayerCombo to
         # the first layer in the project, even if allowEmptyLayer is set to true.
@@ -107,19 +89,18 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tblAddlGeography.setItemDelegateForColumn(1, GeoFieldDelegate(self))
 
-        self.cmbGeoCaption.addItems(defaults.GEOID_LABELS)
+        self.cmbGeoCaption.addItems(settings.geoidFields.values())
 
-        self.btnAddAddlGeoField.setIcon(QgsApplication.getThemeIcon('/mActionAdd.svg'))
+        self.btnAddAddlGeoField.setIcon(QgsApplication.getThemeIcon("/mActionAdd.svg"))
         self.cmbAddlGeoField.fieldChanged.connect(self.fieldChanged)
         self.btnAddAddlGeoField.clicked.connect(self.addField)
         self.tblAddlGeography.setEnableDragRows(True)
 
     def initializePage(self):
         super().initializePage()
-        self.cmbSourceLayer.setFilters(
-            QgsMapLayerProxyModel.Filter.VectorLayer)
+        self.cmbSourceLayer.setFilters(Qgis.LayerFilter.VectorLayer)
 
-        geoLayer = self.field('sourceLayer')
+        geoLayer = self.field("sourceLayer")
         if isinstance(geoLayer, QVariant) and geoLayer.isNull():
             geoLayer = None
         self.cmbSourceLayer.setLayer(geoLayer)
@@ -128,18 +109,17 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.setGeoLayer(geoLayer)
         self.setFinalPage(self.wizard().isComplete())
 
-    def cleanupPage(self):
-        ...  # prevent fields from being reset
+    def cleanupPage(self): ...  # prevent fields from being reset
 
     def setGeoLayer(self, layer: QgsVectorLayer):
         if self.cmbGeoIDField.layer() != layer:
-            field = self.field('geoIdField')
+            field = self.field("geoIdField")
             self.cmbGeoIDField.setLayer(layer)
             if layer:
                 if field and layer.fields().lookupField(field) != -1:
                     self.cmbGeoIDField.setField(field)
                 else:
-                    self.cmbGeoIDField.setField(getDefaultField(layer, defaults.GEOID_FIELDS))
+                    self.cmbGeoIDField.setField(getDefaultField(layer, settings.geoidFields.keys()))
 
         if self.cmbAddlGeoField.layer() != layer:
             self.cmbAddlGeoField.setField(None)
@@ -147,13 +127,14 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
             self.cmbAddlGeoField.setLayer(layer)
 
     def fieldChanged(self, field):
-        self.btnAddAddlGeoField.setEnabled(field != '' and (
-            not self.cmbAddlGeoField.isExpression() or self.cmbAddlGeoField.isValidExpression()))
+        self.btnAddAddlGeoField.setEnabled(
+            field != "" and (not self.cmbAddlGeoField.isExpression() or self.cmbAddlGeoField.isValidExpression())
+        )
 
     def addField(self):
         field, _, isValid = self.cmbAddlGeoField.currentField()
         if not isValid:
             return
 
-        layer = self.field('sourceLayer')
+        layer = self.field("sourceLayer")
         self.fieldsModel.appendField(layer, field)

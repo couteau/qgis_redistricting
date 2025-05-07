@@ -30,11 +30,11 @@ import pandas as pd
 from packaging import version
 from qgis.core import QgsExpression, QgsProject, QgsVectorLayer
 
-from redistricting.models.consts import MetricsColumns
-
 from ..models import DistrictColumns
+from ..models.consts import MetricsColumns
 from ..models.metricslist import MetricLevel, metrics_classes
 from ..utils import camel_to_kebab, makeFieldName, spatialite_connect, tr
+from ..utils.misc import quote_identifier
 
 schemaVersion = version.parse("1.0.5")
 
@@ -477,6 +477,7 @@ def migrateSchema1_0_4_to_1_0_5(data: planSchema1_0_4):
 
             cur = db.execute(
                 f"SELECT min(({DistrictColumns.POPULATION}-members*{ideal})/(members*{ideal})) AS min_deviation, "  # noqa: S608
+                f"max(({DistrictColumns.POPULATION}-members*{ideal})/(members*{ideal})) AS max_deviation, "
                 f"min({MetricsColumns.POLSBYPOPPER}) AS minpolsbypopper, "
                 f"max({MetricsColumns.POLSBYPOPPER}) AS maxpolsbypopper, "
                 f"avg({MetricsColumns.POLSBYPOPPER}) AS meanpolsbypopper, "
@@ -506,11 +507,11 @@ def migrateSchema1_0_4_to_1_0_5(data: planSchema1_0_4):
             cur = db.execute("SELECT count(*) FROM districts HAVING NumGeometries(geometry) > 1")
             metrics["contiguity"] = not bool(cur.fetchall())
 
-            if not isinstance(data["dist-field"], str) or not data["dist-field"].isidentifer():
+            if not isinstance(data["dist-field"], str) or not data["dist-field"].isidentifier():
                 raise ValueError("distField must be a valid identifier")
-            distField = data["dist-field"]
+            distField = quote_identifier(data["dist-field"])
             cur = db.execute(
-                f'SELECT count(*) FROM assignments WHERE "{distField}" = 0 OR "{distField}" IS NULL'  # noqa: S608
+                f"SELECT count(*) FROM assignments WHERE {distField} = 0 OR {distField} IS NULL"  # noqa: S608
             )
             metrics["complete"] = cur.fetchone()[0] == 0
 

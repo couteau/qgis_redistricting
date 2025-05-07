@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - QDockWidget with tools for painting districts
 
         begin                : 2022-01-15
@@ -21,12 +20,10 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
- """
+"""
+
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    QT_VERSION,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QT_VERSION, pyqtSignal
 
 if QT_VERSION >= 0x060000:  # Qt 6 or higher
     from qgis.PyQt.QtGui import QUndoStack
@@ -40,7 +37,6 @@ from .ui.DistrictTools import Ui_qdwDistrictTools
 
 
 class DockRedistrictingToolbox(Ui_qdwDistrictTools, RdsDockWidget):
-
     _plan: RdsPlan = None
     geoFieldChanged = pyqtSignal(int)
     sourceChanged = pyqtSignal(int)
@@ -54,13 +50,13 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, RdsDockWidget):
         self.cmbTarget.currentIndexChanged.connect(self.targetChanged)
         self.cmbSource.currentIndexChanged.connect(self.sourceChanged)
 
-        self.btnUndo.setIcon(QgsApplication.getThemeIcon('/mActionUndo.svg'))
-        self.btnRedo.setIcon(QgsApplication.getThemeIcon('/mActionRedo.svg'))
+        self.btnUndo.setIcon(QgsApplication.getThemeIcon("/mActionUndo.svg"))
+        self.btnRedo.setIcon(QgsApplication.getThemeIcon("/mActionRedo.svg"))
         self.btnUndo.setEnabled(False)
         self.btnRedo.setEnabled(False)
 
-        self.helpContext = 'usage/toolbox.html'
-        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.helpContext = "usage/toolbox.html"
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon("/mActionHelpContents.svg"))
         self.btnHelp.clicked.connect(self.btnHelpClicked)
 
         self._undoStack: QUndoStack = None
@@ -88,9 +84,9 @@ class DockRedistrictingToolbox(Ui_qdwDistrictTools, RdsDockWidget):
         self._undoStack = value
         if self._undoStack is not None:
             self.undoAction = self._undoStack.createUndoAction(self)
-            self.undoAction.setIcon(QgsApplication.getThemeIcon('/mActionUndo.svg'))
+            self.undoAction.setIcon(QgsApplication.getThemeIcon("/mActionUndo.svg"))
             self.redoAction = self._undoStack.createRedoAction(self)
-            self.redoAction.setIcon(QgsApplication.getThemeIcon('/mActionRedo.svg'))
+            self.redoAction.setIcon(QgsApplication.getThemeIcon("/mActionRedo.svg"))
         else:
             self.undoAction = None
             self.redoAction = None

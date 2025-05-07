@@ -36,6 +36,7 @@ from qgis.core import (
 from qgis.utils import spatialite_connect
 
 from ...utils import tr
+from ...utils.misc import quote_identifier
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
@@ -94,7 +95,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
 
             with spatialite_connect(self.geoPackagePath) as db:
                 params = ",".join(geoField.fieldName + " = ?" for geoField in self.geoFields)
-                sql = f'UPDATE assignments SET {params} WHERE "{self.geoIdField}" = ?'  # noqa: S608
+                sql = f"UPDATE assignments SET {params} WHERE {quote_identifier(self.geoIdField)} = ?"  # noqa: S608
                 chunk = []
                 chunkSize = 1000
                 total = self.srcLayer.featureCount() or 1

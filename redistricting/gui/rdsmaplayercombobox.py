@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - A QgsComboBox with a property that can be
         used for a QWizard field
 
@@ -23,13 +22,13 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from qgis.core import QgsMapLayer
 from qgis.gui import QgsMapLayerComboBox
 from qgis.PyQt.QtCore import pyqtProperty
 
 
 class RdsMapLayerComboBox(QgsMapLayerComboBox):
-
     @pyqtProperty(QgsMapLayer)
     def layer(self):
         return self.currentLayer()

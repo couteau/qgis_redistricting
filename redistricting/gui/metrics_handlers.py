@@ -1,3 +1,27 @@
+"""QGIS Redistricting Plugin - gui hanlders for metrics
+
+        begin                : 2025-01-20
+        git sha              : $Format:%H$
+        copyright            : (C) 2024 by Cryptodira
+        email                : stuart@cryptodira.org
+
+/***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 3 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful, but   *
+ *   WITHOUT ANY WARRANTY; without even the implied warranty of            *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          *
+ *   GNU General Public License for more details. You should have          *
+ *   received a copy of the GNU General Public License along with this     *
+ *   program. If not, see <http://www.gnu.org/licenses/>.                  *
+ *                                                                         *
+ ***************************************************************************/
+"""
+
 from abc import abstractmethod
 from functools import partial
 from typing import Any
@@ -12,13 +36,7 @@ from qgis.core import (
 )
 from qgis.gui import QgisInterface, QgsAttributeTableFilterModel, QgsAttributeTableModel
 from qgis.PyQt.QtCore import QAbstractItemModel, QLocale, QModelIndex, QObject, Qt
-from qgis.PyQt.QtWidgets import (
-    QAbstractItemView,
-    QDialog,
-    QStyledItemDelegate,
-    QTableView,
-    QVBoxLayout,
-)
+from qgis.PyQt.QtWidgets import QAbstractItemView, QDialog, QStyledItemDelegate, QTableView, QVBoxLayout
 from qgis.utils import iface
 
 from ..models import DistrictColumns, RdsGeoField, RdsMetric, RdsPlan
@@ -33,7 +51,7 @@ iface: QgisInterface
 
 class RdsNullsAsBlanksDelegate(QStyledItemDelegate):
     def displayText(self, value: Any, locale: QLocale) -> str:
-        if value == 'NULL':
+        if value == "NULL":
             return super().displayText("", locale)
 
         return super().displayText(value, locale)
@@ -62,8 +80,7 @@ class DialogHandler(RdsMetricGuiHandler):
         self.dialog.show()
 
     @abstractmethod
-    def createDialogAndView(self, plan: RdsPlan,  metric: RdsMetric, idx: Any) -> bool:
-        ...
+    def createDialogAndView(self, plan: RdsPlan, metric: RdsMetric, idx: Any) -> bool: ...
 
 
 class AttributeTableDialogHandler(DialogHandler):
@@ -76,7 +93,7 @@ class AttributeTableDialogHandler(DialogHandler):
     def createDialogAndView(self, plan, metric, idx):
         # create the dialog
         self.dialog = QDialog()
-        self.dialog.setObjectName(f'dlg{metric.name()}')
+        self.dialog.setObjectName(f"dlg{metric.name()}")
         self.dialog.setWindowTitle(metric.caption())
         self.dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         self.dialog.destroyed.connect(self.deleteDialog)
@@ -93,8 +110,7 @@ class AttributeTableDialogHandler(DialogHandler):
         return True
 
     @abstractmethod
-    def createModel(self, plan: RdsPlan,  metric: RdsMetric, idx: Any) -> QAbstractItemModel:
-        ...
+    def createModel(self, plan: RdsPlan, metric: RdsMetric, idx: Any) -> QAbstractItemModel: ...
 
     def createView(self, plan: RdsPlan, metric: RdsMetric, idx: Any):  # pylint: disable=unused-argument
         self.itemView = QTableView(self.dialog)
@@ -125,7 +141,7 @@ class CompleteHandler(AttributeTableDialogHandler):
 
     def createModel(self, plan: RdsPlan, metric: RdsMetric, idx: Any):
         ctx = QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(plan.assignLayer))
-        expr = QgsExpression(f'{plan.distField} IS NULL OR {plan.distField} = 0')
+        expr = QgsExpression(f"{plan.distField} IS NULL OR {plan.distField} = 0")
         req = QgsFeatureRequest(expr, ctx)
         layer = plan.assignLayer.materialize(req)
         layer.setParent(self.dialog)
@@ -163,11 +179,7 @@ class CompleteHandler(AttributeTableDialogHandler):
         cache = QgsVectorLayerCache(layer, min(1000, layer.featureCount()))
         unassignedGeographyModel = QgsAttributeTableModel(cache)
         unassignedGeographyModel.loadLayer()
-        filterModel = QgsAttributeTableFilterModel(
-            iface.mapCanvas(),
-            unassignedGeographyModel,
-            self.dialog
-        )
+        filterModel = QgsAttributeTableFilterModel(iface.mapCanvas(), unassignedGeographyModel, self.dialog)
         cache.setParent(filterModel)
         unassignedGeographyModel.setParent(filterModel)
         filterModel.setAttributeTableConfig(attributeConfig)
@@ -186,11 +198,12 @@ class ContiguityHandler(AttributeTableDialogHandler):
 
     def createModel(self, plan, metric, idx):
         ctx = QgsExpressionContext(QgsExpressionContextUtils.globalProjectLayerScopes(plan.distLayer))
-        expr = QgsExpression('num_geometries(@geometry) > 1')
+        expr = QgsExpression("num_geometries(@geometry) > 1")
         req = QgsFeatureRequest(expr, ctx)
         req.setSubsetOfAttributes(
-            ["fid", plan.distField, DistrictColumns.NAME, DistrictColumns.POPULATION, 'description'],
-            plan.distLayer.fields())
+            ["fid", plan.distField, DistrictColumns.NAME, DistrictColumns.POPULATION, "description"],
+            plan.distLayer.fields(),
+        )
         layer = plan.distLayer.materialize(req)
         layer.setParent(self.dialog)
 
@@ -205,11 +218,7 @@ class ContiguityHandler(AttributeTableDialogHandler):
         sourceModel = QgsAttributeTableModel(layerCache)
         sourceModel.loadLayer()
 
-        filterModel = QgsAttributeTableFilterModel(
-            iface.mapCanvas(),
-            sourceModel,
-            self.dialog
-        )
+        filterModel = QgsAttributeTableFilterModel(iface.mapCanvas(), sourceModel, self.dialog)
         layerCache.setParent(filterModel)
         sourceModel.setParent(filterModel)
 
@@ -232,10 +241,7 @@ class SplitsHandler(DialogHandler):
         if idx is None:
             return False
 
-        self.dialog = DlgSplitDetail(
-            plan,
-            iface.mainWindow()
-        )
+        self.dialog = DlgSplitDetail(plan, iface.mainWindow())
         self.dialog.setAttribute(Qt.WA_DeleteOnClose, True)
         self.dialog.destroyed.connect(self.deleteDialog)
         self.itemView = self.dialog.tvSplits

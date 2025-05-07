@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting - A QGIS plugin for building districts from geographic units
 
         begin                : 2022-01-15
@@ -26,10 +25,21 @@
 import os
 import sys
 import typing
+from re import Pattern
 from typing import Any, Callable, TypeVar, Union
 
 from qgis.core import QgsSettings
 from qgis.PyQt.QtCore import QT_VERSION
+
+from .defaults import (
+    CVAP_FIELDS,
+    CVAP_TOTAL_FIELDS,
+    GEOID_FIELDS,
+    GEOID_LABELS,
+    POP_TOTAL_FIELDS,
+    VAP_FIELDS,
+    VAP_TOTAL_FIELDS,
+)
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -45,12 +55,27 @@ __version__ = "0.0.5"
 class Settings:
     enableCutEdges: bool
     enableSplits: bool
+    popTotalFields: list[str]
+    vapTotalFields: list[str]
+    cvapTotalFields: list[str]
+    vapFieldPatterns: list[Pattern[str]]
+    cvapFieldPatterns: list[Pattern[str]]
+    geoidFields: dict[str, str]
 
     def __init__(self):
         self._settings = QgsSettings()
         self._settings.beginGroup("redistricting", QgsSettings.Section.Plugins)
         self.enableCutEdges = self._settings.value("enable_cut_edges", False, bool)
         self.enableSplits = self._settings.value("enable_split_detail", True, bool)
+
+        # TODO: load from settings
+        self.popTotalFields = POP_TOTAL_FIELDS
+        self.vapTotalFields = VAP_TOTAL_FIELDS
+        self.cvapTotalFields = CVAP_TOTAL_FIELDS
+        self.vapFieldPatterns = VAP_FIELDS
+        self.cvapFieldPatterns = CVAP_FIELDS
+        self.geoidFields = dict(zip(GEOID_FIELDS, GEOID_LABELS))
+
         self._settings.endGroup()
 
     def saveSettings(self):
@@ -79,7 +104,7 @@ if not hasattr(typing, "Self"):
 
         class Self: ...
 
-    setattr(typing, "Self", Self)
+    typing.Self = Self
 
 
 if not hasattr(typing, "dataclass_transform"):
@@ -105,10 +130,10 @@ if not hasattr(typing, "dataclass_transform"):
 
         return decorator
 
-    setattr(typing, "dataclass_transform", dataclass_transform)
+    typing.dataclass_transform = dataclass_transform
 
 if not hasattr(typing, "TypeAlias"):
-    setattr(typing, "TypeAlias", type)
+    typing.TypeAlias = type
 
 
 def classFactory(iface):  # pylint: disable=invalid-name

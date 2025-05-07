@@ -69,31 +69,31 @@ class ContextMenuController(BaseController):
         super().__init__(iface, project, planManager, toolbar, parent)
 
         self.contextAction = QAction(
-            QIcon(':/plugins/redistricting/icon.png'),
-            self.tr('Redistricting'),
+            QIcon(":/plugins/redistricting/icon.png"),
+            self.tr("Redistricting"),
             self.iface.mainWindow()
         )
 
-        self.contextMenu = QMenu(self.tr('Redistricting Plan'), self.iface.mainWindow())
+        self.contextMenu = QMenu(self.tr("Redistricting Plan"), self.iface.mainWindow())
         action = QAction(
-            QIcon(':/plugins/redistricting/activateplan.svg'),
-            tr('Activate Plan'),
+            QIcon(":/plugins/redistricting/activateplan.svg"),
+            tr("Activate Plan"),
             self.iface.mainWindow()
         )
         action.triggered.connect(self.contextMenuActivatePlan)
         self.contextMenu.addAction(action)
 
         action = QAction(
-            QIcon(':/plugins/redistricting/editplan.svg'),
-            tr('Edit Plan'),
+            QIcon(":/plugins/redistricting/editplan.svg"),
+            tr("Edit Plan"),
             self.iface.mainWindow()
         )
         action.triggered.connect(self.contextMenuSlot(planController.editPlan))
         self.contextMenu.addAction(action)
 
         action = QAction(
-            QIcon(':/plugins/redistricting/exportplan.svg'),
-            tr('Export Plan'),
+            QIcon(":/plugins/redistricting/exportplan.svg"),
+            tr("Export Plan"),
             self.iface.mainWindow()
         )
         action.triggered.connect(self.contextMenuSlot(planController.exportPlan))
@@ -113,14 +113,14 @@ class ContextMenuController(BaseController):
     def layerChangedActivatePlan(self, layer: QgsMapLayer):  # pylint: disable=unused-argument
         g = self.iface.layerTreeView().currentGroupNode()
         if g.isVisible():
-            p = g.customProperty('redistricting-plan-id', None)
+            p = g.customProperty("redistricting-plan-id", None)
             if p is not None and (self.planManager.activePlan is None or p != str(self.planManager.activePlan.id)):
                 self.planManager.setActivePlan(UUID(p))
                 self.project.setDirty()
 
     def contextMenuActivatePlan(self):
         group = self.iface.layerTreeView().currentGroupNode()
-        planid = group.customProperty('redistricting-plan-id', None)
+        planid = group.customProperty("redistricting-plan-id", None)
         if planid and planid != self.planManager.activePlan.id:
             self.planManager.setActivePlan(planid)
             self.project.setDirty()
@@ -132,7 +132,7 @@ class ContextMenuController(BaseController):
     def contextMenuSlot(self, action):
         def trigger():
             group = self.iface.layerTreeView().currentGroupNode()
-            planid = group.customProperty('redistricting-plan-id', None)
+            planid = group.customProperty("redistricting-plan-id", None)
             plan = self.planManager.get(planid)
             if plan:
                 action(plan)

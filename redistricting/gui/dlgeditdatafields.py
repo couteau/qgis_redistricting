@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Edit Data Fields dialog
                               -------------------
         begin                : 2022-06-07
@@ -22,18 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
+
+from typing import Optional, Union
 
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QVBoxLayout,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QWidget
 
 from ..models import RdsPlan
 from .wzpeditplandatafields import dlgEditPlanFieldPage
@@ -44,16 +36,17 @@ class DlgEditFields(QDialog):
         self,
         plan: RdsPlan,
         parent: Optional[QWidget] = None,
-        flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog
+        flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog,
     ):
         super().__init__(parent, flags)
         self.plan = plan
         self.page = dlgEditPlanFieldPage(self)
         self.buttonBox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self
+        )
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.page.setField('dataFields', plan.dataFields)
+        self.page.setField("dataFields", plan.dataFields)
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.page)
@@ -65,5 +58,5 @@ class DlgEditFields(QDialog):
         self.page.fexDataField.setLayer(plan.popLayer or plan.geoLayer)
 
     def accept(self):
-        self.plan.dataFields = self.page.field('dataFields')
+        self.plan.dataFields = self.page.field("dataFields")
         super().accept()

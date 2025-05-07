@@ -56,30 +56,30 @@ class TestPlan:
             plan = RdsPlan(**params)  # noqa: F841 # pylint: disable=unused-variable
 
     @pytest.mark.parametrize(
-        "params",
+        ("params", "message"),
         [
-            {"name": "", "numDistricts": 2},
-            {"name": "test", "numDistricts": 1},
-            {"name": "test", "numDistricts": 2001},
+            ({"name": "", "numDistricts": 2}, "Value must not be empty"),
+            ({"name": "test", "numDistricts": 1}, "Value must be between"),
+            ({"name": "test", "numDistricts": 2001}, "Value must be between"),
         ],
     )
-    def test_create_plan_throws_valueerror_with_invalid_params(self, params):
-        with pytest.raises(ValueError):
+    def test_create_plan_throws_valueerror_with_invalid_params(self, params, message):
+        with pytest.raises(ValueError, match=message):
             plan = RdsPlan(**params)  # noqa: F841 # pylint: disable=unused-variable
 
     def test_set_invalid_numdistricts_raises_value_error(self):
         p = RdsPlan("test", 5)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Value must be between"):
             p.numDistricts = 1
 
     @pytest.mark.parametrize(
-        "params,expected",
+        ("params", "expected"),
         [
-            [{"name": "test", "numDistricts": 5}, ["test", 5, None]],
-            [
+            ({"name": "test", "numDistricts": 5}, ["test", 5, None]),
+            (
                 {"name": "test", "numDistricts": 2, "id": UUID("d2a95531-0de4-4556-bbe0-bb251d2f2026")},
                 ["test", 2, "d2a95531-0de4-4556-bbe0-bb251d2f2026"],
-            ],
+            ),
         ],
     )
     def test_create_plan_with_valid_params(self, params, expected):

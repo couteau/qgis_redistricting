@@ -24,9 +24,9 @@
 from abc import abstractmethod
 from typing import (
     TYPE_CHECKING,
-    Iterable,
     Optional
 )
+from collections.abc import Iterable
 
 from qgis.core import (
     Qgis,
@@ -108,7 +108,7 @@ class BaseController(QObject):
         if self.errorList:
             errors = self.errorList.errors()
         else:
-            errors = [(f'{self.dlg.labelText()} canceled', Qgis.MessageLevel.Warning)]
+            errors = [(f"{self.dlg.labelText()} canceled", Qgis.MessageLevel.Warning)]
 
         if errors:
             self.pushErrors(errors, tr("Canceled"), Qgis.MessageLevel.Warning)
@@ -123,7 +123,7 @@ class BaseController(QObject):
         if self.dlg:
             self.dlg.cancel()
         self.dlg = RdsProgressDialog(
-            text, tr('Cancel'),
+            text, tr("Cancel"),
             0, maximum,
             self.iface.mainWindow(),
             Qt.WindowType.WindowStaysOnTopHint)
@@ -152,7 +152,7 @@ class BaseController(QObject):
             return
 
         if title is None:
-            title = tr('Error')
+            title = tr("Error")
 
         msg, lvl = errors[0]
         if level is None:
@@ -162,7 +162,7 @@ class BaseController(QObject):
             self.iface.messageBar().pushMessage(
                 title,
                 msg,
-                showMore='\n'.join(e[0] for e in errors),
+                showMore="\n".join(e[0] for e in errors),
                 level=level,
                 duration=5
             )
@@ -226,7 +226,7 @@ class DockWidgetController(BaseController):
         self.dockwidget = self.createDockWidget()
         self.iface.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self.dockwidget)
         self.actionToggle = self.createToggleAction()
-        self.actions.registerAction(f'actionToggle{self.dockwidget.objectName()}', self.actionToggle)
+        self.actions.registerAction(f"actionToggle{self.dockwidget.objectName()}", self.actionToggle)
         self.toolbar.addAction(self.actionToggle)
 
     def unload(self):

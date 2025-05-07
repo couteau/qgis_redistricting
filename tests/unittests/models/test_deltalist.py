@@ -18,13 +18,11 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pandas as pd
 import pytest
 
-from redistricting.models import (
-    Delta,
-    DeltaList
-)
+from redistricting.models import Delta, DeltaList
 
 # pylint: disable=no-self-use
 
@@ -36,18 +34,19 @@ class TestDeltaList:
 
     @pytest.fixture
     def delta_list(self, empty_delta_list: DeltaList):
-        df = pd.DataFrame.from_records(
-            [{
-                'district': 1,
-                'pop_total': 100,
-                'vap_total': 80,
-                'vap_nh_black': 20,
-                'vap_apblack': 25,
-                'vap_nh_white': 40
-            }]
-        )
-        df.set_index('district', drop=False, inplace=True)
-        empty_delta_list.setData(df)  # pylint: disable=protected-access
+        data = pd.DataFrame.from_records(
+            [
+                {
+                    "district": 1,
+                    "pop_total": 100,
+                    "vap_total": 80,
+                    "vap_nh_black": 20,
+                    "vap_apblack": 25,
+                    "vap_nh_white": 40,
+                }
+            ]
+        ).set_index("district", drop=False)
+        empty_delta_list.setData(data)  # pylint: disable=protected-access
         return empty_delta_list
 
     def test_create(self, empty_delta_list: DeltaList):
@@ -58,8 +57,8 @@ class TestDeltaList:
         assert len(delta_list) == 0
 
     def test_getitem(self, delta_list: DeltaList):
-        assert delta_list['1'] == delta_list[0]
+        assert delta_list["1"] == delta_list[0]
         assert isinstance(delta_list[0], Delta)
         assert delta_list[0, 0] == 1
         assert delta_list[0, 1] == 100
-        assert delta_list['vap_total'] == [80]
+        assert delta_list["vap_total"] == [80]

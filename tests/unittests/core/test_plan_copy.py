@@ -1,5 +1,7 @@
 """QGIS Redistricting Plugin - unit tests for RdsPlan class
 
+Copyright 2022-2025, Stuart C. Naifeh
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -16,6 +18,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import sqlite3
 
 import pytest
@@ -39,42 +42,41 @@ class TestPlanCopier:
         assert copier._plan is valid_plan
 
     def test_copy_without_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
+        builder_class = mocker.patch("redistricting.services.copy.PlanBuilder")
         builder = builder_class.fromPlan.return_value
-        copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False)
+        copier.copyPlan("copied", "copy of plan", str(datadir / "copied.gpkg"), False)
         builder_class.fromPlan.assert_called_once()
         builder.setName.assert_called_once()
         builder.createPlan.assert_called_once_with(True, planParent=None)
 
     def test_copy_with_assignments(self, copier: PlanCopier, datadir, mocker: MockerFixture, qtbot: QtBot):
-        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
+        builder_class = mocker.patch("redistricting.services.copy.PlanBuilder")
         builder = builder_class.fromPlan.return_value
         with qtbot.wait_signal(copier.copyComplete):
-            copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), True)
+            copier.copyPlan("copied", "copy of plan", str(datadir / "copied.gpkg"), True)
         builder_class.fromPlan.assert_called_once()
         builder.setName.assert_called_once()
         builder.createPlan.assert_called_once_with(False, planParent=None)
 
     def test_copy_no_gpkg_raises_error(self, copier: PlanCopier, mocker: MockerFixture):
-        mocker.patch('redistricting.services.copy.PlanBuilder')
-        with pytest.raises(ValueError):
-            plan = copier.copyPlan('copied', 'copy of plan',  None)
-            assert not plan
+        mocker.patch("redistricting.services.copy.PlanBuilder")
+        with pytest.raises(ValueError, match="Destination GeoPackage path required"):
+            copier.copyPlan("copied", "copy of plan", None)
 
     def test_copy_create_errors_sets_error(self, copier: PlanCopier, datadir, mocker: MockerFixture):
-        builder_class = mocker.patch('redistricting.services.copy.PlanBuilder')
+        builder_class = mocker.patch("redistricting.services.copy.PlanBuilder")
         builder = builder_class.fromPlan.return_value
         builder.createPlan.return_value = None
-        builder.errors.return_value = [('create error', Qgis.MessageLevel.Critical)]
-        plan = copier.copyPlan('copied', 'copy of plan', str(datadir / 'copied.gpkg'), False, False)
+        builder.errors.return_value = [("create error", Qgis.MessageLevel.Critical)]
+        plan = copier.copyPlan("copied", "copy of plan", str(datadir / "copied.gpkg"), False, False)
         assert not plan
-        assert copier.errors() == [('create error', Qgis.MessageLevel.Critical)]
+        assert copier.errors() == [("create error", Qgis.MessageLevel.Critical)]
 
     def test_copy_assignments(self, copier: PlanCopier, new_plan: RdsPlan):
         with sqlite3.connect(new_plan.geoPackagePath) as db:
-            c = db.execute('SELECT count(distinct district) FROM assignments')
+            c = db.execute("SELECT count(distinct district) FROM assignments")
             assert c.fetchone()[0] == 1
         copier.copyAssignments(new_plan)
         with sqlite3.connect(new_plan.geoPackagePath) as db:
-            c = db.execute('SELECT count(distinct district) FROM assignments')
+            c = db.execute("SELECT count(distinct district) FROM assignments")
             assert c.fetchone()[0] == 5

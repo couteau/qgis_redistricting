@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugins - A QSpinBox that will skip/refuse district 
+"""QGIS Redistricting Plugins - A QSpinBox that will skip/refuse district
         numbers that are already in use
 
         begin                : 2022-01-15
@@ -23,19 +22,11 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Tuple
-)
 
-from qgis.PyQt.QtGui import (
-    QIntValidator,
-    QValidator
-)
-from qgis.PyQt.QtWidgets import (
-    QSpinBox,
-    QWidget
-)
+from typing import Optional, Tuple
+
+from qgis.PyQt.QtGui import QIntValidator, QValidator
+from qgis.PyQt.QtWidgets import QSpinBox, QWidget
 
 from ..models import RdsPlan
 
@@ -52,7 +43,7 @@ class RdsDistrictSpinBox(QSpinBox):
         self._plan = plan
 
     def _findNextValidValue(self, value, steps):
-        if not self._plan or not steps in (-1, 1):
+        if not self._plan or steps not in (-1, 1):
             return value
 
         v = value + steps

@@ -18,21 +18,16 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pytest
 from pytest_mock import MockerFixture
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import (
-    QModelIndex,
-    pyqtBoundSignal
-)
+from qgis.PyQt.QtCore import QModelIndex, pyqtBoundSignal
 from qgis.PyQt.QtWidgets import QAction
 
 from redistricting.controllers import MetricsController
 from redistricting.gui import RdsMetricGuiHandler
-from redistricting.models import (
-    RdsMetric,
-    RdsMetricsModel
-)
+from redistricting.models import RdsMetric, RdsMetricsModel
 
 
 class TestMetricsController:
@@ -41,16 +36,20 @@ class TestMetricsController:
         return MetricsController(qgis_iface, mock_project, mock_planmanager, mock_toolbar, mock_updater)
 
     @pytest.fixture
-    def controller_with_active_plan(self, qgis_iface: QgisInterface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_updater):
-        controller = MetricsController(qgis_iface, mock_project,
-                                       mock_planmanager_with_active_plan, mock_toolbar, mock_updater)
+    def controller_with_active_plan(
+        self, qgis_iface: QgisInterface, mock_planmanager_with_active_plan, mock_project, mock_toolbar, mock_updater
+    ):
+        controller = MetricsController(
+            qgis_iface, mock_project, mock_planmanager_with_active_plan, mock_toolbar, mock_updater
+        )
         controller.load()
         return controller
 
     def test_create(self, controller):
         assert controller
         assert controller.metricsModel is not None
-        assert controller.handler_cache is not None and len(controller.handler_cache) == 0
+        assert controller.handler_cache is not None
+        assert len(controller.handler_cache) == 0
         assert isinstance(controller.actionCopyMetrics, QAction)
 
     def test_load(self, controller, mock_planmanager):
@@ -66,14 +65,16 @@ class TestMetricsController:
 
     def test_plan_changed(self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture):
         handler = mocker.MagicMock()
-        controller_with_active_plan.handler_cache['test'] = handler
+        controller_with_active_plan.handler_cache["test"] = handler
         controller_with_active_plan.planChanged(mock_plan)
         handler.update.assert_called_once_with(mock_plan)
         controller_with_active_plan.planChanged(None)
         handler.deactivate.assert_called_once()
         assert len(controller_with_active_plan.handler_cache) == 0
 
-    def test_show_metric_detail_creates_handler(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
+    def test_show_metric_detail_creates_handler(
+        self, controller_with_active_plan: MetricsController, mocker: MockerFixture
+    ):
         get_metric_handler = mocker.patch("redistricting.controllers.metrics.get_metric_handler")
         handler = mocker.create_autospec(spec=RdsMetricGuiHandler)
         handler.deactivated = mocker.create_autospec(spec=pyqtBoundSignal)
@@ -93,7 +94,9 @@ class TestMetricsController:
         assert len(controller_with_active_plan.handler_cache) == 1
         get_metric_handler.assert_not_called()
 
-    def test_show_detail_for_metric_with_no_handler_creates_no_handler(self, controller_with_active_plan: MetricsController, mocker: MockerFixture):
+    def test_show_detail_for_metric_with_no_handler_creates_no_handler(
+        self, controller_with_active_plan: MetricsController, mocker: MockerFixture
+    ):
         get_metric_handler = mocker.patch("redistricting.controllers.metrics.get_metric_handler")
         get_metric_handler.return_value = None
         metric = mocker.create_autospec(spec=RdsMetric)
@@ -105,7 +108,9 @@ class TestMetricsController:
         controller_with_active_plan.showMetricsDetail(index)
         assert len(controller_with_active_plan.handler_cache) == 0
 
-    def test_show_update_handler_calls_update(self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture):
+    def test_show_update_handler_calls_update(
+        self, controller_with_active_plan: MetricsController, mock_plan, mocker: MockerFixture
+    ):
         sender = mocker.patch.object(controller_with_active_plan, "sender")
         sender.return_value = mock_plan
         metric = mocker.create_autospec(spec=RdsMetric)

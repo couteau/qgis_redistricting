@@ -34,7 +34,7 @@ from redistricting.services import DeltaUpdateService
 class TestPendingChangesController:
     @pytest.fixture
     def mock_delta(self, mocker: MockerFixture):
-        df = pd.DataFrame.from_records(
+        data = pd.DataFrame.from_records(
             [
                 {
                     "district": 1,
@@ -59,7 +59,7 @@ class TestPendingChangesController:
         )
         delta = mocker.create_autospec(spec=DeltaList)
         delta.__bool__.return_value = True
-        delta._data = df
+        delta._data = data
         type(delta).updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
         type(delta).updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
         return delta

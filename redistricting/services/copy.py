@@ -35,6 +35,7 @@ from qgis.PyQt.QtCore import QObject, pyqtSignal
 from qgis.utils import spatialite_connect
 
 from ..utils import tr
+from ..utils.misc import quote_identifier
 from .districtio import DistrictReader
 from .errormixin import ErrorListMixin
 from .planbuilder import PlanBuilder
@@ -148,8 +149,10 @@ class PlanCopier(ErrorListMixin, QObject):
             db.execute(f"ATTACH DATABASE '{self._plan.geoPackagePath}' AS source")
             db.set_progress_handler(progress, 1)
             sql = (
-                f'UPDATE assignments SET "{target.distField}" = s."{self._plan.distField}" '  # noqa: S608
-                f'FROM source.assignments s WHERE assignments."{target.geoIdField}" = s."{self._plan.geoIdField}"'
+                "UPDATE assignments "  # noqa: S608
+                f"SET {quote_identifier(target.distField)} = s.{quote_identifier(self._plan.distField)} "
+                "FROM source.assignments s "
+                f"WHERE assignments.{quote_identifier(target.geoIdField)} = s.{quote_identifier(self._plan.geoIdField)}"
             )
             db.execute(sql)
             db.set_progress_handler(None, 1)

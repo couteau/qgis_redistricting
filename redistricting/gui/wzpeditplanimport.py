@@ -26,7 +26,8 @@ import csv
 import os
 from io import IOBase
 from itertools import islice
-from typing import Iterable, Union
+from typing import Union
+from collections.abc import Iterable
 
 from osgeo import gdal
 from qgis.core import QgsVectorLayer

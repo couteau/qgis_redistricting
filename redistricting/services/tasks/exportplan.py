@@ -48,6 +48,7 @@ from qgis.utils import spatialite_connect
 
 from ...models import DistrictColumns
 from ...utils import tr
+from ...utils.misc import quote_identifier
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
@@ -248,8 +249,9 @@ class ExportRedistrictingPlanTask(QgsTask):
             geoPackagePath = self.assignLayer.dataProvider().dataSourceUri().split("|")[0]
             with closing(spatialite_connect(geoPackagePath)) as db:
                 sql = (
-                    f'SELECT DISTINCT "{self.assignGeography.fieldName}", "{self.distField}" '  # noqa: S608
-                    f'FROM assignments ORDER BY "{self.assignGeography.fieldName}"'
+                    "SELECT DISTINCT "  # noqa: S608
+                    f"{quote_identifier(self.assignGeography.fieldName)}, {quote_identifier(self.distField)} "
+                    f"FROM assignments ORDER BY {quote_identifier(self.assignGeography.fieldName)}"
                 )
                 c = db.execute(sql)
                 total = c.rowcount

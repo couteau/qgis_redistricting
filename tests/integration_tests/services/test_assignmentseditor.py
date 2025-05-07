@@ -150,13 +150,13 @@ class TestAssignmentsEditor:
 
     def test_get_dist_features(self, plan: RdsPlan):
         editor = PlanAssignmentEditor(plan)
-        f = editor.getDistFeatures('placeid', '0116312')
+        f = editor.getDistFeatures("placeid", "0116312")
         assert f is not None
         l = pd.DataFrame(f, columns=plan.assignLayer.fields().names())
         assert len(l) == 47
-        assert len(l.groupby('district')) == 2
+        assert len(l.groupby("district")) == 2
 
-        f = editor.getDistFeatures('district', 5)
+        f = editor.getDistFeatures("district", 5)
         assert f is not None
         l = pd.DataFrame(f, columns=plan.assignLayer.fields().names())
         assert len(l) == 1564

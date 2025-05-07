@@ -24,7 +24,8 @@
 
 from abc import abstractmethod
 from functools import partial
-from typing import Any, Optional, Sequence, Union
+from typing import Any, Optional, Union
+from collections.abc import Sequence
 
 import pandas as pd
 from qgis.PyQt.QtCore import pyqtSignal
@@ -111,7 +112,7 @@ class RdsSplitGeography(RdsSplitBase):
             i = self._data.columns.get_loc(
                 "__name",
             )
-            return self._data.loc[self._idx].iat[0, i]
+            return self._data.loc[self._idx].iat[0, i]  # noqa: PD009
 
         return ""
 

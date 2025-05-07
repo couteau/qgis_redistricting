@@ -24,10 +24,10 @@
 from typing import (
     TYPE_CHECKING,
     Any,
-    Iterable,
     Optional,
     Union
 )
+from collections.abc import Iterable
 
 import geopandas as gpd
 import pandas as pd

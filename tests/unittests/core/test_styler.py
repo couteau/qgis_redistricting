@@ -93,7 +93,7 @@ class TestStyler:
             distCats[styler._distRenderer.categoryIndexForValue(5)].symbol().symbolLayer(0).fillColor()
 
         sym = assignCats[0].symbol()
-        assert sym.symbolLayer(0).fillColor() == QColor('#c8cfc9')
+        assert sym.symbolLayer(0).fillColor() == QColor("#c8cfc9")
         sym = assignCats[1].symbol()
         assert sym.symbolLayer(0).fillColor() == styler._ramp.color(1/6)
 

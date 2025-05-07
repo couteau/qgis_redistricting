@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - RdOverlayWiget
 
         A QWidget to indicate data loading by fading underlying widget and
@@ -29,43 +28,19 @@
 """
 
 import math
-from typing import (
-    Optional,
-    Union,
-    overload
-)
+from typing import Optional, overload
 
-from qgis.PyQt.QtCore import (
-    QEasingCurve,
-    QEvent,
-    QObject,
-    QPropertyAnimation,
-    QRect,
-    Qt,
-    QTimer,
-    pyqtProperty
-)
-from qgis.PyQt.QtGui import (
-    QColor,
-    QPainter,
-    QPaintEvent
-)
-from qgis.PyQt.QtWidgets import (
-    QGraphicsOpacityEffect,
-    QWidget
-)
+from qgis.PyQt.QtCore import QEasingCurve, QEvent, QObject, QPropertyAnimation, QRect, Qt, QTimer, pyqtProperty
+from qgis.PyQt.QtGui import QColor, QPainter, QPaintEvent
+from qgis.PyQt.QtWidgets import QGraphicsOpacityEffect, QWidget
 
 
 class OverlayWidget(QWidget):
     @overload
-    def __init__(self, text: str, parent: Optional['QWidget'] = None,
-                 flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowFlags()):
-        ...
+    def __init__(self, text: str, parent: Optional["QWidget"] = None, flags: Qt.WindowType = ...): ...
 
     @overload
-    def __init__(self, parent: Optional['QWidget'] = None,
-                 flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowFlags()):
-        ...
+    def __init__(self, parent: Optional["QWidget"] = None, flags: Qt.WindowType = ...): ...
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -141,7 +116,7 @@ class OverlayWidget(QWidget):
 
     @roundness.setter
     def roundness(self, roundness: float):
-        self. _roundness = max(0.0, min(100.0, roundness))
+        self._roundness = max(0.0, min(100.0, roundness))
 
     @pyqtProperty(float)
     def minimumTrailOpacity(self) -> float:
@@ -205,20 +180,24 @@ class OverlayWidget(QWidget):
             painter.setPen(Qt.NoPen)
             for i in range(0, self._numberOfLines):
                 painter.save()
-                painter.translate(self.width()/2 + self._innerRadius + self._lineLength,
-                                  self.height()/2 + self._innerRadius + self._lineLength)
-                rotateAngle = 360 * i/self._numberOfLines
+                painter.translate(
+                    self.width() / 2 + self._innerRadius + self._lineLength,
+                    self.height() / 2 + self._innerRadius + self._lineLength,
+                )
+                rotateAngle = 360 * i / self._numberOfLines
                 painter.rotate(rotateAngle)
                 painter.translate(self._innerRadius, 0)
-                distance = self.lineCountDistanceFromPrimary(
-                    i, self. _currentCounter, self._numberOfLines)
-                color: QColor = self.currentLineColor(distance, self._numberOfLines, self._trailFadePercentage,
-                                                      self._minimumTrailOpacity, self._color)
+                distance = self.lineCountDistanceFromPrimary(i, self._currentCounter, self._numberOfLines)
+                color: QColor = self.currentLineColor(
+                    distance, self._numberOfLines, self._trailFadePercentage, self._minimumTrailOpacity, self._color
+                )
                 painter.setBrush(color)
                 painter.drawRoundedRect(
-                    QRect(0, math.floor(-self._lineWidth / 2), self._lineLength,
-                          self._lineWidth), self._roundness,
-                    self._roundness, Qt.RelativeSize)
+                    QRect(0, math.floor(-self._lineWidth / 2), self._lineLength, self._lineWidth),
+                    self._roundness,
+                    self._roundness,
+                    Qt.RelativeSize,
+                )
                 painter.restore()
         finally:
             painter.end()
@@ -228,13 +207,13 @@ class OverlayWidget(QWidget):
         self.setFixedSize(size, size)
 
     def updateTimer(self):
-        self._timer.setInterval(
-            math.floor(1000 / (self._numberOfLines * self._revolutionsPerSecond)))
+        self._timer.setInterval(math.floor(1000 / (self._numberOfLines * self._revolutionsPerSecond)))
 
     def updatePosition(self):
-        if (self.parentWidget() and self._centerOnParent):
-            self.move(self.parentWidget().width()/2 - self.width()/2,
-                      self.parentWidget().height()/2 - self.height()/2)
+        if self.parentWidget() and self._centerOnParent:
+            self.move(
+                self.parentWidget().width() / 2 - self.width() / 2, self.parentWidget().height() / 2 - self.height() / 2
+            )
 
     def lineCountDistanceFromPrimary(self, current: int, primary: int, totalNrOfLines: int):
         distance = primary - current
@@ -243,9 +222,9 @@ class OverlayWidget(QWidget):
 
         return distance
 
-    def currentLineColor(self, countDistance: int,
-                         totalNrOfLines: int, trailFadePerc: float,
-                         minOpacity: float, color: QColor):
+    def currentLineColor(
+        self, countDistance: int, totalNrOfLines: int, trailFadePerc: float, minOpacity: float, color: QColor
+    ):
         if countDistance == 0:
             return color
 
@@ -253,8 +232,7 @@ class OverlayWidget(QWidget):
             color = QColor(color)
 
         minAlphaF = minOpacity / 100.0
-        distanceThreshold = math.ceil(
-            (totalNrOfLines - 1) * trailFadePerc / 100.0)
+        distanceThreshold = math.ceil((totalNrOfLines - 1) * trailFadePerc / 100.0)
         if countDistance > distanceThreshold:
             color.setAlphaF(minAlphaF)
         else:
@@ -274,7 +252,7 @@ class OverlayWidget(QWidget):
         self.parent().installEventFilter(self)
         self.raise_()
 
-    def setParent(self, parent: QWidget, f: Union[Qt.WindowFlags, Qt.WindowType] = None):
+    def setParent(self, parent: QWidget, f: Qt.WindowType = None):
         if self.parent() is not None:
             self.parent().removeEventFilter(self)
 
@@ -315,8 +293,7 @@ class OverlayWidget(QWidget):
     def stop(self, animate=True):
         if animate and self.isVisible():
             self._oldOpacity = self.opacity
-            self._anim = QPropertyAnimation(
-                self, b"opacity")
+            self._anim = QPropertyAnimation(self, b"opacity")
             self._anim.setStartValue(self._oldOpacity)
             self._anim.setEndValue(0)
             self._anim.setDuration(500)

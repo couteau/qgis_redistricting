@@ -22,8 +22,9 @@
  ***************************************************************************/
 """
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Optional, Sequence, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -107,7 +108,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             if field.sumField:
                 self._columns.append(DistrictColumnData(field.fieldName, field.caption, field.category))
             if field.pctBase is not None:
-                self._columns.append(DistrictColumnData(f'pct_{fn}', f'%{field.caption}', field.category))
+                self._columns.append(DistrictColumnData(f"pct_{fn}", f"%{field.caption}", field.category))
 
         self._columns.extend(
             DistrictColumnData(c, c.comment, FieldCategory.Metrics)  # pylint: disable=no-member
@@ -177,10 +178,10 @@ class RdsDistrictDataModel(QAbstractTableModel):
             start, end, {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, Qt.ItemDataRole.BackgroundRole}
         )
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return len(self._districts) if self._districts and not parent.isValid() else 0
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         if parent.isValid() or self._districts is None:
             return 0
 
@@ -196,7 +197,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
             district = self._districts[row]
 
             if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, RdsDistrictDataModel.RawDataRole):
-                if key[:3] == 'pct' and key != 'pct_deviation':
+                if key[:3] == "pct" and key != "pct_deviation":
                     pctbase = self._plan.dataFields[key[4:]].pctBase
                     if pctbase == self._plan.popField:
                         pctbase = DistrictColumns.POPULATION
@@ -211,18 +212,18 @@ class RdsDistrictDataModel(QAbstractTableModel):
                     return None
 
                 if role != RdsDistrictDataModel.RawDataRole:
-                    if key == 'deviation':
-                        value = f'{value:+,}'
-                    elif key == 'pct_deviation':
-                        value = f'{value:+.2%}'
+                    if key == "deviation":
+                        value = f"{value:+,}"
+                    elif key == "pct_deviation":
+                        value = f"{value:+.2%}"
                     elif key in MetricsColumns.CompactnessScores():
-                        value = f'{value:0.3}'
-                    elif key[:3] == 'pct':
-                        value = f'{value:.2%}'
+                        value = f"{value:0.3}"
+                    elif key[:3] == "pct":
+                        value = f"{value:.2%}"
                     elif isinstance(value, (int, np.integer)):
-                        value = f'{value:,}'
+                        value = f"{value:,}"
                     elif isinstance(value, (float, np.floating)):
-                        value = f'{value:,.2f}'
+                        value = f"{value:,.2f}"
 
             elif role == Qt.ItemDataRole.BackgroundRole:
                 if col == 0 or district.district == 0:
@@ -337,7 +338,7 @@ class RdsDistrictFilterFieldsProxyModel(QSortFilterProxyModel):
 
     def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
         # pylint: disable=protected-access
-        if self.districtModel._columns[source_column].key == 'members':
+        if self.districtModel._columns[source_column].key == "members":
             return self.districtModel._plan.numDistricts != self.districtModel._plan.numDistricts
 
         cat = self.districtModel._columns[source_column].category
@@ -398,7 +399,7 @@ class DistrictSelectModel(QAbstractListModel):
 
         if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
             if row == 0:
-                return tr('All')
+                return tr("All")
 
             if row == 1:
                 return self._districts[0].name
@@ -408,7 +409,7 @@ class DistrictSelectModel(QAbstractListModel):
 
         if role == Qt.ItemDataRole.DecorationRole:
             if row == 0:
-                return QgsApplication.getThemeIcon('/mActionSelectAll.svg')
+                return QgsApplication.getThemeIcon("/mActionSelectAll.svg")
 
             if row == 1 or row > self._offset:
                 dist = 0 if row == 1 else row - self._offset
@@ -426,7 +427,7 @@ class DistrictSelectModel(QAbstractListModel):
                 return QIcon(pixmap)
 
         if role == Qt.ItemDataRole.AccessibleDescriptionRole and row == self._offset:
-            return 'separator'
+            return "separator"
 
         return QVariant()
 
@@ -451,9 +452,9 @@ class SourceDistrictModel(DistrictSelectModel):
 
         if row == PAINT_SELECTED:
             if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
-                return tr('Selected')
+                return tr("Selected")
             if role == Qt.ItemDataRole.DecorationRole:
-                return QgsApplication.getThemeIcon('/mActionProcessSelected.svg')
+                return QgsApplication.getThemeIcon("/mActionProcessSelected.svg")
 
         return super().data(index, role)
 
@@ -475,11 +476,11 @@ class TargetDistrictModel(DistrictSelectModel):
 
         if role in {Qt.ItemDataRole.DisplayRole, role == Qt.ItemDataRole.EditRole}:
             if row == 0:
-                return tr('Select district')
+                return tr("Select district")
 
         elif role == Qt.ItemDataRole.DecorationRole:
             if row == 0:
-                return QgsApplication.getThemeIcon('/mActionToggleEditing.svg')
+                return QgsApplication.getThemeIcon("/mActionToggleEditing.svg")
 
         return super().data(index, role)
 
@@ -539,28 +540,28 @@ class DeltaListModel(QAbstractTableModel):
     def updateFields(self):
         self._fields = [
             {
-                'name': f'new_{DistrictColumns.POPULATION}',
-                'caption': DistrictColumns.POPULATION.comment,  # pylint: disable=no-member
-                'format': '{:,.0f}',
-                'field-type': FieldCategory.Population,
+                "name": f"new_{DistrictColumns.POPULATION}",
+                "caption": DistrictColumns.POPULATION.comment,  # pylint: disable=no-member
+                "format": "{:,.0f}",
+                "field-type": FieldCategory.Population,
             },
             {
-                'name': DistrictColumns.POPULATION,
-                'caption': f'{DistrictColumns.POPULATION.comment} - {tr("Change")}',  # pylint: disable=no-member
-                'format': '{:+,.0f}',
-                'field-type': FieldCategory.Population,
+                "name": DistrictColumns.POPULATION,
+                "caption": f"{DistrictColumns.POPULATION.comment} - {tr('Change')}",  # pylint: disable=no-member
+                "format": "{:+,.0f}",
+                "field-type": FieldCategory.Population,
             },
             {
-                'name': DistrictColumns.DEVIATION,
-                'caption': DistrictColumns.DEVIATION.comment,  # pylint: disable=no-member
-                'format': '{:,.0f}',
-                'field-type': FieldCategory.Population,
+                "name": DistrictColumns.DEVIATION,
+                "caption": DistrictColumns.DEVIATION.comment,  # pylint: disable=no-member
+                "format": "{:,.0f}",
+                "field-type": FieldCategory.Population,
             },
             {
-                'name': DistrictColumns.PCT_DEVIATION,
-                'caption': DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
-                'format': '{:+.2%}',
-                'field-type': FieldCategory.Population,
+                "name": DistrictColumns.PCT_DEVIATION,
+                "caption": DistrictColumns.PCT_DEVIATION.comment,  # pylint: disable=no-member
+                "format": "{:+.2%}",
+                "field-type": FieldCategory.Population,
             },
         ]
 
@@ -569,12 +570,12 @@ class DeltaListModel(QAbstractTableModel):
             fn = field.fieldName
             self._fields.extend(
                 [
-                    {'name': f'new_{fn}', 'caption': field.caption, 'format': '{:,.0f}', 'field-type': field.category},
+                    {"name": f"new_{fn}", "caption": field.caption, "format": "{:,.0f}", "field-type": field.category},
                     {
-                        'name': fn,
-                        'caption': f'{field.caption} - {tr("Change")}',
-                        'format': '{:+,.0f}',
-                        'field-type': field.category,
+                        "name": fn,
+                        "caption": f"{field.caption} - {tr('Change')}",
+                        "format": "{:+,.0f}",
+                        "field-type": field.category,
                     },
                 ]
             )
@@ -586,16 +587,16 @@ class DeltaListModel(QAbstractTableModel):
                 self._fields.extend(
                     [
                         {
-                            'name': f'new_{fn}',
-                            'caption': field.caption,
-                            'format': '{:,.0f}',
-                            'field-type': field.category,
+                            "name": f"new_{fn}",
+                            "caption": field.caption,
+                            "format": "{:,.0f}",
+                            "field-type": field.category,
                         },
                         {
-                            'name': fn,
-                            'caption': field.caption + ' - ' + tr('Change'),
-                            'format': '{:+,.0f}',
-                            'field-type': field.category,
+                            "name": fn,
+                            "caption": field.caption + " - " + tr("Change"),
+                            "format": "{:+,.0f}",
+                            "field-type": field.category,
                         },
                     ]
                 )
@@ -603,17 +604,17 @@ class DeltaListModel(QAbstractTableModel):
             if field.pctBase:
                 self._fields.append(
                     {
-                        'name': f'pct_{fn}',
-                        'caption': f'%{field.caption}',
-                        'format': '{:.2%}',
-                        'field-type': field.category,
+                        "name": f"pct_{fn}",
+                        "caption": f"%{field.caption}",
+                        "format": "{:.2%}",
+                        "field-type": field.category,
                     }
                 )
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return len(self._delta) if self._delta is not None and not parent.isValid() else 0
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return len(self._fields) if not parent.isValid() else 0
 
     def data(self, index: QModelIndex, role: int = ...):
@@ -623,10 +624,10 @@ class DeltaListModel(QAbstractTableModel):
 
             if role in {Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole}:
                 value = self._delta[row, col]
-                return self._fields[col]['format'].format(value) if value is not None else None
+                return self._fields[col]["format"].format(value) if value is not None else None
 
             if role == DeltaListModel.FieldTypeRole:
-                return self._fields[col]['field-type']
+                return self._fields[col]["field-type"]
 
         return QVariant()
 
@@ -636,7 +637,7 @@ class DeltaListModel(QAbstractTableModel):
                 if orientation == Qt.Orientation.Vertical:
                     return self._delta[section].name
                 else:
-                    return self._fields[section]['caption']
+                    return self._fields[section]["caption"]
             if role == Qt.ItemDataRole.TextAlignmentRole:
                 return (
                     int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
@@ -645,12 +646,12 @@ class DeltaListModel(QAbstractTableModel):
                 )
 
             if role == Qt.ItemDataRole.BackgroundRole and orientation == Qt.Orientation.Horizontal:
-                ft = self._fields[section]['field-type']
+                ft = self._fields[section]["field-type"]
                 if ft in FieldColors:
                     return QBrush(FieldColors[ft])
 
             if role == DeltaListModel.FieldTypeRole and orientation == Qt.Orientation.Horizontal:
-                return self._fields[section]['field-type']
+                return self._fields[section]["field-type"]
 
         return None
 
@@ -684,7 +685,7 @@ class DeltaFieldFilterProxy(QSortFilterProxyModel):
     def filterAcceptsColumn(self, source_column: int, source_parent: QModelIndex) -> bool:  # pylint: disable=unused-argument
         if source_parent.isValid():
             return True
-        field_type = self.deltaModel._fields[source_column]['field-type']  # pylint: disable=protected-access
+        field_type = self.deltaModel._fields[source_column]["field-type"]  # pylint: disable=protected-access
         return field_type == FieldCategory.Population or self._demographics
 
 
@@ -703,7 +704,7 @@ class GeoFieldsModel(QAbstractListModel):
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return self._data[row].caption
         if role == Qt.ItemDataRole.DecorationRole:
-            return QgsApplication.getThemeIcon('/mIconVector.svg')
+            return QgsApplication.getThemeIcon("/mIconVector.svg")
 
         return QVariant()
 
@@ -727,7 +728,7 @@ class PopFieldsModel(QAbstractListModel):
         if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             return self._data[row].caption
         if role == Qt.ItemDataRole.DecorationRole:
-            return QgsApplication.getThemeIcon('/mIconVector.svg')
+            return QgsApplication.getThemeIcon("/mIconVector.svg")
 
         return QVariant()
 
@@ -796,13 +797,13 @@ class RdsMetricsModel(QAbstractTableModel):
             else:
                 self._data[name] = metric
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         if parent.isValid():
             return 0
 
         return len(self._data)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return 1 if not parent.isValid() else 0
 
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
@@ -818,10 +819,10 @@ class RdsMetricsModel(QAbstractTableModel):
             elif m.level() == MetricLevel.GEOGRAPHIC:
                 # it's an entry in a geographic metric -- header is geoField's caption
                 g = self.metricKey(section)
-                header = f'    {self._plan.geoFields[g].caption}'
+                header = f"    {self._plan.geoFields[g].caption}"
 
             elif m.group() is not None:
-                header = f'    {m.caption()}'
+                header = f"    {m.caption()}"
 
             else:
                 header = m.caption()
@@ -871,20 +872,20 @@ class RdsMetricsModel(QAbstractTableModel):
 
         return list(self._data.keys())[section]
 
-    def mimeTypes(self) -> List[str]:
-        return ['text/csv', 'text/plain']
+    def mimeTypes(self) -> list[str]:
+        return ["text/csv", "text/plain"]
 
     def mimeData(self, indexes: Iterable[QModelIndex]) -> QMimeData:
         data = {
             self.headerData(idx.row(), Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole): self.data(
                 idx, Qt.ItemDataRole.DisplayRole
             )
-            or ''
+            or ""
             for idx in indexes
         }
         mime = QMimeData()
-        mime.setData('text/csv', '\n'.join(','.join(r) for r in data.items()).encode())
-        mime.setText('\n'.join('\t'.join(r) for r in data.items()))
+        mime.setData("text/csv", "\n".join(",".join(r) for r in data.items()).encode())
+        mime.setText("\n".join("\t".join(r) for r in data.items()))
         return mime
 
 
@@ -895,7 +896,7 @@ class RdsSplitsModel(QAbstractItemModel):
         self._splits.splitUpdating.connect(self.beginResetModel)
         self._splits.splitUpdated.connect(self.endResetModel)
         self._data: pd.DataFrame = splits.data
-        self._summary_cols = [self._splits.caption, tr('Districts'), tr(DistrictColumns.POPULATION)]
+        self._summary_cols = [self._splits.caption, tr("Districts"), tr(DistrictColumns.POPULATION)]
         self._header = self._summary_cols[:]
         self._header.extend(f.caption for f in fields)
 
@@ -945,9 +946,9 @@ class RdsSplitsModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.DisplayRole:
             value = item.attributes[col]
             if isinstance(value, (int, np.integer)):
-                value = f'{value:,}'
+                value = f"{value:,}"
             elif isinstance(value, (float, np.floating)):
-                value = f'{value:,.2f}'
+                value = f"{value:,.2f}"
             return value
 
         return QVariant()
@@ -955,7 +956,7 @@ class RdsSplitsModel(QAbstractItemModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = ...) -> Any:
         if orientation == Qt.Orientation.Horizontal:
             if role == Qt.ItemDataRole.DisplayRole:
-                return self._header[section] if section < len(self._header) else ''
+                return self._header[section] if section < len(self._header) else ""
 
         return QVariant()
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Geographic and Demographic Field classes
 
         begin                : 2022-01-15
@@ -22,11 +21,8 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union,
-    overload
-)
+
+from typing import Optional, Union, overload
 
 from qgis.core import (
     QgsApplication,
@@ -37,21 +33,13 @@ from qgis.core import (
     QgsFeatureRequest,
     QgsField,
     QgsVectorLayer,
-    QgsVectorLayerJoinInfo
+    QgsVectorLayerJoinInfo,
 )
-from qgis.PyQt.QtCore import (
-    QMetaType,
-    QVariant,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QMetaType, QVariant, pyqtSignal
 from qgis.PyQt.QtGui import QIcon
 
 from ..utils import makeFieldName
-from .base.model import (
-    Factory,
-    RdsBaseModel,
-    rds_property
-)
+from .base.model import Factory, RdsBaseModel, rds_property
 from .consts import FieldCategory
 
 
@@ -206,7 +194,7 @@ class RdsRelatedField(RdsField):
         if not self._prepared:
             self.prepare()
 
-        req = QgsFeatureRequest(QgsExpression(f'{self.keyField} = {key!r}'), self._context)
+        req = QgsFeatureRequest(QgsExpression(f"{self.keyField} = {key!r}"), self._context)
         f = next(self.layer.getFeatures(req), None)
 
         if f is None:
@@ -259,12 +247,10 @@ class RdsGeoField(RdsField):
         return None
 
     @overload
-    def getName(self, feature: QgsFeature) -> str:
-        ...
+    def getName(self, feature: QgsFeature) -> str: ...
 
     @overload
-    def getName(self, key: Union[str]) -> str:
-        ...
+    def getName(self, key: Union[str]) -> str: ...
 
     def getName(self, feature_or_key: Union[QgsFeature, str]) -> str:
         if isinstance(feature_or_key, QgsFeature):
@@ -297,7 +283,7 @@ class RdsGeoField(RdsField):
         join.setJoinFieldName(keyField)
         join.setTargetFieldName(self.fieldName)
         join.setJoinFieldNamesSubset([self.nameField.field])
-        join.setPrefix(f'{self.fieldName}_')
+        join.setPrefix(f"{self.fieldName}_")
         return join
 
 
@@ -307,7 +293,11 @@ class RdsDataField(RdsField):
 
     def isNumeric(self):
         return self.fieldType() in (
-            QMetaType.Type.Double, QMetaType.Type.Int, QMetaType.Type.LongLong, QMetaType.Type.UInt, QMetaType.Type.ULongLong
+            QMetaType.Type.Double,
+            QMetaType.Type.Int,
+            QMetaType.Type.LongLong,
+            QMetaType.Type.UInt,
+            QMetaType.Type.ULongLong,
         )
 
     category: int = FieldCategory.Demographic
@@ -315,11 +305,11 @@ class RdsDataField(RdsField):
         private=True,
         fvalid=lambda inst, value: value and inst.isNumeric(),
         notify=sumFieldChanged,
-        factory=Factory(isNumeric)
+        factory=Factory(isNumeric),
     )
     pctBase: Union[str, None] = rds_property(
         private=True,
         fvalid=lambda inst, value: None if not inst.isNumeric() else value,
         notify=pctBaseChanged,
-        default=None
+        default=None,
     )

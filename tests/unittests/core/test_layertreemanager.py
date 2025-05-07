@@ -18,12 +18,10 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pytest
 from pytest_mock import MockerFixture
-from qgis.core import (
-    QgsLayerTreeGroup,
-    QgsProject
-)
+from qgis.core import QgsLayerTreeGroup, QgsProject
 from qgis.gui import QgisInterface
 
 from redistricting.services.layertree import LayerTreeManager
@@ -49,7 +47,7 @@ class TestLayerTreeManager:
 
     def test_create_group_invalid_plan_raises(self, manager: LayerTreeManager, mocker: MockerFixture, layertree_plan):
         layertree_plan.isValid.return_value = False
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Cannot add incomplete plan to layer tree"):
             manager.createGroup(layertree_plan)
 
     def test_plan_from_group(self, manager: LayerTreeManager, layertree_plan):
@@ -81,7 +79,9 @@ class TestLayerTreeManager:
         assert group1 in groups
         assert group2 in groups
 
-    def test_get_plan_groups_non_plan_group_ignored(self, manager, mocker: MockerFixture, qgis_iface: QgisInterface, assign_layer, dist_layer):
+    def test_get_plan_groups_non_plan_group_ignored(
+        self, manager, mocker: MockerFixture, qgis_iface: QgisInterface, assign_layer, dist_layer
+    ):
         group1 = mocker.create_autospec(QgsLayerTreeGroup)
         group2 = mocker.create_autospec(QgsLayerTreeGroup)
         group2.customProperty.return_value = None

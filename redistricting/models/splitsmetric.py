@@ -54,6 +54,10 @@ class RdsSplitsMetric(
         return {g: field.getName(g) for g in geoids}
 
     def calculate(self, populationData: pd.DataFrame, geometry, plan: "RdsPlan", **depends):
+        def constant(s: pd.Series):
+            array = s.to_numpy()
+            return array.shape[0] == 0 or (array[0] == array).all()
+
         if plan is None:
             self._value: KeyedList[RdsSplits] = KeyedList[RdsSplits]()
             self.data: dict[str, pd.DataFrame] = {}
@@ -71,7 +75,7 @@ class RdsSplitsMetric(
             self.data = {}
             for field in plan.geoFields:
                 g = populationData.dropna(subset=[field.fieldName])[[field.fieldName] + cols].groupby([field.fieldName])
-                splits_data = g.filter(lambda x: x[plan.distField].nunique() > 1)
+                splits_data = g.filter(lambda x: not constant(x[plan.distField]))
 
                 splitpop = splits_data[[field.fieldName] + cols].groupby([field.fieldName, plan.distField]).sum()
 

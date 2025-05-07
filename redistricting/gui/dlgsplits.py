@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Import Assignments Dialog
 
         begin                : 2022-01-15
@@ -22,27 +21,13 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QModelIndex,
-    QObject,
-    Qt
-)
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
-    QTreeView,
-    QWidget
-)
+from qgis.PyQt.QtCore import QAbstractItemModel, QModelIndex, QObject, Qt
+from qgis.PyQt.QtWidgets import QDialog, QStyledItemDelegate, QStyleOptionViewItem, QTreeView, QWidget
 
-from ..models import (
-    RdsPlan,
-    RdsSplits,
-    RdsSplitsModel
-)
+from ..models import RdsPlan, RdsSplits, RdsSplitsModel
 from ..models.base.lists import KeyedList
 from ..utils import tr
 from .ui.DlgSplits import Ui_dlgSplits
@@ -70,13 +55,7 @@ class RdsSplitDistrictsDelegate(QStyledItemDelegate):
 
 
 class DlgSplitDetail(Ui_dlgSplits, QDialog):
-    def __init__(
-            self,
-            plan: RdsPlan,
-
-            parent: Optional[QWidget] = None,
-            flags: Qt.WindowType = Qt.WindowType.Dialog
-    ):
+    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
 
@@ -112,10 +91,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self.setWindowTitle(f"{geoField.caption} {tr('Splits')}")
         self.cmbGeography.setCurrentText(geoField.caption)
 
-        model = RdsSplitsModel(
-            self._splits[self._field],
-            (*self._plan.popFields, *self._plan.dataFields)
-        )
+        model = RdsSplitsModel(self._splits[self._field], (*self._plan.popFields, *self._plan.dataFields))
         self.setModel(model)
 
     def model(self):

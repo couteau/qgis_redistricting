@@ -26,13 +26,15 @@ import pathlib
 from contextlib import contextmanager
 from itertools import repeat
 from math import ceil, floor
-from typing import Annotated, Iterable, Optional, Union, overload
+from typing import Annotated, Optional, Union, overload
+from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import pyqtSignal
 
 from ..utils import tr
+from . import consts
 from .base.lists import KeyedList
 from .base.model import RdsBaseModel, rds_property
 from .base.prop import in_range, isidentifier, not_empty
@@ -67,7 +69,9 @@ class RdsPlan(RdsBaseModel):
         return layer
 
     name: Annotated[str, not_empty] = rds_property(private=True, notify=nameChanged)
-    numDistricts: Annotated[int, in_range(2, 2000)] = rds_property(private=True, notify=numDistrictsChanged)
+    numDistricts: Annotated[int, in_range(consts.MIN_DISTRICTS, consts.MAX_DISTRICTS)] = rds_property(
+        private=True, notify=numDistrictsChanged
+    )
     numSeats: int = None
     deviation: Annotated[float, in_range(0.0)] = rds_property(private=True, default=0.0, notify=deviationChanged)
     deviationType: DeviationType = rds_property(

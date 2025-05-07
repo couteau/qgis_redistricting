@@ -47,12 +47,12 @@ class TestDistrictDataModel:
         assert district_model.columnCount() == 15
 
     def test_headerdata(self, district_model):
-        assert district_model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == 'District'
-        assert district_model.headerData(14, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == 'Convex Hull'
+        assert district_model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == "District"
+        assert district_model.headerData(14, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole) == "Convex Hull"
 
     def test_data(self, district_model: RdsDistrictDataModel):
         data = district_model.data(district_model.createIndex(0, 0), Qt.ItemDataRole.DisplayRole)
-        assert data == 'Unassigned'
+        assert data == "Unassigned"
         data = district_model.data(district_model.createIndex(0, 0), Qt.ItemDataRole.BackgroundRole)
         assert isinstance(data, QBrush)
 
@@ -64,12 +64,12 @@ class TestDistrictDataModel:
 
         with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):
             e = PlanEditor.fromPlan(plan)
-            e.removePopField('vap_total')
+            e.removePopField("vap_total")
             e.updatePlan()
 
         with qtbot.waitSignal(district_model.dataChanged):
-            district_model.setData(district_model.createIndex(3, 0), 'Council District 3', Qt.ItemDataRole.EditRole)
-        assert plan.districts[3].name == 'Council District 3'
+            district_model.setData(district_model.createIndex(3, 0), "Council District 3", Qt.ItemDataRole.EditRole)
+        assert plan.districts[3].name == "Council District 3"
 
     def test_clear_plan(self, district_model: RdsDistrictDataModel, qtbot: QtBot):
         with qtbot.waitSignals([district_model.modelAboutToBeReset, district_model.modelReset]):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 
 # Form implementation generated from reading ui file '/Users/stuart/Source/qgis_redistricting/ui/DlgConfirmDelete.ui'
 #

@@ -176,16 +176,16 @@ class TestBaseModel:
         assert c.field5 is None
         assert c.parent() is parent
 
-    @pytest.mark.parametrize("minmax,value", [[(1, 5), 7], [("a", "d"), "e"]])
+    @pytest.mark.parametrize(("minmax", "value"), [((1, 5), 7), (("a", "d"), "e")])
     def test_range_outofrange_raises_valueerror(self, minmax, value):
         r = in_range(*minmax)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Value must be between"):
             r(None, value)
 
-    @pytest.mark.parametrize("minmax,value", [[(1, 2), "a"], [("a", "z"), 1]])
+    @pytest.mark.parametrize(("minmax", "value"), [((1, 2), "a"), (("a", "z"), 1)])
     def test_range_incompatible_types_raises_typeerror(self, minmax, value):
         r = in_range(*minmax)
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError, match="Range and value are incompatible types"):
             r(None, value)
 
 
@@ -208,11 +208,11 @@ class TestRdsProperty:
     def test_not_empty_validator(self):
         t = not_empty(None, "name")
         assert t == "name"
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Value must not be empty"):
             t = not_empty(None, "")
 
         t = not_empty()
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Value must not be empty"):
             t(None, "")
 
         assert t(None, "name") == "name"

@@ -85,7 +85,7 @@ class TestEditAssignmentsController:
         mocker.patch("redistricting.controllers.edit.QgsFieldModel")
 
         registry = mocker.patch("redistricting.controllers.base.ActionRegistry")
-        mocker.patch.object(registry.return_value, "createAction", new=lambda *args, **kwargs: QAction())
+        mocker.patch.object(registry.return_value, "createAction", new=lambda *args, **kwargs: QAction())  # noqa: PT008
         # registry.return_value.createAction.return_value = QAction()
         registry.return_value.actionSaveAsNew = QAction()
         registry.return_value.actionCreateDistrict = QAction()
@@ -262,7 +262,7 @@ class TestEditAssignmentsController:
         type(controller_with_plan.planManager).activePlan = plan
         assert len(plan.geoFields) > 0
         assert controller_with_plan.planManager.activePlan == plan
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Attempt to set invalid geography field on paint tool"):
             controller_with_plan.setGeoField("district")
 
     def test_no_plan_geofields_can_set_any_geolayer_field(self, controller_with_plan: EditAssignmentsController, plan):
@@ -273,7 +273,7 @@ class TestEditAssignmentsController:
         controller_with_plan.setGeoField("tractce")
         assert controller_with_plan.geoField == "tractce"
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Attempt to set invalid geography field on paint tool"):
             controller_with_plan.setGeoField("not_a_field")
 
     def test_create_district(  # noqa: PLR0913

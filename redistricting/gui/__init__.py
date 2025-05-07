@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - UI classes and utilities module
 
         begin                : 2022-01-15
@@ -22,16 +21,14 @@
  *                                                                         *
  ***************************************************************************/
 """
-from qgis.PyQt.QtCore import (
-    QEvent,
-    QObject,
-    Qt
-)
+
+from qgis.PyQt.QtCore import QEvent, QObject, Qt
 from qgis.PyQt.QtGui import QKeyEvent
 from qgis.PyQt.QtWidgets import QTableView
 
 from .dlgcopy import DlgCopyPlan
 from .dlgdelete import DlgConfirmDelete
+
 # Dialogs and Dock Widgets
 from .dlgedit import DlgEditPlan
 from .dlgeditdistrict import DlgNewDistrict
@@ -44,15 +41,8 @@ from .dwdistrict import DockDistrictDataTable
 from .dwedit import DockRedistrictingToolbox
 from .dwmetrics import DockPlanMetrics
 from .dwpending import DockPendingChanges
-from .metrics_gui import (
-    RdsMetricGuiHandler,
-    get_metric_handler,
-    register_metric_handler
-)
-from .painttool import (
-    PaintDistrictsTool,
-    PaintMode
-)
+from .metrics_gui import RdsMetricGuiHandler, get_metric_handler, register_metric_handler
+from .painttool import PaintDistrictsTool, PaintMode
 
 
 class TableViewKeyEventFilter(QObject):
@@ -68,22 +58,22 @@ class TableViewKeyEventFilter(QObject):
 
 
 __all__ = [
-    'DlgEditPlan',
-    'DlgCopyPlan',
-    'DlgSelectPlan',
-    'DlgSplitDetail',
-    'DlgExportPlan',
-    'DlgImportPlan',
-    'DlgImportShape',
-    'DlgNewDistrict',
-    'DlgConfirmDelete',
-    'DockRedistrictingToolbox',
-    'DockDistrictDataTable',
-    'DockPendingChanges',
-    'DockPlanMetrics',
-    'PaintDistrictsTool',
-    'PaintMode',
-    'RdsMetricGuiHandler',
-    'get_metric_handler',
-    'register_metric_handler'
+    "DlgEditPlan",
+    "DlgCopyPlan",
+    "DlgSelectPlan",
+    "DlgSplitDetail",
+    "DlgExportPlan",
+    "DlgImportPlan",
+    "DlgImportShape",
+    "DlgNewDistrict",
+    "DlgConfirmDelete",
+    "DockRedistrictingToolbox",
+    "DockDistrictDataTable",
+    "DockPendingChanges",
+    "DockPlanMetrics",
+    "PaintDistrictsTool",
+    "PaintMode",
+    "RdsMetricGuiHandler",
+    "get_metric_handler",
+    "register_metric_handler",
 ]

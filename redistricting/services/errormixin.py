@@ -22,7 +22,8 @@
  ***************************************************************************/
 """
 
-from typing import Iterable, Union
+from collections.abc import Iterable
+from typing import Union
 
 from qgis.core import Qgis, QgsMessageLog
 
@@ -65,7 +66,7 @@ class ErrorListMixin:
         """
         for error in errors:
             self._errors.append((str(error) if isinstance(error, Exception) else error, level))
-            QgsMessageLog.logMessage(error, "Redistricting", level)
+            QgsMessageLog.logMessage(str(error), "Redistricting", level)
 
     def pushError(self, error: Union[str, Exception], level: Qgis.MessageLevel = Qgis.MessageLevel.Warning):
         """

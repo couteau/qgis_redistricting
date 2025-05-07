@@ -22,7 +22,8 @@
  ***************************************************************************/
 """
 
-from typing import Iterable, Optional, overload
+from typing import Optional, overload
+from collections.abc import Iterable
 
 from qgis.core import Qgis, QgsApplication, QgsField, QgsProject, QgsVectorDataProvider, QgsVectorLayer
 from qgis.PyQt.QtCore import QMetaType, QObject, pyqtSignal
@@ -59,19 +60,19 @@ class PlanEditor(BasePlanBuilder):
             self._updateAssignLayerTask.cancel()
 
     def RaiseChangedReadonlyFieldError(self, attribute: str):
-        raise RuntimeError(tr('Cannot change {attribute} after plan creation').format(attribute=attribute))
+        raise RuntimeError(tr("Cannot change {attribute} after plan creation").format(attribute=attribute))
 
     def setGeoIdField(self, value: str):
-        self.RaiseChangedReadonlyFieldError('GeoID RdsField')
+        self.RaiseChangedReadonlyFieldError("GeoID RdsField")
 
     def setDistField(self, value: str):
-        self.RaiseChangedReadonlyFieldError('District RdsField')
+        self.RaiseChangedReadonlyFieldError("District RdsField")
 
     def setGeoLayer(self, value: QgsVectorLayer):
-        self.RaiseChangedReadonlyFieldError('Geography Layer')
+        self.RaiseChangedReadonlyFieldError("Geography Layer")
 
     def setGeoJoinField(self, value: str):
-        self.RaiseChangedReadonlyFieldError('Geography Join RdsField')
+        self.RaiseChangedReadonlyFieldError("Geography Join RdsField")
 
     @overload
     def _addFieldToLayer(self, layer: QgsVectorLayer, fieldName: str, fieldType: QMetaType.Type): ...
@@ -87,13 +88,13 @@ class PlanEditor(BasePlanBuilder):
             if layer.fields().lookupField(fieldOrFieldName) != -1:
                 # fieldName undefined or field already exists
                 self.setError(
-                    tr('Error creating new field: field {field} already exits in layer {layer}').format(
+                    tr("Error creating new field: field {field} already exits in layer {layer}").format(
                         field=fieldOrFieldName, layer=layer.name()
                     )
                 )
                 return
             if fieldType is None:
-                self.setError(tr('RdsField type is required when adding fields by name'))
+                self.setError(tr("RdsField type is required when adding fields by name"))
                 return
 
             fields = [QgsField(fieldOrFieldName, fieldType)]
@@ -102,19 +103,19 @@ class PlanEditor(BasePlanBuilder):
         elif isinstance(fieldOrFieldName, Iterable):
             fields = list(fieldOrFieldName)
             if not all(isinstance(f, QgsField) for f in fields):
-                raise ValueError('Argument must be an iterable of QgsField')
+                raise ValueError("Argument must be an iterable of QgsField")
         else:
-            raise ValueError('Argument must be a string, QgsField, or iterable of QgsField')
+            raise ValueError("Argument must be a string, QgsField, or iterable of QgsField")
 
         provider = layer.dataProvider()
         if not QgsVectorDataProvider.AddAttributes & provider.capabilities():
-            self.pushError('Could not add field to layer', Qgis.MessageLevel.Critical)
+            self.pushError("Could not add field to layer", Qgis.MessageLevel.Critical)
             return
         for field in reversed(fields):
             # ignore fields with conflicting names
             if provider.fields().lookupField(field.name()) != -1:
                 self.pushError(
-                    tr('A field named {field} already exists in layer {layer}. Omitting.').format(
+                    tr("A field named {field} already exists in layer {layer}. Omitting.").format(
                         field=field.name(), layer=layer.name()
                     ),
                     Qgis.MessageLevel.Warning,
@@ -166,7 +167,7 @@ class PlanEditor(BasePlanBuilder):
 
         def terminated():
             if self._updateAssignLayerTask.isCanceled():
-                self.setError(tr('Update geography fields canceled'), Qgis.UserCanceled)
+                self.setError(tr("Update geography fields canceled"), Qgis.UserCanceled)
 
             provider = self._assignLayer.dataProvider()
             fields = self._assignLayer.fields()
@@ -262,14 +263,14 @@ class PlanEditor(BasePlanBuilder):
 
         if self._updater:
             updateGeometry = updateSplits = updateDemographics = False
-            if 'geo-fields' in modifiedFields:
+            if "geo-fields" in modifiedFields:
                 updateSplits = True
 
-            if modifiedFields & {'data-fields', 'pop-fields', 'pop-field', 'pop-layer'}:
+            if modifiedFields & {"data-fields", "pop-fields", "pop-field", "pop-layer"}:
                 updateSplits = True
                 updateDemographics = True
 
-            if 'num-districts' in modifiedFields:
+            if "num-districts" in modifiedFields:
                 updateGeometry = True
 
             if updateSplits or updateDemographics or updateGeometry:
@@ -281,34 +282,34 @@ class PlanEditor(BasePlanBuilder):
         if self._oldvalues is None:
             return
 
-        self._plan.name = self._oldvalues.get('name')
-        self._plan.description = self._oldvalues.get('description', '')
-        self._plan.numDistricts = self._oldvalues.get('num-districts')
-        self._plan.numSeats = self._oldvalues.get('num-seats')
-        self._plan.deviation = self._oldvalues.get('deviation', 0.0)
+        self._plan.name = self._oldvalues.get("name")
+        self._plan.description = self._oldvalues.get("description", "")
+        self._plan.numDistricts = self._oldvalues.get("num-districts")
+        self._plan.numSeats = self._oldvalues.get("num-seats")
+        self._plan.deviation = self._oldvalues.get("deviation", 0.0)
 
-        self._plan._geoIdCaption = self._oldvalues.get('geo-id-caption', '')
+        self._plan._geoIdCaption = self._oldvalues.get("geo-id-caption", "")
 
-        if 'pop-layer' in self._oldvalues:
-            popLayer = QgsProject.instance().mapLayer(self._oldvalues.get('pop-layer'))
+        if "pop-layer" in self._oldvalues:
+            popLayer = QgsProject.instance().mapLayer(self._oldvalues.get("pop-layer"))
             self._plan._popLayer = popLayer
-        self._plan._popJoinField = self._oldvalues.get('pop-join-field', '')
-        self._plan._popField = self._oldvalues.get('pop-field')
+        self._plan._popJoinField = self._oldvalues.get("pop-join-field", "")
+        self._plan._popField = self._oldvalues.get("pop-field")
 
         self._plan.popFields.clear()
-        for field in self._oldvalues.get('pop-fields', []):
+        for field in self._oldvalues.get("pop-fields", []):
             f = deserialize(RdsField, field)
             if f:
                 self._plan.popFields.append(f)
 
         self._plan.dataFields.clear()
-        for field in self._oldvalues.get('data-fields', []):
+        for field in self._oldvalues.get("data-fields", []):
             f = deserialize(RdsDataField, field)
             if f:
                 self._plan.dataFields.append(f)
 
         self._plan._geoFields.clear()
-        for field in self._oldvalues.get('geo-fields', []):
+        for field in self._oldvalues.get("geo-fields", []):
             f = deserialize(RdsGeoField, field)
             if f:
                 self._plan.geoFields.append(f)

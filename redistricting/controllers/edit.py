@@ -23,10 +23,10 @@
 """
 from typing import (
     TYPE_CHECKING,
-    Iterable,
     Optional,
     Union
 )
+from collections.abc import Iterable
 
 from qgis.core import (
     Qgis,
@@ -99,93 +99,93 @@ class EditAssignmentsController(DockWidgetController):
         self.mapTool.selectFeatures.connect(self.selectFeatures)
 
         self.actionStartPaintDistricts = self.actions.createAction(
-            'actionStartPaintDistricts',
-            QIcon(':/plugins/redistricting/paintpalette.svg'),
-            tr('Paint districts'),
+            "actionStartPaintDistricts",
+            QIcon(":/plugins/redistricting/paintpalette.svg"),
+            tr("Paint districts"),
             callback=self.startPaintDistricts,
             parent=self.iface.mainWindow()
         )
         self.actionStartPaintDistricts.setEnabled(False)
 
         self.actionPaintRectangle = self.actions.createAction(
-            'actionPaintRectangle',
-            QIcon(':/plugins/redistricting/paintrubberband.svg'),
-            tr('Paint districts within selection rectangle'),
+            "actionPaintRectangle",
+            QIcon(":/plugins/redistricting/paintrubberband.svg"),
+            tr("Paint districts within selection rectangle"),
             callback=self.startPaintRectangle,
             parent=self.iface.mainWindow()
         )
         self.actionPaintRectangle.setEnabled(False)
 
         self.actionSelectByGeography = self.actions.createAction(
-            'actionSelectByGeography',
-            QgsApplication.getThemeIcon('/mActionSelectFreehand.svg'),
-            tr('Select by geography units'),
+            "actionSelectByGeography",
+            QgsApplication.getThemeIcon("/mActionSelectFreehand.svg"),
+            tr("Select by geography units"),
             callback=self.selectByGeography,
             parent=self.iface.mainWindow()
         )
         self.actionSelectByGeography.setEnabled(False)
 
         self.actionCommitPlanChanges = self.actions.createAction(
-            'actionCommitPlanChanges',
-            QgsApplication.getThemeIcon('/mActionSaveAllEdits.svg'),
-            tr('Commit changes'),
-            tr('Save all districting changes to the underlying layer'),
+            "actionCommitPlanChanges",
+            QgsApplication.getThemeIcon("/mActionSaveAllEdits.svg"),
+            tr("Commit changes"),
+            tr("Save all districting changes to the underlying layer"),
             callback=self.onCommitChanges,
             parent=self.iface.mainWindow()
         )
         self.actionCommitPlanChanges.setEnabled(False)
 
         self.actionSaveAsNew = self.actions.createAction(
-            'actionSaveAsNew',
-            QgsApplication.getThemeIcon('/mActionFileSaveAs.svg'),
-            tr('Save as new'),
-            tr('Save all unsaved districting changes to a new redistricting plan'),
+            "actionSaveAsNew",
+            QgsApplication.getThemeIcon("/mActionFileSaveAs.svg"),
+            tr("Save as new"),
+            tr("Save all unsaved districting changes to a new redistricting plan"),
             callback=self.saveChangesAsNewPlan,
             parent=self.iface.mainWindow()
         )
         self.actionSaveAsNew.setEnabled(False)
 
         self.actionRollbackPlanChanges = self.actions.createAction(
-            'actionRollbackPlanChanges',
-            QgsApplication.getThemeIcon('/mActionCancelEdits.svg'),
-            tr('Rollback changes'),
-            tr('Discard all unsaved districting changes'),
+            "actionRollbackPlanChanges",
+            QgsApplication.getThemeIcon("/mActionCancelEdits.svg"),
+            tr("Rollback changes"),
+            tr("Discard all unsaved districting changes"),
             callback=self.onRollbackChanges,
             parent=self.iface.mainWindow()
         )
         self.actionRollbackPlanChanges.setEnabled(False)
 
         self.actionCreateDistrict = self.actions.createAction(
-            'actionCreateDistrict',
-            QgsApplication.getThemeIcon('/mActionAdd.svg'),
+            "actionCreateDistrict",
+            QgsApplication.getThemeIcon("/mActionAdd.svg"),
             tr("Add district"),
-            tr('Create a new district and add it to the plan'),
+            tr("Create a new district and add it to the plan"),
             callback=self.createDistrict,
             parent=self.iface.mainWindow()
         )
         self.actionCreateDistrict.setEnabled(False)
 
         self.actionEditDistrict = self.actions.createAction(
-            'actionEditDistrict',
-            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
-            tr('Edit district'),
+            "actionEditDistrict",
+            QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
+            tr("Edit district"),
             callback=self.editDistrict,
             parent=self.iface.mainWindow()
         )
 
         self.actionEditTargetDistrict = self.actions.createAction(
-            'actionEditTargetDistrict',
-            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
-            tr('Edit target district'),
+            "actionEditTargetDistrict",
+            QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
+            tr("Edit target district"),
             callback=self.editDistrict,
             parent=self.iface.mainWindow()
         )
         self.actionEditTargetDistrict.setEnabled(False)
 
         self.actionEditSourceDistrict = self.actions.createAction(
-            'actionEditSourceDistrict',
-            QgsApplication.getThemeIcon('/mActionToggleEditing.svg'),
-            tr('Edit source district'),
+            "actionEditSourceDistrict",
+            QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
+            tr("Edit source district"),
             callback=self.editDistrict,
             parent=self.iface.mainWindow()
         )
@@ -225,9 +225,9 @@ class EditAssignmentsController(DockWidgetController):
     def createToggleAction(self) -> QAction:
         action = super().createToggleAction()
         if action is not None:
-            action.setIcon(QIcon(':/plugins/redistricting/paintdistricts.svg'))
-            action.setText(tr('Paint Districts'))
-            action.setStatusTip(tr('Show/hide tools for creating/editing districts'))
+            action.setIcon(QIcon(":/plugins/redistricting/paintdistricts.svg"))
+            action.setText(tr("Paint Districts"))
+            action.setStatusTip(tr("Show/hide tools for creating/editing districts"))
 
         return action
 
@@ -392,12 +392,12 @@ class EditAssignmentsController(DockWidgetController):
         self.targetDistrict = district
 
     def createDistrict(self):
-        if not self.checkActivePlan('create district'):
+        if not self.checkActivePlan("create district"):
             return None
 
         if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
             self.iface.messageBar().pushMessage(
-                self.tr("Warning"), self.tr('All districts have already been allocated'), Qgis.MessageLevel.Warning)
+                self.tr("Warning"), self.tr("All districts have already been allocated"), Qgis.MessageLevel.Warning)
             return None
 
         dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
@@ -447,7 +447,7 @@ class EditAssignmentsController(DockWidgetController):
         self.editDistrict(self.targetDistrict)
 
     def saveChangesAsNewPlan(self):
-        if not self.checkActivePlan(self.tr('save changes to new plan')):
+        if not self.checkActivePlan(self.tr("save changes to new plan")):
             return
 
         if not self.activePlan.assignLayer.isEditable():
@@ -509,16 +509,16 @@ class EditAssignmentsController(DockWidgetController):
             (len(self.activePlan.geoFields) != 0 and value not in self.activePlan.geoFields) or
             (len(self.activePlan.geoFields) == 0 and value not in self.activePlan.geoLayer.fields().names())
         ):
-            raise ValueError(tr('Attempt to set invalid geography field on paint tool'))
+            raise ValueError(tr("Attempt to set invalid geography field on paint tool"))
 
         self.geoField = value
 
     def startPaintingFeatures(self, target, source):
         editor = self.assignmentsService.getEditor(self.activePlan)
         if source is not None:
-            msg = tr('Assign features to district %d from %d') % (target, source)
+            msg = tr("Assign features to district %d from %d") % (target, source)
         else:
-            msg = tr('Assign features to district %d') % target
+            msg = tr("Assign features to district %d") % target
         editor.startEditCommand(msg)
 
     def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: Union[int, None], endEdit: bool):

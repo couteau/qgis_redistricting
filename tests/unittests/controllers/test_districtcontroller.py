@@ -157,12 +157,12 @@ class TestDistrictController:
             "canvas",
             mocker.create_autospec(spec=controller_with_active_plan.canvas, instance=True),
         )
-        with pytest.raises(TypeError):
+        with pytest.raises(TypeError, match="Invalid district"):
             controller_with_active_plan.zoomToDistrict("A")
 
         canvas.zoomToFeatureIds.assert_not_called()
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="No such district"):
             controller_with_active_plan.zoomToDistrict(0)
 
         canvas.zoomToFeatureIds.assert_not_called()

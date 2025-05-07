@@ -26,6 +26,7 @@ import inspect
 import math
 import numbers
 import sys
+from collections.abc import Iterable, MutableSequence
 from copy import copy
 from enum import Enum
 from reprlib import recursive_repr
@@ -35,9 +36,7 @@ from typing import (  # pylint: disable=no-name-in-module
     Any,
     Callable,
     Generic,
-    Iterable,
     Literal,
-    MutableSequence,
     Optional,
     Self,
     TypeVar,
@@ -174,7 +173,7 @@ def not_empty(instance=None, value=None):
 
 
 def isidentifier(instance=None, value=None):  # pylint: disable=unused-argument
-    if isinstance(value, str) and not value.isidentifier():
+    if isinstance(value, str) and value != "" and not value.isidentifier():
         raise ValueError("Value must be an identifier")
 
     return value

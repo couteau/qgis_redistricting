@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Import Assignments Dialog
 
         begin                : 2022-01-15
@@ -22,15 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QVBoxLayout,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QWidget
 
 from ..models import RdsPlan
 from ..utils import tr
@@ -43,7 +38,8 @@ class DlgImportPlan(QDialog):
         self.setWindowTitle(tr("Import Equivalency File"))
         self.page = dlgEditPlanImportPage(self)
         self.buttonBox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self)
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, Qt.Orientation.Horizontal, self
+        )
         self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -59,9 +55,7 @@ class DlgImportPlan(QDialog):
         self.page.cmbJoinField.setField(plan.geoIdField)
 
     def updateButton(self):
-        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
-            bool(self.equivalencyFileName)
-        )
+        self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(bool(self.equivalencyFileName))
 
     @property
     def headerRow(self):

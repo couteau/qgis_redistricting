@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - QTableView with frozen columns -- 
+"""QGIS Redistricting Plugin - QTableView with frozen columns --
     adapted from https://doc.qt.io/qt-6/qtwidgets-itemviews-frozencolumn-example.html
 
         begin                : 2024-05-18
@@ -23,25 +22,12 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Optional,
-    Union
-)
 
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QEvent,
-    QModelIndex,
-    Qt,
-    pyqtProperty
-)
+from typing import Optional, Union
+
+from qgis.PyQt.QtCore import QAbstractItemModel, QEvent, QModelIndex, Qt, pyqtProperty
 from qgis.PyQt.QtGui import QResizeEvent
-from qgis.PyQt.QtWidgets import (
-    QAbstractItemView,
-    QHeaderView,
-    QTableView,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QAbstractItemView, QHeaderView, QTableView, QWidget
 
 
 class RdsTableView(QTableView):
@@ -96,19 +82,28 @@ class RdsTableView(QTableView):
 
     def updateSortIndicator(self):
         self._frozenColumnsView.horizontalHeader().setSortIndicator(
-            self.horizontalHeader().sortIndicatorSection(), self.horizontalHeader().sortIndicatorOrder())
+            self.horizontalHeader().sortIndicatorSection(), self.horizontalHeader().sortIndicatorOrder()
+        )
         self._frozenColumnsView.horizontalHeader().setSortIndicatorShown(self.horizontalHeader().isSortIndicatorShown())
 
     def resizeEvent(self, e: QResizeEvent):
         super().resizeEvent(e)
         self.updateFrozenTableGeometry()
 
-    def moveCursor(self, cursorAction: QAbstractItemView.CursorAction, modifiers: Union[Qt.KeyboardModifiers, Qt.KeyboardModifier]) -> QModelIndex:
+    def moveCursor(
+        self, cursorAction: QAbstractItemView.CursorAction, modifiers: Union[Qt.KeyboardModifiers, Qt.KeyboardModifier]
+    ) -> QModelIndex:
         current = super().moveCursor(cursorAction, modifiers)
-        if cursorAction == QTableView.CursorAction.MoveLeft and current.column() >= self._frozenColumnCount \
-                and self.visualRect(current).topLeft().x() < self._frozenColumnsView.columnWidth(0):
-            newValue = self.horizontalScrollBar().value() + self.visualRect(current).topLeft().x() - \
-                self._frozenColumnsView.columnWidth(0)
+        if (
+            cursorAction == QTableView.CursorAction.MoveLeft
+            and current.column() >= self._frozenColumnCount
+            and self.visualRect(current).topLeft().x() < self._frozenColumnsView.columnWidth(0)
+        ):
+            newValue = (
+                self.horizontalScrollBar().value()
+                + self.visualRect(current).topLeft().x()
+                - self._frozenColumnsView.columnWidth(0)
+            )
             self.horizontalScrollBar().setValue(newValue)
 
         return current
@@ -119,7 +114,7 @@ class RdsTableView(QTableView):
             self.verticalHeader().width() + self.frameWidth(),
             self.frameWidth(),
             width,
-            self.viewport().height() + self.horizontalHeader().height()
+            self.viewport().height() + self.horizontalHeader().height(),
         )
         if self.model() is not None:
             for col in range(self._frozenColumnCount, self.model().columnCount()):
@@ -129,7 +124,7 @@ class RdsTableView(QTableView):
                 self._frozenColumnsView.setColumnWidth(col, self.columnWidth(col))
 
     def updateSectionWidth(self, logicalIndex: int, oldSize: int, newSize: int):  # pylint: disable=unused-argument
-        if (logicalIndex < self._frozenColumnCount):
+        if logicalIndex < self._frozenColumnCount:
             self._frozenColumnsView.setColumnWidth(logicalIndex, newSize)
             self.updateFrozenTableGeometry()
 

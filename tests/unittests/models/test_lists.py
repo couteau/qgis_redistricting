@@ -18,24 +18,17 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Mapping,
-    Sequence
-)
+
+from collections.abc import Mapping, Sequence
 
 import pytest
 
-from redistricting.models.base.lists import (
-    KeyedList,
-    SortedKeyedList
-)
+from redistricting.models.base.lists import KeyedList, SortedKeyedList
 from redistricting.models.base.model import RdsBaseModel
-from redistricting.models.base.serialization import (
-    deserialize,
-    serialize
-)
+from redistricting.models.base.serialization import deserialize, serialize
 
 # ruff: noqa: E741
+
 
 class UnkeyedModel(RdsBaseModel):
     name: str
@@ -113,7 +106,7 @@ class TestKeyedList:
     def test_set_item_non_matching_key_raises_exception(self):
         kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2)])
         itemD = ItemModel("D", 3)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Item key doesn't match index"):
             kl["E"] = itemD
 
     def test_set_item_new_key_appends(self):
@@ -143,15 +136,17 @@ class TestKeyedList:
         assert kl[1].name == "C"
 
     def test_set_item_slice_removes_items(self):
-        kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel(
-            "B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)])
+        kl = KeyedList[ItemModel](
+            iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)]
+        )
 
         assert len(kl) == 5
         kl[2:3] = []
         assert len(kl) == 4
         assert list(kl.keys()) == ["A", "B", "D", "E"]
-        kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel(
-            "B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)])
+        kl = KeyedList[ItemModel](
+            iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)]
+        )
 
         assert len(kl) == 5
         kl[2:4] = []
@@ -159,8 +154,9 @@ class TestKeyedList:
         assert list(kl.keys()) == ["A", "B", "E"]
 
     def test_set_item_slice_replaces_items(self):
-        kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel(
-            "B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)])
+        kl = KeyedList[ItemModel](
+            iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)]
+        )
 
         itemF = ItemModel("F", 5)
         assert len(kl) == 5
@@ -169,8 +165,9 @@ class TestKeyedList:
         assert list(kl.keys()) == ["A", "B", "F", "D", "E"]
 
     def test_set_item_slice_larger_than_value_removes_and_replaces(self):
-        kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel(
-            "B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)])
+        kl = KeyedList[ItemModel](
+            iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2), ItemModel("D", 3), ItemModel("E", 4)]
+        )
 
         itemF = ItemModel("F", 5)
         assert len(kl) == 5
@@ -186,7 +183,6 @@ class TestKeyedList:
         kl[1:2] = [itemD, itemE]
         assert len(kl) == 4
         assert list(kl.keys()) == ["A", "D", "E", "C"]
-
 
     def test_move_moves_item(self):
         kl = KeyedList[ItemModel](iterable=[ItemModel("A", 0), ItemModel("B", 1), ItemModel("C", 2)])
@@ -247,11 +243,10 @@ class TestKeyedList:
 
     @pytest.mark.parametrize("cls", [KeyedList, SortedKeyedList])
     def test_deserialize(self, cls: type[KeyedList]):
-        kl = deserialize(cls[ItemModel], {
-            'A': {'name': 'A', 'value': 0},
-            'B': {'name': 'B', 'value': 1},
-            'C': {'name': 'C', 'value': 2}
-        })
+        kl = deserialize(
+            cls[ItemModel],
+            {"A": {"name": "A", "value": 0}, "B": {"name": "B", "value": 1}, "C": {"name": "C", "value": 2}},
+        )
         assert isinstance(kl, cls)
         assert len(kl) == 3
         assert isinstance(kl[0], ItemModel)

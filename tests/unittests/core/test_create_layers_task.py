@@ -29,49 +29,49 @@ from redistricting.services.tasks.createlayers import CreatePlanLayersTask
 
 
 class TestCreateLayersTask:
-    @pytest.mark.parametrize(('sourcefile', 'pop_field', 'geoid_field'), [
-        ('tuscaloosa_blocks.gpkg|layername=plans', 'pop_total', 'geoid20'),
-        ('tuscaloosa_pl2020_b.shp', 'P0010001', 'GEOID20'),
-        ('tuscaloosa_pl2020_b.geojson', 'P0010001', 'GEOID20')
+    @pytest.mark.parametrize(("sourcefile", "pop_field", "geoid_field"), [
+        ("tuscaloosa_blocks.gpkg|layername=plans", "pop_total", "geoid20"),
+        ("tuscaloosa_pl2020_b.shp", "P0010001", "GEOID20"),
+        ("tuscaloosa_pl2020_b.geojson", "P0010001", "GEOID20")
     ])
     def test_create_layers_formats(self, datadir: pathlib.Path, sourcefile, pop_field, geoid_field):
         path = datadir / sourcefile
-        layer = QgsVectorLayer(str(path), 'blocks', 'ogr')
+        layer = QgsVectorLayer(str(path), "blocks", "ogr")
         layer.setCrs(QgsCoordinateReferenceSystem("EPSG:4269"), False)
         QgsProject.instance().addMapLayer(layer, False)
 
-        p = RdsPlan('test_create_layers', 5)
+        p = RdsPlan("test_create_layers", 5)
         p._geoIdField = geoid_field
         p._popLayer = layer
         p._popJoinField = geoid_field
         p._popField = pop_field
         p._geoLayer = layer
         p._geoJoinField = geoid_field
-        gpkg = (datadir / 'test_create_layers.gpkg').resolve()
+        gpkg = (datadir / "test_create_layers.gpkg").resolve()
         task = CreatePlanLayersTask(p, str(gpkg))
         result = task.run()
         assert task.exception is None
         assert result
         assert gpkg.exists()
 
-    @pytest.mark.parametrize(('datafields', 'geofields'), [
+    @pytest.mark.parametrize(("datafields", "geofields"), [
         ([], []),
-        (['vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
-        (['vap_ap_black - vap_nh_black'], []),
-        (['vap_ap_black', 'vap_ap_black - vap_nh_black', 'vap_hispanic', 'vap_nh_white'], []),
-        (['vap_ap_black - vap_nh_black', 'vap_ap_black', 'vap_hispanic', 'vap_nh_white'], []),
-        ([], ['countyid', 'vtdid']),
-        ([], ['statefp || countyfp']),
+        (["vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
+        (["vap_ap_black - vap_nh_black"], []),
+        (["vap_ap_black", "vap_ap_black - vap_nh_black", "vap_hispanic", "vap_nh_white"], []),
+        (["vap_ap_black - vap_nh_black", "vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
+        ([], ["countyid", "vtdid"]),
+        ([], ["statefp || countyfp"]),
     ])
     def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
-        p = RdsPlan('test_create_layers', 5)
+        p = RdsPlan("test_create_layers", 5)
         p._geoLayer = block_layer
-        p._geoIdField = 'geoid'
-        p._popField = 'pop_total'
+        p._geoIdField = "geoid"
+        p._popField = "pop_total"
 
         p.dataFields.extend([RdsDataField(block_layer, f) for f in datafields])
         p.geoFields.extend([RdsField(block_layer, f) for f in geofields])
-        gpkg = (datadir / 'test_create_layers.gpkg').resolve()
+        gpkg = (datadir / "test_create_layers.gpkg").resolve()
         task = CreatePlanLayersTask(p, str(gpkg))
         result = task.run()
         assert task.exception is None
@@ -79,7 +79,7 @@ class TestCreateLayersTask:
         assert task.totalPopulation == 227036
         assert gpkg.exists()
         try:
-            a = QgsVectorLayer(f'{str(gpkg)}|layername=assignments')
+            a = QgsVectorLayer(f"{str(gpkg)}|layername=assignments")
 
             assert a.isValid()
             assert a.featureCount() == 6567
@@ -87,7 +87,7 @@ class TestCreateLayersTask:
                 assert a.fields().lookupField(f.fieldName) != -1
             del a
 
-            d = QgsVectorLayer(f'{str(gpkg)}|layername=districts')
+            d = QgsVectorLayer(f"{str(gpkg)}|layername=districts")
             try:
                 assert d.isValid()
                 assert d.featureCount() == 1
@@ -100,13 +100,13 @@ class TestCreateLayersTask:
             p._setDistLayer(None)
 
     def test_create_layers_cancel(self, block_layer, datadir: pathlib.Path):
-        p = RdsPlan('test_create_layers', 5)
+        p = RdsPlan("test_create_layers", 5)
         # pylint: disable=protected-access
         p._geoLayer = block_layer
-        p._geoIdField = 'geoid20'
-        p._popField = 'pop_total'
+        p._geoIdField = "geoid20"
+        p._popField = "pop_total"
 
-        gpkg = (datadir / 'test_create_layers.gpkg').resolve()
+        gpkg = (datadir / "test_create_layers.gpkg").resolve()
         task = CreatePlanLayersTask(p, str(gpkg))
         task.cancel()
         result = task.run()

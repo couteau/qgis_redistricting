@@ -23,7 +23,8 @@
 """
 
 from itertools import repeat
-from typing import Annotated, Any, Iterable, Literal, Optional, Union, overload
+from typing import Annotated, Any, Literal, Optional, Union, overload
+from collections.abc import Iterable
 
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 

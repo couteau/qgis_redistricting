@@ -23,7 +23,7 @@ from redistricting.services.tasks.importshape import ImportShapeFileTask
 
 class TestImportShapeFileTask:
     def test_import_shapefile(self, plan, datadir: pathlib.Path):
-        t = ImportShapeFileTask(plan, str((datadir / 'test_plan.shp').resolve()), 'district')
+        t = ImportShapeFileTask(plan, str((datadir / "test_plan.shp").resolve()), "district")
         result = t.run()
         assert result
         assert len(t.errors) == 0

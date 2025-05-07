@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - core classes
 
         begin                : 2022-01-15
@@ -22,11 +21,9 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from .actions import ActionRegistry
-from .assignments import (
-    AssignmentsService,
-    PlanAssignmentEditor
-)
+from .assignments import AssignmentsService, PlanAssignmentEditor
 from .clipboard import DistrictClipboardAccess
 from .copy import PlanCopier
 from .delta import DeltaUpdateService
@@ -37,22 +34,32 @@ from .layertree import LayerTreeManager
 from .planbuilder import PlanBuilder
 from .planeditor import PlanEditor
 from .planexport import PlanExporter
-from .planimport import (
-    AssignmentImporter,
-    PlanImporter,
-    PlanImportService,
-    ShapefileImporter
-)
+from .planimport import AssignmentImporter, PlanImporter, PlanImportService, ShapefileImporter
 from .planlistmodel import PlanListModel
 from .planmgr import PlanManager
 from .storage import ProjectStorage
 from .style import PlanStylerService
 
 __all__ = (
-    'ActionRegistry', 'PlanManager', 'LayerTreeManager', 'DistrictClipboardAccess',
-    'PlanBuilder', 'PlanEditor', 'PlanCopier', 'PlanStylerService',
-    'DistrictUpdater', 'DeltaUpdateService',
-    'PlanAssignmentEditor', 'AssignmentsService', 'DistrictCopier',
-    'PlanExporter', 'PlanImporter', 'AssignmentImporter', 'ShapefileImporter', 'PlanImportService',
-    'ProjectStorage', 'ErrorListMixin', 'PlanListModel'
+    "ActionRegistry",
+    "PlanManager",
+    "LayerTreeManager",
+    "DistrictClipboardAccess",
+    "PlanBuilder",
+    "PlanEditor",
+    "PlanCopier",
+    "PlanStylerService",
+    "DistrictUpdater",
+    "DeltaUpdateService",
+    "PlanAssignmentEditor",
+    "AssignmentsService",
+    "DistrictCopier",
+    "PlanExporter",
+    "PlanImporter",
+    "AssignmentImporter",
+    "ShapefileImporter",
+    "PlanImportService",
+    "ProjectStorage",
+    "ErrorListMixin",
+    "PlanListModel",
 )

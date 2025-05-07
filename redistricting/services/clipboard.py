@@ -23,7 +23,7 @@
  ***************************************************************************/
 """
 
-from typing import Iterable
+from collections.abc import Iterable
 
 import pandas as pd
 from qgis.PyQt.QtCore import QAbstractTableModel, Qt
@@ -41,23 +41,22 @@ class DistrictClipboardAccess:
             data[model.headerData(c, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)] = [
                 model.data(model.createIndex(d, c), Qt.ItemDataRole.DisplayRole) for d in range(model.rowCount())
             ]
-        df = pd.DataFrame(data=data, index=index)
-        df.fillna("", inplace=True)
+        selectionData = pd.DataFrame(data=data, index=index).fillna("")
 
         if selection is not None:
             # create a dataframe of bools with the same dimensions as data
-            s = (df != df).fillna(False)  # noqa: PLR0124
+            s = (selectionData != selectionData).fillna(False)  # noqa: PLR0124
             # set elements to True if in selection
             for row, col in selection:
                 s.iloc[row, col] = True
             # select the elements of data that are contained in selection
-            df = df[s]
+            selectionData = selectionData[s]
 
             # drop the unselected rows and columns
-            df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+            selectionData = selectionData.dropna(axis=0, how="all").dropna(axis=1, how="all")
 
-        df.columns.name = tr("District")
-        return df
+        selectionData.columns.name = tr("District")
+        return selectionData
 
     def getAsHtml(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         def colorRowHeader(row):
@@ -66,8 +65,8 @@ class DistrictClipboardAccess:
             return f"background-color: #{clr.color().rgb() & 0xFFFFFF:x};"
 
         model = RdsDistrictDataModel(plan)
-        df = self.getSelectionData(model, selection)
-        return df.style.map_index(colorRowHeader).to_html(doctype_html=True)
+        selectionData = self.getSelectionData(model, selection)
+        return selectionData.style.map_index(colorRowHeader).to_html(doctype_html=True)
 
     def getAsCsv(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         model = RdsDistrictDataModel(plan)

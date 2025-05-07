@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Map tool for painting districts
 
         begin                : 2022-01-05
@@ -22,34 +21,14 @@
  *                                                                         *
  ***************************************************************************/
 """
-from enum import IntEnum
-from typing import (
-    Iterable,
-    List
-)
 
-from qgis.core import (
-    Qgis,
-    QgsFeature,
-    QgsGeometry
-)
-from qgis.gui import (
-    QgsMapCanvas,
-    QgsMapMouseEvent,
-    QgsMapToolIdentify,
-    QgsRubberBand
-)
-from qgis.PyQt.QtCore import (
-    QRect,
-    Qt,
-    pyqtSignal
-)
-from qgis.PyQt.QtGui import (
-    QColor,
-    QCursor,
-    QKeyEvent,
-    QPixmap
-)
+from collections.abc import Iterable
+from enum import IntEnum
+
+from qgis.core import Qgis, QgsFeature, QgsGeometry
+from qgis.gui import QgsMapCanvas, QgsMapMouseEvent, QgsMapToolIdentify, QgsRubberBand
+from qgis.PyQt.QtCore import QRect, Qt, pyqtSignal
+from qgis.PyQt.QtGui import QColor, QCursor, QKeyEvent, QPixmap
 
 from ..models import RdsPlan
 
@@ -74,10 +53,8 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self._distTarget: int = None
         self._distSource: int = None
 
-        pixmap = QPixmap(':/plugins/redistricting/paintcursor.svg')
-        self.setCursor(QCursor(
-            pixmap, 3, 18)
-        )
+        pixmap = QPixmap(":/plugins/redistricting/paintcursor.svg")
+        self.setCursor(QCursor(pixmap, 3, 18))
 
         self._paintMode: PaintMode = PaintMode.PaintByGeography
         self._selectRect = QRect(0, 0, 0, 0)
@@ -148,13 +125,12 @@ class PaintDistrictsTool(QgsMapToolIdentify):
 
         if self._paintMode == PaintMode.PaintByGeography:
             r = self.searchRadiusMU(self.canvas())
-            self.setCanvasPropertiesOverrides(r/4)
+            self.setCanvasPropertiesOverrides(r / 4)
             self.paintingStarted.emit(
-                self.targetDistrict(self.buttonsPressed),
-                self.sourceDistrict(self.buttonsPressed)
+                self.targetDistrict(self.buttonsPressed), self.sourceDistrict(self.buttonsPressed)
             )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
-            self._selectRect.setRect(e.pos().x(), e.pos().y(), e.pos().x()+1, e.pos().y()+1)
+            self._selectRect.setRect(e.pos().x(), e.pos().y(), e.pos().x() + 1, e.pos().y() + 1)
 
     def canvasReleaseEvent(self, e: QgsMapMouseEvent):
         if self._layer is None:
@@ -172,8 +148,7 @@ class PaintDistrictsTool(QgsMapToolIdentify):
         self.restoreCanvasPropertiesOverrides()
 
         if self._paintMode == PaintMode.PaintByGeography:
-            results: list[QgsMapToolIdentify.IdentifyResult] = \
-                self.identify(e.pos().x(), e.pos().y(), [self._layer])
+            results: list[QgsMapToolIdentify.IdentifyResult] = self.identify(e.pos().x(), e.pos().y(), [self._layer])
             if not results:
                 if self._dragging:
                     self._dragging = False
@@ -185,15 +160,16 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             self._paintFeatures(
                 (r.mFeature for r in results),
                 self.targetDistrict(self.buttonsPressed),
-                self.sourceDistrict(self.buttonsPressed)
+                self.sourceDistrict(self.buttonsPressed),
             )
             self._dragging = False
             self.paintingComplete.emit()
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if self._dragging:
                 self._dragging = False
-                tooShort = (self._selectRect.topLeft() - self._selectRect.bottomRight()) \
-                    .manhattanLength() < self.MinPixelZoom
+                tooShort = (
+                    self._selectRect.topLeft() - self._selectRect.bottomRight()
+                ).manhattanLength() < self.MinPixelZoom
                 if not tooShort:
                     geom = self._rubberBand.asGeometry()
                 self._rubberBand.hide()
@@ -203,20 +179,20 @@ class PaintDistrictsTool(QgsMapToolIdentify):
                 geom = QgsGeometry.fromPointXY(self.toMapCoordinates(e.pos()))
 
             if not tooShort:
-                results: List[QgsMapToolIdentify.IdentifyResult] = \
-                    self.identify(geom, QgsMapToolIdentify.DefaultQgsSetting,
-                                  [self._layer], QgsMapToolIdentify.VectorLayer)
+                results: list[QgsMapToolIdentify.IdentifyResult] = self.identify(
+                    geom, QgsMapToolIdentify.DefaultQgsSetting, [self._layer], QgsMapToolIdentify.VectorLayer
+                )
                 if self._paintMode == PaintMode.SelectByGeography:
                     self._selectFeatures(
                         (r.mFeature for r in results),
                         self.targetDistrict(self.buttonsPressed),
-                        self.sourceDistrict(self.buttonsPressed)
+                        self.sourceDistrict(self.buttonsPressed),
                     )
                 else:
                     self._paintFeatures(
                         (r.mFeature for r in results),
                         self.targetDistrict(self.buttonsPressed),
-                        self.sourceDistrict(self.buttonsPressed)
+                        self.sourceDistrict(self.buttonsPressed),
                     )
 
         self.buttonsPressed = Qt.MouseButton.NoButton
@@ -230,26 +206,24 @@ class PaintDistrictsTool(QgsMapToolIdentify):
             return
 
         if self._paintMode == PaintMode.PaintByGeography:
-            results: List[QgsMapToolIdentify.IdentifyResult] = \
-                self.identify(e.pos().x(), e.pos().y(), [self._layer])
+            results: list[QgsMapToolIdentify.IdentifyResult] = self.identify(e.pos().x(), e.pos().y(), [self._layer])
 
             if not results:
                 return
 
             self._dragging = True
             self._paintFeatures(
-                (r.mFeature for r in results),
-                self.targetDistrict(buttons),
-                self.sourceDistrict(buttons),
-                False
+                (r.mFeature for r in results), self.targetDistrict(buttons), self.sourceDistrict(buttons), False
             )
         elif self._paintMode in {PaintMode.PaintRectangle, PaintMode.SelectByGeography}:
             if not self._dragging:
                 self._dragging = True
                 self._rubberBand = QgsRubberBand(self.canvas(), Qgis.GeometryType.Polygon)
-                color = QColor(Qt.GlobalColor.blue) \
-                    if self._paintMode == PaintMode.PaintRectangle \
+                color = (
+                    QColor(Qt.GlobalColor.blue)
+                    if self._paintMode == PaintMode.PaintRectangle
                     else QColor(Qt.GlobalColor.lightGray)
+                )
                 color.setAlpha(63)
                 self._rubberBand.setColor(color)
                 self._selectRect.setTopLeft(e.pos())

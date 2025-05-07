@@ -35,6 +35,7 @@ from qgis.PyQt.QtCore import QMetaType
 
 from ...errors import CanceledError
 from ...utils import spatialite_connect, tr
+from ...utils.misc import quote_identifier
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
@@ -126,7 +127,8 @@ class ImportAssignmentFileTask(QgsTask):
             progress = 0
 
             with spatialite_connect(self.geoPackagePath) as db:
-                sql = f'UPDATE assignments SET "{self.distField}" = ? WHERE "{self.joinField}" == ?'  # noqa: S608
+                sql = f"UPDATE assignments SET {quote_identifier(self.distField)} = ? "  # noqa: S608
+                f"WHERE {quote_identifier(self.joinField)} == ?"
 
                 db.executemany(sql, updateProgress(assignments.itertuples(index=False)))
                 db.commit()

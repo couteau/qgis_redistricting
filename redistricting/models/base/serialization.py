@@ -32,8 +32,6 @@ from types import GenericAlias
 from typing import (
     Any,
     Callable,
-    Iterable,
-    Mapping,
     Type,
     TypeAlias,
     TypeVar,
@@ -44,6 +42,7 @@ from typing import (
     get_args,
     get_origin,
 )
+from collections.abc import Iterable, Mapping
 from uuid import UUID
 
 import pandas as pd

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-"""QGIS Redistricting Plugin - A QTableView with rows that can be drag/drop 
+"""QGIS Redistricting Plugin - A QTableView with rows that can be drag/drop
         reordered
 
         begin                : 2022-01-15
@@ -23,50 +22,27 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    Iterable,
-    Type,
-    Union
-)
+
+from collections.abc import Iterable
+from typing import Union
 
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    QAbstractTableModel,
-    QCoreApplication,
-    QModelIndex,
-    Qt,
-    QVariant,
-    pyqtProperty,
-    pyqtSignal
-)
-from qgis.PyQt.QtGui import (
-    QDropEvent,
-    QMouseEvent
-)
-from qgis.PyQt.QtWidgets import (
-    QAbstractItemView,
-    QProxyStyle,
-    QStyleOption,
-    QTableView,
-    QWidget
-)
+from qgis.PyQt.QtCore import QAbstractTableModel, QCoreApplication, QModelIndex, Qt, QVariant, pyqtProperty, pyqtSignal
+from qgis.PyQt.QtGui import QDropEvent, QMouseEvent
+from qgis.PyQt.QtWidgets import QAbstractItemView, QProxyStyle, QStyleOption, QTableView, QWidget
 
-from ..models import (
-    RdsDataField,
-    RdsField
-)
+from ..models import RdsDataField, RdsField
 from ..utils import tr
 
 # TODO: come up with an accessible method for reordering without the mouse
 
 
 class FieldListModel(QAbstractTableModel):
-
     _headings = [
-        tr('Redistricting', 'RdsField'),
-        tr('Redistricting', 'Caption'),
-        tr('Redistricting', '∑'),
-        tr('Redistricting', '%')
+        tr("Redistricting", "RdsField"),
+        tr("Redistricting", "Caption"),
+        tr("Redistricting", "∑"),
+        tr("Redistricting", "%"),
     ]
 
     def __init__(self, fields: list[RdsField] = None, popFields: list[RdsField] = None, parent=None):
@@ -106,7 +82,7 @@ class FieldListModel(QAbstractTableModel):
         return self._fieldType
 
     @fieldType.setter
-    def fieldType(self, value: Type[RdsField]):
+    def fieldType(self, value: type[RdsField]):
         self._fieldType = value
         self.setColCount(5 if self._fieldType == RdsDataField else 3)
 
@@ -134,13 +110,13 @@ class FieldListModel(QAbstractTableModel):
             else:
                 self.endInsertColumns()
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return 0 if parent.isValid() else len(self._data)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # pylint: disable=unused-argument
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:  # noqa: B008
         return 0 if parent.isValid() else self._colCount
 
-    def data(self, index: QModelIndex, role):
+    def data(self, index: QModelIndex, role):  # noqa: PLR0912, PLR0915
         row = index.row()
         col = index.column()
 
@@ -182,11 +158,13 @@ class FieldListModel(QAbstractTableModel):
         elif role == Qt.ItemDataRole.AccessibleDescriptionRole:
             field = self._data[row]
             if col == self._colCount - 1:
-                value = QCoreApplication.translate(
-                    'Redistricting', 'Click to delete field {field}').format(field=field.fieldName)
+                value = QCoreApplication.translate("Redistricting", "Click to delete field {field}").format(
+                    field=field.fieldName
+                )
             elif col == 2:
-                value = QCoreApplication.translate('Redistricting', 'Display sum for field {field} is {checkstate}'). \
-                    format(field=field.fieldName, checkstate='checked' if field.sumField else 'unchecked')
+                value = QCoreApplication.translate(
+                    "Redistricting", "Display sum for field {field} is {checkstate}"
+                ).format(field=field.fieldName, checkstate="checked" if field.sumField else "unchecked")
             elif col == 3:
                 pctbase = self._data[row].pctBase
                 if pctbase and pctbase in self.popFields:
@@ -195,14 +173,12 @@ class FieldListModel(QAbstractTableModel):
                     basefield = None
                 if basefield is None:
                     value = QCoreApplication.translate(
-                        'Redistricting',
-                        'Do not display field {field} as a percentage'). \
-                        format(field=field.fieldName, basefield=basefield)
+                        "Redistricting", "Do not display field {field} as a percentage"
+                    ).format(field=field.fieldName, basefield=basefield)
                 else:
                     value = QCoreApplication.translate(
-                        'Redistricting',
-                        'Display field {field} as percent of {basefield}'). \
-                        format(field=field.fieldName, basefield=basefield)
+                        "Redistricting", "Display field {field} as percent of {basefield}"
+                    ).format(field=field.fieldName, basefield=basefield)
             else:
                 value = QVariant()
         else:
@@ -215,7 +191,7 @@ class FieldListModel(QAbstractTableModel):
             if orientation == Qt.Orientation.Horizontal:
                 value = self._headings[section]
             else:
-                value = str(section+1)
+                value = str(section + 1)
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if section in range(2, 4):
                 value = Qt.AlignmentFlag.AlignCenter
@@ -301,7 +277,6 @@ class FieldListModel(QAbstractTableModel):
 
 
 class RdsFieldTableView(QTableView):
-
     class DropmarkerStyle(QProxyStyle):
         def drawPrimitive(self, element, option, painter, widget=None):
             """Draw a line across the entire row rather than just the column we're hovering over.
@@ -315,7 +290,7 @@ class RdsFieldTableView(QTableView):
                 option = option_new
             super().drawPrimitive(element, option, painter, widget)
 
-    fieldsChanged = pyqtSignal(list, name='fieldsChanged')
+    fieldsChanged = pyqtSignal(list, name="fieldsChanged")
 
     def __init__(self, parent: QWidget = None):
         super().__init__(parent)
@@ -340,17 +315,20 @@ class RdsFieldTableView(QTableView):
             self.setStyle(self.DropmarkerStyle())
 
     def dropEvent(self, event: QDropEvent):
-        if (event.source() is not self or
-            (event.dropAction() != Qt.DropAction.MoveAction and
-             self.dragDropMode() != QAbstractItemView.DragDropMode.InternalMove)):
+        if event.source() is not self or (
+            event.dropAction() != Qt.DropAction.MoveAction
+            and self.dragDropMode() != QAbstractItemView.DragDropMode.InternalMove
+        ):
             super().dropEvent(event)
 
         selection = self.selectedIndexes()
         from_index = selection[0].row() if selection else -1
         to_index = self.indexAt(event.pos()).row()
-        if (0 <= from_index < self.model().rowCount() and
-            0 <= to_index < self.model().rowCount() and
-                from_index != to_index):
+        if (
+            0 <= from_index < self.model().rowCount()
+            and 0 <= to_index < self.model().rowCount()
+            and from_index != to_index
+        ):
             self.model().moveField(from_index, to_index)
             event.accept()
         super().dropEvent(event)

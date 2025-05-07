@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - manage editing of assignments
 
         begin                : 2022-05-25
@@ -22,19 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from __future__ import annotations
 
 import itertools
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Iterable,
-    Iterator,
-    Optional,
-    Sequence,
-    Union,
-    overload
-)
+from typing import TYPE_CHECKING, Any, Optional, Union, overload
+from collections.abc import Iterable, Iterator, Sequence
 
 from qgis.core import (
     QgsExpression,
@@ -43,13 +35,9 @@ from qgis.core import (
     QgsFeature,
     QgsFeatureRequest,
     QgsVectorLayerEditPassthrough,
-    QgsVectorLayerFeatureIterator
+    QgsVectorLayerFeatureIterator,
 )
-from qgis.PyQt.QtCore import (
-    QObject,
-    QSignalMapper,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import QObject, QSignalMapper, pyqtSignal
 
 from ..utils import tr
 
@@ -71,8 +59,9 @@ class PlanAssignmentEditor(QObject):
         self._fieldIndex = self._assignLayer.fields().indexOf(self._distField)
         if self._fieldIndex == -1:
             raise RuntimeError(
-                tr('Error updating district assignment for {plan}: district field {field} not found in district layer.')
-                .format(plan=self._plan.name, field=self._distField)
+                tr(
+                    "Error updating district assignment for {plan}: district field {field} not found in district layer."
+                ).format(plan=self._plan.name, field=self._distField)
             )
 
         self._undoStack = self._assignLayer.undoStack()
@@ -84,7 +73,7 @@ class PlanAssignmentEditor(QObject):
             self._assignLayer.undoStack()
 
         if msg is None:
-            msg = tr('Edit assignments')
+            msg = tr("Edit assignments")
 
         self._assignLayer.beginEditCommand(msg)
 
@@ -112,18 +101,18 @@ class PlanAssignmentEditor(QObject):
         if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
             value = [value]
 
-        flt = ' and '.join(f'{field} = {v!r}' for v in value)
+        flt = " and ".join(f"{field} = {v!r}" for v in value)
 
         if sourceDistrict is not None:
             if sourceDistrict == 0:
-                flt += f' and ({self._distField} = 0 or {self._distField} is null)'
+                flt += f" and ({self._distField} = 0 or {self._distField} is null)"
             else:
-                flt += f' and {self._distField} = {sourceDistrict}'
+                flt += f" and {self._distField} = {sourceDistrict}"
         elif targetDistrict is not None:
             if targetDistrict == 0:
-                flt += f' and ({self._distField} is not null and {self._distField} != 0)'
+                flt += f" and ({self._distField} is not null and {self._distField} != 0)"
             else:
-                flt += f' and {self._distField} != {targetDistrict}'
+                flt += f" and {self._distField} != {targetDistrict}"
 
         expression = QgsExpression(flt)
         if expression.hasParserError():
@@ -140,26 +129,12 @@ class PlanAssignmentEditor(QObject):
         return self._assignLayer.getFeatures(request)
 
     @overload
-    def assignFeaturesToDistrict(
-        self,
-        features: Iterable[QgsFeature],
-        district
-    ):
-        ...
+    def assignFeaturesToDistrict(self, features: Iterable[QgsFeature], district): ...
 
     @overload
-    def assignFeaturesToDistrict(
-        self,
-        featureIds: Iterable[int],
-        district: int
-    ):
-        ...
+    def assignFeaturesToDistrict(self, featureIds: Iterable[int], district: int): ...
 
-    def assignFeaturesToDistrict(
-        self,
-        features: Union[Iterable[QgsFeature], Iterable[int]],
-        district
-    ):
+    def assignFeaturesToDistrict(self, features: Union[Iterable[QgsFeature], Iterable[int]], district):
         # determine type of iterable elements
         if isinstance(features, Sequence):
             if len(features) > 0:
@@ -186,8 +161,7 @@ class PlanAssignmentEditor(QObject):
                 self._assignLayer.startEditing()
 
             for f in features:
-                self._assignLayer.changeAttributeValue(
-                    f.id(), self._fieldIndex, district, f[self._fieldIndex])
+                self._assignLayer.changeAttributeValue(f.id(), self._fieldIndex, district, f[self._fieldIndex])
 
             if not inTransaction:
                 self._assignLayer.commitChanges(True)

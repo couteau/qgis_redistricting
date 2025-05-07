@@ -8,7 +8,7 @@ from qgis.core import QgsProject, QgsVectorLayer
 from redistricting.services.schema import checkMigrateSchema
 
 
-@pytest.mark.parametrize("plugin_version", ("0.0.1", "0.0.4"))
+@pytest.mark.parametrize("plugin_version", ["0.0.1", "0.0.4"])
 class TestSchema:
     @pytest.fixture
     def dist_layer(self, plugin_version, datadir):

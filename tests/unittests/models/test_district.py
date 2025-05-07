@@ -64,8 +64,8 @@ class TestDistrict:
         assert district.population == 0
 
     def test_set_property_modifies_property(self, district: RdsDistrict):
-        district.name = 'New Name'
-        assert district.name == 'New Name'
+        district.name = "New Name"
+        assert district.name == "New Name"
         district.description = "Discrict description"
         assert district.description == "Discrict description"
 

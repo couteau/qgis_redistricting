@@ -23,7 +23,8 @@
 """
 
 from enum import IntEnum
-from typing import Any, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 from qgis.PyQt.QtGui import QColor
 

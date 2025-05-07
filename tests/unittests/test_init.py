@@ -18,7 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from pytest_lazy_fixtures import lf
@@ -40,9 +40,9 @@ class TestPluginInit:
 
     @pytest.fixture
     def plugin(self, qgis_iface: QgisInterface, tmp_path, mocker: MockerFixture) -> redistricting.Redistricting:
-        settings = mocker.patch('redistricting.redistricting.QSettings')
+        settings = mocker.patch("redistricting.redistricting.QSettings")
         settings_obj = settings.return_value
-        settings_obj.value.return_value = 'en_US'
+        settings_obj.value.return_value = "en_US"
 
         QgsProject.instance().setFileName(str(tmp_path / "test.qgz"))
 
@@ -61,22 +61,22 @@ class TestPluginInit:
 
     @pytest.fixture
     def plugin_with_project(self, plugin_with_gui, datadir, qtbot: QtBot, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.redistricting.QMessageBox')
+        dlg = mocker.patch("redistricting.redistricting.QMessageBox")
         dlg.return_value.warning.return_value = QMessageBox.StandardButton.Ok
         project = QgsProject.instance()
         with qtbot.waitSignal(project.readProject):
-            project.read(str((datadir / 'test_project.qgz').resolve()))
+            project.read(str((datadir / "test_project.qgz").resolve()))
         yield plugin_with_gui
         project.clear()
 
     def test_init(self, plugin):
-        assert plugin.name == 'Redistricting'
+        assert plugin.name == "Redistricting"
 
     def test_init_gui(self, plugin):
         plugin.initGui()
         plugin.unload()
 
-    @pytest.mark.parametrize('layer', [
+    @pytest.mark.parametrize("layer", [
         lf("block_layer"),
         lf("assign_layer"),
         lf("dist_layer")
@@ -92,10 +92,10 @@ class TestPluginInit:
         assert not plugin_with_gui.planController.actionNewPlan.isEnabled()
 
     def test_open_project(self, plugin_with_gui, datadir, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.redistricting.QMessageBox')
+        dlg = mocker.patch("redistricting.redistricting.QMessageBox")
         dlg.return_value.warning.return_value = QMessageBox.StandardButton.Ok
         project = QgsProject.instance()
-        project.read(str((datadir / 'test_project.qgz').resolve()))
+        project.read(str((datadir / "test_project.qgz").resolve()))
         assert len(project.mapLayers()) == 9
         assert len(plugin_with_gui.planManager) == 1
         project.clear()
@@ -106,14 +106,14 @@ class TestPluginInit:
         assert not plugin_with_project.planController.actionNewPlan.isEnabled()
 
     def test_write_project_calls_storage(self, plugin_with_project: redistricting.Redistricting, datadir, mocker: MockerFixture):
-        dlg = mocker.patch('redistricting.redistricting.QMessageBox')
+        dlg = mocker.patch("redistricting.redistricting.QMessageBox")
         dlg.return_value.warning.return_value = QMessageBox.StandardButton.Ok
-        storage = mocker.patch('redistricting.redistricting.ProjectStorage')
+        storage = mocker.patch("redistricting.redistricting.ProjectStorage")
         QgsProject.instance().write()
         storage.assert_called_once()
         QgsProject.instance().clear()
 
     def test_write_project_no_plan(self, plugin_with_gui, mocker: MockerFixture):  # pylint: disable=unused-argument
-        storage = mocker.patch('redistricting.redistricting.ProjectStorage')
+        storage = mocker.patch("redistricting.redistricting.ProjectStorage")
         QgsProject.instance().write()
         storage.assert_not_called()

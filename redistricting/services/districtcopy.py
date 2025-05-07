@@ -1,28 +1,14 @@
-
 import io
-from typing import (
-    TYPE_CHECKING,
-    Optional
-)
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 import pandas as pd
 from qgis.core import QgsApplication
-from qgis.gui import (
-    QgisInterface,
-    QgsMapMouseEvent,
-    QgsMapToolIdentify
-)
-from qgis.PyQt.QtCore import (
-    QMimeData,
-    QObject
-)
+from qgis.gui import QgisInterface, QgsMapMouseEvent, QgsMapToolIdentify
+from qgis.PyQt.QtCore import QMimeData, QObject
 
 from ..models import RdsPlan
-from ..utils import (
-    LayerReader,
-    tr
-)
+from ..utils import LayerReader, tr
 from .assignments import AssignmentsService
 from .planmgr import PlanManager
 
@@ -33,7 +19,13 @@ else:
 
 
 class DistrictCopier(QObject):
-    def __init__(self, iface: QgisInterface, planManager: PlanManager, assignmentsService: AssignmentsService, parent: Optional[QObject] = None):
+    def __init__(
+        self,
+        iface: QgisInterface,
+        planManager: PlanManager,
+        assignmentsService: AssignmentsService,
+        parent: Optional[QObject] = None,
+    ):
         super().__init__(parent)
         self.canvas = iface.mapCanvas()
         self.planManager = planManager
@@ -56,8 +48,10 @@ class DistrictCopier(QObject):
 
         if plan is not None:
             cb = QgsApplication.instance().clipboard()
-            if cb.mimeData().hasFormat('application/x-redist-planid') and cb.mimeData().hasFormat('application/x-redist-assignments'):
-                planid = UUID(bytes=cb.mimeData().data('application/x-redist-planid').data())
+            if cb.mimeData().hasFormat("application/x-redist-planid") and cb.mimeData().hasFormat(
+                "application/x-redist-assignments"
+            ):
+                planid = UUID(bytes=cb.mimeData().data("application/x-redist-planid").data())
                 if planid != plan.id:
                     return True
 
@@ -70,10 +64,10 @@ class DistrictCopier(QObject):
         else:
             filt = None
         return s.read_layer(
-            ['fid', self.planManager.activePlan.geoIdField, self.planManager.activePlan.distField],
-            order='fid',
+            ["fid", self.planManager.activePlan.geoIdField, self.planManager.activePlan.distField],
+            order="fid",
             filt=filt,
-            read_geometry=False
+            read_geometry=False,
         ).to_csv()
 
     def copyDistrict(self, dist: Optional[int] = None):
@@ -89,8 +83,8 @@ class DistrictCopier(QObject):
         cb = QgsApplication.instance().clipboard()
         assignments = self.getAssignments(dist)
         mime = QMimeData()
-        mime.setData('application/x-redist-planid', self.planManager.activePlan.id.bytes)
-        mime.setData('application/x-redist-assignments', assignments.encode())
+        mime.setData("application/x-redist-planid", self.planManager.activePlan.id.bytes)
+        mime.setData("application/x-redist-assignments", assignments.encode())
         mime.setText(assignments)
         cb.setMimeData(mime)
 
@@ -102,12 +96,12 @@ class DistrictCopier(QObject):
         assignments = pd.read_csv(io.StringIO(cb.mimeData().text()), index_col="fid")
 
         if not assignments.empty:
-            planid = UUID(bytes=cb.mimeData().data('application/x-redist-planid').data())
+            planid = UUID(bytes=cb.mimeData().data("application/x-redist-planid").data())
             plan = self.planManager[planid]
             groups = assignments.groupby(self.planManager.activePlan.distField).groups
 
             assign = self.assignmentsService.getEditor(self.planManager.activePlan)
-            assign.startEditCommand(tr('Paste district from {}').format(plan.name))
+            assign.startEditCommand(tr("Paste district from {}").format(plan.name))
 
             # clear the current assignments for any districts that are being pasted
             for d in groups.keys():

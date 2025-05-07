@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - miscellaneous utility functions
 
         begin                : 2024-03-20
@@ -23,6 +22,7 @@
  ***************************************************************************/
 """
 
+import codecs
 import re
 from secrets import choice
 from typing import Optional, Union
@@ -88,3 +88,21 @@ def camel_to_kebab(s: str):
 def kebab_to_camel(s: str):
     f = "".join(c.capitalize() for c in s.split("-"))
     return f[0].lower() + f[1:]
+
+
+def quote_identifier(s, errors="strict"):
+    encodable = s.encode("utf-8", errors).decode("utf-8")
+
+    nul_index = encodable.find("\x00")
+
+    if nul_index >= 0:
+        error = UnicodeEncodeError("NUL-terminated utf-8", encodable, nul_index, nul_index + 1, "NUL not allowed")
+        error_handler = codecs.lookup_error(errors)
+        replacement, _ = error_handler(error)
+        encodable = encodable.replace("\x00", replacement)
+
+    return '"' + encodable.replace('"', '""') + '"'
+
+
+def quote_list(l: list[str]) -> list[str]:
+    return [quote_identifier(s) for s in l]

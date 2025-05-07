@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - New/Edit Plan Dialog
 
         begin                : 2022-01-15
@@ -22,21 +21,16 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
-from qgis.core import (
-    QgsProject,
-    QgsVectorLayer
-)
+from qgis.core import QgsProject, QgsVectorLayer
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QVariant
 from qgis.PyQt.QtWidgets import QWizard
 from qgis.utils import iface
 
-from ..models import (
-    DeviationType,
-    RdsPlan
-)
+from ..models import DeviationType, RdsPlan
 from ..utils import tr
 from .help import showHelp
 from .rdsfieldcombobox import RdsFieldComboBox
@@ -57,22 +51,21 @@ class DlgEditPlan(QWizard):
     def __init__(self, plan: Optional[RdsPlan] = None, parent=None):
         super().__init__(parent)
         self.new = plan is None
-        self.setWindowTitle(
-            tr('New Redistricting Plan') if plan is None else
-            tr('Edit Redistricting Plan')
-        )
+        self.setWindowTitle(tr("New Redistricting Plan") if plan is None else tr("Edit Redistricting Plan"))
         self.setModal(False)
         self.wizardStyle = QWizard.ModernStyle
-        self.setOptions(QWizard.NoBackButtonOnStartPage |
-                        QWizard.CancelButtonOnLeft |
-                        QWizard.NoDefaultButton |
-                        QWizard.HaveFinishButtonOnEarlyPages |
-                        QWizard.HaveHelpButton |
-                        QWizard.HelpButtonOnRight)
+        self.setOptions(
+            QWizard.NoBackButtonOnStartPage
+            | QWizard.CancelButtonOnLeft
+            | QWizard.NoDefaultButton
+            | QWizard.HaveFinishButtonOnEarlyPages
+            | QWizard.HaveHelpButton
+            | QWizard.HelpButtonOnRight
+        )
 
-        self.setDefaultProperty('RdsMapLayerComboBox', 'layer', RdsMapLayerComboBox.layerChanged)
-        self.setDefaultProperty('RdsFieldComboBox', 'field', RdsFieldComboBox.fieldChanged)
-        self.setDefaultProperty('RdsFieldTableView', 'fields', RdsFieldTableView.fieldsChanged)
+        self.setDefaultProperty("RdsMapLayerComboBox", "layer", RdsMapLayerComboBox.layerChanged)
+        self.setDefaultProperty("RdsFieldComboBox", "field", RdsFieldComboBox.fieldChanged)
+        self.setDefaultProperty("RdsFieldTableView", "fields", RdsFieldTableView.fieldsChanged)
 
         self.helpRequested.connect(self.showHelp)
 
@@ -82,22 +75,22 @@ class DlgEditPlan(QWizard):
         self.addPage(dlgEditPlanFieldPage(self))
 
         if plan:
-            self.setField('planName', plan.name)
-            self.setField('description', plan.description)
-            self.setField('numDistricts', plan.numDistricts)
-            self.setField('numSeats', plan.numSeats)
-            self.setField('deviation', plan.deviation * 100)
-            self.setField('deviationType', plan.deviationType == DeviationType.OverUnder)
-            self.setField('geoIdField', plan.geoIdField)
-            self.setField('geoCaption', plan.geoIdCaption)
-            self.setField('gpkgPath', plan.geoPackagePath)
-            self.setField('popLayer', plan.popLayer)
-            self.setField('joinField', plan.popJoinField)
-            self.setField('popField', plan.popField)
-            self.setField('sourceLayer', plan.geoLayer)
-            self.setField('geoFields', list(plan.geoFields))
-            self.setField('popFields', list(plan.popFields))
-            self.setField('dataFields', list(plan.dataFields))
+            self.setField("planName", plan.name)
+            self.setField("description", plan.description)
+            self.setField("numDistricts", plan.numDistricts)
+            self.setField("numSeats", plan.numSeats)
+            self.setField("deviation", plan.deviation * 100)
+            self.setField("deviationType", plan.deviationType == DeviationType.OverUnder)
+            self.setField("geoIdField", plan.geoIdField)
+            self.setField("geoCaption", plan.geoIdCaption)
+            self.setField("gpkgPath", plan.geoPackagePath)
+            self.setField("popLayer", plan.popLayer)
+            self.setField("joinField", plan.popJoinField)
+            self.setField("popField", plan.popField)
+            self.setField("sourceLayer", plan.geoLayer)
+            self.setField("geoFields", list(plan.geoFields))
+            self.setField("popFields", list(plan.popFields))
+            self.setField("dataFields", list(plan.dataFields))
         else:
             self.addPage(dlgEditPlanImportPage(self))
             l = iface.activeLayer()
@@ -110,84 +103,84 @@ class DlgEditPlan(QWizard):
             if l is None:
                 raise ValueError(tr("No vector layer found in project"))
 
-            self.setField('sourceLayer', l)
+            self.setField("sourceLayer", l)
 
     def showHelp(self):
-        showHelp(f'usage/create_plan.html#page-{self.currentId()+1}')
+        showHelp(f"usage/create_plan.html#page-{self.currentId() + 1}")
 
     def planName(self):
-        return self.field('planName')
+        return self.field("planName")
 
     def description(self):
-        return self.field('description')
+        return self.field("description")
 
     def numDistricts(self):
-        return self.field('numDistricts')
+        return self.field("numDistricts")
 
     def numSeats(self):
-        return self.field('numSeats')
+        return self.field("numSeats")
 
     def geoLayer(self):
-        layer = self.field('sourceLayer')
+        layer = self.field("sourceLayer")
         return None if isinstance(layer, QVariant) else layer
 
     def geoIdField(self):
-        return self.field('geoIdField')
+        return self.field("geoIdField")
 
     def geoIdCaption(self):
-        return self.field('geoCaption')
+        return self.field("geoCaption")
 
     def geoFields(self):
-        return self.field('geoFields')
+        return self.field("geoFields")
 
     def popLayer(self):
-        layer = self.field('popLayer')
+        layer = self.field("popLayer")
         return None if isinstance(layer, QVariant) else layer
 
     def joinField(self):
-        return self.field('joinField') or self.field('geoIdField')
+        return self.field("joinField") or self.field("geoIdField")
 
     def popField(self):
-        return self.field('popField')
+        return self.field("popField")
 
     def deviation(self):
-        return self.field('deviation') / 100
+        return self.field("deviation") / 100
 
     def deviationType(self):
-        return DeviationType.OverUnder if self.field('deviationType') else DeviationType.TopToBottom
+        return DeviationType.OverUnder if self.field("deviationType") else DeviationType.TopToBottom
 
     def popFields(self):
-        return self.field('popFields')
+        return self.field("popFields")
 
     def dataFields(self):
-        return self.field('dataFields')
+        return self.field("dataFields")
 
     def gpkgPath(self):
-        return self.field('gpkgPath')
+        return self.field("gpkgPath")
 
     def importPlan(self):
-        return bool(self.field('importPath'))
+        return bool(self.field("importPath"))
 
     def importHeaderRow(self):
-        return self.field('headerRow')
+        return self.field("headerRow")
 
     def importPath(self):
-        return self.field('importPath')
+        return self.field("importPath")
 
     def importField(self):
-        return self.field('importField')
+        return self.field("importField")
 
     def importDelim(self):
-        return self.field('delimiter')
+        return self.field("delimiter")
 
     def importQuote(self):
-        return self.field('quote')
+        return self.field("quote")
 
     def importGeoCol(self):
-        return self.field('geoCol') - 1
+        return self.field("geoCol") - 1
 
     def importDistCol(self):
-        return self.field('distCol') - 1
+        return self.field("distCol") - 1
 
     def isComplete(self):
         for pageId in self.pageIds():

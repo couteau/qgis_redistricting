@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - QDockWidget displaying plan metrics
 
         begin                : 2024-09-20
@@ -21,12 +20,10 @@
  *   program. If not, see <http://www.gnu.org/licenses/>.                  *
  *                                                                         *
  ***************************************************************************/
- """
+"""
+
 from qgis.core import QgsApplication
-from qgis.PyQt.QtCore import (
-    Qt,
-    pyqtSignal
-)
+from qgis.PyQt.QtCore import Qt, pyqtSignal
 from qgis.PyQt.QtGui import QMouseEvent
 from qgis.PyQt.QtWidgets import QHeaderView
 
@@ -48,12 +45,17 @@ class QResizableHeaderView(QHeaderView):
         self.old_size = 0
 
     def mousePressEvent(self, e: QMouseEvent):
-        atEdge = e.pos().x() > self.rect().right() - 10 \
-            if self.orientation() == Qt.Orientation.Vertical \
+        atEdge = (
+            e.pos().x() > self.rect().right() - 10
+            if self.orientation() == Qt.Orientation.Vertical
             else e.pos().y() > self.rect().bottom() - 10
+        )
         if atEdge:
-            self.resize_offset = self.rect().right(
-            ) - e.pos().x() if self.orientation() == Qt.Orientation.Vertical else self.rect().bottom() - e.pos().y()
+            self.resize_offset = (
+                self.rect().right() - e.pos().x()
+                if self.orientation() == Qt.Orientation.Vertical
+                else self.rect().bottom() - e.pos().y()
+            )
             self.old_size = self.width() if self.orientation() == Qt.Orientation.Vertical else self.height()
             self.resizing = True
 
@@ -70,13 +72,18 @@ class QResizableHeaderView(QHeaderView):
 
         if not self.testAttribute(Qt.WidgetAttribute.WA_SetCursor):
             pos = e.pos().x() if self.orientation() == Qt.Orientation.Vertical else e.pos().y()
-            atEdge = pos > self.rect().right() - 10 \
-                if self.orientation() == Qt.Orientation.Vertical \
+            atEdge = (
+                pos > self.rect().right() - 10
+                if self.orientation() == Qt.Orientation.Vertical
                 else pos > self.rect().bottom() - 10
+            )
 
             if atEdge:
-                self.setCursor(Qt.CursorShape.SplitHCursor if self.orientation() ==
-                               Qt.Orientation.Vertical else Qt.CursorShape.SplitVCursor)
+                self.setCursor(
+                    Qt.CursorShape.SplitHCursor
+                    if self.orientation() == Qt.Orientation.Vertical
+                    else Qt.CursorShape.SplitVCursor
+                )
             else:
                 self.unsetCursor()
 
@@ -111,5 +118,5 @@ class DockPlanMetrics(Ui_qdwPlanMetrics, RdsDockWidget):
         self.tblPlanMetrics.setVerticalHeader(self.header)
 
         self.lblWaiting.setParent(self.tblPlanMetrics)
-        self.btnHelp.setIcon(QgsApplication.getThemeIcon('/mActionHelpContents.svg'))
+        self.btnHelp.setIcon(QgsApplication.getThemeIcon("/mActionHelpContents.svg"))
         self.btnHelp.clicked.connect(self.btnHelpClicked)

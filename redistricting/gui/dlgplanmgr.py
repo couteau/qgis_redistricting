@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Plan Manager Dialog
 
         begin                : 2022-01-15
@@ -22,28 +21,17 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Optional
-)
 
-from qgis.PyQt.QtCore import (
-    QAbstractItemModel,
-    QModelIndex,
-    QSize,
-    Qt,
-    pyqtSignal
-)
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QHeaderView,
-    QWidget
-)
+from typing import TYPE_CHECKING, Optional
+
+from qgis.PyQt.QtCore import QAbstractItemModel, QModelIndex, QSize, Qt, pyqtSignal
+from qgis.PyQt.QtWidgets import QDialog, QHeaderView, QWidget
 
 from .ui.DlgSelectPlan import Ui_dlgSelectPlan
 
 if TYPE_CHECKING:
     from qgis.PyQt.QtCore import QT_VERSION
+
     if QT_VERSION >= 0x060000:
         from PyQt6.QtGui import QAction  # type: ignore[import]
     else:
@@ -56,8 +44,7 @@ else:
 class DlgSelectPlan(Ui_dlgSelectPlan, QDialog):
     currentIndexChanged = pyqtSignal(int)
 
-    def __init__(self, parent: Optional[QWidget] = None,
-                 flags: Qt.WindowType = Qt.WindowType.Dialog):
+    def __init__(self, parent: Optional[QWidget] = None, flags: Qt.WindowType = Qt.WindowType.Dialog):
         super().__init__(parent, flags)
         self.setupUi(self)
         self._newAction: QAction = None

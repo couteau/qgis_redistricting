@@ -35,6 +35,7 @@ from shapely.geometry import MultiPolygon, Polygon
 
 from ...models import DistrictColumns
 from ...utils import spatialite_connect, tr
+from ...utils.misc import quote_identifier
 from ..districtio import DistrictReader
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
@@ -115,8 +116,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         try:
             self.setProgressIncrement(0, 20)
-            self.populationData = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry)
-            self.populationData.set_index(self.geoIdField, inplace=True)
+            self.populationData = self.read_layer(self.assignLayer, read_geometry=self.includeGeometry).set_index(
+                self.geoIdField
+            )
 
             cols = [self.distField]
             if self.includeDemographics:
@@ -174,7 +176,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 # ideal = round(self.totalPopulation / self.numSeats)
                 # deviation = self.districtData[DistrictColumns.POPULATION].sub(members * ideal)
                 # pct_dev = deviation.div(members * ideal)
-                df = pd.DataFrame(
+                districtCols = pd.DataFrame(
                     {
                         DistrictColumns.NAME: name,
                         DistrictColumns.MEMBERS: members,
@@ -183,9 +185,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
                     }
                 )
             else:
-                df = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
+                districtCols = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
 
-            self.districtData = self.districtData.join(df)
+            self.districtData = self.districtData.join(districtCols)
 
             return True
         except Exception as e:  # pylint: disable=broad-except
@@ -208,26 +210,27 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             if zero:
                 params = ",".join(repeat("?", len(zero)))
-                sql = f'DELETE FROM districts WHERE "{self.distField}" IN ({params})'  # noqa: S608
+                sql = f"DELETE FROM districts WHERE {quote_identifier(self.distField)} IN ({params})"  # noqa: S608
                 db.execute(sql, (str(d) for d in zero))
                 db.commit()
 
             # Update existing dictricts
             fields = {
-                f'"{f}"': f"GeomFromText(:{f})" if f == "geometry" else f":{f}" for f in list(self.districtData.columns)
+                quote_identifier(f): f"GeomFromText(:{f})" if f == "geometry" else f":{f}"
+                for f in list(self.districtData.columns)
             }
             data = [d._asdict() for d in self.districtData.itertuples()]
             params = ",".join(f"{field} = {param}" for field, param in fields.items())
             sql = (
                 "UPDATE districts "  # noqa: S608
                 f"SET {params} "
-                f'WHERE "{self.distField}" = :Index'
+                f"WHERE {quote_identifier(self.distField)} = :Index"
             )
             db.executemany(sql, data)
             db.commit()
 
-            fields = {self.distField: ":Index"} | fields
-            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields)}) VALUES ({','.join(fields.values())})"  # noqa: S608
+            fields = {quote_identifier(self.distField): ":Index"} | fields
+            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields.keys())}) VALUES ({','.join(fields.values())})"  # noqa: S608
             db.executemany(sql, data)
             db.commit()
 

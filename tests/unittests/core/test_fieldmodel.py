@@ -36,16 +36,16 @@ from redistricting.models import (
 class TestFieldTableView:
     @pytest.fixture
     def field_list(self, block_layer) -> list[RdsField]:
-        f = RdsField(block_layer, 'vtdid')
+        f = RdsField(block_layer, "vtdid")
         return [f]
 
     @pytest.fixture
     def field_list_two(self, block_layer) -> list[RdsField]:
-        return [RdsField(block_layer, 'vtdid'), RdsField(block_layer, 'countyid')]
+        return [RdsField(block_layer, "vtdid"), RdsField(block_layer, "countyid")]
 
     @pytest.fixture
     def data_field_list(self, block_layer) -> list[RdsDataField]:
-        f = RdsDataField(block_layer, 'vap_nh_white')
+        f = RdsDataField(block_layer, "vap_nh_white")
         return [f]
 
     @pytest.fixture
@@ -75,27 +75,27 @@ class TestFieldTableView:
 
     def test_add_field(self, block_layer, field_list_model: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model.rowsAboutToBeInserted, field_list_model.rowsInserted]):
-            field_list_model.appendField(block_layer, 'countyid')
+            field_list_model.appendField(block_layer, "countyid")
         assert field_list_model.rowCount() == 2
 
     def test_move_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model_two.rowsAboutToBeMoved, field_list_model_two.rowsMoved]):
             field_list_model_two.moveField(1, 0)
-        assert field_list_model_two.fields[0].field == 'countyid'
+        assert field_list_model_two.fields[0].field == "countyid"
 
     def test_delete_field(self, field_list_model_two: FieldListModel, qtbot: QtBot):
         with qtbot.waitSignals([field_list_model_two.rowsAboutToBeRemoved, field_list_model_two.rowsRemoved]):
             field_list_model_two.deleteField(0)
         assert field_list_model_two.rowCount() == 1
-        assert field_list_model_two.fields[0].field == 'countyid'
+        assert field_list_model_two.fields[0].field == "countyid"
 
     def test_disallow_add_duplicate(self, block_layer, field_list_model: FieldListModel):
-        field_list_model.appendField(block_layer, 'vtdid')
+        field_list_model.appendField(block_layer, "vtdid")
         assert field_list_model.rowCount() == 1
 
     def test_data(self, datafield_list_model: FieldListModel):
         data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.ItemDataRole.DisplayRole)
-        assert data == 'vap_nh_white'
+        assert data == "vap_nh_white"
         data = datafield_list_model.data(datafield_list_model.createIndex(0, 0), Qt.ItemDataRole.DecorationRole)
         assert isinstance(data, QIcon)
         data = datafield_list_model.data(datafield_list_model.createIndex(0, 2), Qt.ItemDataRole.CheckStateRole)
@@ -103,9 +103,9 @@ class TestFieldTableView:
 
     def test_set_data(self, datafield_list_model: FieldListModel):
         assert not datafield_list_model.setData(
-            datafield_list_model.createIndex(0, 0), 'dummy', Qt.ItemDataRole.EditRole)
-        assert datafield_list_model.setData(datafield_list_model.createIndex(0, 1), 'WVAP', Qt.ItemDataRole.EditRole)
-        assert datafield_list_model.fields[0].caption == 'WVAP'
+            datafield_list_model.createIndex(0, 0), "dummy", Qt.ItemDataRole.EditRole)
+        assert datafield_list_model.setData(datafield_list_model.createIndex(0, 1), "WVAP", Qt.ItemDataRole.EditRole)
+        assert datafield_list_model.fields[0].caption == "WVAP"
 
     def test_flags(self, datafield_list_model: FieldListModel):
         assert datafield_list_model.flags(datafield_list_model.createIndex(0, 1)) & Qt.ItemFlag.ItemIsEditable

@@ -80,7 +80,8 @@ class AutoAssignUnassignedUnits(SqlAccess, QgsTask):
                 .rename(columns={"index_right": "group", "fid_right": "fids"})
                 .dissolve(by=["group", "district"])
             )
-            # TODO: potentially use amount of the cluster bordered by each district to determine which district to assign
+            # TODO: potentially use amount of the cluster bordered by each district
+            #       to determine which district to assign
             unassigned["length"] = unassigned.geometry.intersection(unassigned["area_geom"]).length
             unassigned = (
                 unassigned.drop(columns=["geometry", "area_geom"])  # drop the geometry columns
@@ -90,15 +91,15 @@ class AutoAssignUnassignedUnits(SqlAccess, QgsTask):
                 .agg({"district": list, "length": list, "fids": "first"})
             )
 
-            update = {}
-            indeterminate = []
+            update: dict[int, dict[int, int]] = {}
+            indeterminate: list[dict[int, tuple[list, list, list]]] = []
             for group, district, length, fids in unassigned.itertuples(index=True):
                 if len(district) == 1:
                     # if the poygon grouping only borders one other district, we can automatically assign
                     update.update({f: {self.distIndex: district[0]} for f in fids})
                 else:
                     # if the grouping borders more than one district, we don't automatically assign
-                    indeterminate.extend(fids)
+                    indeterminate.extend({group: (district, length, fids)})
 
             self.assignments.dataProvider().changeAttributeValues(update)
 

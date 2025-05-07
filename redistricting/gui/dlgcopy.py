@@ -1,11 +1,10 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Copy Plan Dialog
 
         begin                : 2022-03-18
         git sha              : $Format:%H$
         copyright            : (C) 2022 by Cryptodira
         email                : stuart@cryptodira.org
- 
+
 /***************************************************************************
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -22,20 +21,14 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import os
 import re
-from typing import (
-    Optional,
-    Union
-)
+from typing import Optional, Union
 
 from qgis.core import QgsProject
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox, QWidget
 
 from ..models import RdsPlan
 from ..utils import tr
@@ -43,14 +36,19 @@ from .ui.DlgCopyPlan import Ui_dlgCopyPlan
 
 
 class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
-    def __init__(self, plan: RdsPlan, parent: Optional[QWidget] = None, flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog):
+    def __init__(
+        self,
+        plan: RdsPlan,
+        parent: Optional[QWidget] = None,
+        flags: Union[Qt.WindowFlags, Qt.WindowType] = Qt.WindowType.Dialog,
+    ):
         super().__init__(parent, flags)
         self.setupUi(self)
 
         self.setTabOrder(self.inpPlanName, self.fwGeoPackage.lineEdit())
 
-        self.lblSourcePlan.setText(tr('Copy from <b>{plan}</b>').format(plan=plan.name))
-        self.cbxCopyAssignments.setText(tr('Copy {geography} assignments').format(geography=plan.geoIdCaption.lower()))
+        self.lblSourcePlan.setText(tr("Copy from <b>{plan}</b>").format(plan=plan.name))
+        self.cbxCopyAssignments.setText(tr("Copy {geography} assignments").format(geography=plan.geoIdCaption.lower()))
         self.inpPlanName.editingFinished.connect(self.planNameChanged)
         self.inpPlanName.textChanged.connect(self.updateButtonBox)
         self.txtDescription.setPlainText(plan.description)
@@ -74,12 +72,9 @@ class DlgCopyPlan(Ui_dlgCopyPlan, QDialog):
         return self.txtDescription.toPlainText()
 
     def planNameChanged(self):
-        if self.planName and not self.fwGeoPackage.path and QgsProject.instance().absolutePath() != ' ':
+        if self.planName and not self.fwGeoPackage.path and QgsProject.instance().absolutePath() != " ":
             self.fwGeoPackage.setFilePath(
-                os.path.join(
-                    QgsProject.instance().absolutePath(),
-                    re.sub(r'[^\w]+', '_', self.planName) + '.gpkg'
-                )
+                os.path.join(QgsProject.instance().absolutePath(), re.sub(r"[^\w]+", "_", self.planName) + ".gpkg")
             )
 
     def updateButtonBox(self):

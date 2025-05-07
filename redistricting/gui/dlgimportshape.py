@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Import Shapefile Dialog
 
         begin                : 2022-01-15
@@ -22,15 +21,12 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox, QWidget
 
 from .ui.DlgImportShapefile import Ui_dlgImportShapefile
 

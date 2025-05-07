@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - monitor assignment changes and update delta object
 
         begin                : 2024-05-12
@@ -22,24 +21,15 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from dataclasses import dataclass
 from typing import Optional
 
 import pandas as pd
-from qgis.core import (
-    QgsApplication,
-    QgsTask
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    QSignalMapper,
-    pyqtSignal
-)
+from qgis.core import QgsApplication, QgsTask
+from qgis.PyQt.QtCore import QObject, QSignalMapper, pyqtSignal
 
-from ..models import (
-    DeltaList,
-    RdsPlan
-)
+from ..models import DeltaList, RdsPlan
 from .errormixin import ErrorListMixin
 from .planmgr import PlanManager
 from .tasks.updatepending import AggregatePendingChangesTask
@@ -129,9 +119,11 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             del self._deltas[plan]
 
     def isUpdating(self, plan: RdsPlan):
-        return plan in self._deltas \
-            and self._deltas[plan].task is not None \
+        return (
+            plan in self._deltas
+            and self._deltas[plan].task is not None
             and self._deltas[plan].task.status() < QgsTask.TaskStatus.Complete
+        )
 
     def deltaTaskCompleted(self, plan: RdsPlan):
         delta = self._deltas[plan]
@@ -161,9 +153,11 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         if delta.task is not None and delta.task.status() < QgsTask.TaskStatus.Complete:
             return delta.task
 
-        if delta.plan.assignLayer is None \
-                or delta.plan.assignLayer.editBuffer() is None \
-                or delta.plan.assignLayer.undoStack().index() == 0:
+        if (
+            delta.plan.assignLayer is None
+            or delta.plan.assignLayer.editBuffer() is None
+            or delta.plan.assignLayer.undoStack().index() == 0
+        ):
             delta.delta.clear()
             return None
 

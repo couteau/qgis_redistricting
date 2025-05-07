@@ -44,7 +44,8 @@ class TestPlanImport:
         result = p.importPlan(new_plan)
         assert not result
         msg, _ = p.error()  # pylint: disable=unpacking-non-sequence
-        assert msg is not None and re.search("not exist", msg)
+        assert msg is not None
+        assert re.search("not exist", msg)
 
     def test_import_shapefile_bad_shapefile_sets_error(self, new_plan, datadir):
         p = redistricting.services.planimport.ShapefileImporter()

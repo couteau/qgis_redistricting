@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - install additional python packages
 
         begin                : 2024-02-01
@@ -22,6 +21,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import json
 import pathlib
 import shutil
@@ -31,10 +31,7 @@ from functools import lru_cache
 import requests
 from packaging.version import parse as parse_version
 from qgis.gui import QgisInterface
-from qgis.PyQt.QtCore import (
-    QProcess,
-    QStandardPaths
-)
+from qgis.PyQt.QtCore import QProcess, QStandardPaths
 from qgis.utils import iface
 
 iface: QgisInterface
@@ -49,14 +46,14 @@ def install_vendor_dir():
     # before other python code loads modules we have overridden
     homePath = QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)
     if len(homePath) > 0:
-        startuppy = pathlib.Path(homePath[0]) / 'startup.py'
+        startuppy = pathlib.Path(homePath[0]) / "startup.py"
         with startuppy.open("a+") as f:
             f.seek(0)
             lines = f.readlines()
-            if not "import sys\n" in lines:
+            if "import sys\n" not in lines:
                 lines.insert(0, "import sys\n")
             insert_path = f"sys.path.insert(0, {str(vendor_dir().resolve())!r})\n"
-            if not insert_path in lines:
+            if insert_path not in lines:
                 lines.append(insert_path)
             f.truncate()
             f.writelines(lines)
@@ -67,7 +64,7 @@ def install_vendor_dir():
 def uninstall_vendor_dir():
     homePath = QStandardPaths.standardLocations(QStandardPaths.StandardLocation.AppDataLocation)
     if len(homePath) > 0:
-        startuppy = pathlib.Path(homePath[0]) / 'startup.py'
+        startuppy = pathlib.Path(homePath[0]) / "startup.py"
         if startuppy.exists():
             f = startuppy.open("r+")
             lines = f.readlines()
@@ -95,24 +92,24 @@ def uninstall_all():
 
 def python_executable():
     if sys.platform == "win32":
-        return pathlib.Path(sys.prefix) / 'python3.exe'
+        return pathlib.Path(sys.prefix) / "python3.exe"
 
-    return pathlib.Path(sys.prefix) / 'bin' / 'python3'
+    return pathlib.Path(sys.prefix) / "bin" / "python3"
 
 
 @lru_cache
 def check_new_version(pkg: str):
-    if not pkg in sys.modules:
+    if pkg not in sys.modules:
         return False
 
     current_version = sys.modules[pkg].__version__
 
     # Check pypi for the latest version number
     try:
-        r = requests.get(f'https://pypi.org/pypi/{pkg}/json', timeout=5)
+        r = requests.get(f"https://pypi.org/pypi/{pkg}/json", timeout=5)
         contents = r.content.decode()
         data = json.loads(contents)
-        latest_version = data['info']['version']
+        latest_version = data["info"]["version"]
     except TimeoutError:
         return False
 
@@ -130,7 +127,7 @@ def install_addon(pkg: str, *options):
 
     process = QProcess(iface.mainWindow())
     process.setProgram(str(python_executable()))
-    process.setArguments(['-m', 'pip', 'install', '-t', str(installdir), *options, pkg])
+    process.setArguments(["-m", "pip", "install", "-t", str(installdir), *options, pkg])
     process.start()
     return process
 
@@ -139,15 +136,17 @@ def install_pyogrio():
     pkgs = []
     # pylint: disable=import-outside-toplevel
     import geopandas
-    if parse_version(geopandas.__version__) < parse_version('0.12.0'):
-        pkgs.append('geopandas')
+
+    if parse_version(geopandas.__version__) < parse_version("0.12.0"):
+        pkgs.append("geopandas")
 
     import shapely
-    if parse_version(shapely.__version__) < parse_version('2.0.0'):
-        pkgs.append('shapely')
 
-    return install_addon('pyogrio', *pkgs)
+    if parse_version(shapely.__version__) < parse_version("2.0.0"):
+        pkgs.append("shapely")
+
+    return install_addon("pyogrio", *pkgs)
 
 
 def install_pyarrow():
-    return install_addon('pyarrow')
+    return install_addon("pyarrow")

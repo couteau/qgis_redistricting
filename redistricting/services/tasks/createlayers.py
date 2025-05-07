@@ -35,11 +35,11 @@ import geopandas as gpd
 from qgis.core import QgsExpressionContext, QgsExpressionContextUtils, QgsField, QgsVectorLayer
 from qgis.PyQt.QtCore import QMetaType
 
-from redistricting.models.field import RdsField
-
 from ...errors import CanceledError
 from ...models import DistrictColumns, MetricLevel
+from ...models.field import RdsField
 from ...utils import camel_to_snake, createGeoPackage, createGpkgTable, spatialite_connect, tr
+from ...utils.misc import quote_identifier, quote_list
 from ..districtio import DistrictReader
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
@@ -102,9 +102,9 @@ class CreatePlanLayersTask(AggregateDataTask):
     def validatePopFields(self, popLayer: QgsVectorLayer):
         popFields = popLayer.fields()
         if popFields.lookupField(self.popJoinField) == -1:
-            raise ValueError((f"Could not find field {self.popJoinField} in population layer"))
+            raise ValueError(f"Could not find field {self.popJoinField} in population layer")
         if popFields.lookupField(self.popField) == -1:
-            raise ValueError((f"Could not find field {self.popField} in population layer"))
+            raise ValueError(f"Could not find field {self.popField} in population layer")
         for field in self.popFields:
             if not field.validate():
                 raise ValueError(*field.errors())
@@ -195,11 +195,12 @@ class CreatePlanLayersTask(AggregateDataTask):
 
     def createDistricts(self, db: sqlite3.Connection):
         self.popTotals: dict[str, Any] = self.getPopFieldTotals()
-        popFields = ", ".join(f'"{k}"' for k in self.popTotals)  # quote all field names
         self.totalPopulation = self.popTotals[DistrictColumns.POPULATION]
         sql = (
-            f'INSERT INTO districts ("{self.distField}", {popFields}, geometry) '  # noqa: S608
-            f"VALUES (0, {', '.join('?' * len(self.popTotals))}, (SELECT ST_union(geometry) FROM assignments))"
+            f"INSERT INTO districts "  # noqa: S608
+            f"({quote_identifier(self.distField)}, {', '.join(quote_list(self.popTotals.keys()))}, geometry) "
+            "VALUES "
+            f"(0, {', '.join('?' * len(self.popTotals))}, (SELECT ST_union(geometry) FROM assignments))"
         )
         db.execute(sql, list(self.popTotals.values()))
         db.commit()
@@ -262,7 +263,7 @@ class CreatePlanLayersTask(AggregateDataTask):
                 sql += f"ST_AsText({geocol}) as geometry FROM {table}"
                 if self.geoLayer.subsetString():
                     sql += f" WHERE {self.geoLayer.subsetString()}"
-                gen = self.executeSql(self.geoLayer, sql, False)
+                gen = self.executeSql(self.geoLayer, sql, as_dict=False)
 
         if not gen:
             context = QgsExpressionContext()

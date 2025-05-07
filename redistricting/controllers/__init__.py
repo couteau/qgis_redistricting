@@ -29,6 +29,6 @@ from .pending import PendingChangesController
 from .plan import PlanController
 
 __all__ = (
-    'ContextMenuController', 'DistrictController', 'EditAssignmentsController',
-    'MetricsController', 'PendingChangesController', 'PlanController'
+    "ContextMenuController", "DistrictController", "EditAssignmentsController",
+    "MetricsController", "PendingChangesController", "PlanController"
 )

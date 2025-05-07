@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """QGIS Redistricting Plugin - Export Plan Dialog
 
         begin                : 2022-01-15
@@ -22,14 +21,11 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from typing import Optional
 
 from qgis.PyQt.QtCore import Qt
-from qgis.PyQt.QtWidgets import (
-    QDialog,
-    QDialogButtonBox,
-    QWidget
-)
+from qgis.PyQt.QtWidgets import QDialog, QDialogButtonBox, QWidget
 
 from .ui.DlgExportPlan import Ui_dlgExportPlan
 
@@ -52,13 +48,14 @@ class DlgExportPlan(Ui_dlgExportPlan, QDialog):
         self.cbxExportEquivalency.setChecked(
             self.cbxExportEquivalency.isChecked() or bool(self.fwEquivalency.filePath())
         )
-        self.cbxExportShape.setChecked(
-            bool(self.cbxExportShape.isChecked() or self.fwShape.filePath()))
+        self.cbxExportShape.setChecked(bool(self.cbxExportShape.isChecked() or self.fwShape.filePath()))
         self.fwEquivalency.lineEdit().setEnabled(self.cbxExportEquivalency.isChecked())
         self.fwShape.lineEdit().setEnabled(self.cbxExportShape.isChecked())
         self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
-            bool((self.exportEquivalency and self.equivalencyFileName) or
-                 (self.exportShapefile and self.shapefileFileName))
+            bool(
+                (self.exportEquivalency and self.equivalencyFileName)
+                or (self.exportShapefile and self.shapefileFileName)
+            )
         )
 
     @property
