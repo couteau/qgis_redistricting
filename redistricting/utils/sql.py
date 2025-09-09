@@ -116,7 +116,7 @@ class SqlAccess:
                 _, table = table.split(".", 1)
             r = self.executeSql(
                 layer,
-                f"SELECT f_geometry_column FROM geometry_columns WHERE f_table_name='{table.replace("'", "''")}'",  # noqa: S608
+                f"""SELECT f_geometry_column FROM geometry_columns WHERE f_table_name='{table.replace("'", "''")}'""",  # noqa: S608
             )
             if r:
                 return next(r)["f_geometry_column"]
