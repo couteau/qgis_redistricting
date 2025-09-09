@@ -2,6 +2,8 @@ __pycache__
 .vscode
 .qt_for_python
 .pytest_cache
+.mypy_cache
+.ruff_cache
 .DS_Store
 *.pyc
 redistricting/vendor
