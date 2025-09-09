@@ -22,10 +22,10 @@
  ***************************************************************************/
 """
 
-from typing import Optional, overload
 from collections.abc import Iterable
+from typing import Optional, overload
 
-from qgis.core import Qgis, QgsApplication, QgsField, QgsProject, QgsVectorDataProvider, QgsVectorLayer
+from qgis.core import Qgis, QgsApplication, QgsField, QgsProject, QgsVectorLayer
 from qgis.PyQt.QtCore import QMetaType, QObject, pyqtSignal
 
 from ..models import RdsDataField, RdsField, RdsGeoField, deserialize, serialize
@@ -39,6 +39,7 @@ from .tasks.addgeofield import AddGeoFieldToAssignmentLayerTask
 
 class PlanEditor(BasePlanBuilder):
     progressChanged = pyqtSignal(int)
+    geoFieldsUpdated = pyqtSignal("PyQt_PyObject")
 
     def __init__(self, parent: QObject = None, planUpdater: DistrictUpdater = None):
         super().__init__(parent)
@@ -108,7 +109,7 @@ class PlanEditor(BasePlanBuilder):
             raise ValueError("Argument must be a string, QgsField, or iterable of QgsField")
 
         provider = layer.dataProvider()
-        if not QgsVectorDataProvider.AddAttributes & provider.capabilities():
+        if not Qgis.VectorProviderCapability.AddAttributes & provider.capabilities():
             self.pushError("Could not add field to layer", Qgis.MessageLevel.Critical)
             return
         for field in reversed(fields):
@@ -128,7 +129,7 @@ class PlanEditor(BasePlanBuilder):
     def _updatePopFields(self):
         if self._plan.distLayer:
             layer = self._plan.distLayer
-            addedFields: list[RdsField] = [f for f in self._popFields if f not in self._plan.popFields]
+            addedFields: list[RdsField] = [f for f in self._popFields if not self._plan.popFields.has(f.fieldName)]
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -138,7 +139,9 @@ class PlanEditor(BasePlanBuilder):
         if self._plan.distLayer:
             layer = self._plan.distLayer
 
-            addedFields: list[RdsDataField] = [f for f in self._dataFields if f not in self._plan.dataFields]
+            addedFields: list[RdsDataField] = [
+                f for f in self._dataFields if not self._plan.dataFields.has(f.fieldName)
+            ]
             if addedFields:
                 self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -167,7 +170,7 @@ class PlanEditor(BasePlanBuilder):
 
         def terminated():
             if self._updateAssignLayerTask.isCanceled():
-                self.setError(tr("Update geography fields canceled"), Qgis.UserCanceled)
+                self.setError(tr("Update geography fields canceled"), Qgis.MessageLevel.Warning)
 
             provider = self._assignLayer.dataProvider()
             fields = self._assignLayer.fields()
@@ -187,13 +190,14 @@ class PlanEditor(BasePlanBuilder):
         def completed():
             removeFields()
             self._updateAssignLayerTask = None
+            self.geoFieldsUpdated.emit(self._plan)
 
-        if not self._plan or not self._plan.assignLayer or self._geoFields == self._plan.geoFields:
+        if not self._plan or not self._plan.assignLayer or self._geoFields == list(self._plan.geoFields):
             return
 
         saveFields = self._plan.geoFields
         layer = self._plan.assignLayer
-        addedFields: list[RdsField] = [f for f in self._geoFields if f not in self._plan.geoFields]
+        addedFields: list[RdsField] = [f for f in self._geoFields if not self._plan.geoFields.has(f.fieldName)]
         if addedFields:
             self._addFieldToLayer(layer, [f.makeQgsField() for f in addedFields])
 
@@ -274,8 +278,8 @@ class PlanEditor(BasePlanBuilder):
                 updateGeometry = True
 
             if updateSplits or updateDemographics or updateGeometry:
-                self._updater.updateDistricts(
-                    self._plan, needDemographics=updateDemographics, needGeometry=updateGeometry, force=True
+                self._updater.update(
+                    self._plan, force=True, includeDemographics=updateDemographics, includeGeometry=updateGeometry
                 )
 
     def cancelPlanUpdate(self):

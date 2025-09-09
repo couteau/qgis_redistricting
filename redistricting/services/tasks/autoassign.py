@@ -25,7 +25,14 @@
 from typing import NamedTuple
 
 import geopandas as gpd
-import libpysal
+
+try:
+    import libpysal
+
+    AUTOASSIGN_ENABLED = True
+except ImportError:
+    AUTOASSIGN_ENABLED = False
+
 from qgis.core import QgsTask, QgsVectorLayer
 
 from ...errors import CanceledError

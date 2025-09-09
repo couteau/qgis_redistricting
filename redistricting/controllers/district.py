@@ -22,12 +22,12 @@
  ***************************************************************************/
 """
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import Optional, Union
 
 from qgis.core import QgsApplication, QgsProject
 from qgis.gui import QgisInterface, QgsMapMouseEvent
 from qgis.PyQt.QtCore import QEvent, QMimeData, QModelIndex, QObject, QPoint, Qt
-from qgis.PyQt.QtGui import QContextMenuEvent, QKeySequence
+from qgis.PyQt.QtGui import QAction, QContextMenuEvent, QKeySequence
 from qgis.PyQt.QtWidgets import QMenu, QToolBar
 
 from ..gui import DockDistrictDataTable
@@ -36,23 +36,12 @@ from ..services import (
     ActionRegistry,
     AssignmentsService,
     DistrictClipboardAccess,
-    DistrictCopier,
     DistrictUpdater,
+    DistrictUtils,
     PlanManager,
 )
 from ..utils import tr
 from .base import DockWidgetController
-
-if TYPE_CHECKING:
-    from qgis.PyQt.QtCore import QT_VERSION
-
-    if QT_VERSION >= 0x060000:
-        from PyQt6.QtGui import QAction  # type: ignore[import]
-    else:
-        from PyQt5.QtWidgets import QAction  # type: ignore[import]
-
-else:
-    from qgis.PyQt.QtGui import QAction
 
 
 class DistrictController(DockWidgetController):
@@ -63,14 +52,14 @@ class DistrictController(DockWidgetController):
         planManager: PlanManager,
         toolbar: QToolBar,
         assignmentsService: AssignmentsService,
-        districtCopier: DistrictCopier,
+        districtUtils: DistrictUtils,
         updateService: DistrictUpdater,
         parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.canvas = iface.mapCanvas()
         self.assignmentsService = assignmentsService
-        self.districtCopier = districtCopier
+        self.districtUtils = districtUtils
         self.updateService = updateService
         self.model: RdsDistrictDataModel = None
         self.proxyModel: RdsDistrictFilterFieldsProxyModel = None
@@ -83,7 +72,7 @@ class DistrictController(DockWidgetController):
             icon=":/plugins/redistricting/copydistrict.svg",
             text=tr("Copy District"),
             tooltip=tr("Copy district to clipboard"),
-            callback=self.districtCopier.copyDistrict,
+            callback=self.districtUtils.copyDistrict,
             parent=self.iface.mainWindow(),
         )
 
@@ -92,7 +81,16 @@ class DistrictController(DockWidgetController):
             icon=QgsApplication.getThemeIcon("/mActionDuplicateFeature.svg"),
             text=tr("Paste District"),
             tooltip=tr("Paste district from clipboard"),
-            callback=self.districtCopier.pasteDistrict,
+            callback=self.districtUtils.pasteDistrict,
+            parent=self.iface.mainWindow(),
+        )
+
+        self.actionDeleteDistrict = self.actions.createAction(
+            name="actionDeleteDistrict",
+            icon=QgsApplication.getThemeIcon("/mActionRemove.svg"),
+            text=self.tr("Delete District"),
+            tooltip=self.tr("Delete district from the plan"),
+            callback=self.districtUtils.deleteDistrict,
             parent=self.iface.mainWindow(),
         )
 
@@ -130,6 +128,7 @@ class DistrictController(DockWidgetController):
             shortcut=QKeySequence.StandardKey.Copy,
             parent=self.iface.mainWindow(),
         )
+        self.actionCopySelectedData.setEnabled(False)
 
         self.actionRecalculate = self.actions.createAction(
             name="actionRecalculate",
@@ -139,6 +138,7 @@ class DistrictController(DockWidgetController):
             statustip=self.tr("Reaggregate all demographics"),
             callback=self.recalculate,
         )
+        self.actionRecalculate.setEnabled(False)
 
         self.dataTableContextMenu: QMenu = None
 
@@ -148,20 +148,23 @@ class DistrictController(DockWidgetController):
         self.dataTableContextMenu.addAction(self.actionCopySelectedData)
         self.dataTableContextMenu.addAction(self.actionCopyDistrict)
         self.dataTableContextMenu.addAction(self.actionPasteDistrict)
+        self.dataTableContextMenu.addAction(self.actionDeleteDistrict)
         self.dataTableContextMenu.addAction(self.actionZoomToDistrict)
         self.dataTableContextMenu.addAction(self.actionFlashDistrict)
 
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.updateService.updateStarted.connect(self.showOverlay)
         self.updateService.updateComplete.connect(self.hideOverlay)
-        self.updateService.updateTerminated.connect(self.hideOverlay)
+        self.updateService.updateTerminated.connect(self.showUpdateError)
+        self.updateService.updateCanceled.connect(self.hideOverlay)
         self.canvas.contextMenuAboutToShow.connect(self.addCanvasContextMenuItems)
 
     def unload(self):
         self.canvas.contextMenuAboutToShow.disconnect(self.addCanvasContextMenuItems)
         self.updateService.updateStarted.disconnect(self.showOverlay)
         self.updateService.updateComplete.disconnect(self.hideOverlay)
-        self.updateService.updateTerminated.disconnect(self.hideOverlay)
+        self.updateService.updateTerminated.disconnect(self.showUpdateError)
+        self.updateService.updateCanceled.disconnect(self.hideOverlay)
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         super().unload()
         self.dataTableContextMenu.destroy(True, True)
@@ -205,7 +208,7 @@ class DistrictController(DockWidgetController):
         self.dockwidget.plan = plan
         self.actionRecalculate.setEnabled(plan is not None)
         self.actionCopySelectedData.setEnabled(plan is not None)
-        if self.updateService.planIsUpdating(plan):
+        if plan is not None and self.updateService.planIsUpdating(plan):
             self.dockwidget.setWaiting(True)
 
     def addCanvasContextMenuItems(self, menu: QMenu, event: QgsMapMouseEvent):
@@ -213,12 +216,17 @@ class DistrictController(DockWidgetController):
             return
 
         menu.addAction(self.actionCopyDistrict)
-        self.actionCopyDistrict.setEnabled(self.districtCopier.canCopyAssignments(self.actionCopyDistrict, event))
+        self.actionCopyDistrict.setEnabled(self.districtUtils.canCopyOrCutAssignments(self.actionCopyDistrict, event))
 
         menu.addAction(self.actionPasteDistrict)
-        self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
+        self.actionPasteDistrict.setEnabled(self.districtUtils.canPasteAssignments(self.planManager.activePlan))
 
-    def eventFilter(self, obj: QObject, event: QContextMenuEvent):  # pylint: disable=unused-argument
+        menu.addAction(self.actionDeleteDistrict)
+        self.actionDeleteDistrict.setEnabled(
+            self.districtUtils.canCopyOrCutAssignments(self.actionDeleteDistrict, event)
+        )
+
+    def eventFilter(self, _: QObject, event: QContextMenuEvent):
         if event.type() != QEvent.Type.ContextMenu:
             return False
 
@@ -239,7 +247,9 @@ class DistrictController(DockWidgetController):
         self.actionCopyDistrict.setData(district.district)
         self.actionCopyDistrict.setEnabled(district.district != 0)
         self.actionPasteDistrict.setData(district.district)
-        self.actionPasteDistrict.setEnabled(self.districtCopier.canPasteAssignments(self.planManager.activePlan))
+        self.actionPasteDistrict.setEnabled(self.districtUtils.canPasteAssignments(self.planManager.activePlan))
+        self.actionDeleteDistrict.setData(district.district)
+        self.actionDeleteDistrict.setEnabled(district.district != 0)
         self.actionZoomToDistrict.setData(district.district)
         self.actionFlashDistrict.setData(district.district)
         self.actionFlashDistrict.setEnabled(district.district != 0)
@@ -264,7 +274,7 @@ class DistrictController(DockWidgetController):
         if district < 1 or district > self.planManager.activePlan.numDistricts:
             raise ValueError("No such district")
 
-        fid = self.planManager.activePlan.districts[district].fid
+        fid = self.planManager.activePlan.districts.get(district).fid
         if fid != -1:
             method(self.planManager.activePlan.distLayer, [fid])
             if refresh:
@@ -298,7 +308,7 @@ class DistrictController(DockWidgetController):
             self.copyMimeDataToClipboard(selection)
 
     def recalculate(self):
-        self.updateService.updateDistricts(self.planManager.activePlan, needDemographics=True)
+        self.updateService.update(self.planManager.activePlan, includeDemographics=True)
 
     def editDistrict(self, index: QModelIndex):
         if not self.actions.actionEditDistrict.isEnabled():
@@ -310,11 +320,3 @@ class DistrictController(DockWidgetController):
         district = self.planManager.activePlan.districts[index.row()]
         self.actions.actionEditDistrict.setData(district)
         self.actions.actionEditDistrict.trigger()
-
-    def showOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(True)
-
-    def hideOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(False)

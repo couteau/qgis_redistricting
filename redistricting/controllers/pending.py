@@ -21,25 +21,15 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-    Union
-)
+
+from typing import TYPE_CHECKING, Optional, Union
 
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 
 from ..gui import DockPendingChanges
-from ..models import (
-    DeltaFieldFilterProxy,
-    DeltaListModel,
-    RdsPlan
-)
-from ..services import (
-    DeltaUpdateService,
-    PlanManager
-)
+from ..models import DeltaFieldFilterProxy, DeltaListModel, RdsPlan
+from ..services import DeltaUpdateService, PlanManager
 from ..utils import tr
 from .base import DockWidgetController
 
@@ -57,7 +47,7 @@ class PendingChangesController(DockWidgetController):
         planManager: PlanManager,
         toolbar,
         deltaService: DeltaUpdateService,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.deltaService = deltaService
@@ -72,15 +62,13 @@ class PendingChangesController(DockWidgetController):
         super().load()
         self.planManager.activePlanChanged.connect(self.activePlanChanged)
         self.deltaService.updateStarted.connect(self.showOverlay)
-        self.deltaService.updateCompleted.connect(self.hideOverlay)
-        self.deltaService.updateTerminated.connect(self.hideOverlay)
-        # self.editingStartedSignals.mappedObject.connect(self.startDelta)
+        self.deltaService.updateComplete.connect(self.hideOverlay)
+        self.deltaService.updateTerminated.connect(self.showUpdateError)
 
     def unload(self):
-        # self.editingStartedSignals.mappedObject.disconnect(self.startDelta)
         self.deltaService.updateStarted.disconnect(self.showOverlay)
-        self.deltaService.updateCompleted.disconnect(self.hideOverlay)
-        self.deltaService.updateTerminated.disconnect(self.hideOverlay)
+        self.deltaService.updateComplete.disconnect(self.hideOverlay)
+        self.deltaService.updateTerminated.disconnect(self.showUpdateError)
         self.planManager.activePlanChanged.disconnect(self.activePlanChanged)
         super().unload()
 
@@ -109,17 +97,9 @@ class PendingChangesController(DockWidgetController):
             self.model.setPlan(None, None)
         else:
             self.model.setPlan(plan, self.deltaService.getDelta(plan))
-            if self.deltaService.isUpdating(plan):
+            if self.deltaService.planIsUpdating(plan):
                 self.dockwidget.setWaiting(True)
 
     def startDelta(self, plan):
         if plan == self.activePlan:
             self.model.setDelta(self.deltaService.getDelta(plan))
-
-    def showOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(True)
-
-    def hideOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(False)

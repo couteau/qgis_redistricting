@@ -28,9 +28,9 @@ from typing import TYPE_CHECKING
 import pandas as pd
 
 from ..utils import tr
-from .base.lists import KeyedList
-from .base.model import Factory
+from .base import Factory
 from .consts import DistrictColumns
+from .lists import KeyedList
 from .metricslist import MetricLevel, MetricTriggers, RdsMetric, register_metrics
 from .splits import RdsSplits
 
@@ -40,12 +40,14 @@ if TYPE_CHECKING:
 
 
 class RdsSplitsMetric(
-    RdsMetric[KeyedList[RdsSplits]],
+    RdsMetric[KeyedList[str, RdsSplits]],
     mname="splits",
     level=MetricLevel.GEOGRAPHIC,
-    triggers=MetricTriggers.ON_UPDATE_GEOMETRY | MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
+    triggers=MetricTriggers.ON_UPDATE_GEOMETRY
+    | MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+    | MetricTriggers.ON_UPDATE_GEOFIELDS,
 ):
-    value = RdsMetric.value.factory(Factory(KeyedList[RdsSplits], with_owner=False), override=True)
+    value = RdsMetric.value.factory(Factory(KeyedList[str, RdsSplits], with_owner=False), override=True)
 
     def __pre_init__(self):
         self.data: dict[str, pd.DataFrame] = {}
@@ -53,24 +55,22 @@ class RdsSplitsMetric(
     def getSplitNames(self, field: "RdsGeoField", geoids: Iterable[str]):
         return {g: field.getName(g) for g in geoids}
 
-    def calculate(self, populationData: pd.DataFrame, geometry, plan: "RdsPlan", **depends):
+    def calculate(
+        self, populationData: pd.DataFrame, districtData: pd.DataFrame, geometry: pd.Series, plan: "RdsPlan", **depends
+    ):
         def constant(s: pd.Series):
             array = s.to_numpy()
             return array.shape[0] == 0 or (array[0] == array).all()
 
         if plan is None:
-            self._value: KeyedList[RdsSplits] = KeyedList[RdsSplits]()
+            self._value: KeyedList[str, RdsSplits] = KeyedList(elem_type=RdsSplits)
             self.data: dict[str, pd.DataFrame] = {}
             return
 
         if populationData is not None:
             cols = [plan.distField]
             if DistrictColumns.POPULATION in populationData.columns:
-                cols += (
-                    [DistrictColumns.POPULATION]
-                    + [f.fieldName for f in plan.popFields]
-                    + [f.fieldName for f in plan.dataFields]
-                )
+                cols += [DistrictColumns.POPULATION, *plan.popFields.keys(), *plan.dataFields.keys()]
 
             self.data = {}
             for field in plan.geoFields:
@@ -96,16 +96,17 @@ class RdsSplitsMetric(
 
     # pylint: disable=unsubscriptable-object,unsupported-assignment-operation
     def finished(self, plan: "RdsPlan"):
-        new_splits: KeyedList[RdsSplits] = KeyedList[RdsSplits]()
+        new_splits: KeyedList[str, RdsSplits] = KeyedList(elem_type=RdsSplits)
 
         for f, split in self.data.items():
-            if f not in self._value:
-                new_splits[f] = RdsSplits(f, split)
-                new_splits[f].caption = plan.geoFields[f].caption
-                plan.geoFields[f].captionChanged.connect(new_splits[f].updateCaption)
+            if self._value.has(f):
+                s = RdsSplits(f, data=split)
+                s.caption = plan.geoFields.get(f).caption
+                plan.geoFields.get(f).captionChanged.connect(s.updateCaption)
+                new_splits.append(s)
             else:
-                new_splits[f] = self._value[f]
-                new_splits[f].setData(split)
+                new_splits.append(self._value.get(f))
+                new_splits.get(f).setData(split)
 
         self._value = new_splits
         self.data: dict[str, pd.DataFrame] = {}
@@ -117,10 +118,10 @@ class RdsSplitsMetric(
         if idx is None:
             return repr({k: len(v) for k, v in self._value.items()})  # pylint: disable=no-member
 
-        if idx not in self._value:
+        if idx not in self._value.keys():
             return ""
 
-        return f"{len(self._value[idx]):,}"
+        return f"{len(self._value.get(idx)):,}"
 
     def tooltip(self, idx=None):
         return tr("Double-click or press enter to see split details")

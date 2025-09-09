@@ -24,8 +24,6 @@
 
 from __future__ import annotations
 
-import sqlite3
-from collections.abc import Iterable
 from contextlib import closing
 from itertools import islice
 from numbers import Integral, Real
@@ -45,6 +43,9 @@ from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
+    import sqlite3
+    from collections.abc import Iterable
+
     from ...models import RdsPlan
 
 
@@ -165,17 +166,17 @@ class CreatePlanLayersTask(AggregateDataTask):
         addPopFields(self.popFields)
         addPopFields(self.dataFields)
 
-        for m in self.plan.metrics.metrics:
+        for m in self.plan.metrics:
             name = camel_to_snake(m.name())
             if name in fieldNames:
                 continue
 
-            if m.level() == MetricLevel.DISTRICT and m.serialize() and m.name() not in fieldNames:
-                if issubclass(m.get_type(), Integral):
+            if m.level() == MetricLevel.DISTRICT and m.serialize():
+                if issubclass(m.field_type(), Integral):
                     tp = "INTEGER"
-                elif issubclass(m.get_type(), Real):
+                elif issubclass(m.field_type(), Real):
                     tp = "REAL"
-                elif m.get_type() in (str, bytes):
+                elif m.field_type() in (str, bytes):
                     tp = "TEXT"
                 else:
                     continue
@@ -223,8 +224,8 @@ class CreatePlanLayersTask(AggregateDataTask):
         context = QgsExpressionContext()
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.geoLayer))
         context.setFeature(next(self.geoLayer.getFeatures()))
-        for f in self.geoFields:
-            if f.fieldName in fieldNames:
+        for fieldName, f in self.geoFields.items():
+            if fieldName in fieldNames:
                 continue
 
             f.prepare(context)
@@ -232,15 +233,15 @@ class CreatePlanLayersTask(AggregateDataTask):
             if tp not in {"INTEGER", "TEXT"}:
                 continue
 
-            fields.append(f"{f.fieldName} {tp}")
-            fieldNames.append(f.fieldName)
+            fields.append(f"{fieldName} {tp}")
+            fieldNames.append(fieldName)
 
         sql = f"CREATE TABLE assignments ({','.join(fields)})"
         success, error = createGpkgTable(db, "assignments", sql, srid=self.srid)
         if success:
             db.execute(f"CREATE INDEX idx_assignments_{self.distField} ON assignments ({self.distField})")
-            for field in self.geoFields:
-                db.execute(f"CREATE INDEX idx_assignments_{field.fieldName} ON assignments ({field.fieldName})")
+            for fieldName in self.geoFields.keys():
+                db.execute(f"CREATE INDEX idx_assignments_{fieldName} ON assignments ({fieldName})")
             db.commit()
         else:
             return False, error
@@ -257,9 +258,9 @@ class CreatePlanLayersTask(AggregateDataTask):
             geocol = self.getGeometryColumn(self.geoLayer, table)
             if table and geocol:
                 sql = f"SELECT {self.geoJoinField}, 0 as district, "
-                for f in self.geoFields:
-                    if f.fieldName in self.assignFields:
-                        sql += f"{f.field} as {f.fieldName}, "
+                for fieldName, f in self.geoFields.items():
+                    if fieldName in self.assignFields:
+                        sql += f"{f.field} as {fieldName}, "
                 sql += f"ST_AsText({geocol}) as geometry FROM {table}"
                 if self.geoLayer.subsetString():
                     sql += f" WHERE {self.geoLayer.subsetString()}"
@@ -341,6 +342,9 @@ class CreatePlanLayersTask(AggregateDataTask):
 
     def finished(self, result):
         super().finished(result)
+        if not result:
+            return
+
         self.plan.addLayersFromGeoPackage(self.path)
         reader = DistrictReader(self.plan.distLayer)
         unassigned = reader.readFromLayer()[0]

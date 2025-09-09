@@ -21,99 +21,235 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Optional,
-    Union
-)
-from collections.abc import Iterable
+
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
+from itertools import repeat
+from typing import TYPE_CHECKING, Any, Optional
 
 import geopandas as gpd
 import pandas as pd
-from qgis.core import (
-    QgsApplication,
-    QgsFeatureRequest,
-    QgsTask
-)
-from qgis.PyQt.QtCore import (
-    QObject,
-    QSignalMapper,
-    pyqtSignal
-)
+import shapely.ops
+from qgis.core import QgsFeatureRequest, QgsTask
+from qgis.PyQt.QtCore import QObject, QRunnable, QSignalMapper, QThreadPool
+from shapely import MultiPolygon, Polygon
 
-from ..models import MetricTriggers
-from .tasks.updatebase import UpdateMetricsTask
-from .tasks.updatedistricts import AggregateDistrictDataTask
+from ..models import DistrictColumns, MetricTriggers
+from ..utils import spatialite_connect, tr
+from ..utils.misc import quote_identifier
+from .districtio import DistrictReader
+from .metrics import MetricsService
+from .updateservice import IncrementalFeedback, UpdateParams, UpdateService, UpdateStatus
 
 if TYPE_CHECKING:
     from ..models import RdsPlan
 
 
-class DistrictUpdater(QObject):
-    updateStarted = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")  # plan, districts
-    updateComplete = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")  # plan, districts
-    updateTerminated = pyqtSignal("PyQt_PyObject", bool, "PyQt_PyObject")  # plan, canceled, exception
+class DissolveWorker(QRunnable):
+    def __init__(self, dist: int, geoms: Sequence[MultiPolygon], cb=None):
+        super().__init__()
+        self.dist = dist
+        self.geoms = geoms
+        self.merged = None
+        self.callback = cb
 
-    def __init__(self, parent: Optional[QObject] = None):
-        super().__init__(parent)
-        self._updateTasks: dict["RdsPlan", AggregateDistrictDataTask] = {}
+    def run(self):
+        self.merged = shapely.ops.unary_union(self.geoms)
+        if isinstance(self.merged, Polygon):
+            self.merged = MultiPolygon([self.merged])
+
+        if self.callback:
+            self.callback()
+
+
+@dataclass
+class DistrictUpdateParams(UpdateParams):
+    includeDemographics: bool
+    includeGeometry: bool
+    totalPopulation: Optional[int] = None
+    updateDistricts: Optional[set[int]] = None
+    populationData: Optional[pd.DataFrame] = None
+    districtData: Optional[gpd.GeoDataFrame] = None
+    geometry: Optional[gpd.GeoSeries] = None
+
+
+class DistrictUpdater(UpdateService):
+    paramsCls = DistrictUpdateParams
+
+    def __init__(self, metricsService: MetricsService, parent: Optional[QObject] = None):
+        super().__init__(tr("Calculating district geometry and demographics"), parent)
+        self._metricsService = metricsService
         self._updateDistricts: dict["RdsPlan", set[int]] = {}
         self._beforeCommitSignals = QSignalMapper(self)
         self._beforeCommitSignals.mappedObject.connect(self.checkForChangedAssignments)
         self._afterCommitSignals = QSignalMapper(self)
         self._afterCommitSignals.mappedObject.connect(self.startUpdateDistricts)
 
-    def updateDistrictData(self, plan: "RdsPlan", data: Union[pd.DataFrame, gpd.GeoDataFrame]):
-        for district, row in data.to_dict(orient="index").items():
-            plan.districts[f"{district:04}"].update(row)
-
-    def updateTaskCompleted(self):
-        updateTask: AggregateDistrictDataTask = self.sender()
-        del self._updateTasks[updateTask.plan]
-
-        trigger: MetricTriggers = 0
-        if updateTask.includeDemographics:
-            trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
-        if updateTask.includeGeometry:
-            trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
-
-        updateMetricsTask = UpdateMetricsTask(updateTask.plan, trigger, updateTask.populationData, updateTask.geometry)
-        QgsApplication.taskManager().addTask(updateMetricsTask)
-
-        if updateTask.districtData is not None:
-            self.updateDistrictData(updateTask.plan, updateTask.districtData)
-
-        updated = list(updateTask.updateDistricts) if updateTask.updateDistricts else None
-        self.updateComplete.emit(updateTask.plan, updated)
-
-    def updateTaskTerminated(self):
-        updateTask: AggregateDistrictDataTask = self.sender()
-        del self._updateTasks[updateTask.plan]
-        self.updateTerminated.emit(updateTask.plan, updateTask.isCanceled(), updateTask.exception)
-
-    def planIsUpdating(self, plan):
-        return plan in self._updateTasks and self._updateTasks[plan].status() < QgsTask.Complete
-
-    def cancelUpdate(self, plan):
-        if plan in self._updateTasks:
-            task = self._updateTasks[plan]
-            task.cancel()
-            task.waitForFinished()
-            del self._updateTasks[plan]
-
-    def updateDistricts(
-            self,
-            plan: "RdsPlan",
-            districts: Optional[Iterable[int]] = None,
-            needDemographics=False,
-            needGeometry=False,
-            force=False
+    def _disolveGeometry(
+        self, plan: "RdsPlan", update: gpd.GeoDataFrame, feedback: Optional[IncrementalFeedback] = None
     ):
-        """ update aggregate district data from assignments, including geometry where requested
+        def dissolve_progress():
+            nonlocal count, total
+            count += 1
+            feedback.updateProgress(total, count)
+
+        g_geom = update[[plan.distField, "geometry"]].groupby(plan.distField)
+        total = len(g_geom) + 1
+        count = 0
+        geoms: dict[int, shapely.MultiPolygon] = {}
+        pool = QThreadPool()
+        workers: list[DissolveWorker] = []
+        for g, v in g_geom["geometry"]:
+            if g == 0:
+                geoms[g] = None
+                count += 1
+                feedback.updateProgress(total, count)
+            else:
+                worker = DissolveWorker(int(g), v.array, dissolve_progress if feedback is not None else None)
+                worker.setAutoDelete(False)
+                workers.append(worker)
+                pool.start(worker)
+
+        pool.waitForDone()
+        geoms |= {t.dist: t.merged for t in workers}
+        return geoms
+
+    def _saveDistricts(self, plan: "RdsPlan", params: DistrictUpdateParams, feedback: IncrementalFeedback):
+        name = pd.Series(
+            [plan.districts.get(d).name if plan.districts.has(d) else str(d) for d in params.districtData.index],
+            index=params.districtData.index,
+        )
+        members = pd.Series(
+            [
+                0 if d == 0 else plan.districts.get(d).members if plan.districts.has(d) else 1
+                for d in params.districtData.index
+            ],
+            index=params.districtData.index,
+            dtype=int,
+        )
+
+        params.districtData = params.districtData.join(
+            pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
+        )
+
+        with spatialite_connect(plan.geoPackagePath) as db:
+            # Account for districts with no assignments --
+            # otherwise, they will never be updated in the database
+            if params.updateDistricts is None:
+                zero = set(range(0, plan.numDistricts + 1)) - set(params.districtData.index)
+            else:
+                zero = params.updateDistricts - set(params.districtData.index)
+
+            if zero:
+                parameters = ",".join(repeat("?", len(zero)))
+                sql = f"DELETE FROM districts WHERE {quote_identifier(plan.distField)} IN ({parameters})"  # noqa: S608
+                db.execute(sql, [str(d) for d in zero])
+                db.commit()
+
+            # Update existing dictricts
+            fields = {
+                quote_identifier(f): f"GeomFromText(:{f})" if f == "geometry" else f":{f}"
+                for f in list(params.districtData.columns)
+            }
+            if params.includeGeometry:
+                data = (d._asdict() for d in params.districtData.to_wkt().itertuples())
+            else:
+                data = (d._asdict() for d in params.districtData.itertuples())
+            parameters = ",".join(f"{field} = {param}" for field, param in fields.items())
+            sql = (
+                "UPDATE districts "  # noqa: S608
+                f"SET {parameters} "
+                f"WHERE {quote_identifier(plan.distField)} = :Index"
+            )
+            db.executemany(sql, data)
+            db.commit()
+
+            fields = {quote_identifier(plan.distField): ":Index"} | fields
+            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields.keys())}) VALUES ({','.join(fields.values())})"  # noqa: S608
+            db.executemany(sql, data)
+            db.commit()
+            feedback.updateProgress(1, 1)
+
+    def run(self, task: QgsTask, plan: "RdsPlan", params: DistrictUpdateParams):
+        feedback = IncrementalFeedback(task)
+
+        feedback.setProgressIncrement(0, 40)
+        params.populationData = self._loadAssignments(
+            plan, True, params.includeDemographics, params.includeGeometry, feedback
+        )
+
+        if params.includeDemographics:
+            params.totalPopulation = int(params.populationData[DistrictColumns.POPULATION].sum())
+
+        pop_cols: list[str] = [c for c in params.populationData.columns if not plan.geoFields.has(c)]
+        params.districtData = params.populationData[pop_cols].groupby(by=plan.distField).sum()
+
+        if params.includeGeometry:
+            feedback.setProgressIncrement(40, 90)
+            if params.updateDistricts is not None:
+                assignments = params.populationData.loc[
+                    params.populationData[plan.distField].isin(params.updateDistricts), [plan.distField, "geometry"]
+                ]
+            else:
+                assignments = params.populationData[[plan.distField, "geometry"]]
+
+            geoms = self._disolveGeometry(plan, assignments, feedback)
+            params.geometry = gpd.GeoSeries(geoms)
+            params.districtData = gpd.GeoDataFrame(
+                params.districtData, geometry=params.geometry, crs=params.populationData.crs
+            )
+
+        feedback.setProgressIncrement(90, 100)
+        self._saveDistricts(plan, params, feedback)
+
+        return params
+
+    def finished(
+        self,
+        status: UpdateStatus,
+        task: Optional[QgsTask],
+        plan: Optional["RdsPlan"],
+        params: Optional[DistrictUpdateParams],
+        exception: Optional[Exception],
+    ):
+        if status == UpdateStatus.SUCCESS:
+            plan.distLayer.reload()
+            reader = DistrictReader(plan.distLayer, plan.distField, plan.popField, plan.districtColumns)
+            reader.loadDistricts(plan)
+
+            trigger: MetricTriggers = 0
+            if params.includeDemographics:
+                trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+            if params.includeGeometry:
+                trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
+
+            self._metricsService.update(
+                plan,
+                False,
+                trigger=trigger,
+                populationData=params.populationData,
+                districtData=params.districtData,
+                geometry=params.geometry,
+            )
+
+        super().finished(status, task, plan, params, exception)
+
+    def update(
+        self,
+        plan: "RdsPlan",
+        force: bool = False,
+        *,
+        districts: Optional[Iterable[int]] = None,
+        includeDemographics=False,
+        includeGeometry=False,
+    ):
+        """update aggregate district data from assignments, including geometry where requested
 
         :param plan: Plan to update
         :type plan: RdsPlan
+
+        :param force: Cancel any pending update and begin a new update
+        :type force: bool
 
         :param districts: Districts of plan to update if less than all districts
         :type districts: Iterable[int] | None
@@ -124,28 +260,17 @@ class DistrictUpdater(QObject):
         :param needGeometry: Plan needs district geometry and related metrics updated
         :type needGeometry: bool
 
-        :param force: Cancel any pending update and begin a new update
-        :type force: bool
         """
-        if not (needDemographics or needGeometry):
-            return
+        if not (includeDemographics or includeGeometry):
+            return None
 
-        if force and self.planIsUpdating(plan):
-            self.cancelUpdate(plan)
-
-        if not self.planIsUpdating(plan):
-            districts = set(districts) if districts is not None else set()
-            self.updateStarted.emit(plan, list(districts))
-            updateTask = AggregateDistrictDataTask(
-                plan,
-                updateDistricts=districts,
-                includeGeometry=needGeometry,
-                includeDemographics=needDemographics,
-            )
-            updateTask.taskCompleted.connect(self.updateTaskCompleted)
-            updateTask.taskTerminated.connect(self.updateTaskTerminated)
-            self._updateTasks[plan] = updateTask
-            QgsApplication.taskManager().addTask(updateTask)
+        super().update(
+            plan,
+            force,
+            updateDistricts=districts,
+            includeDemographics=includeDemographics,
+            includeGeometry=includeGeometry,
+        )
 
     def watchPlan(self, plan: "RdsPlan"):
         if plan.assignLayer:
@@ -173,12 +298,12 @@ class DistrictUpdater(QObject):
                 if fld == dindex:
                     new[fid] = value
 
-        old = {
-            f[dindex] for f in plan.assignLayer.dataProvider().getFeatures(QgsFeatureRequest(list(new.keys())))
-        }
+        old = {f[dindex] for f in plan.assignLayer.dataProvider().getFeatures(QgsFeatureRequest(list(new.keys())))}
         self._updateDistricts[plan] = set(new.values()) | old
 
     def startUpdateDistricts(self, plan: "RdsPlan"):
         if self._updateDistricts[plan]:
-            self.updateDistricts(plan, self._updateDistricts[plan], True, True, True)
+            self.update(
+                plan, True, districts=self._updateDistricts[plan], includeDemographics=True, includeGeometry=True
+            )
             del self._updateDistricts[plan]

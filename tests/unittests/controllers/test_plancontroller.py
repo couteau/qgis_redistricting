@@ -94,9 +94,9 @@ class TestPlanController:
         dlg.geoIdCaption.return_value = "Block"
         dlg.joinField.return_value = "geoid20"
         dlg.popField.return_value = "pop_total"
-        dlg.popFields.return_value = []
-        dlg.dataFields.return_value = []
-        dlg.geoFields.return_value = []
+        dlg.popFields.return_value = {}
+        dlg.dataFields.return_value = {}
+        dlg.geoFields.return_value = {}
         dlg.gpkgPath.return_value = datadir / "test_plan.gpkg"
 
         dlg.importPlan.return_value = False

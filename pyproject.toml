@@ -3,8 +3,9 @@ max_line_length = 120
 
 [tool.pytest.ini_options]
 filterwarnings = "ignore:distutils:DeprecationWarning"
-qt_api = "pyqt6"
+qt_api = "pyqt5"
 addopts = "-nauto --import-mode=importlib -vv --dist loadgroup"
+tmp_path_retention_policy = "none"
 
 [tool.ruff]
 exclude = ["redistricting/gui/ui/*"]
@@ -12,7 +13,10 @@ indent-width = 4
 line-length = 120
 show-fixes = true
 fix = true
-target-version = "py39"
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
 
 [tool.ruff.lint]
 extend-select = [
@@ -29,16 +33,14 @@ extend-select = [
     "ICN",
     "ISC",
     "Q",
+    "TC",
 ]
-ignore = ["E741", "F811", "PLR2004", "COM812"]
+ignore = ["E741", "F811", "PLR2004", "COM812", "TC001", "TC002"]
 # don't fix unused imports -- some modules are imported for their side effects
 unfixable = ["F401"]
 
 [tool.ruff.lint.pylint]
 max-branches = 15
-
-[tool.ruff.format]
-quote-style = "double"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "PLR0915", "E501"]

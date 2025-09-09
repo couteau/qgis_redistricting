@@ -39,20 +39,22 @@ from qgis.PyQt.QtCore import QMetaType, QVariant, pyqtSignal
 from qgis.PyQt.QtGui import QIcon
 
 from ..utils import makeFieldName
-from .base.model import Factory, RdsBaseModel, rds_property
+from .base import Factory, Property, RdsBaseModel, rds_property
 from .consts import FieldCategory
 
 
 class RdsField(RdsBaseModel):
     captionChanged = pyqtSignal()
+    fieldNameChanged = pyqtSignal()
 
-    layer: QgsVectorLayer = rds_property(private=True)
-    field: str = rds_property(private=True)
-    caption: str = rds_property(private=True, notify=captionChanged, default=None)
+    layer: QgsVectorLayer
+    field: str
+    caption: str = None
+    fieldName: str = None
     category: int = FieldCategory.Population
 
     def __pre_init__(self):
-        self._field: str = None
+        self._fieldName: str = None
         self._icon: QIcon = None
         self._expression: QgsExpression = None
         self._context: QgsExpressionContext = None
@@ -60,9 +62,9 @@ class RdsField(RdsBaseModel):
         self._errors = []
 
     def __key__(self):
-        return self._field
+        return self.fieldName
 
-    @caption.getter
+    @Property(private=True, notify=captionChanged)
     def caption(self) -> str:
         if self._caption is None:
             if self.qgsField() is not None:
@@ -76,9 +78,19 @@ class RdsField(RdsBaseModel):
     def caption(self, value: str):
         self._caption = value
 
-    @property
-    def fieldName(self):
-        return makeFieldName(self.field, self._caption)
+    @Property(private=True, notify=fieldNameChanged)
+    def fieldName(self) -> str:
+        if self._fieldName is None:
+            return makeFieldName(self.field, self._caption)
+
+        return self._fieldName
+
+    @fieldName.setter
+    def fieldName(self, value: str):
+        if not self.isExpression():
+            self._fieldName = None
+
+        self._fieldName = value
 
     @property
     def expression(self):
@@ -231,7 +243,7 @@ class RdsGeoField(RdsField):
     nameField: Optional[RdsRelatedField] = rds_property(private=True, factory=Factory(_createNameField))
 
     def getRelation(self):
-        index = QgsExpression.expressionToLayerFieldIndex(self._field, self._layer)
+        index = QgsExpression.expressionToLayerFieldIndex(self.field, self.layer)
         if index != -1:
             relations = self.layer.referencingRelations(index)
             if relations:

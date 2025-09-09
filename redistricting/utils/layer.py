@@ -24,8 +24,8 @@
 
 import re
 import shlex
-from typing import Any, Literal, Optional, Union, overload
 from collections.abc import Iterator
+from typing import Any, Literal, Optional, Union, overload
 from urllib.parse import parse_qs, urlsplit
 
 import geopandas as gpd
@@ -47,6 +47,14 @@ class LayerReader(SqlAccess):
 
         self._layer = layer
         self._feedback = feedback
+
+    @property
+    def table_name(self):
+        return self.getTableName(self._layer)
+
+    @property
+    def is_sql_capable(self):
+        return self.isSQLCapable(self._layer)
 
     def updateProgress(self, total, count):
         if not self._feedback:
@@ -174,6 +182,7 @@ class LayerReader(SqlAccess):
     @overload
     def read_layer(
         self,
+        query: Optional[str] = None,
         columns: Optional[list[str]] = ...,
         order: Optional[str] = ...,
         filt: Optional[dict[str, Any]] = ...,
@@ -185,6 +194,7 @@ class LayerReader(SqlAccess):
     @overload
     def read_layer(
         self,
+        query: Optional[str] = None,
         columns: Optional[list[str]] = ...,
         order: Optional[str] = ...,
         filt: Optional[dict[str, Any]] = ...,
@@ -193,8 +203,9 @@ class LayerReader(SqlAccess):
         **kwargs,
     ) -> gpd.GeoDataFrame: ...
 
-    def read_layer(  # noqa: PLR0915, PLR0912
+    def read_layer(  # noqa: PLR0915, PLR0913, PLR0912
         self,
+        query: Optional[str] = None,
         columns: Optional[list[str]] = None,
         order: Optional[str] = None,
         filt: Optional[dict[str, Any]] = None,
@@ -203,8 +214,6 @@ class LayerReader(SqlAccess):
         **kwargs,
     ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
         def makeSqlQuery():
-            nonlocal filt
-
             if columns is None:
                 cols = "*"
             else:
@@ -237,71 +246,71 @@ class LayerReader(SqlAccess):
         else:
             total = 0
 
-        # use QGIS if reading a shapefile and the relevant engine is fiona -- otherwise, it crawls
+        # use QGIS if reading a shapefile and the relevant GeoPandas engine is fiona -- otherwise, it crawls
         if gpd_io_engine == "fiona" and self._layer.storageType() == "ESRI Shapefile":
+            if query is not None:
+                raise ValueError("ShapeFile does not support sql query")
             return self.read_qgis(columns, order, read_geometry, chunksize, filt)
 
-        if self._layer.storageType() in ("GPKG", "OpenFileGDB"):
-            if read_geometry:
-                database, params = self.split_provider_url()
-                result = self.gpd_read(
-                    database,
-                    self._layer.featureCount(),
-                    chunksize,
-                    filt,
-                    layer=params["layername"],
-                    columns=columns,
-                    **kwargs,
+        if not read_geometry:
+            with self.dbconnect(self._layer) as db:
+                result = pd.read_sql(
+                    query or makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
                 )
-                if order:
-                    result = result.set_index(order).sort_index()
-            else:
-                with self._connectSqlOgrSqlite(self._layer.dataProvider()) as db:
-                    result = pd.read_sql(
-                        makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
-                    )
                 if isinstance(result, Iterator):
                     result = pd.concat(self.iterateWithProgress(result, total))
-        elif self._layer.dataProvider().name() in ("spatialite", "SQLite"):
-            if read_geometry:
+            return result
+
+        if (
+            query is not None
+            and self._layer.dataProvider().name() not in ("postgis", "postgres")
+            and gpd_io_engine == "fiona"
+        ):
+            raise ValueError("Cannot run SQL queries with fiona")
+
+        storage_type = self._layer.storageType()
+        provider_name = self._layer.dataProvider().name()
+        if storage_type in ("GPKG", "OpenFileGDB") or provider_name in ("spatialite", "SQLite"):
+            if storage_type in ("GPKG", "OpenFileGDB"):
+                database, params = self.split_provider_url()
+                layer = params["layername"]
+            else:
                 params = dict(
                     pair.split("=", 1)
                     for pair in shlex.split(re.sub(r" \(\w+\)", "", self._layer.dataProvider().dataSourceUri(True)))
                 )
-                result = self.gpd_read(
-                    params["dbname"],
-                    self._layer.featureCount(),
-                    chunksize,
-                    layer=params["table"],
-                    columns=columns,
+                database = params["dbname"]
+                layer = params["table"]
+
+            if query is not None:
+                kwargs["sql"] = query
+            else:
+                kwargs["layer"] = layer
+
+            result = self.gpd_read(
+                database,
+                self._layer.featureCount(),
+                chunksize,
+                filt,
+                columns=columns,
+                **kwargs,
+            )
+            if order:
+                result = result.set_index(order).sort_index()
+        elif provider_name in ("postgis", "postgres"):
+            with self._connectSqlPostgres(self._layer.dataProvider(), dict_connection=False) as db:
+                result = gpd.read_postgis(
+                    query or makeSqlQuery(),
+                    db,
+                    self.getGeometryColumn(self._layer),
+                    index_col=order,
+                    chunksize=chunksize,
                     **kwargs,
                 )
-                if order:
-                    result = result.set_index(order).sort_index()
-            else:
-                with self._connectSqlNativeSqlite(self._layer.dataProvider()) as db:
-                    result = pd.read_sql(makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize)
-                if isinstance(result, Iterator):
-                    result = pd.concat(self.iterateWithProgress(result, total))
-        elif self._layer.dataProvider().name() in ("postgis", "postgres"):
-            with self._connectSqlPostgres(self._layer.dataProvider(), dict_connection=False) as db:
-                if read_geometry:
-                    result = gpd.read_postgis(
-                        makeSqlQuery(),
-                        db,
-                        self.getGeometryColumn(self._layer),
-                        index_col=order,
-                        chunksize=chunksize,
-                        **kwargs,
-                    )
-                else:
-                    result = pd.read_sql(
-                        makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
-                    )
 
             if isinstance(result, Iterator):
                 result = pd.concat(self.iterateWithProgress(result, total))
-        elif self._layer.storageType() in ("ESRI Shapefile", "GeoJSON"):
+        elif storage_type in ("ESRI Shapefile", "GeoJSON"):
             result = self.gpd_read(
                 self._layer.source(),
                 self._layer.featureCount(),
@@ -312,7 +321,7 @@ class LayerReader(SqlAccess):
             )
             if order:
                 result = result.set_index(order).sort_index()
-        elif self._layer.dataProvider().name() == "delimitedtext":
+        elif provider_name == "delimitedtext":
             uri_parts = urlsplit(self._layer.source())
             params = parse_qs(uri_parts.query)
             delimiter = params.get("delimiter", ",")[-1:]
@@ -347,4 +356,97 @@ class LayerReader(SqlAccess):
             result = self.read_qgis(self._layer, columns, order, read_geometry, chunksize)
 
         self.checkCanceled()
+        return result
+
+    @overload
+    def read_sql(
+        self,
+        sql: str,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        read_geometry: Literal[False] = ...,
+        chunksize: int = ...,
+        **kwargs,
+    ) -> pd.DataFrame: ...
+
+    @overload
+    def read_sql(
+        self,
+        sql: str,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        read_geometry: Literal[True] = ...,
+        chunksize: int = ...,
+        **kwargs,
+    ) -> gpd.GeoDataFrame: ...
+
+    def read_sql(  # noqa: PLR0915, PLR0912
+        self,
+        sql: str,
+        columns: Optional[list[str]] = None,
+        order: Optional[str] = None,
+        read_geometry: bool = True,
+        chunksize: int = 0,
+        **kwargs,
+    ) -> Union[pd.DataFrame, gpd.GeoDataFrame]:
+        if not self.is_sql_capable:
+            raise TypeError("Cannot read sql queary from non-sql-capable layer")
+
+        if read_geometry and gpd_io_engine == "fiona":
+            return self.read_layer(
+                columns=columns, order=order, read_geometry=read_geometry, chunksize=chunksize, **kwargs
+            )
+
+        fc = self._layer.featureCount()
+        if chunksize <= 0:
+            chunksize = None
+
+        if fc != -1:
+            if not chunksize:
+                chunksize = fc // 10 if fc % 10 == 0 else fc // 9
+                total = 10
+            else:
+                total = fc // chunksize + int(bool(fc % chunksize))
+        else:
+            total = 0
+
+        if read_geometry:
+            if gpd_io_engine == "fiona":
+                # TODO: extract columns and order from sql query
+                return self.read_layer(
+                    columns=columns, order=order, read_geometry=read_geometry, chunksize=chunksize, **kwargs
+                )
+            if self._layer.storageType() in ("GPKG", "OpenFileGDB") or self._layer.dataProvider().name() in (
+                "spatialite",
+                "SQLite",
+            ):
+                if self._layer.storageType() in ("GPKG", "OpenFileGDB"):
+                    database, params = self.split_provider_url()
+                else:
+                    params = dict(
+                        pair.split("=", 1)
+                        for pair in shlex.split(re.sub(r" \(\w+\)", "", self._layer.dataProvider().dataSourceUri(True)))
+                    )
+                    database = params["dbname"]
+                result = self.gpd_read(database, fc, chunksize, sql=sql, columns=columns, **kwargs)
+            elif self._layer.dataProvider().name() in ("postgis", "postgres"):
+                with self._connectSqlPostgres(self._layer.dataProvider(), dict_connection=False) as db:
+                    result = gpd.read_postgis(
+                        sql,
+                        db,
+                        self.getGeometryColumn(self._layer),
+                        index_col=order,
+                        chunksize=chunksize,
+                        **kwargs,
+                    )
+        else:
+            with self.dbconnect(self._layer) as db:
+                result = pd.read_sql(sql, db, index_col=order, columns=columns, chunksize=chunksize, **kwargs)
+
+        if isinstance(result, Iterator):
+            result = pd.concat(self.iterateWithProgress(result, total))
+
+        if order:
+            result = result.set_index(order).sort_index()
+
         return result

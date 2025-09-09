@@ -24,9 +24,8 @@
 
 from __future__ import annotations
 
-import pathlib
 from numbers import Number
-from typing import Optional, Self, overload  # pylint: disable=no-name-in-module
+from typing import TYPE_CHECKING, Optional, overload  # pylint: disable=no-name-in-module
 
 from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
@@ -35,6 +34,10 @@ from .. import settings
 from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, consts
 from ..utils import matchField, tr
 from .planvalidator import PlanValidator
+
+if TYPE_CHECKING:
+    import pathlib
+    from typing import Self
 
 
 class BasePlanBuilder(PlanValidator):
@@ -131,7 +134,7 @@ class BasePlanBuilder(PlanValidator):
         self._distField = value
         return self
 
-    def setGeoLayer(self, value: QgsVectorLayer):
+    def setGeoLayer(self, value: Optional[QgsVectorLayer]):
         if value is not None and not isinstance(value, QgsVectorLayer):
             raise ValueError(tr("Geography layer must be a vector layer"))
 
@@ -217,14 +220,14 @@ class BasePlanBuilder(PlanValidator):
         return matchField(fieldName, self._popLayer, settings.cvapFieldPatterns)
 
     @overload
-    def appendPopField(self, field: str, caption: str = None) -> Self: ...
+    def appendPopField(self, field: str, caption: Optional[str] = None, fieldName: Optional[str] = None) -> "Self": ...
 
     @overload
-    def appendPopField(self, field: RdsField) -> Self: ...
+    def appendPopField(self, field: RdsField) -> "Self": ...
 
-    def appendPopField(self, field, caption=None):
+    def appendPopField(self, field, caption=None, fieldName=None):
         if isinstance(field, str):
-            field = RdsField(self._popLayer, field, caption)
+            field = RdsField(self._popLayer, field, caption, fieldName)
         elif not isinstance(field, RdsField):
             raise TypeError(
                 tr("Attempt to add invalid field {field!r} to plan {plan}").format(field=field, plan=self._name)
@@ -244,15 +247,15 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def removePopField(self, field: RdsField) -> Self: ...
+    def removePopField(self, field: RdsField) -> "Self": ...
 
     @overload
-    def removePopField(self, field: str) -> Self: ...
+    def removePopField(self, field: str) -> "Self": ...
 
     @overload
-    def removePopField(self, field: int) -> Self: ...
+    def removePopField(self, field: int) -> "Self": ...
 
-    def removePopField(self, field) -> Self:
+    def removePopField(self, field) -> "Self":
         if isinstance(field, RdsField):
             if field not in self._popFields:
                 raise ValueError(
@@ -282,7 +285,7 @@ class BasePlanBuilder(PlanValidator):
         self._popFields.remove(field)
         return self
 
-    def setDataFields(self, dataFields: list[RdsDataField]) -> Self:
+    def setDataFields(self, dataFields: list[RdsDataField]) -> "Self":
         l = []
         for f in dataFields:
             if not self._checkNotDuplicate(f, l):
@@ -295,20 +298,27 @@ class BasePlanBuilder(PlanValidator):
 
     @overload
     def appendDataField(
-        self, field: str, caption: str = None, sumField: bool = True, pctBase: Optional[str] = None
-    ) -> Self: ...
+        self,
+        field: str,
+        caption: str = None,
+        sumField: bool = True,
+        pctBase: Optional[str] = None,
+        fieldName: Optional[str] = None,
+    ) -> "Self": ...
 
     @overload
-    def appendDataField(self, field: RdsDataField) -> Self: ...
+    def appendDataField(self, field: RdsDataField) -> "Self": ...
 
-    def appendDataField(self, field, caption=None, sumField=True, pctBase=None) -> Self:
+    def appendDataField(self, field, caption=None, sumField=True, pctBase=None, fieldName=None) -> "Self":
         if isinstance(field, str):
             if pctBase is None:
                 if self._vap and matchField(field, self._popLayer, settings.vapFieldPatterns):
                     pctBase = self._vap.field
                 elif self._cvap and matchField(field, self._popLayer, settings.cvapFieldPatterns):
                     pctBase = self._cvap.field
-            field = RdsDataField(self._popLayer, field, caption, sumField=sumField, pctBase=pctBase)
+            field = RdsDataField(
+                self._popLayer, field, caption, sumField=sumField, pctBase=pctBase, fieldName=fieldName
+            )
         elif not isinstance(field, RdsDataField):
             raise TypeError(tr("Field must be an RdsField or the name of a field").format(field=field, plan=self._name))
 
@@ -322,15 +332,15 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def removeDataField(self, field: str) -> Self: ...
+    def removeDataField(self, field: str) -> "Self": ...
 
     @overload
-    def removeDataField(self, field: RdsDataField) -> Self: ...
+    def removeDataField(self, field: RdsDataField) -> "Self": ...
 
     @overload
-    def removeDataField(self, field: int) -> Self: ...
+    def removeDataField(self, field: int) -> "Self": ...
 
-    def removeDataField(self, field) -> Self:
+    def removeDataField(self, field) -> "Self":
         if isinstance(field, RdsDataField):
             if field not in self._dataFields:
                 raise ValueError(
@@ -373,10 +383,10 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def appendGeoField(self, field: str, caption: str = None) -> Self: ...
+    def appendGeoField(self, field: str, caption: str = None) -> "Self": ...
 
     @overload
-    def appendGeoField(self, field: RdsGeoField) -> Self: ...
+    def appendGeoField(self, field: RdsGeoField) -> "Self": ...
 
     def appendGeoField(self, field, caption=None):
         if isinstance(field, str):
@@ -396,15 +406,15 @@ class BasePlanBuilder(PlanValidator):
         return self
 
     @overload
-    def removeGeoField(self, field: RdsGeoField) -> Self: ...
+    def removeGeoField(self, field: RdsGeoField) -> "Self": ...
 
     @overload
-    def removeGeoField(self, field: str) -> Self: ...
+    def removeGeoField(self, field: str) -> "Self": ...
 
     @overload
-    def removeGeoField(self, field: int) -> Self: ...
+    def removeGeoField(self, field: int) -> "Self": ...
 
-    def removeGeoField(self, field) -> Self:
+    def removeGeoField(self, field) -> "Self":
         if isinstance(field, RdsField):
             if field not in self._geoFields:
                 raise ValueError(

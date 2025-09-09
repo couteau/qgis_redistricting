@@ -23,7 +23,7 @@ from qgis.core import QgsField
 from qgis.PyQt.QtCore import QVariant
 
 from redistricting.models import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
-from redistricting.models.base.serialization import deserialize, serialize
+from redistricting.models.serialization import deserialize, serialize
 
 # pylint: disable=comparison-with-callable, protected-access, unused-argument
 

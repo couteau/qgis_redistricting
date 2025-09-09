@@ -28,7 +28,7 @@ from qgis.PyQt.QtCore import QAbstractItemModel, QModelIndex, QObject, Qt
 from qgis.PyQt.QtWidgets import QDialog, QStyledItemDelegate, QStyleOptionViewItem, QTreeView, QWidget
 
 from ..models import RdsPlan, RdsSplits, RdsSplitsModel
-from ..models.base.lists import KeyedList
+from ..models.lists import KeyedList
 from ..utils import tr
 from .ui.DlgSplits import Ui_dlgSplits
 
@@ -60,7 +60,7 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self.setupUi(self)
 
         self._plan = plan
-        self._splits: KeyedList[RdsSplits] = plan.metrics.splits
+        self._splits: KeyedList[str, RdsSplits] = plan.metrics.splits
         self._field: str = None
         self._plan.nameChanged.connect(self.planNameChanged)
         self._plan.geoFieldsChanged.connect(self.updateGeography)
@@ -80,14 +80,14 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
 
     @field.setter
     def field(self, value: str):
-        if value not in self._splits.keys():
+        if not self._splits.has(value):
             raise ValueError("No splits data for field")
 
         if self._field == value:
             return
 
         self._field = value
-        geoField = self._plan.geoFields[value]
+        geoField = self._plan.geoFields.get(value)
         self.setWindowTitle(f"{geoField.caption} {tr('Splits')}")
         self.cmbGeography.setCurrentText(geoField.caption)
 
@@ -108,4 +108,4 @@ class DlgSplitDetail(Ui_dlgSplits, QDialog):
         self.cmbGeography.addItems([f.caption for f in self._plan.geoFields])
 
     def changeGeography(self, idx: int):
-        self.field = self._splits.get_key(idx)
+        self.field = self._splits[idx].field

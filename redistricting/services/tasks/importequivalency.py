@@ -127,10 +127,14 @@ class ImportAssignmentFileTask(QgsTask):
             progress = 0
 
             with spatialite_connect(self.geoPackagePath) as db:
-                sql = f"UPDATE assignments SET {quote_identifier(self.distField)} = ? "  # noqa: S608
-                f"WHERE {quote_identifier(self.joinField)} == ?"
+                sql = (
+                    f"UPDATE assignments SET {quote_identifier(self.distField)} = ?"  # noqa
+                    f"WHERE {quote_identifier(self.joinField)} == ?"
+                )
 
-                db.executemany(sql, updateProgress(assignments.itertuples(index=False)))
+                db.executemany(
+                    sql, updateProgress(assignments[[self.distColumn, self.geoColumn]].itertuples(index=False))
+                )
                 db.commit()
         except CanceledError:
             return False

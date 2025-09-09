@@ -23,8 +23,8 @@
 """
 
 import json
-from typing import List
 from collections.abc import Iterable
+from typing import List
 from uuid import UUID
 
 from packaging import version
@@ -49,6 +49,10 @@ class ProjectStorage:
 
     def needsMigration(self) -> bool:
         """Check if the redistricting plans need to be migrated to the current schema version"""
+        l, success = self._project.readListEntry("redistricting", "redistricting-plans", [])
+        if not success or len(l) == 0:
+            return False
+
         return self._version < schemaVersion
 
     def migrate(self):
@@ -89,8 +93,7 @@ class ProjectStorage:
             DistrictColumns.PCT_DEVIATION,
             "description",
         ]
-        for f in plan.popFields:
-            columns.append(f.fieldName)
+        columns.extend(plan.popFields.keys())
         for f in plan.dataFields:
             if f.sumField:
                 columns.append(f.fieldName)
@@ -111,10 +114,8 @@ class ProjectStorage:
             DistrictColumns.PCT_DEVIATION,
             "description",
         ]
-        for f in plan.popFields:
-            columns.append(f.fieldName)
-        for f in plan.dataFields:
-            columns.append(f.fieldName)
+        columns.extend(plan.popFields.keys())
+        columns.extend(plan.dataFields.keys())
         columns.extend(MetricsColumns)
         if plan.distLayer:
             writer = DistrictWriter(plan.distLayer, plan.distField, plan.popField, columns)
@@ -143,8 +144,8 @@ class ProjectStorage:
                     del planJson["pop-layer"]
 
                 plan = deserialize(RdsPlan, planJson, parent=self._project)
-                self.readDistricts(plan)
                 if plan is not None:
+                    self.readDistricts(plan)
                     plans.append(plan)
         return plans
 

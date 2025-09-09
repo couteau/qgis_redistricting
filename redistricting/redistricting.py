@@ -51,9 +51,10 @@ from .services import (
     ActionRegistry,
     AssignmentsService,
     DeltaUpdateService,
-    DistrictCopier,
+    DistrictUtils,
     DistrictUpdater,
     LayerTreeManager,
+    MetricsService,
     PlanImportService,
     PlanManager,
     PlanStylerService,
@@ -97,13 +98,14 @@ class Redistricting:
         self.layerTreeManger = LayerTreeManager(self.project)
         self.planStyler = PlanStylerService(self.planManager)
         self.deltaService = DeltaUpdateService(self.planManager)
-        self.updaterService = DistrictUpdater()
+        self.metricsService = MetricsService()
+        self.updaterService = DistrictUpdater(self.metricsService)
         self.importService = PlanImportService()
         self.importService.importComplete.connect(
-            lambda plan: self.updaterService.updateDistricts(plan, needDemographics=True, needGeometry=True, force=True)
+            lambda plan: self.updaterService.update(plan, force=True, includeDemographics=True, includeGeometry=True)
         )
         self.assignmentsService = AssignmentsService()
-        self.districtCopier = DistrictCopier(iface, self.planManager, self.assignmentsService)
+        self.districtUtils = DistrictUtils(iface, self.planManager, self.assignmentsService)
 
         # create toolbar
         self.toolbar: QToolBar = QToolBar(self.name)
@@ -118,6 +120,7 @@ class Redistricting:
             self.layerTreeManger,
             self.planStyler,
             self.updaterService,
+            self.metricsService,
             self.importService,
         )
 
@@ -126,7 +129,7 @@ class Redistricting:
         )
 
         self.metricsController = MetricsController(
-            self.iface, self.project, self.planManager, self.toolbar, self.updaterService
+            self.iface, self.project, self.planManager, self.toolbar, self.metricsService
         )
 
         self.districtController = DistrictController(
@@ -135,7 +138,7 @@ class Redistricting:
             self.planManager,
             self.toolbar,
             self.assignmentsService,
-            self.districtCopier,
+            self.districtUtils,
             self.updaterService,
         )
 

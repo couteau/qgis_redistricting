@@ -46,7 +46,8 @@ from qgis.core import (
 from qgis.gui import QgisInterface, QgsLayerTreeMapCanvasBridge, QgsLayerTreeView, QgsMapCanvas
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QObject, QSize, pyqtBoundSignal, pyqtSignal
-from qgis.PyQt.QtWidgets import QAction, QActionGroup, QMainWindow, QMenu, QToolBar, QWidget
+from qgis.PyQt.QtGui import QAction, QActionGroup
+from qgis.PyQt.QtWidgets import QMainWindow, QMenu, QToolBar, QWidget
 from qgis.utils import iface  # noqa: F401  # pylint: disable=unused-import
 
 # pylint: disable=redefined-outer-name
@@ -585,8 +586,9 @@ def dist_layer(plan_gpkg_path):
 from redistricting.services.planbuilder import PlanBuilder  # noqa: E402 # isort:skip
 from redistricting.services.districtio import DistrictReader  # noqa: E402 # isort:skip
 from redistricting.models.plan import RdsPlan  # isort: skip  # noqa: E402
-from redistricting.models.base.serialization import deserialize  # noqa: E402 # isort: skip
+from redistricting.models.serialization import deserialize  # noqa: E402 # isort: skip
 from redistricting.models import metrics, splitsmetric  # noqa: F401, E402 # isort: skip; pylint: disable=unused-import
+from redistricting.models.lists import KeyedList  # noqa: F401, E402 # isort: skip
 
 
 @pytest.fixture
@@ -659,8 +661,8 @@ def plan(qgis_parent, block_layer, assign_layer, dist_layer):
                     "contiguity": {"value": True},
                     "complete": {"value": True},
                     "splits": {
-                        "value": {
-                            "vtdid": {
+                        "value": [
+                            {
                                 "field": "vtdid",
                                 "caption": "VTD",
                                 "data": {
@@ -672,7 +674,7 @@ def plan(qgis_parent, block_layer, assign_layer, dist_layer):
                                     "data": [],
                                 },
                             }
-                        }
+                        ]
                     },
                 }
             },
@@ -746,17 +748,17 @@ def mock_plan(mocker: MockerFixture) -> RdsPlan:
     type(plan).allocatedDistricts = mocker.PropertyMock(return_value=5)
     type(plan).allocatedSeats = mocker.PropertyMock(return_value=5)
 
-    districts = mocker.create_autospec(spec=list, spec_set=True, instance=True)
+    districts = mocker.create_autospec(spec=KeyedList, spec_set=True, instance=True)
     districts.__len__.return_value = 6
     type(plan).districts = mocker.PropertyMock(return_value=districts)
 
-    pop_fields = mocker.create_autospec(spec=list, spec_set=True, instance=True)
+    pop_fields = mocker.create_autospec(spec=KeyedList, spec_set=True, instance=True)
     type(plan).popFields = mocker.PropertyMock(return_value=pop_fields)
 
-    data_fields = mocker.create_autospec(spec=list, spec_set=True, instance=True)
+    data_fields = mocker.create_autospec(spec=KeyedList, spec_set=True, instance=True)
     type(plan).dataFields = mocker.PropertyMock(return_value=data_fields)
 
-    geo_fields = mocker.create_autospec(spec=list, spec_set=True, instance=True)
+    geo_fields = mocker.create_autospec(spec=KeyedList, spec_set=True, instance=True)
     type(plan).geoFields = mocker.PropertyMock(return_value=geo_fields)
 
     plan.assignLayer.isEditable.return_value = False

@@ -22,14 +22,14 @@
  ***************************************************************************/
 """
 
-from .base import lists
-from .base.serialization import deserialize, serialize
+from . import lists
 from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
 from .delta import Delta, DeltaList
 from .district import DistrictList, RdsDistrict, RdsUnassigned
 from .field import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
 from .metricslist import MetricLevel, MetricTriggers, RdsMetric, RdsMetrics, register_metrics
 from .plan import DeviationType, RdsPlan
+from .serialization import deserialize, serialize
 from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
 from .validators import BaseDeviationValidator, MaxDeviationValidator, PlusMinusDeviationValidator
 from .viewmodels import (

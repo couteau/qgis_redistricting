@@ -114,6 +114,7 @@ class DockPlanMetrics(Ui_qdwPlanMetrics, RdsDockWidget):
         super().__init__(parent)
         self.setupUi(self)
         self.header = QResizableHeaderView(Qt.Orientation.Vertical, self.tblPlanMetrics)
+        self.header.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.header.resized.connect(self.tblPlanMetrics.updateGeometries)
         self.tblPlanMetrics.setVerticalHeader(self.header)
 

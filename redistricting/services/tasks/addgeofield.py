@@ -22,7 +22,7 @@
  ***************************************************************************/
 """
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from qgis.core import (
     Qgis,
@@ -49,7 +49,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
         geoPackagePath: str,
         assignLayer: QgsVectorLayer,
         srcLayer: QgsVectorLayer,
-        geoFields: List["RdsField"],
+        geoFields: list["RdsField"],
         srcIdField: str,
         geoIdField: str,
     ):
@@ -91,7 +91,7 @@ class AddGeoFieldToAssignmentLayerTask(QgsTask):
             getters = [makeGetter(geoField) for geoField in self.geoFields]
             getters.append(lambda f: f[gindex])
             request = QgsFeatureRequest()
-            request.setFlags(QgsFeatureRequest.NoGeometry)
+            request.setFlags(Qgis.FeatureRequestFlag.NoGeometry)
 
             with spatialite_connect(self.geoPackagePath) as db:
                 params = ",".join(geoField.fieldName + " = ?" for geoField in self.geoFields)

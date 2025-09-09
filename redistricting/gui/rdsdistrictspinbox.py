@@ -47,7 +47,7 @@ class RdsDistrictSpinBox(QSpinBox):
             return value
 
         v = value + steps
-        while 0 < v <= self._plan.numDistricts and v in self._plan.districts:
+        while 0 < v <= self._plan.numDistricts and v in self._plan.districts.keys():
             v += steps
 
         if 0 < v <= self._plan.numDistricts:
@@ -71,7 +71,7 @@ class RdsDistrictSpinBox(QSpinBox):
         if valid != QValidator.Invalid:
             if inp.isnumeric():
                 v = int(inp)
-                if v in self._plan.districts:
+                if v in self._plan.districts.keys():
                     valid = QValidator.Intermediate
 
         return (valid, inp, pos)

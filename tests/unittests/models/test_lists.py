@@ -23,9 +23,9 @@ from collections.abc import Mapping, Sequence
 
 import pytest
 
-from redistricting.models.base.lists import KeyedList, SortedKeyedList
-from redistricting.models.base.model import RdsBaseModel
-from redistricting.models.base.serialization import deserialize, serialize
+from redistricting.models.base import RdsBaseModel
+from redistricting.models.lists import KeyedList, SortedKeyedList
+from redistricting.models.serialization import deserialize, serialize
 
 # ruff: noqa: E741
 

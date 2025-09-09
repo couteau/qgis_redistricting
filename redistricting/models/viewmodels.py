@@ -22,7 +22,7 @@
  ***************************************************************************/
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
@@ -47,7 +47,8 @@ from ..utils import tr
 from .consts import DistrictColumns, FieldCategory, FieldColors, MetricsColumns
 from .delta import DeltaList
 from .district import RdsDistrict
-from .field import RdsDataField, RdsField
+from .field import RdsField
+from .lists import KeyedList
 from .metricslist import MetricLevel, RdsMetric, RdsMetrics
 from .plan import DeviationType, RdsPlan
 from .splits import RdsSplitBase, RdsSplitDistrict, RdsSplitGeography, RdsSplits
@@ -83,7 +84,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
         super().__init__(parent)
         self._columns: list[DistrictColumnData] = []
         self._plan = None
-        self._districts: Sequence[RdsDistrict] = []
+        self._districts: KeyedList[int, RdsDistrict] = KeyedList()
         self._validator: BaseDeviationValidator = None
         self.plan = plan
 
@@ -194,11 +195,11 @@ class RdsDistrictDataModel(QAbstractTableModel):
             row = index.row()
             col = index.column()
             key = self._columns[col].key
-            district = self._districts[row]
+            district = self._districts[row]  # noqa: PD009
 
             if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole, RdsDistrictDataModel.RawDataRole):
                 if key[:3] == "pct" and key != "pct_deviation":
-                    pctbase = self._plan.dataFields[key[4:]].pctBase
+                    pctbase = self._plan.dataFields.get(key[4:]).pctBase
                     if pctbase == self._plan.popField:
                         pctbase = DistrictColumns.POPULATION
                     if district[pctbase] != 0:
@@ -291,7 +292,7 @@ class RdsDistrictDataModel(QAbstractTableModel):
 
         return f
 
-    def districtsUpdated(self, plan: RdsPlan, districts: Union[Iterable[int], None]):
+    def districtsUpdated(self, plan: RdsPlan, districts: Union[Iterable[int], None] = None):
         if plan != self._plan:
             return
 
@@ -565,7 +566,6 @@ class DeltaListModel(QAbstractTableModel):
             },
         ]
 
-        field: RdsField
         for field in self._plan.popFields:
             fn = field.fieldName
             self._fields.extend(
@@ -580,7 +580,6 @@ class DeltaListModel(QAbstractTableModel):
                 ]
             )
 
-        field: RdsDataField
         for field in self._plan.dataFields:
             fn = field.fieldName
             if field.sumField:
@@ -819,7 +818,7 @@ class RdsMetricsModel(QAbstractTableModel):
             elif m.level() == MetricLevel.GEOGRAPHIC:
                 # it's an entry in a geographic metric -- header is geoField's caption
                 g = self.metricKey(section)
-                header = f"    {self._plan.geoFields[g].caption}"
+                header = f"    {self._plan.geoFields.get(g).caption}"
 
             elif m.group() is not None:
                 header = f"    {m.caption()}"

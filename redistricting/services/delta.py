@@ -22,43 +22,40 @@
  ***************************************************************************/
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
-from qgis.core import QgsApplication, QgsTask
+from qgis.core import QgsTask
 from qgis.PyQt.QtCore import QObject, QSignalMapper, pyqtSignal
 
-from ..models import DeltaList, RdsPlan
+from ..models import DeltaList, DistrictColumns, RdsPlan
+from ..utils import spatialite_connect
+from ..utils.misc import quote_identifier
 from .errormixin import ErrorListMixin
 from .planmgr import PlanManager
-from .tasks.updatepending import AggregatePendingChangesTask
+from .updateservice import IncrementalFeedback, UpdateParams, UpdateService, UpdateStatus
 
 
 @dataclass
-class DeltaUpdate:
+class DeltaUpdate(UpdateParams):
     plan: RdsPlan
-    assignments: pd.DataFrame = None
-    popData: pd.DataFrame = None
-    delta: DeltaList = None
-    task: AggregatePendingChangesTask = None
-
-    def __post_init__(self):
-        if self.delta is None:
-            self.delta = DeltaList()
+    assignments: Optional[pd.DataFrame] = None
+    popData: Optional[pd.DataFrame] = None
+    data: Optional[pd.DataFrame] = None
+    delta: DeltaList = field(default_factory=DeltaList)
 
     def clear(self):
         self.assignments = None
-        self.task = None
+        self.data = None
         self.delta.clear()
 
 
-class DeltaUpdateService(ErrorListMixin, QObject):
-    updateStarted = pyqtSignal("PyQt_PyObject")
-    updateCompleted = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")
-    updateTerminated = pyqtSignal("PyQt_PyObject", bool, "PyQt_PyObject")
+class DeltaUpdateService(ErrorListMixin, UpdateService):
     deltaStarted = pyqtSignal("PyQt_PyObject")
     deltaStopped = pyqtSignal("PyQt_PyObject")
+
+    paramsCls = DeltaUpdate
 
     def __init__(self, planManager: PlanManager, parent: Optional[QObject] = None):
         super().__init__(parent)
@@ -66,10 +63,6 @@ class DeltaUpdateService(ErrorListMixin, QObject):
         self._deltas: dict[RdsPlan, DeltaUpdate] = {}
         self._planManager.planAdded.connect(self.planAdded)
         self._planManager.planRemoved.connect(self.planRemoved)
-        self._completeSignals = QSignalMapper(self)
-        self._completeSignals.mappedObject.connect(self.deltaTaskCompleted)
-        self._terminatedSignals = QSignalMapper(self)
-        self._terminatedSignals.mappedObject.connect(self.deltaTaskTerminated)
         self._commitSignals = QSignalMapper(self)
         self._commitSignals.mappedObject.connect(self.commitChanges)
         self._rollbackSignals = QSignalMapper(self)
@@ -118,63 +111,23 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             self._assignmentChangedSignals.removeMappings(plan.assignLayer.undoStack())
             del self._deltas[plan]
 
-    def isUpdating(self, plan: RdsPlan):
-        return (
-            plan in self._deltas
-            and self._deltas[plan].task is not None
-            and self._deltas[plan].task.status() < QgsTask.TaskStatus.Complete
-        )
-
-    def deltaTaskCompleted(self, plan: RdsPlan):
-        delta = self._deltas[plan]
-        task = delta.task
-        self._completeSignals.removeMappings(task)
-        self._terminatedSignals.removeMappings(task)
-        delta.assignments = task.assignments
-        delta.popData = task.popData
-        delta.delta.update(task.data)
-        delta.task = None
-        self.updateCompleted.emit(plan, delta.delta)
-
-    def deltaTaskTerminated(self, plan):
-        task = self._deltas[plan].task
-        self._completeSignals.removeMappings(task)
-        self._terminatedSignals.removeMappings(task)
-        if task.exception:
-            self.setError(str(task.exception))
-        self._deltas[plan].task = None
-        self.updateTerminated.emit(plan, task.isCanceled(), task.exception)
-
-    def updatePendingData(self, plan: RdsPlan):
-        if plan not in self._deltas:
+    def _createParams(self, plan: "RdsPlan", *args, **kwargs):
+        params = self._deltas.get(plan, None)
+        if params is None:
             return None
-
-        delta = self._deltas[plan]
-        if delta.task is not None and delta.task.status() < QgsTask.TaskStatus.Complete:
-            return delta.task
 
         if (
-            delta.plan.assignLayer is None
-            or delta.plan.assignLayer.editBuffer() is None
-            or delta.plan.assignLayer.undoStack().index() == 0
+            plan.assignLayer is None
+            or plan.assignLayer.editBuffer() is None
+            or plan.assignLayer.undoStack().index() == 0
         ):
-            delta.delta.clear()
+            params.clear()
             return None
 
-        task = AggregatePendingChangesTask(plan, delta.popData, delta.assignments)
-        self._completeSignals.setMapping(task, plan)
-        self._terminatedSignals.setMapping(task, plan)
-        task.taskCompleted.connect(self._completeSignals.map)
-        task.taskTerminated.connect(self._terminatedSignals.map)
-        delta.task = task
-
-        self.updateStarted.emit(plan)
-        QgsApplication.taskManager().addTask(task)
-
-        return task
+        return params
 
     def undoChanged(self, plan: RdsPlan):  # pylint: disable=unused-argument
-        self.updatePendingData(plan)
+        self.update(plan)
 
     def commitChanges(self, plan: RdsPlan):
         if plan in self._deltas:
@@ -189,3 +142,122 @@ class DeltaUpdateService(ErrorListMixin, QObject):
             return None
 
         return self._deltas[plan].delta
+
+    def loadPendingChanges(self, plan: RdsPlan):
+        index = []
+        data = []
+        dindex = plan.assignLayer.fields().lookupField(plan.distField)
+        if dindex == -1:
+            raise ValueError(f"{plan.distField} not found in assignment layer")
+
+        for k, v in plan.assignLayer.editBuffer().changedAttributeValues().items():
+            if dindex in v:
+                index.append(k)
+                data.append(v[dindex])
+        return pd.DataFrame({f"new_{plan.distField}": data}, index=index)
+
+    def run(self, task: QgsTask, plan: RdsPlan, params: DeltaUpdate) -> UpdateParams:  # noqa: PLR0915
+        feedback = IncrementalFeedback(task)
+
+        feedback.setProgressIncrement(0, 10)
+        df_new = self.loadPendingChanges(plan)
+        feedback.checkCanceled()
+        if df_new.empty:
+            return params
+
+        if params.assignments is None:
+            feedback.setProgressIncrement(10, 30)
+            with spatialite_connect(plan.geoPackagePath) as db:
+                params.assignments = pd.read_sql(
+                    f"SELECT fid, {quote_identifier(plan.geoIdField)}, "  # noqa: S608
+                    f"{quote_identifier(plan.distField)} as {quote_identifier(f'old_{plan.distField}')} "
+                    "FROM assignments",
+                    db,
+                    index_col="fid",
+                )
+            feedback.checkCanceled()
+
+        if params.popData is None:
+            feedback.setProgressIncrement(30, 70)
+            params.popData = self._loadPopData(plan, feedback=feedback)
+            feedback.checkCanceled()
+
+        feedback.setProgressIncrement(70, 100)
+        pending = params.assignments.join(df_new, how="inner")
+        pending = pending[pending[f"new_{plan.distField}"] != pending[f"old_{plan.distField}"]]
+        if len(pending) == 0:
+            return params
+
+        pending = pending.join(params.popData, on=plan.geoIdField, how="inner")
+        feedback.setProgress(0.2)
+
+        newdist = pending.drop(columns=f"old_{plan.distField}").groupby(f"new_{plan.distField}").sum(numeric_only=True)
+        olddist = pending.drop(columns=f"new_{plan.distField}").groupby(f"old_{plan.distField}").sum(numeric_only=True)
+        feedback.checkCanceled()
+
+        data = newdist.sub(olddist, fill_value=0)
+        dist = (
+            params.assignments.join(params.popData, on=plan.geoIdField)
+            .drop(columns=plan.geoIdField)
+            .groupby(f"old_{plan.distField}")
+            .sum()
+        )
+        feedback.setProgress(0.40)
+        feedback.checkCanceled()
+        dist = dist.loc[dist.index.intersection(data.index)]
+
+        new = pd.DataFrame(0, index=data.index.difference(dist.index), columns=dist.columns)
+        if len(new) > 0:
+            dist = pd.concat([dist, new])
+        members = [plan.districts.get(d).members for d in dist.index]
+        dist["members"] = members
+
+        data[f"new_{DistrictColumns.POPULATION}"] = dist[DistrictColumns.POPULATION] + data[DistrictColumns.POPULATION]
+        data["deviation"] = data[f"new_{DistrictColumns.POPULATION}"] - (dist["members"] * plan.idealPopulation)
+        data["pct_deviation"] = data["deviation"] / (dist["members"] * plan.idealPopulation)
+        for fieldName in plan.popFields.keys():
+            data[f"new_{fieldName}"] = dist[fieldName] + data[fieldName]
+        for fieldName, fld in plan.dataFields.items():
+            data[f"new_{fieldName}"] = dist[fieldName] + data[fieldName]
+            pctbase = DistrictColumns.POPULATION if fld.pctBase == plan.popField else fld.pctBase
+            if pctbase:
+                data[f"pct_{fieldName}"] = data[f"new_{fieldName}"] / data[f"new_{pctbase}"]
+
+        feedback.setProgress(0.8)
+        feedback.checkCanceled()
+
+        data["__name"] = pd.Series([plan.districts.get(i).name for i in data.index], data.index)
+
+        cols = [f"new_{DistrictColumns.POPULATION}", DistrictColumns.POPULATION, "deviation", "pct_deviation"]
+        for fieldName in plan.popFields.keys():
+            cols.append(f"new_{fieldName}")
+            cols.append(fieldName)
+        for fieldName, fld in plan.dataFields.items():
+            cols.append(f"new_{fieldName}")
+            cols.append(fieldName)
+            if fld.pctBase:
+                cols.append(f"pct_{fieldName}")
+
+        params.data = data.set_index("__name")[cols]
+        feedback.setProgress(1.0)
+        feedback.checkCanceled()
+
+        return params
+
+    def finished(
+        self,
+        status: UpdateStatus,
+        task: Optional[QgsTask],
+        plan: Optional[RdsPlan],
+        params: Optional[DeltaUpdate],
+        exception: Optional[Exception],
+    ):
+        if params is not None:
+            if status == UpdateStatus.SUCCESS:
+                params.delta.update(params.data)
+            elif status == UpdateStatus.ERROR and exception is not None:
+                self.setError(str(exception))
+            params.task = None
+            params.data = None
+
+        return super().finished(status, task, plan, params, exception)

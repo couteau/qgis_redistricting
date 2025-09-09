@@ -21,43 +21,19 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Optional,
-    Union
-)
-from collections.abc import Iterable
 
-from qgis.core import (
-    Qgis,
-    QgsApplication,
-    QgsFeature,
-    QgsFieldModel,
-    QgsVectorLayer
-)
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Optional, Union
+
+from qgis.core import Qgis, QgsApplication, QgsFeature, QgsFieldModel, QgsVectorLayer
 from qgis.PyQt import sip
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QDialog
 
-from ..gui import (
-    DlgCopyPlan,
-    DlgNewDistrict,
-    DockRedistrictingToolbox,
-    PaintDistrictsTool,
-    PaintMode
-)
-from ..models import (
-    DistrictSelectModel,
-    GeoFieldsModel,
-    RdsDistrict,
-    RdsPlan,
-    TargetDistrictModel
-)
-from ..services import (
-    AssignmentsService,
-    PlanCopier
-)
+from ..gui import DlgCopyPlan, DlgNewDistrict, DockRedistrictingToolbox, PaintDistrictsTool, PaintMode
+from ..models import DistrictSelectModel, GeoFieldsModel, RdsDistrict, RdsPlan, TargetDistrictModel
+from ..services import AssignmentsService, PlanCopier
 from ..utils import tr
 from .base import DockWidgetController
 
@@ -75,7 +51,7 @@ class EditAssignmentsController(DockWidgetController):
         planManager,
         toolbar,
         assignmentsService: AssignmentsService,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
         self.assignmentsService = assignmentsService
@@ -103,7 +79,7 @@ class EditAssignmentsController(DockWidgetController):
             QIcon(":/plugins/redistricting/paintpalette.svg"),
             tr("Paint districts"),
             callback=self.startPaintDistricts,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionStartPaintDistricts.setEnabled(False)
 
@@ -112,7 +88,7 @@ class EditAssignmentsController(DockWidgetController):
             QIcon(":/plugins/redistricting/paintrubberband.svg"),
             tr("Paint districts within selection rectangle"),
             callback=self.startPaintRectangle,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionPaintRectangle.setEnabled(False)
 
@@ -121,7 +97,7 @@ class EditAssignmentsController(DockWidgetController):
             QgsApplication.getThemeIcon("/mActionSelectFreehand.svg"),
             tr("Select by geography units"),
             callback=self.selectByGeography,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionSelectByGeography.setEnabled(False)
 
@@ -131,7 +107,7 @@ class EditAssignmentsController(DockWidgetController):
             tr("Commit changes"),
             tr("Save all districting changes to the underlying layer"),
             callback=self.onCommitChanges,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionCommitPlanChanges.setEnabled(False)
 
@@ -141,7 +117,7 @@ class EditAssignmentsController(DockWidgetController):
             tr("Save as new"),
             tr("Save all unsaved districting changes to a new redistricting plan"),
             callback=self.saveChangesAsNewPlan,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionSaveAsNew.setEnabled(False)
 
@@ -151,7 +127,7 @@ class EditAssignmentsController(DockWidgetController):
             tr("Rollback changes"),
             tr("Discard all unsaved districting changes"),
             callback=self.onRollbackChanges,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionRollbackPlanChanges.setEnabled(False)
 
@@ -161,7 +137,7 @@ class EditAssignmentsController(DockWidgetController):
             tr("Add district"),
             tr("Create a new district and add it to the plan"),
             callback=self.createDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionCreateDistrict.setEnabled(False)
 
@@ -170,7 +146,7 @@ class EditAssignmentsController(DockWidgetController):
             QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
             tr("Edit district"),
             callback=self.editDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
 
         self.actionEditTargetDistrict = self.actions.createAction(
@@ -178,7 +154,7 @@ class EditAssignmentsController(DockWidgetController):
             QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
             tr("Edit target district"),
             callback=self.editDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionEditTargetDistrict.setEnabled(False)
 
@@ -187,7 +163,7 @@ class EditAssignmentsController(DockWidgetController):
             QgsApplication.getThemeIcon("/mActionToggleEditing.svg"),
             tr("Edit source district"),
             callback=self.editDistrict,
-            parent=self.iface.mainWindow()
+            parent=self.iface.mainWindow(),
         )
         self.actionEditSourceDistrict.setEnabled(False)
 
@@ -283,9 +259,7 @@ class EditAssignmentsController(DockWidgetController):
         self.actionStartPaintDistricts.setEnabled(plan is not None)
         self.actionPaintRectangle.setEnabled(plan is not None)
         self.actionSelectByGeography.setEnabled(plan is not None)
-        self.actionCreateDistrict.setEnabled(
-            plan is not None and plan.allocatedDistricts < plan.numDistricts
-        )
+        self.actionCreateDistrict.setEnabled(plan is not None and plan.allocatedDistricts < plan.numDistricts)
         self.actionEditTargetDistrict.setEnabled(False)
         self.actionEditSourceDistrict.setEnabled(False)
 
@@ -397,16 +371,15 @@ class EditAssignmentsController(DockWidgetController):
 
         if self.activePlan.allocatedDistricts == self.activePlan.numDistricts:
             self.iface.messageBar().pushMessage(
-                self.tr("Warning"), self.tr("All districts have already been allocated"), Qgis.MessageLevel.Warning)
+                self.tr("Warning"), self.tr("All districts have already been allocated"), Qgis.MessageLevel.Warning
+            )
             return None
 
         dlg = DlgNewDistrict(self.activePlan, self.iface.mainWindow())
         if dlg.exec() == QDialog.DialogCode.Rejected:
             return None
 
-        dist = self.activePlan.addDistrict(
-            dlg.districtNumber, dlg.districtName, dlg.members, dlg.description
-        )
+        dist = self.activePlan.addDistrict(dlg.districtNumber, dlg.districtName, dlg.members, dlg.description)
         self.project.setDirty()
         i = self.targetModel.indexFromDistrict(dist)
         self.dockwidget.cmbTarget.setCurrentIndex(i)
@@ -454,7 +427,7 @@ class EditAssignmentsController(DockWidgetController):
             self.iface.messageBar().pushMessage(
                 self.tr("Oops!"),
                 self.tr("Cannot save changes to no plan: active plan has no unsaved changes."),
-                Qgis.MessageLevel.Warning
+                Qgis.MessageLevel.Warning,
             )
             return
 
@@ -463,8 +436,9 @@ class EditAssignmentsController(DockWidgetController):
 
         if dlgCopyPlan.exec() == QDialog.DialogCode.Accepted:
             copier = PlanCopier(self.planManager.activePlan)
-            plan = copier.copyPlan(dlgCopyPlan.planName, dlgCopyPlan.description,
-                                   dlgCopyPlan.geoPackagePath, copyAssignments=True)
+            plan = copier.copyPlan(
+                dlgCopyPlan.planName, dlgCopyPlan.description, dlgCopyPlan.geoPackagePath, copyAssignments=True
+            )
 
             self.planManager.appendPlan(plan, False)
             copier.copyBufferedAssignments(plan)
@@ -483,7 +457,8 @@ class EditAssignmentsController(DockWidgetController):
                     "Please toggle the visibility of plan {name}'s assignment layer."
                 ).format(name=self.planManager.activePlan.name),
                 level=Qgis.MessageLevel.Warning,
-                duration=5)
+                duration=5,
+            )
             return
 
         self.mapTool.paintMode = mode
@@ -501,13 +476,17 @@ class EditAssignmentsController(DockWidgetController):
             field = self.geoFieldsModel.fields[index].fieldName
         self.setGeoField(field)
 
-    def setGeoField(self, value):
+    def setGeoField(self, value: str):
         if self.activePlan is None:
             return
 
-        if value is not None and value != self.activePlan.geoIdField and (
-            (len(self.activePlan.geoFields) != 0 and value not in self.activePlan.geoFields) or
-            (len(self.activePlan.geoFields) == 0 and value not in self.activePlan.geoLayer.fields().names())
+        if (
+            value is not None
+            and value != self.activePlan.geoIdField
+            and (
+                (len(self.activePlan.geoFields) != 0 and value not in self.activePlan.geoFields.keys())
+                or (len(self.activePlan.geoFields) == 0 and value not in self.activePlan.geoLayer.fields().names())
+            )
         ):
             raise ValueError(tr("Attempt to set invalid geography field on paint tool"))
 
@@ -519,14 +498,13 @@ class EditAssignmentsController(DockWidgetController):
             msg = tr("Assign features to district %d from %d") % (target, source)
         else:
             msg = tr("Assign features to district %d") % target
-        editor.startEditCommand(msg)
+        editor.beginEditCommand(msg)
 
     def paintFeatures(self, features: Iterable[QgsFeature], target: int, source: Union[int, None], endEdit: bool):
         editor = self.assignmentsService.getEditor(self.planManager.activePlan)
         if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
             values = {feature.attribute(self.geoField) for feature in features}
-            features = editor.getDistFeatures(
-                self.geoField, values, target, source)
+            features = editor.getDistFeatures(self.geoField, values, target, source)
 
         editor.assignFeaturesToDistrict(features, target)
         if endEdit:
@@ -541,11 +519,7 @@ class EditAssignmentsController(DockWidgetController):
         editor.cancelEditCommand()
 
     def selectFeatures(
-        self,
-        features: Iterable[QgsFeature],
-        target: int,
-        source: int,
-        behavior: QgsVectorLayer.SelectBehavior
+        self, features: Iterable[QgsFeature], target: int, source: int, behavior: QgsVectorLayer.SelectBehavior
     ):
         if self.geoField is not None and self.geoField != self.planManager.activePlan.geoIdField:
             editor = self.assignmentsService.getEditor(self.planManager.activePlan)

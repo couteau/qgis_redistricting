@@ -1,26 +1,18 @@
 from collections.abc import Iterable
 
-from qgis.core import (
-    QgsFeature,
-    QgsVectorLayer
-)
+from qgis.core import QgsFeature, QgsVectorLayer
 from qgis.PyQt.QtCore import QVariant
 
-from ..models import (
-    DistrictColumns,
-    RdsDistrict,
-    RdsPlan,
-    RdsUnassigned
-)
+from ..models import DistrictColumns, RdsDistrict, RdsPlan, RdsUnassigned
 
 
 class DistrictReader:
     def __init__(
-            self,
-            distLayer: QgsVectorLayer,
-            distField=DistrictColumns.DISTRICT,
-            popField=DistrictColumns.POPULATION,
-            columns: list[str] = None
+        self,
+        distLayer: QgsVectorLayer,
+        distField=DistrictColumns.DISTRICT,
+        popField=DistrictColumns.POPULATION,
+        columns: list[str] = None,
     ):
         if distLayer is None:
             raise ValueError("DistLayer is required to create DistrictReader")
@@ -42,7 +34,8 @@ class DistrictReader:
         for f in self._distLayer.getFeatures():
             data = {
                 k: None if isinstance(v, QVariant) and v.isNull() else v
-                for k, v in f.attributeMap().items() if k in self._columns
+                for k, v in f.attributeMap().items()
+                if k in self._columns
             }
 
             if self._popField != DistrictColumns.POPULATION and self._popField in data:
@@ -73,11 +66,11 @@ class DistrictReader:
 
 class DistrictWriter:
     def __init__(
-            self,
-            distLayer: QgsVectorLayer,
-            distField=DistrictColumns.DISTRICT,
-            popField=DistrictColumns.POPULATION,
-            columns: list[str] = None
+        self,
+        distLayer: QgsVectorLayer,
+        distField=DistrictColumns.DISTRICT,
+        popField=DistrictColumns.POPULATION,
+        columns: list[str] = None,
     ):
         if distLayer is None:
             raise ValueError("DistLayer is required to create DistrictReader")
@@ -101,12 +94,6 @@ class DistrictWriter:
 
     def writeToLayer(self, districts: Iterable[RdsDistrict]):
         def changeAttributes(dist: RdsDistrict, feature: QgsFeature):
-            # if all population is assigned, delete the Unassigned feature
-            if dist[self._distField] == 0 and not dist[DistrictColumns.POPULATION]:
-                if dist.fid != -1:
-                    self._layer.deleteFeature(dist.fid)
-                return
-
             dirty = False
             for idx, field in self._field_map.items():
                 if field not in dist:

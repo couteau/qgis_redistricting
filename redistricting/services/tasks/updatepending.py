@@ -114,7 +114,7 @@ class AggregatePendingChangesTask(AggregateDataTask):
             new = pd.DataFrame(0, index=data.index.difference(dist.index), columns=dist.columns)
             if len(new) > 0:
                 dist = pd.concat([dist, new])
-            members = [self.districts[f"{d:04}"].members for d in dist.index]
+            members = [self.districts.get(d).members for d in dist.index]
             dist["members"] = members
 
             data[f"new_{DistrictColumns.POPULATION}"] = (
@@ -122,27 +122,27 @@ class AggregatePendingChangesTask(AggregateDataTask):
             )
             data["deviation"] = data[f"new_{DistrictColumns.POPULATION}"] - (dist["members"] * self.ideal)
             data["pct_deviation"] = data["deviation"] / (dist["members"] * self.ideal)
-            for f in self.popFields:
-                data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
-            for f in self.dataFields:
-                data[f"new_{f.fieldName}"] = dist[f.fieldName] + data[f.fieldName]
-                pctbase = DistrictColumns.POPULATION if f.pctBase == self.popField else f.pctBase
+            for fieldName in self.popFields.keys():
+                data[f"new_{fieldName}"] = dist[fieldName] + data[fieldName]
+            for fieldName, field in self.dataFields.items():
+                data[f"new_{fieldName}"] = dist[fieldName] + data[fieldName]
+                pctbase = DistrictColumns.POPULATION if field.pctBase == self.popField else field.pctBase
                 if pctbase:
-                    data[f"pct_{f.fieldName}"] = data[f"new_{f.fieldName}"] / data[f"new_{pctbase}"]
+                    data[f"pct_{field.fieldName}"] = data[f"new_{field.fieldName}"] / data[f"new_{pctbase}"]
 
             self.checkCanceled()
 
-            data["__name"] = pd.Series([self.plan.districts[str(i).rjust(4, "0")].name for i in data.index], data.index)
+            data["__name"] = pd.Series([self.plan.districts.get(d).name for d in data.index], data.index)
 
             cols = [f"new_{DistrictColumns.POPULATION}", DistrictColumns.POPULATION, "deviation", "pct_deviation"]
-            for f in self.popFields:
-                cols.append(f"new_{f.fieldName}")
-                cols.append(f.fieldName)
-            for f in self.dataFields:
-                cols.append(f"new_{f.fieldName}")
-                cols.append(f.fieldName)
-                if f.pctBase:
-                    cols.append(f"pct_{f.fieldName}")
+            for fieldName in self.popFields.keys():
+                cols.append(f"new_{fieldName}")
+                cols.append(fieldName)
+            for fieldName, field in self.dataFields.items():
+                cols.append(f"new_{fieldName}")
+                cols.append(fieldName)
+                if field.pctBase:
+                    cols.append(f"pct_{fieldName}")
 
             self.data = data.set_index("__name")[cols]
             self.checkCanceled()

@@ -269,7 +269,7 @@ class TestEditAssignmentsController:
         type(controller_with_plan.planManager).activePlan = plan
         plan.geoFields.clear()
         assert len(plan.geoFields) == 0
-        assert "district" not in plan.geoFields
+        assert not plan.geoFields.has("district")
         controller_with_plan.setGeoField("tractce")
         assert controller_with_plan.geoField == "tractce"
 

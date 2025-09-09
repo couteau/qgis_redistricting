@@ -46,7 +46,7 @@ class DlgEditFields(QDialog):
         )
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
-        self.page.setField("dataFields", plan.dataFields)
+        self.page.setField("dataFields", list(plan.dataFields))
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.page)

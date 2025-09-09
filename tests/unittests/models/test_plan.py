@@ -34,7 +34,7 @@ from redistricting.models import (
     RdsPlan,
     metrics,  # noqa: F401
 )
-from redistricting.models.base.serialization import deserialize, serialize
+from redistricting.models.serialization import deserialize, serialize
 
 # pylint: disable=too-many-public-methods,protected-access
 
@@ -114,7 +114,7 @@ class TestPlan:
         assert len(plan.geoFields) == 0
         assert len(plan.dataFields) == 0
         assert len(plan.districts) == 1
-        assert plan.districts[0].name == "Unassigned"  # pylint: disable=unsubscriptable-object
+        assert plan.districts[0].name == "Unassigned"
 
     def test_new_plan_is_not_valid(self):
         plan = RdsPlan("test", 5)
@@ -143,7 +143,7 @@ class TestPlan:
     # pylint: disable-next=unused-argument
     def test_geofields_assign(self, valid_plan: RdsPlan, block_layer, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            valid_plan.geoFields = [RdsField(block_layer, "vtdid20")]
+            valid_plan.geoFields = {"vtdid20": RdsField(block_layer, "vtdid20")}
         assert len(valid_plan.geoFields) == 1
 
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):

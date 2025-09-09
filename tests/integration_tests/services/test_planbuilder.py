@@ -18,6 +18,7 @@ Copyright 2022-2024, Stuart C. Naifeh
  *                                                                         *
  ***************************************************************************/
 """
+
 import pytest
 
 from redistricting.services import PlanBuilder
@@ -28,12 +29,14 @@ from redistricting.services import PlanBuilder
 class TestCreatePlan:
     @pytest.fixture
     def builder(self, block_layer):
-        return PlanBuilder() \
-            .setName("test") \
-            .setNumDistricts(5) \
-            .setGeoLayer(block_layer) \
-            .setGeoIdField("geoid") \
+        return (
+            PlanBuilder()
+            .setName("test")
+            .setNumDistricts(5)
+            .setGeoLayer(block_layer)
+            .setGeoIdField("geoid")
             .setPopField("pop_total")
+        )
 
     def test_set_nonexistent_fields_no_validate(self, builder: PlanBuilder):
         assert builder._validatePopLayer()

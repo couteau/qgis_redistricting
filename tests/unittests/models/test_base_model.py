@@ -24,9 +24,8 @@ from typing import Annotated, Union
 import pytest
 from qgis.PyQt.QtCore import QObject
 
-from redistricting.models.base.model import Factory, RdsBaseModel
-from redistricting.models.base.prop import field, get_real_type, in_range, not_empty, rds_property
-from redistricting.models.base.serialization import deserialize, serialize
+from redistricting.models.base import Factory, RdsBaseModel, field, get_real_type, in_range, not_empty, rds_property
+from redistricting.models.serialization import deserialize, serialize
 
 # pylint: disable=redefined-outer-name, unused-argument, protected-access
 

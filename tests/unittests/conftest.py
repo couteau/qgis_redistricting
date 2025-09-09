@@ -117,8 +117,8 @@ def mock_updater(mocker: MockerFixture) -> services.DistrictUpdater:
 
 
 @pytest.fixture
-def mock_copier(mocker: MockerFixture) -> services.DistrictCopier:
-    copier = mocker.create_autospec(spec=services.DistrictCopier, instance=True)
+def mock_copier(mocker: MockerFixture) -> services.DistrictUtils:
+    copier = mocker.create_autospec(spec=services.DistrictUtils, instance=True)
     return copier
 
 

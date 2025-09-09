@@ -23,22 +23,20 @@
 """
 
 from numbers import Number
-from typing import Optional, cast
+from typing import Optional
 
-import pandas as pd
 from qgis.core import Qgis, QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
-from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, RdsSplits, consts
-from ..models.base.lists import KeyedList
+from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, consts
 from ..utils import tr
 from .errormixin import ErrorListMixin
 
 
 class PlanValidator(ErrorListMixin, QObject):
-    def __init__(self, parent: QObject = None):
+    def __init__(self, parent: Optional[QObject] = None):
         super().__init__(parent)
-        self._plan: RdsPlan = None
+        self._plan: Optional[RdsPlan] = None
 
         self._name = ""
         self._description = ""
@@ -47,25 +45,23 @@ class PlanValidator(ErrorListMixin, QObject):
         self._deviation = 0.0
         self._deviationType = DeviationType.OverUnder
         self._totalPopulation = 0
-        self._cutEdges = 0
-        self._splits: dict[str, pd.DataFrame] = {}
 
         self._geoIdField = None
         self._geoIdCaption = ""
         self._distField = "district"
 
-        self._geoLayer: QgsVectorLayer = None
+        self._geoLayer: Optional[QgsVectorLayer] = None
         self._geoJoinField = None
         self._geoFields: list[RdsGeoField] = []
 
-        self._popLayer: QgsVectorLayer = None
+        self._popLayer: Optional[QgsVectorLayer] = None
         self._popJoinField = None
         self._popField = None
         self._popFields: list[RdsField] = []
         self._dataFields: list[RdsDataField] = []
 
-        self._assignLayer: QgsVectorLayer = None
-        self._distLayer: QgsVectorLayer = None
+        self._assignLayer: Optional[QgsVectorLayer] = None
+        self._distLayer: Optional[QgsVectorLayer] = None
 
     @classmethod
     def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
@@ -84,17 +80,15 @@ class PlanValidator(ErrorListMixin, QObject):
 
         instance._geoLayer = plan.geoLayer
         instance._geoJoinField = plan.geoJoinField
-        instance._geoFields = plan.geoFields[:]
+        instance._geoFields = list(plan.geoFields)
 
         instance._popLayer = plan.popLayer
         instance._popJoinField = plan.popJoinField
         instance._popField = plan.popField
-        instance._popFields = plan.popFields[:]
-        instance._dataFields = plan.dataFields[:]
+        instance._popFields = list(plan.popFields)
+        instance._dataFields = list(plan.dataFields)
 
         instance._totalPopulation = plan.totalPopulation
-        instance._cutEdges = plan.metrics.cutEdges
-        instance._splits = {s.field: s.data for s in cast(KeyedList[RdsSplits], plan.metrics.splits)}
 
         instance._assignLayer = plan.assignLayer
         instance._distLayer = plan.distLayer

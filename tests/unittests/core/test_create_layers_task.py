@@ -17,6 +17,7 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 import pathlib
 
 import pytest
@@ -29,11 +30,14 @@ from redistricting.services.tasks.createlayers import CreatePlanLayersTask
 
 
 class TestCreateLayersTask:
-    @pytest.mark.parametrize(("sourcefile", "pop_field", "geoid_field"), [
-        ("tuscaloosa_blocks.gpkg|layername=plans", "pop_total", "geoid20"),
-        ("tuscaloosa_pl2020_b.shp", "P0010001", "GEOID20"),
-        ("tuscaloosa_pl2020_b.geojson", "P0010001", "GEOID20")
-    ])
+    @pytest.mark.parametrize(
+        ("sourcefile", "pop_field", "geoid_field"),
+        [
+            ("tuscaloosa_blocks.gpkg|layername=plans", "pop_total", "geoid20"),
+            ("tuscaloosa_pl2020_b.shp", "P0010001", "GEOID20"),
+            ("tuscaloosa_pl2020_b.geojson", "P0010001", "GEOID20"),
+        ],
+    )
     def test_create_layers_formats(self, datadir: pathlib.Path, sourcefile, pop_field, geoid_field):
         path = datadir / sourcefile
         layer = QgsVectorLayer(str(path), "blocks", "ogr")
@@ -54,15 +58,18 @@ class TestCreateLayersTask:
         assert result
         assert gpkg.exists()
 
-    @pytest.mark.parametrize(("datafields", "geofields"), [
-        ([], []),
-        (["vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
-        (["vap_ap_black - vap_nh_black"], []),
-        (["vap_ap_black", "vap_ap_black - vap_nh_black", "vap_hispanic", "vap_nh_white"], []),
-        (["vap_ap_black - vap_nh_black", "vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
-        ([], ["countyid", "vtdid"]),
-        ([], ["statefp || countyfp"]),
-    ])
+    @pytest.mark.parametrize(
+        ("datafields", "geofields"),
+        [
+            ([], []),
+            (["vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
+            (["vap_ap_black - vap_nh_black"], []),
+            (["vap_ap_black", "vap_ap_black - vap_nh_black", "vap_hispanic", "vap_nh_white"], []),
+            (["vap_ap_black - vap_nh_black", "vap_ap_black", "vap_hispanic", "vap_nh_white"], []),
+            ([], ["countyid", "vtdid"]),
+            ([], ["statefp || countyfp"]),
+        ],
+    )
     def test_create_layers_with_fields(self, block_layer, datadir: pathlib.Path, datafields, geofields):
         p = RdsPlan("test_create_layers", 5)
         p._geoLayer = block_layer
@@ -91,7 +98,7 @@ class TestCreateLayersTask:
             try:
                 assert d.isValid()
                 assert d.featureCount() == 1
-                for f in p.dataFields:  # pylint: disable=not-an-iterable
+                for f in p.dataFields:
                     assert d.fields().lookupField(f.fieldName) != -1
             finally:
                 del d

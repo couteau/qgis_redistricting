@@ -28,9 +28,10 @@ from .clipboard import DistrictClipboardAccess
 from .copy import PlanCopier
 from .delta import DeltaUpdateService
 from .district import DistrictUpdater
-from .districtcopy import DistrictCopier
+from .districtutil import DistrictUtils
 from .errormixin import ErrorListMixin
 from .layertree import LayerTreeManager
+from .metrics import MetricsService
 from .planbuilder import PlanBuilder
 from .planeditor import PlanEditor
 from .planexport import PlanExporter
@@ -53,7 +54,7 @@ __all__ = (
     "DeltaUpdateService",
     "PlanAssignmentEditor",
     "AssignmentsService",
-    "DistrictCopier",
+    "DistrictUtils",
     "PlanExporter",
     "PlanImporter",
     "AssignmentImporter",
@@ -62,4 +63,5 @@ __all__ = (
     "ProjectStorage",
     "ErrorListMixin",
     "PlanListModel",
+    "MetricsService",
 )

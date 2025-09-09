@@ -29,7 +29,7 @@ from qgis.PyQt.QtWidgets import QAction, QMenu
 
 from redistricting.controllers import DistrictController, EditAssignmentsController
 from redistricting.models import RdsPlan
-from redistricting.services import DistrictCopier
+from redistricting.services import DistrictUtils
 
 
 class TestDistrictController:
@@ -95,22 +95,22 @@ class TestDistrictController:
         plan.assert_called_once()
 
     def test_add_canvas_context_menu_items(
-        self, controller_with_active_plan: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictCopier
+        self, controller_with_active_plan: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictUtils
     ):
         menu = QMenu("test")
         event = QgsMapMouseEvent(qgis_canvas, QEvent.Type.MouseButtonPress, QPoint(0, 0), Qt.MouseButton.RightButton)
         controller_with_active_plan.addCanvasContextMenuItems(menu, event)
-        mock_copier.canCopyAssignments.assert_called_once()
+        mock_copier.canCopyOrCutAssignments.assert_called_once()
         mock_copier.canPasteAssignments.assert_called_once()
 
     def test_add_canvas_context_menu_items_no_active_plan_returns(
-        self, controller: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictCopier
+        self, controller: DistrictController, qgis_canvas: QgsMapCanvas, mock_copier: DistrictUtils
     ):
         assert controller.planManager.activePlan is None
         menu = QMenu("test")
         event = QgsMapMouseEvent(qgis_canvas, QEvent.Type.MouseButtonPress, QPoint(0, 0), Qt.MouseButton.RightButton)
         controller.addCanvasContextMenuItems(menu, event)
-        mock_copier.canCopyAssignments.assert_not_called()
+        mock_copier.canCopyOrCutAssignments.assert_not_called()
         mock_copier.canPasteAssignments.assert_not_called()
 
     def test_zoom_to_district(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):

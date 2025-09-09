@@ -22,16 +22,16 @@
  ***************************************************************************/
 """
 
-from itertools import repeat
-from typing import Annotated, Any, Literal, Optional, Union, overload
 from collections.abc import Iterable
+from itertools import repeat
+from typing import Annotated, Any, Literal, Optional, Union, cast, overload
 
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 from ..utils import tr
-from .base.lists import SortedKeyedList
-from .base.prop import in_range, not_empty, rds_property
+from .base import Property, in_range, not_empty, rds_property
 from .consts import DistrictColumns, MetricsColumns
+from .lists import SortedKeyedList
 
 
 class RdsDistrict(QObject):
@@ -81,8 +81,14 @@ class RdsDistrict(QObject):
 
         self.update(kwargs)
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}(fid={self.fid}, district={self.district}, "
+            f"name={self.name}, members={self.members})"
+        )
+
     def __key__(self):
-        return str(self.district).rjust(4, "0")
+        return self.district
 
     def clone(self):
         return self.__class__(fid=self.fid, description=self.description, **self._data)
@@ -130,50 +136,59 @@ class RdsDistrict(QObject):
 
         return self._data == __value._data
 
+    def __hash__(self):
+        return hash(
+            (
+                self.fid,
+                self.description,
+                *tuple(self._data.items()),
+            )
+        )
+
     def __getattr__(self, name):
         if name in self._data:
             return self._data[name]
 
         return super().__getattr__(name)
 
-    @rds_property
-    def district(self):
+    @Property
+    def district(self) -> int:
         return self._data[DistrictColumns.DISTRICT]
 
-    @name.getter
-    def name(self):
+    @cast("Property[str]", name).getter
+    def name(self) -> str:
         return self._data[DistrictColumns.NAME]
 
     @name.setter
     def name(self, value: str):
         self._data[DistrictColumns.NAME] = value
 
-    @members.getter
-    def members(self):
+    @cast("Property[int]", members).getter
+    def members(self) -> int:
         return self._data[DistrictColumns.MEMBERS]
 
     @members.setter
     def members(self, value: int):
         self._data[DistrictColumns.MEMBERS] = value
 
-    @rds_property
-    def population(self):
+    @Property
+    def population(self) -> int:
         return self._data[DistrictColumns.POPULATION]
 
     @population.setter
     def population(self, value: int):
         self._data[DistrictColumns.POPULATION] = value
 
-    @rds_property
-    def deviation(self):
+    @Property
+    def deviation(self) -> int:
         return self._data[DistrictColumns.DEVIATION]
 
     @deviation.setter
     def deviation(self, value: int):
         self._data[DistrictColumns.DEVIATION] = value
 
-    @rds_property
-    def pct_deviation(self):
+    @Property
+    def pct_deviation(self) -> float:
         return self._data[DistrictColumns.PCT_DEVIATION]
 
     @pct_deviation.setter
@@ -237,20 +252,17 @@ class RdsUnassigned(RdsDistrict):
         self._data.update(zip(RdsDistrict.STATS_COLUMNS, repeat(None)))
 
 
-class DistrictList(SortedKeyedList[RdsDistrict]):  # pylint: disable=abstract-method
+class DistrictList(SortedKeyedList[int, RdsDistrict]):  # pylint: disable=abstract-method
     def clear(self):
-        addUnassigned = "0000" in self._keys
+        addUnassigned = 0 in self._keys
 
         super().clear()
 
         if addUnassigned:
             self.append(RdsUnassigned())
 
-    def __contains__(self, item: Union[int, str, RdsDistrict]):
-        if isinstance(item, int):
-            item = str(item)
+    def __contains__(self, item: Union[int, RdsDistrict]):
+        if isinstance(item, RdsDistrict):
+            return item in self._items.values()
 
-        if isinstance(item, str):
-            return item in self._items
-
-        return item in self._items.values()
+        return super().__contains__(item)

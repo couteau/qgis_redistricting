@@ -26,7 +26,7 @@ import csv
 import io
 from typing import Optional
 
-from qgis.core import QgsApplication, QgsProject
+from qgis.core import QgsApplication, QgsProject, QgsSettings
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QModelIndex, QObject, Qt
 from qgis.PyQt.QtGui import QIcon, QKeySequence
@@ -34,7 +34,7 @@ from qgis.PyQt.QtWidgets import QToolBar
 
 from ..gui import DockPlanMetrics, RdsMetricGuiHandler, TableViewKeyEventFilter, get_metric_handler
 from ..models import RdsMetric, RdsMetricsModel, RdsPlan
-from ..services import ActionRegistry, DistrictUpdater, PlanManager
+from ..services import ActionRegistry, MetricsService, PlanManager
 from .base import DockWidgetController
 
 
@@ -45,7 +45,7 @@ class MetricsController(DockWidgetController):
         project: QgsProject,
         planManager: PlanManager,
         toolbar: QToolBar,
-        updateService: DistrictUpdater,
+        updateService: MetricsService,
         parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
@@ -82,6 +82,7 @@ class MetricsController(DockWidgetController):
         dockwidget.tblPlanMetrics.setModel(self.metricsModel)
         dockwidget.tblPlanMetrics.installEventFilter(TableViewKeyEventFilter(dockwidget))
         dockwidget.tblPlanMetrics.activated.connect(self.showMetricsDetail)
+        self.updateService.updateComplete.connect(self.updateModel)
         return dockwidget
 
     def createToggleAction(self):
@@ -100,15 +101,25 @@ class MetricsController(DockWidgetController):
         self.planManager.planRemoved.connect(self.planRemoved)
         self.updateService.updateStarted.connect(self.showOverlay)
         self.updateService.updateComplete.connect(self.hideOverlay)
-        self.updateService.updateTerminated.connect(self.hideOverlay)
+        self.updateService.updateTerminated.connect(self.showUpdateError)
+        self.updateService.updateCanceled.connect(self.hideOverlay)
+        QgsSettings().beginGroup("redistricting", QgsSettings.Section.Plugins)
+        hw = QgsSettings().value("metrics_table_header_width", 0, int)
+        if hw:
+            self.dockwidget.tblPlanMetrics.verticalHeader().setFixedWidth(hw)
+        QgsSettings().endGroup()
 
     def unload(self):
         self.updateService.updateStarted.disconnect(self.showOverlay)
         self.updateService.updateComplete.disconnect(self.hideOverlay)
-        self.updateService.updateTerminated.disconnect(self.hideOverlay)
+        self.updateService.updateTerminated.disconnect(self.showUpdateError)
+        self.updateService.updateCanceled.disconnect(self.hideOverlay)
         self.planManager.planRemoved.disconnect(self.planRemoved)
         self.planManager.planAdded.disconnect(self.planAdded)
         self.planManager.activePlanChanged.disconnect(self.planChanged)
+        QgsSettings().beginGroup("redistricting", QgsSettings.Section.Plugins)
+        QgsSettings().setValue("metrics_table_header_width", self.dockwidget.tblPlanMetrics.verticalHeader().width())
+        QgsSettings().endGroup()
         super().unload()
 
     def planChanged(self, plan: RdsPlan):
@@ -125,8 +136,8 @@ class MetricsController(DockWidgetController):
             for handler in self.handler_cache.values():
                 handler.update(plan)
 
-        if self.updateService.planIsUpdating(plan):
-            self.dockwidget.setWaiting(True)
+            if self.updateService.planIsUpdating(plan):
+                self.dockwidget.setWaiting(True)
 
     def planAdded(self, plan: RdsPlan):
         plan.metricsChanged.connect(self.updateMetricsDetail)
@@ -134,13 +145,9 @@ class MetricsController(DockWidgetController):
     def planRemoved(self, plan: RdsPlan):
         plan.metricsChanged.disconnect(self.updateMetricsDetail)
 
-    def showOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(True)
-
-    def hideOverlay(self, plan: RdsPlan):
-        if plan == self.activePlan:
-            self.dockwidget.setWaiting(False)
+    def updateModel(self):
+        self.metricsModel.beginResetModel()
+        self.metricsModel.endResetModel()
 
     def copyMetrics(self):
         indexes = (self.metricsModel.createIndex(d, 0) for d in range(self.metricsModel.rowCount()))

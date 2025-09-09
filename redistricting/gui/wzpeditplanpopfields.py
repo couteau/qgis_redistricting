@@ -119,7 +119,7 @@ class dlgEditPlanPopPage(Ui_wzpPopulation, QWizardPage):
             self.cmbAddlPopField.setLayer(layer)
             popFields: list[RdsField] = self.field("popFields")
             for f in popFields:
-                f.setLayer(layer)
+                f.layer = layer
 
     def fieldChanged(self, field):
         self.btnAddAddlPopField.setEnabled(

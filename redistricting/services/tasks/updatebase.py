@@ -22,35 +22,131 @@
  ***************************************************************************/
 """
 
+from collections.abc import Mapping
 from typing import Literal, Optional, Union, overload
-from collections.abc import Sequence
 
 import geopandas as gpd
 import pandas as pd
 from qgis.core import Qgis, QgsExpressionContext, QgsExpressionContextUtils, QgsMessageLog, QgsTask, QgsVectorLayer
 
 from ...errors import CanceledError
-from ...models import DistrictColumns, MetricTriggers, RdsDataField, RdsField, RdsGeoField, RdsPlan
-from ...utils import LayerReader, SqlAccess, tr
+from ...models import (
+    DistrictColumns,
+    MetricLevel,
+    MetricTriggers,
+    RdsDataField,
+    RdsField,
+    RdsGeoField,
+    RdsMetric,
+    RdsPlan,
+)
+from ...models.lists import KeyedList
+from ...models.metricslist import get_batches
+from ...utils import LayerReader, SqlAccess, camel_to_snake, tr
 from ._debug import debug_thread
 
 
 class UpdateMetricsTask(QgsTask):
-    def __init__(self, plan: RdsPlan, trigger: MetricTriggers, populationData: pd.DataFrame, geometry: gpd.GeoSeries):
+    def __init__(
+        self,
+        plan: RdsPlan,
+        trigger: MetricTriggers,
+        populationData: pd.DataFrame,
+        districtData: Optional[pd.DataFrame],
+        geometry: Optional[gpd.GeoSeries],
+    ):
         super().__init__(tr("Updating metrics"), QgsTask.Flag.AllFlags)
         self.plan = plan
+        self.metrics: KeyedList[str, RdsMetric] = plan.metrics.metrics
         self.trigger = trigger
         self.populationData = populationData
-        self.geometry = geometry
+        self.districtData = districtData
+        self.geometry = gpd.GeoSeries.from_wkt(geometry.to_wkt(), crs=geometry.crs) if geometry is not None else None
+        self.exception: Optional[Exception] = None
+
+    def _get_batches_for_trigger(self, trigger: MetricTriggers):
+        # pylint: disable=no-member
+        metrics = {name: metric for name, metric in self.metrics.items() if metric.triggers() & trigger}
+        ready = {m.name(): m for metric in metrics.values() for m in metric.depends() if not m.triggers() & trigger}
+
+        return get_batches(metrics, ready)
+
+    def calculateMetrics(self):
+        """called in background thread to recalculate values of metrics"""
+        batches = self._get_batches_for_trigger(self.trigger)
+
+        for b in batches:
+            for metric in b:
+                if self.trigger & metric.triggers():
+                    depends = {
+                        m.name(): self.metrics[m.name()].value  # pylint: disable=unsubscriptable-object
+                        for m in metric.depends()
+                        if m.name() in self.metrics  # pylint: disable=unsupported-membership-test
+                    }
+                    metric.calculate(self.populationData, self.districtData, self.geometry, self.plan, **depends)
+
+    def saveDistrictMetrics(self):
+        """updates the district-level metrics in the plan's district layer"""
+
+        def to_dict(value: Union[Mapping, pd.Series, pd.DataFrame]) -> dict:
+            if isinstance(value, pd.Series):
+                return value.to_dict()
+            if isinstance(value, pd.DataFrame):
+                return value.to_dict(orient="records")
+            if isinstance(value, Mapping):
+                return value
+
+            raise TypeError("Unsupported type for serialization.")
+
+        provider = self.plan.distLayer.dataProvider() if self.plan.distLayer else None
+        if provider is None:
+            raise RuntimeError("No district layer available to add the metric field.")
+
+        dist_metrics: dict[str, Union[Mapping, pd.Series, pd.DataFrame]] = {
+            provider.fieldNameIndex(camel_to_snake(m.name())): to_dict(m.value)
+            for m in self.metrics  # pylint: disable=no-member
+            if m.level() == MetricLevel.DISTRICT  # only update district level metrics
+            and m.serialize()  # only update metrics that are meant to be serialized
+            and m.triggers() & self.trigger  # only update if the metric is triggered
+            and m.value is not None  # only update if the metric has a value
+            # only update if the metric has a corresponding field in the district layer
+            and provider.fieldNameIndex(camel_to_snake(m.name())) != -1
+        }
+
+        try:
+            provider.changeAttributeValues(
+                {
+                    f.id(): {name: values.get(f[self.plan.distField]) for name, values in dist_metrics.items()}
+                    for f in provider.getFeatures()
+                }
+            )  # reset the attributes
+
+            self.plan.distLayer.reload()
+        except Exception as e:  # pylint: disable=broad-except
+            raise RuntimeError(f"Failed to update district metrics: {e}") from e
 
     def run(self):
         debug_thread()
-        self.plan.metrics.updateMetrics(self.trigger, self.populationData, self.geometry, self.plan)
-        return True
+        try:
+            self.calculateMetrics()
+            return True
+        except Exception as e:
+            self.exception = e
+            return False
 
     def finished(self, result: bool):
         super().finished(result)
-        self.plan.metrics.updateFinished(self.trigger, self.plan)
+        if result:
+            batches = self._get_batches_for_trigger(self.trigger)
+            update_districts = False
+            for b in batches:
+                for metric in b:
+                    if metric.level() == MetricLevel.DISTRICT:
+                        update_districts = True
+                    metric.finished(self.plan)
+
+            if update_districts:
+                self.saveDistrictMetrics()
 
 
 class AggregateDataTask(SqlAccess, QgsTask):
@@ -70,9 +166,9 @@ class AggregateDataTask(SqlAccess, QgsTask):
         self.geoIdField: str = plan.geoIdField
         self.popJoinField: str = plan.popJoinField
         self.popField: str = plan.popField
-        self.popFields: Sequence[RdsField] = plan.popFields
-        self.dataFields: Sequence[RdsDataField] = plan.dataFields
-        self.geoFields: Sequence[RdsGeoField] = plan.geoFields
+        self.popFields: KeyedList[str, RdsField] = plan.popFields
+        self.dataFields: KeyedList[str, RdsDataField] = plan.dataFields
+        self.geoFields: KeyedList[str, RdsGeoField] = plan.geoFields
         self.districts = plan.districts
         self.count = 0
         self.total = 1
@@ -154,9 +250,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
 
             cols.extend(new_cols)
 
-        popData = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField, read_geometry=False).rename(
-            columns={self.popField: str(DistrictColumns.POPULATION)}
-        )
+        popData = self.read_layer(self.popLayer, columns=cols, order=self.popJoinField, read_geometry=False)
 
         for f in self.popFields:
             if f.isExpression():
@@ -165,7 +259,7 @@ class AggregateDataTask(SqlAccess, QgsTask):
             if f.isExpression():
                 popData.loc[:, f.fieldName] = popData.eval(f.field)
 
-        return popData.drop(columns=remove)
+        return popData.drop(columns=remove).rename(columns={self.popField: str(DistrictColumns.POPULATION)})
 
     def finished(self, result: bool):
         super().finished(result)

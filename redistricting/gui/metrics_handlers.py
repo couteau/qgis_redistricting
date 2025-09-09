@@ -39,7 +39,7 @@ from qgis.PyQt.QtCore import QAbstractItemModel, QLocale, QModelIndex, QObject, 
 from qgis.PyQt.QtWidgets import QAbstractItemView, QDialog, QStyledItemDelegate, QTableView, QVBoxLayout
 from qgis.utils import iface
 
-from ..models import DistrictColumns, RdsGeoField, RdsMetric, RdsPlan
+from ..models import DistrictColumns, RdsMetric, RdsPlan
 from ..models.metrics import RdsCompleteMetric, RdsContiguityMetric
 from ..models.splitsmetric import RdsSplitsMetric
 from ..utils import tr
@@ -151,7 +151,6 @@ class CompleteHandler(AttributeTableDialogHandler):
         columns = {c.name: c for c in attributeConfig.columns()}  # pylint: disable=not-an-iterable
 
         for f in plan.geoFields:
-            f: RdsGeoField
             if f.fieldName not in columns:
                 continue
 

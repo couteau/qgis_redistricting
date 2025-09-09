@@ -26,49 +26,56 @@ import datetime
 import inspect
 import json
 import logging
+from collections.abc import Callable, Iterable, Mapping
 from functools import partial, reduce, wraps
 from io import StringIO
 from types import GenericAlias
 from typing import (
+    TYPE_CHECKING,
     Any,
-    Callable,
+    Optional,
     Type,
-    TypeAlias,
     TypeVar,
     Union,
-    _GenericAlias,
-    _strip_annotations,
-    _UnionGenericAlias,
+    _GenericAlias,  # type: ignore
+    _strip_annotations,  # type: ignore
+    _UnionGenericAlias,  # type: ignore
+    cast,
     get_args,
     get_origin,
 )
-from collections.abc import Iterable, Mapping
 from uuid import UUID
 
 import pandas as pd
 from qgis.core import QgsProject, QgsVectorLayer
 
-from ...utils import camel_to_kebab
+from ..utils import camel_to_kebab
+
+if TYPE_CHECKING:
+    from typing_extensions import TypeAlias, TypeForm
 
 _ST = TypeVar("_ST")
 
-ScalarType = Union[str, bytes, int, float, bool, None]
-JSONableType = Union[ScalarType, dict[str, "JSONableType"], list["JSONableType"], tuple["JSONableType"]]
-SimpleSerializeFunction: TypeAlias = Callable[[_ST], JSONableType]
-SerializerFunction: TypeAlias = Callable[[_ST, dict[int, Any], bool], JSONableType]
-SimpleDeserializeFunction: TypeAlias = Callable[[JSONableType], _ST]
-DeserializerFunction: TypeAlias = Callable[[type, JSONableType, Any], _ST]
+
+ScalarType: "TypeAlias" = Union[str, bytes, int, float, bool, None]
+JSONableType: "TypeAlias" = Union[ScalarType, dict[str, "JSONableType"], list["JSONableType"], tuple["JSONableType"]]
+
+_JSONable_contra = TypeVar("_JSONable_contra", contravariant=True)
 
 
-def wrap_simple_serializer(f):
-    def wrapper(value: Any, memo: dict[int, Any] = None, exclude_none: bool = True):  # pylint: disable=unused-argument
+def wrap_simple_serializer(
+    f: Callable[[_ST], JSONableType],
+) -> Callable[[_ST, Optional[dict[int, Any]], bool], JSONableType]:
+    def wrapper(value: _ST, memo: Optional[dict[int, Any]] = None, exclude_none: bool = True):
         return f(value)
 
     return wrapper
 
 
-def wrap_simple_deserializer(f):
-    def wrapper(cls, data: Any, **kw):  # pylint: disable=unused-argument
+def wrap_simple_deserializer(
+    f: Callable[[_JSONable_contra], _ST],
+) -> Callable[[type[_ST], _JSONable_contra], _ST]:
+    def wrapper(cls: type[_ST], data: _JSONable_contra, **kw) -> _ST:
         return f(data)
 
     return wrapper
@@ -86,7 +93,7 @@ serialize_dataframe = compose(partial(pd.DataFrame.to_json, orient="table"), jso
 deserialize_dataframe = compose(json.dumps, StringIO, partial(pd.read_json, orient="table"))
 
 
-serializers: dict[type, SerializerFunction] = {
+serializers: dict[type, Callable[[Any, Optional[dict[int, Any]], bool], JSONableType]] = {
     datetime.datetime: wrap_simple_serializer(datetime.datetime.isoformat),
     datetime.date: wrap_simple_serializer(datetime.date.isoformat),
     datetime.time: wrap_simple_serializer(datetime.time.isoformat),
@@ -95,30 +102,33 @@ serializers: dict[type, SerializerFunction] = {
     pd.DataFrame: wrap_simple_serializer(serialize_dataframe),
 }
 
-deserializers: dict[type, DeserializerFunction] = {
+deserializers: dict[type, Callable[[Union[type, _GenericAlias, GenericAlias], Any], Any]] = {
     datetime.datetime: wrap_simple_deserializer(datetime.datetime.fromisoformat),
     datetime.date: wrap_simple_deserializer(datetime.date.fromisoformat),
     datetime.time: wrap_simple_deserializer(datetime.time.fromisoformat),
     UUID: wrap_simple_deserializer(UUID),
-    QgsVectorLayer: wrap_simple_deserializer(QgsProject.instance().mapLayer),
+    QgsVectorLayer: wrap_simple_deserializer(QgsProject.instance().mapLayer),  # type: ignore
     pd.DataFrame: wrap_simple_deserializer(deserialize_dataframe),
 }
 
 
 def register_serializer(
     dtype: Type[_ST],
-    serializer: Union[SimpleSerializeFunction[_ST], SerializerFunction[_ST]],
-    deserializer: Union[SimpleDeserializeFunction[_ST], DeserializerFunction[_ST]],
+    serializer: Union[
+        Callable[[_ST], JSONableType],
+        Callable[[_ST, Optional[dict[int, Any]], bool], JSONableType],
+    ],
+    deserializer: Union[Callable[[JSONableType], _ST], Callable[[type[_ST], JSONableType], _ST]],
 ):
     if len(inspect.signature(serializer).parameters) == 1:
-        serializers[dtype] = wrap_simple_serializer(serializer)
+        serializers[dtype] = wrap_simple_serializer(serializer)  # type: ignore
     else:
-        serializers[dtype] = serializer
+        serializers[dtype] = serializer  # type: ignore
 
     if len(inspect.signature(deserializer).parameters) == 1:
-        deserializers[dtype] = wrap_simple_deserializer(deserializer)
+        deserializers[dtype] = wrap_simple_deserializer(deserializer)  # type: ignore
     else:
-        deserializers[dtype] = deserializer
+        deserializers[dtype] = deserializer  # type: ignore
 
 
 def kebab_dict(kw: Iterable[tuple[str, Any]]):
@@ -148,22 +158,22 @@ def serialize_value(value, memo: dict[int, Any], exclude_none=True):
     return memo[id(value)]
 
 
-def serialize(obj: Any, memo: dict[int, Any] = None, exclude_none=True):
+def serialize(obj: Any, memo: Optional[dict[int, Any]] = None, exclude_none=True):
     if memo is None:
         memo = {}
 
     return serialize_value(obj, memo, exclude_none)
 
 
-def deserialize_iterable(value: Iterable, *args):
+def deserialize_iterable(value: Iterable, *args: "TypeForm") -> Union[list, dict]:
     if len(args) == 0:
-        key_type = Any
+        key_type = lambda x: x  # noqa: E731 # pylint: disable=unnecessary-lambda-assignment
         elem_type = Any
     elif isinstance(value, Mapping) and len(args) > 1:
         key_type = args[0]
         elem_type = args[1]
     else:
-        key_type = Any
+        key_type = lambda x: x  # noqa: E731 # pylint: disable=unnecessary-lambda-assignment
         elem_type = args[-1]
 
     if not isinstance(key_type, type) or key_type is Any:
@@ -173,9 +183,9 @@ def deserialize_iterable(value: Iterable, *args):
         if elem_type.__bound__ is not None:
             elem_type = elem_type.__bound__
         elif elem_type.__constraints__:
-            elem_type = Union[elem_type.__constraints__]
+            elem_type = Union[*elem_type.__constraints__]
         else:
-            elem_type = elem_type.__bound__ if elem_type.__bound__ is not None else type
+            elem_type = type
 
     if isinstance(value, zip):
         value = dict(value)
@@ -188,12 +198,16 @@ def deserialize_iterable(value: Iterable, *args):
     return value
 
 
-def _get_type_and_args(dtype: type, value: Any):
+T = TypeVar("T")
+
+
+def _get_type_and_args(dtype: "TypeForm[T]", value: Any) -> tuple["TypeForm[T]", type[T], tuple[type, ...]]:
     # find base type
     args = ()
-    dtype = t = _strip_annotations(dtype)
-    while isinstance(t, (_GenericAlias, GenericAlias)):
-        args = get_args(t)
+    dtype = cast("TypeForm[T]", _strip_annotations(dtype))
+    t = dtype
+    while not isinstance(t, type):
+        args: tuple[type, ...] = get_args(t)
         if isinstance(t, _UnionGenericAlias):
             # type is Optional or Union
             if type(value) in args:
@@ -201,16 +215,16 @@ def _get_type_and_args(dtype: type, value: Any):
             else:
                 t = args[0]
             args = ()
-            dtype = t
+            dtype = cast("type[T]", t)
         else:
-            t = get_origin(t)
+            t = cast("type", get_origin(t))
 
-    return dtype, t, args
+    return dtype, cast("type[T]", t), args
 
 
-def deserialize_value(dtype: type, value: Any, **kw):
+def deserialize_value(dtype: "TypeForm[T]", value: Any, **kw) -> T:
     if value is None:
-        return None
+        return value
 
     dtype, t, args = _get_type_and_args(dtype, value)
 
@@ -229,13 +243,15 @@ def deserialize_value(dtype: type, value: Any, **kw):
                 break
         else:
             if issubclass(t, Iterable) and t not in (str, bytes):
-                value = dtype(deserialize_iterable(value, *args))
+                list_items: Union[list, dict] = deserialize_iterable(value, *args)
+                if type(list_items) is t:
+                    value = list_items
+                else:
+                    constructor: Callable[[Iterable], T] = dtype if callable(dtype) else t
+                    value = constructor(list_items)  # type: ignore
 
     return value
 
 
-T = TypeVar("T")
-
-
-def deserialize(t: type[T], value: Any, **kw) -> T:
+def deserialize(t: "TypeForm[T]", value: Any, **kw) -> T:
     return deserialize_value(t, value, **kw)

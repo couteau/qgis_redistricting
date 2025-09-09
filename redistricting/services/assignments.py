@@ -25,8 +25,8 @@
 from __future__ import annotations
 
 import itertools
-from typing import TYPE_CHECKING, Any, Optional, Union, overload
 from collections.abc import Iterable, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Union, overload
 
 from qgis.core import (
     QgsExpression,
@@ -38,6 +38,7 @@ from qgis.core import (
     QgsVectorLayerFeatureIterator,
 )
 from qgis.PyQt.QtCore import QObject, QSignalMapper, pyqtSignal
+from qgis.PyQt.QtWidgets import QUndoCommand
 
 from ..utils import tr
 
@@ -67,10 +68,9 @@ class PlanAssignmentEditor(QObject):
         self._undoStack = self._assignLayer.undoStack()
         self._undoStack.indexChanged.connect(self.undoChanged)
 
-    def startEditCommand(self, msg: str = None):
+    def beginEditCommand(self, msg: str = None):
         if not self._assignLayer.isEditable():
             self._assignLayer.startEditing()
-            self._assignLayer.undoStack()
 
         if msg is None:
             msg = tr("Edit assignments")
@@ -178,6 +178,12 @@ class PlanAssignmentEditor(QObject):
         buffer = self._assignLayer.editBuffer()
         if isinstance(buffer, QgsVectorLayerEditPassthrough):
             buffer.update(query)
+
+    def pushUndoCommand(self, cmd: QUndoCommand, msg: str = None):
+        if not self._assignLayer.isEditCommandActive():
+            msg = msg or tr("Edit assignments")
+            self._assignLayer.beginEditCommand(msg)
+        self._undoStack.push(cmd)
 
 
 class AssignmentsService(QObject):

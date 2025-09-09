@@ -97,7 +97,7 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         super().initializePage()
         popLayer = self.field("popLayer") or self.field("sourceLayer")
         popField = RdsField(popLayer, self.field("popField"), tr("Total Population"))
-        popFields: list[RdsField] = [popField, *self.field("popFields")]
+        popFields: list[RdsDataField] = [popField, *self.field("popFields")]
         self.fieldsModel.popFields = popFields
 
         delegate: PopFieldDelegate = self.tblDataFields.itemDelegateForColumn(3)
@@ -129,12 +129,12 @@ class dlgEditPlanFieldPage(Ui_wzpDisplayFields, QWizardPage):
         f = self.fieldsModel.appendField(self.fexDataField.layer(), field, isExpression)
         if f and f.isNumeric and not isExpression:
             if matchField(f.field, self.fexDataField.layer(), settings.vapFieldPatterns):
-                for p in self.fieldsModel.popFields:
+                for p in self.fieldsModel.popFields.values():
                     if matchField(p.field, None, settings.vapTotalFields):
                         f.pctbase = p.fieldName
 
             elif matchField(f.field, self.fexDataField.layer(), settings.cvapFieldPatterns):
-                for p in self.fieldsModel.popFields:
+                for p in self.fieldsModel.popFields.values():
                     if matchField(p.field, None, settings.cvapTotalFields):
                         f.pctbase = p.fieldName
 

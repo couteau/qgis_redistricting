@@ -60,7 +60,7 @@ class DistrictClipboardAccess:
 
     def getAsHtml(self, plan: RdsPlan, selection: Iterable[tuple[int, int]]) -> str:
         def colorRowHeader(row):
-            r = 0 if row == tr("Unassigned") else int(row)
+            r = 0 if row == tr("Unassigned") else selectionData.index.get_loc(row)
             clr: QBrush = model.data(model.index(r, 0), Qt.ItemDataRole.BackgroundRole)
             return f"background-color: #{clr.color().rgb() & 0xFFFFFF:x};"
 

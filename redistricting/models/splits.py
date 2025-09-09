@@ -23,15 +23,14 @@
 """
 
 from abc import abstractmethod
+from collections.abc import Sequence
 from functools import partial
 from typing import Any, Optional, Union
-from collections.abc import Sequence
 
 import pandas as pd
 from qgis.PyQt.QtCore import pyqtSignal
 
-from .base.model import RdsBaseModel
-from .base.prop import Factory, rds_property
+from .base import Factory, RdsBaseModel, rds_property
 
 
 class RdsSplitBase:

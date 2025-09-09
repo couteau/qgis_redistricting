@@ -21,39 +21,21 @@
  *                                                                         *
  ***************************************************************************/
 """
-from typing import (
-    TYPE_CHECKING,
-    Optional
-)
+
+from typing import Optional
 from uuid import UUID
 
-from qgis.core import (
-    QgsMapLayer,
-    QgsMapLayerType,
-    QgsProject
-)
+from qgis.core import QgsMapLayer, QgsMapLayerType, QgsProject
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import (
-    QMenu,
-    QToolBar
-)
+from qgis.PyQt.QtGui import QAction, QIcon
+from qgis.PyQt.QtWidgets import QMenu, QToolBar
 
 from ..models import RdsPlan
 from ..services import PlanManager
 from ..utils import tr
 from .base import BaseController
 from .plan import PlanController
-
-if TYPE_CHECKING:
-    from qgis.PyQt.QtCore import QT_VERSION
-    if QT_VERSION >= 0x060000:
-        from PyQt6.QtGui import QAction  # type: ignore[import]
-    else:
-        from PyQt5.QtWidgets import QAction  # type: ignore[import]
-else:
-    from qgis.PyQt.QtWidgets import QAction
 
 
 class ContextMenuController(BaseController):
@@ -64,38 +46,26 @@ class ContextMenuController(BaseController):
         planManager: PlanManager,
         toolbar: QToolBar,
         planController: PlanController,
-        parent: Optional[QObject] = None
+        parent: Optional[QObject] = None,
     ):
         super().__init__(iface, project, planManager, toolbar, parent)
 
         self.contextAction = QAction(
-            QIcon(":/plugins/redistricting/icon.png"),
-            self.tr("Redistricting"),
-            self.iface.mainWindow()
+            QIcon(":/plugins/redistricting/icon.png"), self.tr("Redistricting"), self.iface.mainWindow()
         )
 
         self.contextMenu = QMenu(self.tr("Redistricting Plan"), self.iface.mainWindow())
         action = QAction(
-            QIcon(":/plugins/redistricting/activateplan.svg"),
-            tr("Activate Plan"),
-            self.iface.mainWindow()
+            QIcon(":/plugins/redistricting/activateplan.svg"), tr("Activate Plan"), self.iface.mainWindow()
         )
         action.triggered.connect(self.contextMenuActivatePlan)
         self.contextMenu.addAction(action)
 
-        action = QAction(
-            QIcon(":/plugins/redistricting/editplan.svg"),
-            tr("Edit Plan"),
-            self.iface.mainWindow()
-        )
+        action = QAction(QIcon(":/plugins/redistricting/editplan.svg"), tr("Edit Plan"), self.iface.mainWindow())
         action.triggered.connect(self.contextMenuSlot(planController.editPlan))
         self.contextMenu.addAction(action)
 
-        action = QAction(
-            QIcon(":/plugins/redistricting/exportplan.svg"),
-            tr("Export Plan"),
-            self.iface.mainWindow()
-        )
+        action = QAction(QIcon(":/plugins/redistricting/exportplan.svg"), tr("Export Plan"), self.iface.mainWindow())
         action.triggered.connect(self.contextMenuSlot(planController.exportPlan))
         self.contextMenu.addAction(action)
 

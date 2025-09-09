@@ -51,7 +51,14 @@ class RdsTotalPopulationMetric(
     def caption(self):
         return DistrictColumns.POPULATION.comment
 
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: "RdsPlan", **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
         if populationData is not None:
             self._value = int(populationData[DistrictColumns.POPULATION].sum())
 
@@ -68,6 +75,7 @@ class RdsDeviationMetric(
     level=MetricLevel.DISTRICT,
     triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
     depends=(RdsTotalPopulationMetric,),
+    field_type=int,
 ):
     def caption(self):
         return DistrictColumns.DEVIATION.comment
@@ -75,6 +83,7 @@ class RdsDeviationMetric(
     def calculate(
         self,
         populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
         geometry: gpd.GeoSeries,
         plan: "RdsPlan",
         *,
@@ -82,19 +91,13 @@ class RdsDeviationMetric(
         **depends,
     ):
         if populationData is not None and plan is not None:
-            members = pd.Series(
-                [None if d == 0 else d.members for d in plan.districts],
-                index=(d.district for d in plan.districts),
-                dtype="Int64",
-            )
-
-            ideal = round(totalPopulation / plan.numSeats)
+            idealPerMember = round(totalPopulation / plan.numSeats)
 
             self._value = (
                 populationData[[plan.distField, DistrictColumns.POPULATION]]
                 .groupby(plan.distField)
                 .sum()[DistrictColumns.POPULATION]
-                .sub(members * ideal)
+                .sub(districtData["members"] * idealPerMember)
             )
 
     def format(self, idx=None) -> str:
@@ -116,13 +119,15 @@ class RdsPctDeviationMetric(
     level=MetricLevel.DISTRICT,
     triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
     depends=(RdsTotalPopulationMetric, RdsDeviationMetric),
+    field_type=float,
 ):
     def caption(self):
         return DistrictColumns.PCT_DEVIATION.comment
 
-    def calculate(
+    def calculate(  # noqa: PLR0913
         self,
         populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
         geometry: gpd.GeoSeries,
         plan: "RdsPlan",
         *,
@@ -138,11 +143,7 @@ class RdsPctDeviationMetric(
             self._value = pd.Series(0, deviation.index)
         else:
             idealPerMember = round(totalPopulation / plan.numSeats)
-            districtIdeal = pd.Series(
-                [None if d.district == 0 else d.members * idealPerMember for d in plan.districts],
-                index=(d.district for d in plan.districts),
-                dtype="Int64",
-            )
+            districtIdeal = districtData["members"] * idealPerMember
 
             self._value = deviation / districtIdeal
 
@@ -166,33 +167,31 @@ class RdsPlanDeviationMetric(
     triggers=MetricTriggers.ON_UPDATE_DEMOGRAPHICS,
     values=RdsPctDeviationMetric,
 ):
-    def __post_init__(self, **kwargs):
-        super().__post_init__(**kwargs)
-        self._formatted_value = ""
-        self._valid = True
+    formattedValue: str = ""
+    valid: bool = True
 
     def caption(self):
         return DistrictColumns.PCT_DEVIATION.comment
 
-    def aggregate(self, populationData, geometry, plan: "RdsPlan", values: pd.Series):
-        minDeviation, maxDeviation = float(values.min()), float(values.max())
-        self._formatted_value = (
+    def aggregate(self, populationData, districtData, geometry, plan: "RdsPlan", values: pd.Series):
+        minDeviation, maxDeviation = float(values[values.index != 0].min()), float(values[values.index != 0].max())
+        self.formattedValue = (
             f"{maxDeviation:+.2%}, {minDeviation:+.2%}"
             if plan is None or plan.deviationType == DeviationType.OverUnder
             else f"{maxDeviation - minDeviation:.2%}"
         )
         if plan is not None:
             validator = validators[plan.deviationType](plan)
-            self._valid = validator.validatePlan()
+            self.valid = validator.validatePlan()
         else:
-            self._valid = True
+            self.valid = True
         return minDeviation, maxDeviation
 
     def format(self, idx=None):
-        return self._formatted_value
+        return self.formattedValue
 
     def forgroundColor(self, idx=None):
-        return QColor(Qt.GlobalColor.red) if not self._valid else QColor(Qt.GlobalColor.green)
+        return QColor(Qt.GlobalColor.red) if not self.valid else QColor(Qt.GlobalColor.green)
 
 
 class CeaProjMetric(
@@ -203,7 +202,14 @@ class CeaProjMetric(
     display=False,
     serialize=False,
 ):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: "RdsPlan", **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
         cea_crs = pyproj.CRS("+proj=cea")
         self._value: gpd.GeoSeries = geometry.geometry.to_crs(cea_crs)
 
@@ -215,7 +221,7 @@ class DistrictAggregateMixin:
 
 
 class DistrictMeanMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, plan: "RdsPlan", values):
+    def aggregate(self, populationData, districtData, geometry, plan: "RdsPlan", values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].mean())
 
@@ -233,7 +239,7 @@ class DistrictMeanMixin(DistrictAggregateMixin):
 
 
 class DistrictMinMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, plan: "RdsPlan", values):
+    def aggregate(self, populationData, districtData, geometry, plan: "RdsPlan", values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].min())
 
@@ -248,7 +254,7 @@ class DistrictMinMixin(DistrictAggregateMixin):
 
 
 class DistrictMaxMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, plan: "RdsPlan", values):
+    def aggregate(self, populationData, districtData, geometry, plan: "RdsPlan", values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].max())
 
@@ -263,7 +269,7 @@ class DistrictMaxMixin(DistrictAggregateMixin):
 
 
 class DistrictSumMixin(DistrictAggregateMixin):
-    def aggregate(self, populationData, geometry, plan: "RdsPlan", values):
+    def aggregate(self, populationData, districtData, geometry, plan: "RdsPlan", values):
         if isinstance(values, pd.Series):
             return float(values[values.index != 0].sum())
 
@@ -281,16 +287,19 @@ class DistrictSumMixin(DistrictAggregateMixin):
 
 
 class RdsCompactnessMetric(RdsMetric[pd.Series], mname="__compactness"):
-    def __init_subclass__(
+    def __init_subclass__(  # noqa: PLR0913
         cls,
         score: ConstStr,
         group=tr("Compactness"),  # noqa: B008
         level=MetricLevel.DISTRICT,
         triggers=MetricTriggers.ON_UPDATE_GEOMETRY,
         depends=(CeaProjMetric,),
+        field_type=float,
         **kwargs,
     ):
-        super().__init_subclass__(mname=score, group=group, level=level, triggers=triggers, depends=depends, **kwargs)
+        super().__init_subclass__(
+            mname=score, group=group, level=level, triggers=triggers, depends=depends, field_type=field_type, **kwargs
+        )
         cls._score = score
 
     def __init__(self, value: Optional[Union[Mapping[int, float], Sequence[float]]] = None):
@@ -338,7 +347,14 @@ class RdsCompactnessAggregate(RdsAggregateMetric[float], mname="__compactnessagg
 
 class RdsPolsbyPopper(RdsCompactnessMetric, score=MetricsColumns.POLSBYPOPPER):
     def calculate(
-        self, populationData, geometry: gpd.GeoSeries, plan: "RdsPlan", *, cea_proj: gpd.GeoSeries = None, **depends
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        *,
+        cea_proj: gpd.GeoSeries = None,
+        **depends,
     ):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
@@ -385,7 +401,14 @@ class RdsAggScores(RdsMetric, mname="__agg_compactness", level=MetricLevel.PLANW
         )
         cls._score = score
 
-    def calculate(self, populationData, geometry, plan: "RdsPlan", **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
         self._value: dict[type[RdsAggregateMetric], float] = {d: depends[d.name()] for d in self.depends()}
 
     def caption(self):
@@ -395,7 +418,7 @@ class RdsAggScores(RdsMetric, mname="__agg_compactness", level=MetricLevel.PLANW
         return f"{self._score.comment} ({', '.join(d.short_name() for d in self._value.keys())})"
 
     def format(self, idx=None):
-        if self._value is None:
+        if self._value is None or any(v is None for v in self._value.values()):
             return None
 
         return ", ".join(f"{v:0.3f}" for v in self._value.values())
@@ -409,7 +432,16 @@ class RdsAggPolsbyPopper(
 
 
 class RdsReock(RdsCompactnessMetric, score=MetricsColumns.REOCK):
-    def calculate(self, populationData, geometry, plan: "RdsPlan", *, cea_proj: gpd.GeoSeries = None, **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        *,
+        cea_proj: gpd.GeoSeries = None,
+        **depends,
+    ):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
         self._value = cea_proj.area / cea_proj.minimum_bounding_circle().area
@@ -446,7 +478,16 @@ class RdsAggReock(RdsAggScores, score=MetricsColumns.REOCK, depends=(RdsMeanReoc
 
 
 class RdsConvexHull(RdsCompactnessMetric, score=MetricsColumns.CONVEXHULL):
-    def calculate(self, populationData, geometry, plan: "RdsPlan", *, cea_proj: gpd.GeoSeries = None, **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        *,
+        cea_proj: gpd.GeoSeries = None,
+        **depends,
+    ):
         if cea_proj is None:
             self._value = pd.Series(0, geometry.index)
         self._value = cea_proj.area / cea_proj.convex_hull.area
@@ -497,7 +538,14 @@ class RdsCutEdges(
     def caption(self):
         return tr("Cut Edges")
 
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: "RdsPlan", **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
         with spatialite_connect(plan.geoPackagePath) as db:
             # select count of unit pairs where
             #   1) assigned districts are different (also takes care of excluding unassigned units from count),
@@ -543,12 +591,21 @@ class RdsBoolMetric(RdsMetric[bool], mname="__boolmetric"):
 
 
 class RdsContiguityMetric(RdsBoolMetric, mname="contiguity", triggers=MetricTriggers.ON_UPDATE_GEOMETRY):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: "RdsPlan", **depends):
-        if plan is None or len(plan.districts) == 1:
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
+        if plan is None or len(geometry) == 1:
             self._value = None
             return
 
-        self._value = geometry[geometry.index != 0].count_geometries().sum() == plan.allocatedDistricts
+        # bool cast ensures the value is not np.True_ or np.False_, which are
+        # not json serializable with the standard lib json.dumps function
+        self._value = bool(geometry[geometry.index != 0].count_geometries().sum() == plan.allocatedDistricts)
 
     def tooltip(self, idx=None):
         if self._value:
@@ -558,7 +615,14 @@ class RdsContiguityMetric(RdsBoolMetric, mname="contiguity", triggers=MetricTrig
 
 
 class RdsCompleteMetric(RdsBoolMetric, mname="complete", triggers=MetricTriggers.ON_UPDATE_GEOMETRY):
-    def calculate(self, populationData: pd.DataFrame, geometry: gpd.GeoSeries, plan: "RdsPlan", **depends):
+    def calculate(
+        self,
+        populationData: pd.DataFrame,
+        districtData: pd.DataFrame,
+        geometry: gpd.GeoSeries,
+        plan: "RdsPlan",
+        **depends,
+    ):
         if plan is None:
             self._value = False
         else:

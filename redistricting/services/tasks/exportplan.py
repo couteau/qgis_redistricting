@@ -25,8 +25,7 @@
 from __future__ import annotations
 
 import csv
-from contextlib import closing
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, cast
 
 from qgis.core import (
     QgsExpression,
@@ -39,20 +38,20 @@ from qgis.core import (
     QgsFields,
     QgsProject,
     QgsTask,
+    QgsVectorDataProvider,
     QgsVectorFileWriter,
     QgsVectorLayer,
     QgsWkbTypes,
 )
 from qgis.PyQt.QtCore import QMetaType
-from qgis.utils import spatialite_connect
 
-from ...models import DistrictColumns
-from ...utils import tr
+from ...models import DistrictColumns, MetricLevel, RdsField, RdsPlan
+from ...utils import spatialite_connect, tr
 from ...utils.misc import quote_identifier
 from ._debug import debug_thread
 
 if TYPE_CHECKING:
-    from ...models import RdsDataField, RdsField, RdsPlan
+    from collections.abc import Iterable
 
 
 def makeDbfFieldName(fieldName, fields: QgsFields):
@@ -74,15 +73,18 @@ class ExportRedistrictingPlanTask(QgsTask):
         self,
         plan: RdsPlan,
         exportShape: bool = True,
-        shapeFileName: str = None,
+        shapeFileName: Optional[str] = None,
         includeDemographics: bool = True,
         includeMetrics: bool = True,
         includeUnassigned: bool = False,
         exportEquivalency: bool = True,
-        equivalencyFileName: str = None,
-        assignGeography: RdsField = None,
+        equivalencyFileName: Optional[str] = None,
+        assignGeography: Optional[RdsField] = None,
     ):
         super().__init__(tr("Export assignments"), QgsTask.Flag.AllFlags)
+        if plan.distLayer is None or plan.assignLayer is None:
+            raise ValueError("plan assign layer and district layer must exist")
+
         self.exportShape = exportShape and shapeFileName and plan.distLayer
         self.shapeFileName = shapeFileName
         self.includeDemographics = includeDemographics
@@ -104,6 +106,8 @@ class ExportRedistrictingPlanTask(QgsTask):
         self.dataFields = plan.dataFields
 
         self.districts = plan.districts
+
+        self.metrics = [m for m in plan.metrics if m.level() == MetricLevel.DISTRICT and m.serialize()]
 
         self.exception = None
 
@@ -147,19 +151,55 @@ class ExportRedistrictingPlanTask(QgsTask):
                     fields.append(QgsField(fieldNames[fn], QMetaType.Type.Double))
 
         if self.includeMetrics:
-            fieldNames |= {"polsbypopper": "polsbypop", "reock": "reock", "convexhull": "convexhull"}
-            fields.append(QgsField("polsbypop", QMetaType.Type.Double))
-            fields.append(QgsField("reock", QMetaType.Type.Double))
-            fields.append(QgsField("convexhull", QMetaType.Type.Double))
+            for m in self.metrics:
+                if ftype := m.field_type() not in (str, int, float, bool):
+                    continue
+
+                shortName = m.name()[:10]
+                if shortName in fieldNames.values():
+                    continue
+
+                fieldNames[m.name()] = shortName
+                t = (
+                    QMetaType.Type.QString
+                    if ftype is str
+                    else QMetaType.Type.LongLong
+                    if ftype is int
+                    else QMetaType.Type.Double
+                    if ftype is float
+                    else QMetaType.Type.Bool
+                )
+                fields.append(QgsField(shortName, t))
+
+            # fields.append(QgsField("polsbypop", QMetaType.Type.Double))
+            # fields.append(QgsField("reock", QMetaType.Type.Double))
+            # fields.append(QgsField("convexhull", QMetaType.Type.Double))
         return fields, fieldNames
 
-    def _createDistrictsMemoryLayer(self):
-        def fieldByName(fieldName, fieldList: list[RdsField]) -> Union[RdsField, RdsDataField]:
-            for f in fieldList:
-                if f.field == fieldName:
-                    return f
-            return None
+    def createFeature(self, f: QgsFeature, dist, fieldNames) -> QgsFeature:
+        feat = QgsFeature()
+        data = []
+        for srcFld in fieldNames:
+            if srcFld[:3] == "pct" and srcFld != DistrictColumns.PCT_DEVIATION:
+                basefld = srcFld[4:]
+                fld = self.dataFields.get(basefld, None)
+                if fld is None:
+                    continue
 
+                pctbase = fld.pctBase
+                if pctbase == self.popField:
+                    pctbase = DistrictColumns.POPULATION
+                if dist[basefld] is None or not dist[pctbase]:
+                    data.append(0)
+                else:
+                    data.append(dist[basefld] / dist[pctbase])
+            else:
+                data.append(dist[srcFld])
+        feat.setAttributes(data)
+        feat.setGeometry(f.geometry())
+        return feat
+
+    def _createDistrictsMemoryLayer(self):
         if not self.includeUnassigned:
             flt = f"{self.distField} != 0 AND {self.distField} IS NOT NULL"
         else:
@@ -172,7 +212,7 @@ class ExportRedistrictingPlanTask(QgsTask):
         context.appendScopes(QgsExpressionContextUtils.globalProjectLayerScopes(self.distLayer))
         fields, fieldNames = self._createFields(context)
 
-        pr = layer.dataProvider()
+        pr: QgsVectorDataProvider = cast("QgsVectorDataProvider", layer.dataProvider())
         pr.addAttributes(fields)
         layer.updateFields()
 
@@ -186,25 +226,9 @@ class ExportRedistrictingPlanTask(QgsTask):
             request.setSubsetOfAttributes(fieldNames, self.distLayer.fields())
 
         features = []
-        for f in self.distLayer.getFeatures(request):
-            if (dist := self.districts[f["district"]]) is not None:
-                feat = QgsFeature()
-                data = []
-                for srcFld in fieldNames:
-                    if srcFld[:3] == "pct" and srcFld != DistrictColumns.PCT_DEVIATION:
-                        basefld = srcFld[4:]
-                        pctbase = fieldByName(basefld, self.dataFields).pctBase
-                        if pctbase == self.popField:
-                            pctbase = DistrictColumns.POPULATION
-                        if dist[basefld] is None or not dist[pctbase]:
-                            data.append(0)
-                        else:
-                            data.append(dist[basefld] / dist[pctbase])
-                    else:
-                        data.append(dist[srcFld])
-                feat.setAttributes(data)
-                feat.setGeometry(f.geometry())
-                features.append(feat)
+        for f in cast("Iterable[QgsFeature]", self.distLayer.getFeatures(request)):
+            if (dist := self.districts.get(f["district"], None)) is not None:
+                features.append(self.createFeature(f, dist, fieldNames))
 
         success, _ = pr.addFeatures(features)
         if success:
@@ -222,7 +246,7 @@ class ExportRedistrictingPlanTask(QgsTask):
             saveOptions = QgsVectorFileWriter.SaveVectorOptions()
             saveOptions.driverName = "ESRI Shapefile"
             saveOptions.fileEncoding = "UTF-8"
-            saveOptions.actionOnExistingFile = QgsVectorFileWriter.CreateOrOverwriteFile
+            saveOptions.actionOnExistingFile = QgsVectorFileWriter.ActionOnExistingFile.CreateOrOverwriteFile
             feedback = QgsFeedback()
             feedback.progressChanged.connect(self.setProgress)
             if self.canCancel():
@@ -232,11 +256,11 @@ class ExportRedistrictingPlanTask(QgsTask):
             error, msg, _fn, _ln = QgsVectorFileWriter.writeAsVectorFormatV3(
                 layer,
                 self.shapeFileName,
-                QgsProject.instance().transformContext(),
+                QgsProject.instance().transformContext(),  # type: ignore
                 saveOptions,
             )
 
-            if error != QgsVectorFileWriter.NoError:
+            if error != QgsVectorFileWriter.WriterError.NoError:
                 self.exception = RuntimeError(msg)
                 return False
         else:
@@ -246,8 +270,8 @@ class ExportRedistrictingPlanTask(QgsTask):
 
     def _exportEquivalency(self):
         if self.assignGeography:
-            geoPackagePath = self.assignLayer.dataProvider().dataSourceUri().split("|")[0]
-            with closing(spatialite_connect(geoPackagePath)) as db:
+            geoPackagePath = self.assignLayer.dataProvider().dataSourceUri().split("|")[0]  # type: ignore
+            with spatialite_connect(geoPackagePath) as db:
                 sql = (
                     "SELECT DISTINCT "  # noqa: S608
                     f"{quote_identifier(self.assignGeography.fieldName)}, {quote_identifier(self.distField)} "

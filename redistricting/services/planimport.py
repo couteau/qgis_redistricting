@@ -95,8 +95,12 @@ class PlanImporter(ErrorListMixin, QObject):
 
     def taskCompleted(self):
         self.setProgress(100)
-        self._importTask = None
-        self.importComplete.emit(self._plan)
+
+    def taskStatusChanged(self, id: int, status: QgsTask.TaskStatus):
+        if id == QgsApplication.taskManager().taskId(self._importTask) and status == QgsTask.TaskStatus.Complete:
+            self._importTask = None
+            QgsApplication.taskManager().statusChanged.disconnect(self.taskStatusChanged)
+            self.importComplete.emit(self._plan)
 
     def taskTerminated(self):
         if self._importTask.exception:
@@ -119,7 +123,11 @@ class PlanImporter(ErrorListMixin, QObject):
             self._plan.assignLayer.commitChanges(True)
 
         self._importTask = self._createImportTask()
+
         self._importTask.taskCompleted.connect(self.taskCompleted)
+        # Use QgsTaskManager.statusChanged to signal import complete --
+        # this allows QgsTask.finished to run before the signal is emitted
+        QgsApplication.taskManager().statusChanged.connect(self.taskStatusChanged)
         self._importTask.taskTerminated.connect(self.taskTerminated)
         self._importTask.progressChanged.connect(self.setProgress)
 
@@ -277,7 +285,7 @@ class ShapefileImporter(PlanImporter):
             name = f[self._nameField] if self._nameField else None
             members = f[self._membersField] if self._membersField else 1
             if dist != 0:
-                d = self._plan.districts[dist]
+                d = self._plan.districts.get(dist)
                 d.name = name
                 d.members = members
         super().taskCompleted()

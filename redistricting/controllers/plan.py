@@ -23,14 +23,15 @@
 """
 
 import pathlib
-from collections.abc import Iterable
-from typing import Optional
+from typing import Optional, cast
 
 from qgis.core import Qgis, QgsApplication, QgsProject, QgsVectorLayer
 from qgis.gui import QgisInterface
 from qgis.PyQt.QtCore import QObject
 from qgis.PyQt.QtGui import QAction, QActionGroup, QIcon
 from qgis.PyQt.QtWidgets import QDialog, QMenu, QToolBar, QToolButton
+
+from redistricting.models.metricslist import MetricTriggers
 
 from ..gui import (
     DlgConfirmDelete,
@@ -45,6 +46,7 @@ from ..models import GeoFieldsModel, RdsPlan
 from ..services import (  # ShapefileImporter
     DistrictUpdater,
     LayerTreeManager,
+    MetricsService,
     PlanBuilder,
     PlanCopier,
     PlanEditor,
@@ -56,7 +58,7 @@ from ..services import (  # ShapefileImporter
     PlanStylerService,
 )
 from ..services.actions import PlanAction
-from ..services.tasks.autoassign import AutoAssignUnassignedUnits
+from ..services.tasks.autoassign import AUTOASSIGN_ENABLED, AutoAssignUnassignedUnits
 from ..utils import tr
 from .base import BaseController
 
@@ -71,6 +73,7 @@ class PlanController(BaseController):
         layerTreeManager: LayerTreeManager,
         planStyler: PlanStylerService,
         updateService: DistrictUpdater,
+        metricsService: MetricsService,
         importService: PlanImportService,
         parent: Optional[QObject] = None,
     ):
@@ -78,30 +81,21 @@ class PlanController(BaseController):
         self.layerTreeManager = layerTreeManager
         self.styler = planStyler
         self.updateService = updateService
+        self.metricsService = metricsService
         self.importService = importService
 
         self.icon = QIcon(":/plugins/redistricting/icon.png")
         self.menuName = tr("&Redistricting")
 
-        self.menu = QMenu(self.menuName)
-        self.menu.setIcon(self.icon)
+        self.menu: QMenu
+        self.menuButton: QToolButton
+        self.toolBtnAction: QAction
+        self.planMenu: QMenu
+        self.planActions: QActionGroup
+        self.vectorSubMenu: QAction
 
-        self.menuButton = QToolButton()
-        self.menuButton.setMenu(self.menu)
-        self.menuButton.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-        self.menuButton.setIcon(self.icon)
-        self.menuButton.setToolTip(tr("Redistricting Utilities"))
-
-        self.toolBtnAction: QAction = None
-
-        self.planMenu: QMenu = None
-        self.planActions: QActionGroup = None
-        self.vectorSubMenu: QAction = None
-
-        self.planManagerDlg: DlgSelectPlan = None
-        self.planModel: PlanListModel = None
-
-        self.createActions()
+        self.planModel: PlanListModel
+        self.planManagerDlg: Optional[DlgSelectPlan] = None
 
     def load(self):
         self.planManager.activePlanChanged.connect(self.enableActivePlanActions)
@@ -112,15 +106,26 @@ class PlanController(BaseController):
         self.project.layersRemoved.connect(self.enableNewPlan)
         self.updateService.updateComplete.connect(self.planDistrictsUpdated)
         self.importService.importComplete.connect(self.importComplete)
+        self.importService.importTerminated.connect(self.endProgress)
 
         self.planModel = PlanListModel(self.planManager)
 
-        self.toolBtnAction: QAction = self.toolbar.addWidget(self.menuButton)
+        self.menu = QMenu(self.menuName)
+        self.menu.setIcon(self.icon)
 
-        self.planMenu = self.menu.addMenu(self.icon, tr("&Redistricting Plans"))
+        self.menuButton = QToolButton()
+        self.menuButton.setMenu(self.menu)
+        self.menuButton.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+        self.menuButton.setIcon(self.icon)
+        self.menuButton.setToolTip(tr("Redistricting Utilities"))
+
+        self.toolBtnAction = cast("QAction", self.toolbar.addWidget(self.menuButton))
+
+        self.planMenu = cast("QMenu", self.menu.addMenu(self.icon, tr("&Redistricting Plans")))
         self.planActions = QActionGroup(self.iface.mainWindow())
 
-        self.vectorSubMenu: QAction = self.iface.vectorMenu().addMenu(self.menuButton.menu())
+        self.vectorSubMenu: QAction = cast("QAction", self.iface.vectorMenu().addMenu(self.menuButton.menu()))  # type: ignore[no-untyped-call]
+        self.createActions()
 
     def unload(self):
         if self.planManagerDlg is not None:
@@ -137,15 +142,18 @@ class PlanController(BaseController):
         self.updateService.updateComplete.disconnect(self.planDistrictsUpdated)
         self.importService.importComplete.disconnect(self.importComplete)
 
-        self.planModel = None
+        del self.planModel
         self.toolbar.removeAction(self.toolBtnAction)
-        self.toolBtnAction = None
-        self.iface.vectorMenu().removeAction(self.vectorSubMenu)
-        self.vectorSubMenu = None
+        del self.toolBtnAction
+        self.iface.vectorMenu().removeAction(self.vectorSubMenu)  # type: ignore[no-untyped-call]
+        del self.vectorSubMenu
         self.planActions.setParent(None)
-        self.planActions = None
+        del self.planActions
         self.planMenu.setParent(None)
-        self.planMenu = None
+        del self.planMenu
+        del self.menuButton
+        self.menu.clear()
+        del self.menu
 
     def createActions(self):
         self.actionShowPlanManager = self.actions.createAction(
@@ -164,7 +172,6 @@ class PlanController(BaseController):
             tr("New Plan"),
             tooltip=tr("Create a new redistricting plan"),
             callback=self.newPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionNewPlan.setEnabled(False)
         self.menu.addAction(self.actionNewPlan)
@@ -174,7 +181,6 @@ class PlanController(BaseController):
             QIcon(":/plugins/redistricting/editplan.svg"),
             tr("Edit Active Plan"),
             callback=self.editPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionEditActivePlan.setEnabled(False)
         self.menu.addAction(self.actionEditActivePlan)
@@ -185,7 +191,6 @@ class PlanController(BaseController):
             tr("Copy Active Plan"),
             tooltip=tr("Copy the active plan to a new redistricting plan"),
             callback=self.copyPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionCopyPlan.setEnabled(False)
         self.menu.addAction(self.actionCopyPlan)
@@ -196,7 +201,6 @@ class PlanController(BaseController):
             tr("Import Equivalency File"),
             tooltip=tr("Import assignments to active plan from equivalency file"),
             callback=self.importPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionImportAssignments.setEnabled(False)
         self.menu.addAction(self.actionImportAssignments)
@@ -207,7 +211,6 @@ class PlanController(BaseController):
             tr("Import Shapefile"),
             tooltip=tr("Import assignments to active plan from shapefile"),
             callback=self.importShapefile,
-            parent=self.iface.mainWindow(),
         )
         self.actionImportShapefile.setEnabled(False)
         self.menu.addAction(self.actionImportShapefile)
@@ -218,7 +221,6 @@ class PlanController(BaseController):
             tr("Export Active Plan"),
             tooltip=tr("Export plan as equivalency and/or shapefile"),
             callback=self.exportPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionExportPlan.setEnabled(False)
         self.menu.addAction(self.actionExportPlan)
@@ -229,7 +231,6 @@ class PlanController(BaseController):
             tr("Select Plan"),
             tooltip=tr("Make the selected plan the active plan"),
             callback=self.selectPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionSelectPlan.setEnabled(False)
 
@@ -238,7 +239,6 @@ class PlanController(BaseController):
             QIcon(":/plugins/redistricting/icon.png"),
             tr("Edit Plan"),
             callback=self.editPlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionEditPlan.setEnabled(False)
 
@@ -248,7 +248,6 @@ class PlanController(BaseController):
             tr("Delete Plan"),
             tooltip=tr("Remove the selected plan from the project"),
             callback=self.deletePlan,
-            parent=self.iface.mainWindow(),
         )
         self.actionDeletePlan.setEnabled(False)
 
@@ -258,14 +257,13 @@ class PlanController(BaseController):
             tr("Auto-assign Units"),
             tooltip=tr("Attempt to automatically assign unassigned units to districts in the active plan"),
             callback=self.autoassign,
-            parent=self.iface.mainWindow(),
         )
         self.actionAutoAssign.setEnabled(False)
         self.menu.addAction(self.actionAutoAssign)
 
     # slots
 
-    def planDistrictsUpdated(self, plan: RdsPlan, districts: Iterable[int]):  # pylint: disable=unused-argument
+    def planDistrictsUpdated(self, plan: RdsPlan):  # pylint: disable=unused-argument
         self.project.setDirty()
 
     def enableActivePlanActions(self, plan: Optional[RdsPlan]):
@@ -282,7 +280,8 @@ class PlanController(BaseController):
         )
         self.actionExportPlan.setTarget(plan)
         self.actionAutoAssign.setEnabled(
-            plan is not None
+            AUTOASSIGN_ENABLED
+            and plan is not None
             and plan.assignLayer is not None
             and plan.distField is not None
             and not plan.metrics.complete
@@ -338,6 +337,8 @@ class PlanController(BaseController):
     def planAdded(self, plan: RdsPlan):
         self.addPlanToMenu(plan)
         plan.districtDataChanged.connect(self.project.setDirty)
+        plan.districtAdded.connect(self.project.setDirty)
+        plan.districtRemoved.connect(self.project.setDirty)
         self.updateService.watchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
 
@@ -345,7 +346,14 @@ class PlanController(BaseController):
         self.removePlanFromMenu(plan)
         self.updateService.unwatchPlan(plan)
         self.actionSelectPlan.setEnabled(len(self.planManager) > 0)
+        plan.districtAdded.disconnect(self.project.setDirty)
+        plan.districtRemoved.disconnect(self.project.setDirty)
         plan.districtDataChanged.disconnect(self.project.setDirty)
+
+    def updateGeoFieldMetrics(self, plan: RdsPlan):
+        self.metricsService.update(
+            plan, trigger=MetricTriggers.ON_UPDATE_GEOFIELDS, populationData=None, districtData=None, geometry=None
+        )
 
     # action slots
 
@@ -440,6 +448,7 @@ class PlanController(BaseController):
                 .setDataFields(dlgEditPlan.dataFields())
                 .setGeoFields(dlgEditPlan.geoFields())
             )
+            builder.geoFieldsUpdated.connect(self.updateGeoFieldMetrics)
 
             if builder.updatePlan():
                 self.project.setDirty()
@@ -566,7 +575,7 @@ class PlanController(BaseController):
     def selectPlan(self, plan: Optional[RdsPlan] = None):
         """Make the selected plan the active plan"""
         if plan is None:
-            action = self.sender()
+            action = cast("QAction", self.sender())
             if isinstance(action, PlanAction):
                 plan = action.target()
 
@@ -621,9 +630,7 @@ class PlanController(BaseController):
             if importer is not None:
                 progress = self.startProgress(tr("Importing assignments..."))
                 importer.importComplete.connect(self.triggerUpdate)
-                importer.importTerminated.connect(self.endProgress)
                 self.importService.startImport(plan, importer)
-                # importer.importPlan(plan)
 
         def buildError(builder: PlanBuilder):
             if not builder.isCancelled():
@@ -642,7 +649,7 @@ class PlanController(BaseController):
 
     def triggerUpdate(self, plan: RdsPlan):
         self.endProgress()
-        self.updateService.updateDistricts(plan, needDemographics=True, needGeometry=True)
+        self.updateService.update(plan, includeDemographics=True, includeGeometry=True)
 
     def autoassign(self):
         def assignComplete():

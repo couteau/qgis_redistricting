@@ -30,7 +30,7 @@ from qgis.core import Qgis, QgsApplication, QgsProject
 from qgis.PyQt.QtCore import QObject, pyqtSignal
 
 from ..models import MetricTriggers, RdsDataField, RdsField, RdsGeoField, RdsMetrics, RdsPlan
-from ..models.base.lists import KeyedList
+from ..models.lists import KeyedList
 from ..utils import tr
 from .basebuilder import BasePlanBuilder
 from .tasks.createlayers import CreatePlanLayersTask
@@ -84,10 +84,15 @@ class PlanBuilder(BasePlanBuilder):
         def taskCompleted():
             QgsProject.instance().addMapLayers([plan.assignLayer, plan.distLayer], False)
             if self._updateMetrics:
+                districtData = self._createLayersTask.populationData.sum()
+                districtData["name"] = plan.districts[0].name
+                districtData["members"] = None
+
                 self.updateMetricsTask = UpdateMetricsTask(
                     plan,
                     MetricTriggers.ON_CREATE_PLAN,
                     self._createLayersTask.populationData,
+                    districtData,
                     self._createLayersTask.geometry,
                 )
                 QgsApplication.taskManager().addTask(self.updateMetricsTask)
@@ -182,12 +187,12 @@ class PlanBuilder(BasePlanBuilder):
             popLayer=self._popLayer if self._geoLayer != self._popLayer else None,
             popJoinField=self._popJoinField if self._popJoinField != self._geoIdField else None,
             popField=self._popField,
-            popFields=KeyedList[RdsField](self._popFields),
-            dataFields=KeyedList[RdsDataField](self._dataFields),
+            popFields=KeyedList(self._popFields, elem_type=RdsField),
+            dataFields=KeyedList(self._dataFields, elem_type=RdsDataField),
             geoIdField=self._geoIdField,
             distField=self._distField,
             geoIdCaption=self._geoIdCaption,
-            geoFields=KeyedList[RdsGeoField](self._geoFields),
+            geoFields=KeyedList(self._geoFields, elem_type=RdsGeoField),
             description=self._description,
             metrics=RdsMetrics(totalPopulation=self._totalPopulation),
             parent=planParent,

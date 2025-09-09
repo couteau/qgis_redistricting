@@ -22,7 +22,7 @@
  ***************************************************************************/
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from itertools import repeat
 from typing import TYPE_CHECKING, Union
 
@@ -30,18 +30,19 @@ import geopandas as gpd
 import pandas as pd
 import shapely.ops
 from qgis.PyQt.QtCore import QRunnable, QThreadPool
-from shapely import wkt
 from shapely.geometry import MultiPolygon, Polygon
 
-from ...models import DistrictColumns
+from ...models import DistrictColumns, MetricLevel, MetricTriggers
+from ...models.metricslist import get_batches
 from ...utils import spatialite_connect, tr
-from ...utils.misc import quote_identifier
+from ...utils.misc import camel_to_snake, quote_identifier
 from ..districtio import DistrictReader
 from ._debug import debug_thread
 from .updatebase import AggregateDataTask
 
 if TYPE_CHECKING:
-    from ...models import RdsPlan
+    from ...models import RdsMetric, RdsPlan
+    from ...models.lists import KeyedList
 
 
 class DissolveWorker(QRunnable):
@@ -84,6 +85,14 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
         self.districtData: Union[pd.DataFrame, gpd.GeoDataFrame] = None
 
+        self.metrics: KeyedList[RdsMetric] = plan.metrics.metrics
+        trigger: MetricTriggers = 0
+        if self.includeDemographics:
+            trigger |= MetricTriggers.ON_UPDATE_DEMOGRAPHICS
+        if self.includeGeometry:
+            trigger |= MetricTriggers.ON_UPDATE_GEOMETRY
+        self.trigger = trigger
+
     def disolveGeometry(self, update: gpd.GeoDataFrame):
         def dissolve_progress():
             nonlocal count, total
@@ -111,6 +120,121 @@ class AggregateDistrictDataTask(AggregateDataTask):
         geoms |= {t.dist: t.merged for t in tasks}
         return geoms
 
+    def saveDistricts(self):
+        name = pd.Series(
+            [self.districts.get(d).name if d in self.districts else str(d) for d in self.districtData.index],
+            index=self.districtData.index,
+        )
+        members = pd.Series(
+            [
+                0 if d == 0 else self.districts.get(d).members if d in self.districts else 1
+                for d in self.districtData.index
+            ],
+            index=self.districtData.index,
+            dtype=int,
+        )
+
+        self.districtData = self.districtData.join(
+            pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
+        )
+
+        with spatialite_connect(self.geoPackagePath) as db:
+            # Account for districts with no assignments --
+            # otherwise, they will never be updated in the database
+            if self.updateDistricts is None:
+                zero = set(range(0, self.numDistricts + 1)) - set(self.districtData.index)
+            else:
+                zero = self.updateDistricts - set(self.districtData.index)
+
+            if zero:
+                params = ",".join(repeat("?", len(zero)))
+                sql = f"DELETE FROM districts WHERE {quote_identifier(self.distField)} IN ({params})"  # noqa: S608
+                db.execute(sql, [str(d) for d in zero])
+                db.commit()
+
+            # Update existing dictricts
+            fields = {
+                quote_identifier(f): f"GeomFromText(:{f})" if f == "geometry" else f":{f}"
+                for f in list(self.districtData.columns)
+            }
+            data = [d._asdict() for d in self.districtData.to_wkt().itertuples()]
+            params = ",".join(f"{field} = {param}" for field, param in fields.items())
+            sql = (
+                "UPDATE districts "  # noqa: S608
+                f"SET {params} "
+                f"WHERE {quote_identifier(self.distField)} = :Index"
+            )
+            db.executemany(sql, data)
+            db.commit()
+
+            fields = {quote_identifier(self.distField): ":Index"} | fields
+            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields.keys())}) VALUES ({','.join(fields.values())})"  # noqa: S608
+            db.executemany(sql, data)
+            db.commit()
+
+    def _get_batches_for_trigger(self, trigger: MetricTriggers):
+        # pylint: disable=no-member
+        metrics = {name: metric for name, metric in self.metrics.items() if metric.triggers() & trigger}
+        ready = {m.name(): m for metric in metrics.values() for m in metric.depends() if not m.triggers() & trigger}
+
+        return get_batches(metrics, ready)
+
+    def calculateMetrics(self):
+        """called in background thread to recalculate values of metrics"""
+        batches = self._get_batches_for_trigger(self.trigger)
+
+        for b in batches:
+            for metric in b:
+                if self.trigger & metric.triggers():
+                    depends = {
+                        m.name(): self.metrics[m.name()].value  # pylint: disable=unsubscriptable-object
+                        for m in metric.depends()
+                        if m.name() in self.metrics  # pylint: disable=unsupported-membership-test
+                    }
+                    metric.calculate(self.populationData, self.districtData, self.geometry, self.plan, **depends)
+
+    def saveDistrictMetrics(self):
+        """updates the district-level metrics in the plan's district layer"""
+
+        def to_dict(value: Union[Mapping, pd.Series, pd.DataFrame]) -> dict:
+            if isinstance(value, pd.Series):
+                return value.to_dict()
+            if isinstance(value, pd.DataFrame):
+                return value.to_dict(orient="records")
+            if isinstance(value, Mapping):
+                return value
+
+            raise TypeError("Unsupported type for serialization.")
+
+        provider = self.plan.distLayer.dataProvider() if self.plan.distLayer else None
+        if provider is None:
+            raise RuntimeError("No district layer available to add the metric field.")
+
+        dist_metrics: dict[str, Union[Mapping, pd.Series, pd.DataFrame]] = {
+            provider.fieldNameIndex(camel_to_snake(m.name())): to_dict(m.value)
+            for m in self.metrics  # pylint: disable=no-member
+            if m.level() == MetricLevel.DISTRICT  # only update district level metrics
+            and m.serialize()  # only update metrics that are meant to be serialized
+            and m.triggers() & self.trigger  # only update if the metric is triggered
+            and m.value is not None  # only update if the metric has a value
+            # only update if the metric has a corresponding field in the district layer
+            and provider.fieldNameIndex(camel_to_snake(m.name())) != -1
+        }
+
+        try:
+            provider.changeAttributeValues(
+                {
+                    f.id(): {name: values.get(f[self.plan.distField]) for name, values in dist_metrics.items()}
+                    for f in provider.getFeatures()
+                }
+            )  # reset the attributes
+
+            self.plan.distLayer.reload()
+            reader = DistrictReader(self.plan.distLayer, self.distField, self.popField, self.plan.districtColumns)
+            reader.loadDistricts(self.plan)
+        except Exception as e:  # pylint: disable=broad-except
+            raise RuntimeError(f"Failed to update district metrics: {e}") from e
+
     def run(self) -> bool:  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
         debug_thread()
 
@@ -125,11 +249,7 @@ class AggregateDistrictDataTask(AggregateDataTask):
                 self.setProgressIncrement(20, 40)
                 popdf = self.loadPopData()
                 self.populationData: gpd.GeoDataFrame = self.populationData.join(popdf)
-                cols += (
-                    [DistrictColumns.POPULATION]
-                    + [f.fieldName for f in self.popFields]
-                    + [f.fieldName for f in self.dataFields]
-                )
+                cols += [DistrictColumns.POPULATION, *self.popFields.keys(), *self.dataFields.keys()]
                 self.totalPopulation = int(self.populationData[DistrictColumns.POPULATION].sum())
 
             self.setProgressIncrement(40, 90)
@@ -146,8 +266,6 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
                 # self.data = data.to_wkt()
                 self.geometry = update["geometry"]
-                update["wkt_geom"] = update["geometry"].apply(wkt.dumps)
-                update = update.drop(columns="geometry").rename(columns={"wkt_geom": "geometry"})
                 self.districtData = update
 
                 self.updateProgress(1, 1)
@@ -160,34 +278,9 @@ class AggregateDistrictDataTask(AggregateDataTask):
 
             self.setProgressIncrement(90, 100)
 
-            name = pd.Series(
-                [self.districts[d].name if d in self.districts else str(d) for d in self.districtData.index],
-                index=self.districtData.index,
-            )
-            members = pd.Series(
-                [
-                    None if d == 0 else self.districts[d].members if d in self.districts else 1
-                    for d in self.districtData.index
-                ],
-                index=self.districtData.index,
-            )
+            self.saveDistricts()
 
-            if self.includeDemographics:
-                # ideal = round(self.totalPopulation / self.numSeats)
-                # deviation = self.districtData[DistrictColumns.POPULATION].sub(members * ideal)
-                # pct_dev = deviation.div(members * ideal)
-                districtCols = pd.DataFrame(
-                    {
-                        DistrictColumns.NAME: name,
-                        DistrictColumns.MEMBERS: members,
-                        # DistrictColumns.DEVIATION: deviation,
-                        # DistrictColumns.PCT_DEVIATION: pct_dev
-                    }
-                )
-            else:
-                districtCols = pd.DataFrame({DistrictColumns.NAME: name, DistrictColumns.MEMBERS: members})
-
-            self.districtData = self.districtData.join(districtCols)
+            self.calculateMetrics()
 
             return True
         except Exception as e:  # pylint: disable=broad-except
@@ -200,41 +293,14 @@ class AggregateDistrictDataTask(AggregateDataTask):
         if not result:
             return
 
-        with spatialite_connect(self.geoPackagePath) as db:
-            # Account for districts with no assignments --
-            # otherwise, they will never be updated in the database
-            if self.updateDistricts is None:
-                zero = set(range(0, self.numDistricts + 1)) - set(self.districtData.index)
-            else:
-                zero = self.updateDistricts - set(self.districtData.index)
+        # Finish metrics calculations
+        batches = self._get_batches_for_trigger(self.trigger)
+        update_districts = False
+        for b in batches:
+            for metric in b:
+                if metric.level() == MetricLevel.DISTRICT:
+                    update_districts = True
+                metric.finished(self.plan)
 
-            if zero:
-                params = ",".join(repeat("?", len(zero)))
-                sql = f"DELETE FROM districts WHERE {quote_identifier(self.distField)} IN ({params})"  # noqa: S608
-                db.execute(sql, (str(d) for d in zero))
-                db.commit()
-
-            # Update existing dictricts
-            fields = {
-                quote_identifier(f): f"GeomFromText(:{f})" if f == "geometry" else f":{f}"
-                for f in list(self.districtData.columns)
-            }
-            data = [d._asdict() for d in self.districtData.itertuples()]
-            params = ",".join(f"{field} = {param}" for field, param in fields.items())
-            sql = (
-                "UPDATE districts "  # noqa: S608
-                f"SET {params} "
-                f"WHERE {quote_identifier(self.distField)} = :Index"
-            )
-            db.executemany(sql, data)
-            db.commit()
-
-            fields = {quote_identifier(self.distField): ":Index"} | fields
-            sql = f"INSERT OR IGNORE INTO districts ({','.join(fields.keys())}) VALUES ({','.join(fields.values())})"  # noqa: S608
-            db.executemany(sql, data)
-            db.commit()
-
-        reader = DistrictReader(self.plan.distLayer, self.distField, self.popField, self.plan.districtColumns)
-        reader.loadDistricts(self.plan)
-
-        self.distLayer.reload()
+        if update_districts:
+            self.saveDistrictMetrics()

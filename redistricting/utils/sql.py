@@ -25,8 +25,8 @@
 import re
 import shlex
 import sqlite3
-from typing import Any, Dict, Literal, Union, overload
 from collections.abc import Iterable, Sequence
+from typing import Any, Dict, Literal, Union, overload
 
 import psycopg2
 from osgeo import gdal, ogr
@@ -43,6 +43,7 @@ from qgis.core import (
 )
 
 from .gpkg import spatialite_connect
+from .io import gpd_io_engine
 from .misc import random_id
 
 
@@ -127,7 +128,10 @@ class SqlAccess:
     ) -> Union[Iterable[Union[Iterable, sqlite3.Row]], None]:
         if as_dict:
             db.row_factory = sqlite3.Row
-        cur = db.execute(sql, parameters)
+        if parameters is None:
+            cur = db.execute(sql)
+        else:
+            cur = db.execute(sql, parameters)
         if cur.rowcount == 0:
             return None
 
@@ -227,7 +231,7 @@ class SqlAccess:
         # virtual layer only supports SELECT statements
         vl = self.createVirtualLayer(layer, sql, table)
         if as_dict:
-            return (dict(zip(f.fields().names(), f.attributes())) for f in vl.getFeatures())
+            return (dict(zip(f.fields().names(), f.attributes(), strict=True)) for f in vl.getFeatures())
 
         return (f.attributes() for f in vl.getFeatures())
 
@@ -268,6 +272,6 @@ class SqlAccess:
     def isSQLCapable(self, layer: QgsVectorLayer):
         provider = layer.dataProvider()
         if provider.name() == "ogr":
-            return provider.storageType() in ("GPKG", "SQLite")
+            return (provider.storageType() == "GPKG" and gpd_io_engine != "fiona") or provider.storageType() == "SQLite"
 
         return provider.name() in ("spatialite", "postgis", "postgres")
