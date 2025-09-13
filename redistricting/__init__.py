@@ -36,6 +36,7 @@ from .defaults import (
     CVAP_TOTAL_FIELDS,
     GEOID_FIELDS,
     GEOID_LABELS,
+    POP_FIELDS,
     POP_TOTAL_FIELDS,
     VAP_FIELDS,
     VAP_TOTAL_FIELDS,
@@ -58,9 +59,11 @@ class Settings:
     popTotalFields: list[str]
     vapTotalFields: list[str]
     cvapTotalFields: list[str]
+    popFieldPatterns: list[Pattern[str]]
     vapFieldPatterns: list[Pattern[str]]
     cvapFieldPatterns: list[Pattern[str]]
-    geoidFields: dict[str, str]
+    geoidFields: list[str]
+    geoidLabels: list[str]
 
     def __init__(self):
         self._settings = QgsSettings()
@@ -72,9 +75,11 @@ class Settings:
         self.popTotalFields = POP_TOTAL_FIELDS
         self.vapTotalFields = VAP_TOTAL_FIELDS
         self.cvapTotalFields = CVAP_TOTAL_FIELDS
+        self.popFieldPatterns = POP_FIELDS
         self.vapFieldPatterns = VAP_FIELDS
         self.cvapFieldPatterns = CVAP_FIELDS
-        self.geoidFields = dict(zip(GEOID_FIELDS, GEOID_LABELS))
+        self.geoidFields = GEOID_FIELDS
+        self.geoidLabels = GEOID_LABELS
 
         self._settings.endGroup()
 
@@ -143,6 +148,6 @@ def classFactory(iface):  # pylint: disable=invalid-name
     :type iface: QgsInterface
     """
 
-    from .redistricting import Redistricting  # pylint: disable=import-outside-toplevel
+    from .redistricting import Redistricting  # pylint: disable=import-outside-toplevel # noqa: PLC0415
 
     return Redistricting(iface)

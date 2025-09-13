@@ -512,14 +512,14 @@ class TestEditAssignmentsController:
         self, controller_with_plan: EditAssignmentsController, mock_assignments_service: AssignmentsService
     ):
         controller_with_plan.startPaintingFeatures(1, None)
-        mock_assignments_service.getEditor.return_value.startEditCommand.assert_called_once_with(
+        mock_assignments_service.getEditor.return_value.beginEditCommand.assert_called_once_with(
             "Assign features to district 1"
         )
 
         mock_assignments_service.reset_mock()
 
         controller_with_plan.startPaintingFeatures(1, 2)
-        mock_assignments_service.getEditor.return_value.startEditCommand.assert_called_once_with(
+        mock_assignments_service.getEditor.return_value.beginEditCommand.assert_called_once_with(
             "Assign features to district 1 from 2"
         )
 

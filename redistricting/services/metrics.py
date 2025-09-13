@@ -34,7 +34,7 @@ from qgis.PyQt.QtCore import QObject
 from ..models.metricslist import MetricLevel, MetricTriggers, get_batches
 from ..utils import camel_to_snake, tr
 from .districtio import DistrictReader
-from .updateservice import UpdateParams, UpdateService, UpdateStatus
+from .updateservice import UpdateParams, UpdateService
 
 if TYPE_CHECKING:
     from ..models import RdsMetrics, RdsPlan
@@ -58,7 +58,9 @@ class MetricsService(UpdateService):
         triggered_metrics = {name: metric for name, metric in metrics.metrics.items() if metric.triggers() & trigger}
         # get all dependencies of the triggered metrics that are not themselves triggered
         #  -- and treat them as satisfied/up-to-date
-        ready = {m.name(): m for metric in metrics for m in metric.depends() if not m.triggers() & trigger}
+        ready = {
+            m.name(): m for metric in triggered_metrics.values() for m in metric.depends() if not m.triggers() & trigger
+        }
 
         return get_batches(triggered_metrics, ready)
 
@@ -129,14 +131,16 @@ class MetricsService(UpdateService):
 
     def finished(
         self,
-        status: UpdateStatus,
+        status: UpdateService.UpdateStatus,
         task: Optional[QgsTask],
         plan: Optional["RdsPlan"],
         params: Optional[MetricsUpdate],
         exception: Optional[Exception],
     ):
-        if status == UpdateStatus.SUCCESS:
+        if status == UpdateService.UpdateStatus.SUCCESS:
             try:
+                plan.metrics.beginUpdate()
+
                 # Finish metrics calculations
                 batches = self._get_batches_for_trigger(plan.metrics, params.trigger)
                 update_districts = False
@@ -148,16 +152,19 @@ class MetricsService(UpdateService):
                         metric.finished(plan)
                 if update_districts:
                     self._saveDistrictMetrics(plan, params)
+
+                plan.metrics.endUpdate()
             except Exception as e:
                 exception = e
-                status = UpdateStatus.ERROR
+                status = UpdateService.UpdateStatus.ERROR
 
         super().finished(status, task, plan, params, exception)
 
-    def update(  # noqa: PLR0913
+    def update(
         self,
         plan: "RdsPlan",
         force: bool = False,
+        foreground: bool = False,
         *,
         trigger: "MetricTriggers",
         populationData: Optional[pd.DataFrame],
@@ -165,5 +172,11 @@ class MetricsService(UpdateService):
         geometry: Optional[gpd.GeoSeries],
     ):
         return super().update(
-            plan, force, trigger=trigger, populationData=populationData, districtData=districtData, geometry=geometry
+            plan,
+            force,
+            foreground,
+            trigger=trigger,
+            populationData=populationData,
+            districtData=districtData,
+            geometry=geometry,
         )

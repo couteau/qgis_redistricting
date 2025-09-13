@@ -158,6 +158,7 @@ class Factory(Generic[_T]):
         with_owner: Literal[False] = False,
         defer: bool = False,
     ): ...
+
     @overload
     def __init__(
         self,

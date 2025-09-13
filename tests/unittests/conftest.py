@@ -113,6 +113,7 @@ def mock_updater(mocker: MockerFixture) -> services.DistrictUpdater:
     updater.updateStarted = mocker.create_autospec(spec=pyqtBoundSignal)
     updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
     updater.updateTerminated = mocker.create_autospec(spec=pyqtBoundSignal)
+    updater.updateCanceled = mocker.create_autospec(spec=pyqtBoundSignal)
     return updater
 
 

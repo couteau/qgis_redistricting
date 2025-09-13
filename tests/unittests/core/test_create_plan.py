@@ -161,11 +161,12 @@ class TestPlanCreator:
         assert ("Number of seats (30) must equal or exceed number of districts (45)", 2) in creator.errors()
 
     def test_set_num_districts(self, creator: PlanBuilder):
-        with pytest.raises(ValueError, match="Invalid number of districts for plan"):
-            creator.setNumDistricts(1)
-
         with pytest.raises(TypeError, match="Number of districts must be an integer"):
             creator.setNumDistricts("1")
+
+        creator.setNumDistricts(1)
+        assert not creator.validate()
+        assert ("Invalid number of districts for plan: 1", 2) in creator.errors()
 
     def test_validate_pop_layer_fields_not_found_no_validate(self, creator: PlanBuilder):
         assert creator._validatePopLayer()

@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
-from qgis.core import QgsTask
+from qgis.core import QgsFeedback, QgsTask
 from qgis.PyQt.QtCore import QObject, QSignalMapper, pyqtSignal
 
 from ..models import DeltaList, DistrictColumns, RdsPlan
@@ -34,7 +34,7 @@ from ..utils import spatialite_connect
 from ..utils.misc import quote_identifier
 from .errormixin import ErrorListMixin
 from .planmgr import PlanManager
-from .updateservice import IncrementalFeedback, UpdateParams, UpdateService, UpdateStatus
+from .updateservice import IncrementalFeedback, UpdateParams, UpdateService
 
 
 @dataclass
@@ -156,8 +156,8 @@ class DeltaUpdateService(ErrorListMixin, UpdateService):
                 data.append(v[dindex])
         return pd.DataFrame({f"new_{plan.distField}": data}, index=index)
 
-    def run(self, task: QgsTask, plan: RdsPlan, params: DeltaUpdate) -> UpdateParams:  # noqa: PLR0915
-        feedback = IncrementalFeedback(task)
+    def run(self, task: Optional[QgsTask], plan: RdsPlan, params: DeltaUpdate) -> UpdateParams:  # noqa: PLR0915
+        feedback = IncrementalFeedback(task or QgsFeedback())
 
         feedback.setProgressIncrement(0, 10)
         df_new = self.loadPendingChanges(plan)
@@ -246,16 +246,16 @@ class DeltaUpdateService(ErrorListMixin, UpdateService):
 
     def finished(
         self,
-        status: UpdateStatus,
+        status: UpdateService.UpdateStatus,
         task: Optional[QgsTask],
         plan: Optional[RdsPlan],
         params: Optional[DeltaUpdate],
         exception: Optional[Exception],
     ):
         if params is not None:
-            if status == UpdateStatus.SUCCESS:
+            if status == UpdateService.UpdateStatus.SUCCESS:
                 params.delta.update(params.data)
-            elif status == UpdateStatus.ERROR and exception is not None:
+            elif status == UpdateService.UpdateStatus.ERROR and exception is not None:
                 self.setError(str(exception))
             params.task = None
             params.data = None

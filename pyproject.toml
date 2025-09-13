@@ -35,7 +35,7 @@ extend-select = [
     "Q",
     "TC",
 ]
-ignore = ["E741", "F811", "PLR2004", "COM812", "TC001", "TC002"]
+ignore = ["E741", "F811", "PLR0913", "PLR2004", "COM812", "TC001", "TC002"]
 # don't fix unused imports -- some modules are imported for their side effects
 unfixable = ["F401"]
 

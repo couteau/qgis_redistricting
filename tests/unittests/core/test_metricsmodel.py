@@ -24,6 +24,8 @@ from pytestqt.plugin import QtBot
 from qgis.PyQt.QtCore import Qt
 
 from redistricting.models import RdsMetricsModel, RdsPlan
+from redistricting.models.metricslist import MetricTriggers
+from redistricting.services.metrics import MetricsService, MetricsUpdate
 
 
 class TestMetricsModel:
@@ -38,17 +40,38 @@ class TestMetricsModel:
         assert metrics_model.rowCount() == 11
 
     def test_headerdata(self, metrics_model: RdsMetricsModel):
-        assert metrics_model.headerData(0, Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole) == "Population"
+        headers = [
+            metrics_model.headerData(r, Qt.Orientation.Vertical, Qt.ItemDataRole.DisplayRole)
+            for r in range(metrics_model.rowCount())
+        ]
+        assert headers == [
+            "Population",
+            "%Deviation",
+            "Compactness",
+            "    Cut Edges",
+            "    Polsby-Popper (Mean, Min., Max.)",
+            "    Reock (Mean, Min., Max.)",
+            "    Convex Hull (Mean, Min., Max.)",
+            "Contiguity",
+            "Complete",
+            "Splits",
+            "    VTD",
+        ]
 
     @pytest.mark.parametrize(
         ("row", "value"),
         [
             (0, "227,036"),
+            (1, ""),
+            (2, None),
+            (3, None),
             (4, "0.400, 0.150, 0.800"),
             (5, "0.500, 0.100, 0.900"),
             (6, "0.500, 0.100, 0.900"),
             (7, "YES"),
             (8, "YES"),
+            (9, None),
+            (10, ""),
         ],
     )
     def test_data(self, metrics_model: RdsMetricsModel, row, value):
@@ -57,8 +80,10 @@ class TestMetricsModel:
 
     # pylint: disable=unused-argument
     def test_signals(self, metrics_model: RdsMetricsModel, plan: RdsPlan, mock_taskmanager, qtbot: QtBot):
+        service = MetricsService()
         with qtbot.waitSignals([metrics_model.modelAboutToBeReset, metrics_model.modelReset]):
-            plan.metrics.updateFinished(0, plan)
+            update = MetricsUpdate(MetricTriggers.ON_UPDATE_DEMOGRAPHICS, None, None, None)
+            service.finished(MetricsService.UpdateStatus.SUCCESS, None, plan, update, None)
 
     def test_clear_metrics(self, metrics_model: RdsMetricsModel, qtbot: QtBot):
         with qtbot.waitSignals([metrics_model.modelAboutToBeReset, metrics_model.modelReset]):

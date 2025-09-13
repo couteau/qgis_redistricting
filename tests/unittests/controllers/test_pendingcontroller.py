@@ -115,7 +115,7 @@ class TestPendingChangesController:
         controller.load()
         mock_planmanager.activePlanChanged.connect.assert_called_once()
         mock_update_service.updateStarted.connect.assert_called_once()
-        mock_update_service.updateCompleted.connect.assert_called_once()
+        mock_update_service.updateComplete.connect.assert_called_once()
         mock_update_service.updateTerminated.connect.assert_called_once()
 
     def test_unload(self, controller, mock_planmanager, mock_update_service):
@@ -124,7 +124,7 @@ class TestPendingChangesController:
         controller.unload()
         mock_planmanager.activePlanChanged.disconnect.assert_called_once()
         mock_update_service.updateStarted.disconnect.assert_called_once()
-        mock_update_service.updateCompleted.disconnect.assert_called_once()
+        mock_update_service.updateComplete.disconnect.assert_called_once()
         mock_update_service.updateTerminated.disconnect.assert_called_once()
 
     def test_active_plan_changed(

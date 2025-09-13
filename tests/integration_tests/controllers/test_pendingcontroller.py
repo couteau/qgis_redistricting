@@ -81,7 +81,7 @@ class TestPendingChangesController:
         )
         delta = DeltaList()
         delta.setData(data)
-        delta_update_service._deltas[plan] = DeltaUpdate(plan, None, None, delta, None)
+        delta_update_service._deltas[plan] = DeltaUpdate(plan, delta=delta)
         return delta
 
     @pytest.fixture
@@ -143,7 +143,7 @@ class TestPendingChangesController:
         qtbot,
     ):
         assert controller_with_active_plan.model._delta is None
-        with qtbot.waitSignal(delta_update_service.updateCompleted, timeout=20000):
+        with qtbot.waitSignal(delta_update_service.updateComplete, timeout=20000):
             plan.assignLayer.startEditing()
             plan.assignLayer.changeAttributeValue(114, 2, 1, 5)
             # delta_update_service.updatePendingData(plan)

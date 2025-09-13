@@ -16,42 +16,128 @@
  *                                                                         *
  ***************************************************************************/
 """
+
+import geopandas as gpd
 import pytest
 from pytest_mock import MockerFixture
 
+import redistricting.services.updateservice  # noqa
 from redistricting.models.plan import RdsPlan
-from redistricting.services.tasks.updatedistricts import (
-    AggregateDistrictDataTask
-)
+from redistricting.services.district import DistrictUpdateParams, DistrictUpdater
 
 
 class TestUpdateDistrictsTask:
-
     @pytest.fixture(scope="class", autouse=True)
     def patch_task(self, class_mocker: MockerFixture):
-        class_mocker.patch.object(AggregateDistrictDataTask, "setDependentLayers")
+        class_mocker.patch("redistricting.services.updateservice.QgsApplication.taskManager")
+        class_mocker.patch("redistricting.services.district.QgsTask.setDependentLayers")
 
     def test_create(self, plan: RdsPlan):
-        t = AggregateDistrictDataTask(plan)
-        assert t.exception is None
-        assert not t.updateDistricts
+        updater = DistrictUpdater(plan)
+        t = updater.update(plan, includeDemographics=True)
+        assert t.task is not None
 
     def test_run(self, plan: RdsPlan):
-        t = AggregateDistrictDataTask(plan)
-        t.run()
-        assert t.exception is None
-        assert t.districtData is not None
+        updater = DistrictUpdater(plan)
+        params = DistrictUpdateParams(True, False)
+        task, plan, params = updater._doUpdate(None, plan, params)
+        assert isinstance(params, DistrictUpdateParams)
+        assert params.totalPopulation == 227036
+        assert params.populationData is not None
+        assert list(params.populationData.columns) == [
+            "district",
+            "vtdid",
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+        ]
+        assert params.districtData is not None
+        assert not isinstance(params.districtData, gpd.GeoDataFrame)
+        assert list(params.districtData.columns) == [
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+            "name",
+            "members",
+        ]
+        assert params.geometry is None
+
+        params = DistrictUpdateParams(False, True)
+        task, plan, params = updater._doUpdate(None, plan, params)
+        assert isinstance(params, DistrictUpdateParams)
+        assert params.totalPopulation is None
+        assert params.populationData is not None
+        assert list(params.populationData.columns) == ["district", "vtdid", "geometry"]
+        assert params.districtData is not None
+        assert isinstance(params.districtData, gpd.GeoDataFrame)
+        assert list(params.districtData.columns) == ["geometry", "name", "members"]
+        assert params.geometry is not None
+        assert len(params.geometry) == 5
+
+        params = DistrictUpdateParams(True, True)
+        task, plan, params = updater._doUpdate(None, plan, params)
+        assert isinstance(params, DistrictUpdateParams)
+        assert params.totalPopulation == 227036
+        assert params.populationData is not None
+        assert list(params.populationData.columns) == [
+            "district",
+            "vtdid",
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+            "geometry",
+        ]
+        assert params.districtData is not None
+        assert isinstance(params.districtData, gpd.GeoDataFrame)
+        assert list(params.districtData.columns) == [
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+            "geometry",
+            "name",
+            "members",
+        ]
+        assert params.geometry is not None
+        assert len(params.geometry) == 5
 
     def test_run_subset(self, plan: RdsPlan):
-        t = AggregateDistrictDataTask(plan, [2, 3])
-        result = t.run()
-        assert result
-        assert t.districtData is not None
-        assert t.exception is None
-        assert len(t.districtData.index) == 2
-        assert t.totalPopulation == 227036
-
-    def test_finished(self, plan: RdsPlan):
-        t = AggregateDistrictDataTask(plan, [2, 3])
-        t.run()
-        t.finished(True)
+        updater = DistrictUpdater(plan)
+        params = DistrictUpdateParams(True, True, {2, 3})
+        task, plan, params = updater._doUpdate(None, plan, params)
+        assert isinstance(params, DistrictUpdateParams)
+        assert params.totalPopulation == 227036
+        assert params.populationData is not None
+        assert list(params.populationData.columns) == [
+            "district",
+            "vtdid",
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+            "geometry",
+        ]
+        assert params.districtData is not None
+        assert isinstance(params.districtData, gpd.GeoDataFrame)
+        assert list(params.districtData.columns) == [
+            "population",
+            "vap_total",
+            "vap_ap_black",
+            "vap_nh_white",
+            "vap_hispanic",
+            "geometry",
+            "name",
+            "members",
+        ]
+        assert len(params.districtData) == 5
+        assert len(params.districtData[params.districtData.geometry.notna()]) == 2
+        assert params.geometry is not None
+        assert len(params.geometry) == 2

@@ -30,12 +30,15 @@ from collections.abc import (
     Hashable,
     Iterable,
     Iterator,
+    Mapping,
     MutableSequence,
     Set,
     Sized,
 )
 from operator import attrgetter
 from typing import TYPE_CHECKING, Generic, Optional, SupportsIndex, TypeVar, Union, _GenericAlias, cast, overload
+
+from .base import MISSING
 
 if TYPE_CHECKING:
     from typing import Self
@@ -251,7 +254,11 @@ class KeyedList(Generic[_K, _T], MutableSequence[_T]):
         self._keys_append = self._keys.append
 
         if iterable is not None:
-            self.extend(iterable)
+            if isinstance(iterable, Mapping):
+                for k, v in iterable.items():
+                    self.set(k, v)
+            else:
+                self.extend(iterable)
 
     def index(self, value: _T, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
         key = self._keyfunc(value)
@@ -290,7 +297,7 @@ class KeyedList(Generic[_K, _T], MutableSequence[_T]):
             for v in value:
                 key = self._keyfunc(v)
                 if key in self._items and key not in old_keys:
-                    raise ValueError("Cannot insert duplicate key in KeyedList")
+                    raise KeyError("Cannot insert duplicate key in KeyedList")
                 new_items[key] = v
 
             for key in old_keys:
@@ -298,9 +305,9 @@ class KeyedList(Generic[_K, _T], MutableSequence[_T]):
             self._items.update(new_items)
             self._keys_setitem(index, new_items.keys())
         else:
-            key = self._keyfunc[value]
+            key = self._keyfunc(value)
             if key in self._items and self._keys_getitem(index) != key:
-                raise ValueError("Cannot insert duplicate key in KeyedList")
+                raise KeyError("Cannot insert duplicate key in KeyedList")
             self._items_setitem(key, value)
             self._keys_setitem(index, key)
 
@@ -322,7 +329,7 @@ class KeyedList(Generic[_K, _T], MutableSequence[_T]):
     def insert(self, index: SupportsIndex, value: _T) -> None:
         key = self._keyfunc(value)
         if key in self._items:
-            raise ValueError("Cannot insert duplicate key in KeyedList")
+            raise KeyError("Cannot insert duplicate key in KeyedList")
         self._keys_insert(index, key)
         self._items_setitem(key, value)
 
@@ -348,7 +355,10 @@ class KeyedList(Generic[_K, _T], MutableSequence[_T]):
     @overload
     def get(self, key: _K, default: _DT) -> Union[_T, _DT]: ...
 
-    def get(self, key, default=None):
+    def get(self, key, default=MISSING):
+        if default is MISSING and key not in self._items:
+            raise KeyError(str(key))
+
         return self._items.get(key, default)
 
     def set(self, key: _K, value: _T) -> None:
@@ -396,15 +406,15 @@ class SortedKeyedList(KeyedList[_K, _T]):
 
     def _insertkey(self, index: SupportsIndex, key: _K, /):
         if index != len(self._items):
-            return NotImplemented
+            raise NotImplementedError()
 
         insort(self._keys, key)
 
     def __setitem__(self, index, value):
-        return NotImplemented
+        raise NotImplementedError()
 
     def insert(self, index: SupportsIndex, value: _T):
         if index != len(self._items):
-            return NotImplemented
+            raise NotImplementedError()
 
         super().insert(index, value)

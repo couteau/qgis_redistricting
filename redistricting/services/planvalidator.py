@@ -299,10 +299,8 @@ class PlanValidator(ErrorListMixin, QObject):
         return result
 
     def validate(self, strict=False):
-        result = True
-
         result = (
-            self._name
+            self._name is not None and self._name != ""
             and self._geoLayer
             and self._popLayer
             and self._geoJoinField
@@ -310,9 +308,12 @@ class PlanValidator(ErrorListMixin, QObject):
             and self._geoIdField
             and self._distField
             and self._popField
-            and self._numDistricts > 1
+            and consts.MIN_DISTRICTS <= self._numDistricts <= consts.MAX_DISTRICTS
             and self._numSeats >= self._numDistricts
         )
+
+        if self._name is None or self._name == "":
+            self.pushError(tr("Plan name must be set"), Qgis.MessageLevel.Critical)
 
         if self._numDistricts < consts.MIN_DISTRICTS or self._numDistricts > consts.MAX_DISTRICTS:
             self.pushError(
@@ -331,9 +332,6 @@ class PlanValidator(ErrorListMixin, QObject):
         if not isinstance(self._deviation, Number) or self._deviation < 0:
             self.pushError(tr("Deviation must be 0 or a positive number"))
             result = False
-
-        if not self._name:
-            self.pushError(tr("Plan name must be set"), Qgis.MessageLevel.Critical)
 
         if not self._geoIdField:
             self.pushError(tr("{field} field is required").format(field=tr("Geography ID")), Qgis.MessageLevel.Critical)

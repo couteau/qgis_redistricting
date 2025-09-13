@@ -30,8 +30,9 @@ POP_TOTAL_FIELDS = ["pop_total", "p0010001", "tot_pop", "total_pop"]
 VAP_TOTAL_FIELDS = ["vap_total", "p0030001", "tot_vap", "total_vap"]
 CVAP_TOTAL_FIELDS = ["cvap_total", re.compile(r"^cvap_(?:\d{4}_)total$")]
 
-CVAP_FIELDS = [re.compile(r"^cvap_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?cvap(?:_\d{4})?$")]
+POP_FIELDS = [re.compile(r"^pop_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?pop(?:_\d{4})?$")]
 VAP_FIELDS = [re.compile(r"^vap_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?vap(?:_\d{4})?$")]
+CVAP_FIELDS = [re.compile(r"^cvap_(?:\d{4}_)?\w+$"), re.compile(r"^\w+(?:\d{4}_)?cvap(?:_\d{4})?$")]
 
 GEOID_FIELDS = ["geoid20", "geoid30", "geoid10", "geoid", "block", "block_id"]
 

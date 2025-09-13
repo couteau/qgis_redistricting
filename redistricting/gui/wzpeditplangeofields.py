@@ -40,7 +40,7 @@ class GeoFieldDelegate(QStyledItemDelegate):
             rect = option.rect
             editor.setGeometry(rect)
             editor.setEditable(True)
-            editor.addItems(settings.geoidFields.values())
+            editor.addItems(settings.geoidLabels)
             return editor
         return super().createEditor(parent, option, index)
 
@@ -89,7 +89,7 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
         self.tblAddlGeography.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tblAddlGeography.setItemDelegateForColumn(1, GeoFieldDelegate(self))
 
-        self.cmbGeoCaption.addItems(settings.geoidFields.values())
+        self.cmbGeoCaption.addItems(settings.geoidLabels)
 
         self.btnAddAddlGeoField.setIcon(QgsApplication.getThemeIcon("/mActionAdd.svg"))
         self.cmbAddlGeoField.fieldChanged.connect(self.fieldChanged)
@@ -119,7 +119,7 @@ class dlgEditPlanGeoPage(Ui_wzpAddlGeography, QWizardPage):
                 if field and layer.fields().lookupField(field) != -1:
                     self.cmbGeoIDField.setField(field)
                 else:
-                    self.cmbGeoIDField.setField(getDefaultField(layer, settings.geoidFields.keys()))
+                    self.cmbGeoIDField.setField(getDefaultField(layer, settings.geoidFields))
 
         if self.cmbAddlGeoField.layer() != layer:
             self.cmbAddlGeoField.setField(None)

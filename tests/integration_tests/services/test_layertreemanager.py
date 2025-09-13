@@ -77,7 +77,9 @@ class TestLayerTreeManager:
                  "caption": "VTD"}
             ],
             "metrics": {
-                "total-population": {"vale": 227036},
+                "metrics": {
+                    "total-population": {"vale": 227036},
+                }
             }
 
         })

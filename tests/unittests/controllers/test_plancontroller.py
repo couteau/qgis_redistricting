@@ -118,6 +118,12 @@ class TestPlanController:
         return updater
 
     @pytest.fixture
+    def mock_metric_service(self, mocker: MockerFixture) -> services.MetricsService:
+        updater = mocker.create_autospec(spec=services.MetricsService)
+        updater.updateComplete = mocker.create_autospec(spec=pyqtBoundSignal)
+        return updater
+
+    @pytest.fixture
     def mock_import_service(self, mocker: MockerFixture) -> services.PlanImportService:
         importer = mocker.create_autospec(spec=services.PlanImportService)
         importer.importComplete = mocker.create_autospec(spec=pyqtBoundSignal)
@@ -137,6 +143,7 @@ class TestPlanController:
         mock_project,
         mock_toolbar,
         mock_update_service,
+        mock_metric_service,
         mock_styler,
         mock_import_service,
         mocker: MockerFixture,
@@ -150,6 +157,7 @@ class TestPlanController:
             layerTreeManager,
             mock_styler,
             mock_update_service,
+            mock_metric_service,
             mock_import_service,
         )
         mocker.patch.object(controller, "startProgress")
@@ -166,6 +174,7 @@ class TestPlanController:
         mock_project,
         mock_toolbar,
         mock_update_service,
+        mock_metric_service,
         mock_styler,
         mock_import_service,
         mocker: MockerFixture,
@@ -179,6 +188,7 @@ class TestPlanController:
             layerTreeManager,
             mock_styler,
             mock_update_service,
+            mock_metric_service,
             mock_import_service,
         )
         mocker.patch.object(controller, "startProgress")
@@ -553,4 +563,4 @@ class TestPlanController:
         self, controller_with_active_plan: controllers.PlanController, mock_update_service, mock_plan
     ):
         controller_with_active_plan.triggerUpdate(mock_plan)
-        mock_update_service.updateDistricts.assert_called_once()
+        mock_update_service.update.assert_called_once()

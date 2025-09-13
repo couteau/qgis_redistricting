@@ -16,24 +16,28 @@
  *                                                                         *
  ***************************************************************************/
 """
+
 from redistricting.models.plan import RdsPlan
-from redistricting.services.tasks.updatepending import (
-    AggregatePendingChangesTask
-)
+from redistricting.services.delta import DeltaUpdate, DeltaUpdateService
 
 
 class TestUpdatePendingChangesTask:
-    def test_create(self, mock_plan):
-        t = AggregatePendingChangesTask(mock_plan)
-        assert t.exception is None
+    def test_create(self, mock_plan, mock_planmanager):
+        service = DeltaUpdateService(mock_planmanager)
+        params = DeltaUpdate(mock_plan)
+        task, plan, params = service._doUpdate(None, mock_plan, params)
+        assert isinstance(params, DeltaUpdate)
 
-    def test_run(self, plan: RdsPlan):
+    def test_run(self, plan: RdsPlan, mock_planmanager):
+        service = DeltaUpdateService(mock_planmanager)
+        service.planAdded(plan)
         plan.assignLayer.startEditing()
+        assert service._assignmentChangedSignals.mapping(plan) is not None
         f = next(plan.assignLayer.getFeatures())
         i = plan.assignLayer.fields().lookupField(plan.distField)
         plan.assignLayer.changeAttributeValue(f.id(), i, f[i] + 1, f[i])
-        t = AggregatePendingChangesTask(plan)
-        t.run()
-        assert t.exception is None
-        assert t.data is not None
-        assert len(t.data) == 2
+        params = DeltaUpdate(plan)
+        task, plan, params = service._doUpdate(None, plan, params)
+        assert isinstance(params, DeltaUpdate)
+        assert params.data is not None
+        assert len(params.data) == 2

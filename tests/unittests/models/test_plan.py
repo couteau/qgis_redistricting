@@ -143,7 +143,7 @@ class TestPlan:
     # pylint: disable-next=unused-argument
     def test_geofields_assign(self, valid_plan: RdsPlan, block_layer, mock_taskmanager, qtbot: QtBot):
         with qtbot.waitSignal(valid_plan.geoFieldsChanged):
-            valid_plan.geoFields = {"vtdid20": RdsField(block_layer, "vtdid20")}
+            valid_plan.geoFields = [RdsField(block_layer, "vtdid20")]
         assert len(valid_plan.geoFields) == 1
 
     def test_addgeopackage_sets_error_package_doesnt_exist(self, datadir):
@@ -177,81 +177,86 @@ class TestPlan:
             "pop-layer": block_layer.id(),
             "pop-join-field": "geoid",
             "pop-field": "pop_total",
-            "pop-fields": {
-                "vap_total": {
+            "pop-fields": [
+                {
                     "layer": block_layer.id(),
                     "field": "vap_total",
                     "caption": "VAP",
+                    "field-name": "vap_total",
                     "category": FieldCategory.Population,
                 }
-            },
+            ],
             "assign-layer": assign_layer.id(),
             "geo-id-field": "geoid",
             "geo-id-caption": "geoid",
             "dist-layer": dist_layer.id(),
             "dist-field": "district",
-            "data-fields": {
-                "vap_ap_black": {
+            "data-fields": [
+                {
                     "layer": block_layer.id(),
                     "field": "vap_ap_black",
                     "caption": "APBVAP",
+                    "field-name": "vap_ap_black",
                     "category": FieldCategory.Demographic,
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-                "vap_nh_white": {
+                {
                     "layer": block_layer.id(),
                     "field": "vap_nh_white",
                     "caption": "WVAP",
+                    "field-name": "vap_nh_white",
                     "category": FieldCategory.Demographic,
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-                "vap_hispanic": {
+                {
                     "layer": block_layer.id(),
                     "field": "vap_hispanic",
                     "caption": "HVAP",
+                    "field-name": "vap_hispanic",
                     "category": FieldCategory.Demographic,
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-            },
-            "geo-fields": {
-                "vtdid": {
+            ],
+            "geo-fields": [
+                {
                     "layer": assign_layer.id(),
                     "field": "vtdid",
                     "caption": "VTD",
+                    "field-name": "vtdid",
                     "category": FieldCategory.Geography,
                 }
-            },
+            ],
             "metrics": {
                 "metrics": {
                     "total-population": {"value": 227036},
-                    "cea_proj": None,
-                    "plan-deviation": {"value": [100, -500]},
-                    "deviation": None,
-                    "pct-deviation": None,
-                    "polsbypopper": None,
+                    "cea_proj": {},
+                    "plan-deviation": {"formatted-value": "", "valid": True, "value": [100, -500]},
+                    "deviation": {},
+                    "pct-deviation": {},
+                    "polsbypopper": {},
                     "mean-polsbypopper": {"value": 0.4},
                     "min-polsbypopper": {"value": 0.15},
                     "max-polsbypopper": {"value": 0.8},
-                    "agg-polsbypopper": None,
-                    "reock": None,
+                    "agg-polsbypopper": {},
+                    "reock": {},
                     "mean-reock": {"value": 0.5},
                     "min-reock": {"value": 0.1},
                     "max-reock": {"value": 0.9},
-                    "agg-reock": None,
-                    "convexhull": None,
+                    "agg-reock": {},
+                    "convexhull": {},
                     "mean-convexhull": {"value": 0.5},
                     "min-convexhull": {"value": 0.1},
                     "max-convexhull": {"value": 0.9},
-                    "agg-convexhull": None,
+                    "agg-convexhull": {},
                     "cut-edges": {},
                     "contiguity": {"value": True},
                     "complete": {"value": True},
                     "splits": {
-                        "value": {
-                            "vtdid": {
+                        "value": [
+                            {
                                 "field": "vtdid",
                                 "caption": "VTD",
                                 "data": {
@@ -263,7 +268,7 @@ class TestPlan:
                                     "data": [],
                                 },
                             }
-                        }
+                        ]
                     },
                 }
             },
@@ -283,21 +288,21 @@ class TestPlan:
             "pop-layer": block_layer.id(),
             "pop-join-field": "geoid",
             "pop-field": "pop_total",
-            "pop-fields": {
-                "vap_total": {
+            "pop-fields": [
+                {
                     "layer": block_layer.id(),
                     "field": "vap_total",
                     "caption": "VAP",
                     "category": FieldCategory.Population,
                 }
-            },
+            ],
             "assign-layer": assign_layer.id(),
             "geo-id-field": "geoid",
             "geo-id-caption": "Block",
             "dist-layer": dist_layer.id(),
             "dist-field": "district",
-            "data-fields": {
-                "vap_ap_black": {
+            "data-fields": [
+                {
                     "layer": block_layer.id(),
                     "field": "vap_ap_black",
                     "caption": "APBVAP",
@@ -305,7 +310,7 @@ class TestPlan:
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-                "vap_nh_white": {
+                {
                     "layer": block_layer.id(),
                     "field": "vap_nh_white",
                     "caption": "WVAP",
@@ -313,7 +318,7 @@ class TestPlan:
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-                "vap_hispanic": {
+                {
                     "layer": block_layer.id(),
                     "field": "vap_hispanic",
                     "caption": "HVAP",
@@ -321,21 +326,22 @@ class TestPlan:
                     "sum-field": True,
                     "pct-base": "vap_total",
                 },
-            },
-            "geo-fields": {
-                "vtdid": {
+            ],
+            "geo-fields": [
+                {
                     "layer": assign_layer.id(),
                     "field": "vtdid",
                     "caption": "VTD",
                     "category": FieldCategory.Geography,
                 }
-            },
+            ],
             "metrics": {
                 "metrics": {
+                    "cut-edges": {},
                     "total-population": {"value": 227036},
                     "splits": {
-                        "value": {
-                            "vtdid": {
+                        "value": [
+                            {
                                 "field": "vtdid",
                                 "data": {
                                     "schema": {
@@ -346,9 +352,9 @@ class TestPlan:
                                     "data": [],
                                 },
                             }
-                        }
+                        ]
                     },
-                }
+                },
             },
         }
         plan = deserialize(RdsPlan, data)
@@ -376,10 +382,10 @@ class TestPlan:
         assert len(plan.popFields) == 1
         assert plan.metrics.cutEdges is None
         assert len(plan.metrics.splits) == 1
-        assert "vtdid" in plan.metrics.splits
-        assert plan.metrics.splits["vtdid"].field == "vtdid"
-        assert plan.metrics.splits["vtdid"].data is not None
-        assert plan.metrics.splits["vtdid"].data.empty
+        assert plan.metrics.splits.has("vtdid")
+        assert plan.metrics.splits[0].field == "vtdid"
+        assert plan.metrics.splits.get("vtdid").data is not None
+        assert plan.metrics.splits.get("vtdid").data.empty
 
     def test_validate_district(self, plan: RdsPlan, mocker):
         plan.metrics["totalPopulation"]._value = 500

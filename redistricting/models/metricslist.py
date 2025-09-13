@@ -36,15 +36,17 @@ from typing import (
     Optional,
     TypeVar,
     Union,
-    _GenericAlias,  # type: ignore
+    _GenericAlias,
+    cast,  # type: ignore
     get_args,
     get_origin,
+    overload,
 )
 
 import geopandas as gpd
 import pandas as pd
-from qgis.core import QgsField, QgsVectorLayer
-from qgis.PyQt.QtCore import QMetaType, pyqtSignal
+from qgis.core import QgsField
+from qgis.PyQt.QtCore import QMetaType, QObject, pyqtSignal
 from qgis.PyQt.QtGui import QColor
 
 from ..utils import camel_to_kebab, kebab_to_camel, tr
@@ -305,17 +307,29 @@ class RdsMetrics(RdsBaseModel):
     metricsAboutToChange = pyqtSignal()
     metricsChanged = pyqtSignal()
 
-    metrics: KeyedList[str, RdsMetric]
+    metrics: KeyedList[str, RdsMetric] = rds_property(private=True, readonly=True)
 
-    distLayer: QgsVectorLayer = None
-    distField: str = None
+    @overload
+    def __init__(self, metrics: KeyedList[str, RdsMetric]): ...
 
-    def __pre_init__(self):
-        self._metrics = KeyedList([v() for v in base_metrics.values()], elem_type=RdsMetric)
+    @overload
+    def __init__(self, **kwargs): ...
 
-    @Property
-    def metrics(self) -> KeyedList[str, RdsMetric]:
-        return self._metrics
+    def __init__(self, metrics: Optional[KeyedList[str, RdsMetric]] = None, parent: Optional[QObject] = None, **kwargs):
+        base_metrics = RdsMetrics.metrics.default_factory()
+        if metrics is not None:
+            for m in metrics:
+                base_metrics.set(m.name(), m)
+
+        for k, v in kwargs.items():
+            base_metrics.set(k, metrics_classes[k](v))
+
+        super().__init__(metrics=base_metrics, parent=parent)
+
+    @cast("Property[KeyedList[str, RdsMetric]]", metrics).factory
+    @staticmethod
+    def metrics() -> KeyedList[str, RdsMetric]:
+        return KeyedList([v() for v in base_metrics.values()], elem_type=RdsMetric)
 
     @metrics.serializer
     @staticmethod
@@ -328,7 +342,7 @@ class RdsMetrics(RdsBaseModel):
             if metric.serialize() and metric.level() != MetricLevel.DISTRICT:
                 metrics[camel_to_kebab(name)] = serialize_value(metric, memo, exclude_none)
             else:
-                metrics[camel_to_kebab(name)] = None
+                metrics[camel_to_kebab(name)] = {}
 
         return metrics
 
@@ -343,7 +357,7 @@ class RdsMetrics(RdsBaseModel):
             if metric_cls is None:
                 continue
 
-            if v is None or not metric_cls.serialize() or metric_cls.level() == MetricLevel.DISTRICT:
+            if not v or not metric_cls.serialize() or metric_cls.level() == MetricLevel.DISTRICT:
                 metrics[n] = metric_cls()
             else:
                 metrics[n] = deserialize_value(metric_cls, v)
@@ -370,11 +384,6 @@ class RdsMetrics(RdsBaseModel):
         metrics = {n: metrics[n] for n in metrics_classes if n in metrics}
 
         return KeyedList(metrics.values(), elem_type=RdsMetric)
-
-    @metrics.setter
-    def metrics(self, value: Iterable[RdsMetric]):
-        self._metrics.clear()
-        self._metrics.extend(value)  # pylint: disable=no-member
 
     def __getitem__(self, name: str) -> RdsMetric:
         if (m := self.metrics.get(name, None)) is not None:

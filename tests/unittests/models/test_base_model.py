@@ -62,6 +62,7 @@ class TestBaseModel:
         inst = TestBaseModel.ModelTest()
         assert inst.prop1 == "default"
         assert inst.prop2 == 1
+        inst.deleteLater()
 
     def test_repr(self):
         inst = TestBaseModel.ModelTest()

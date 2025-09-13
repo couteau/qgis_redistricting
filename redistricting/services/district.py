@@ -25,12 +25,12 @@
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from itertools import repeat
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import geopandas as gpd
 import pandas as pd
 import shapely.ops
-from qgis.core import QgsFeatureRequest, QgsTask
+from qgis.core import QgsFeatureRequest, QgsFeedback, QgsTask
 from qgis.PyQt.QtCore import QObject, QRunnable, QSignalMapper, QThreadPool
 from shapely import MultiPolygon, Polygon
 
@@ -39,7 +39,7 @@ from ..utils import spatialite_connect, tr
 from ..utils.misc import quote_identifier
 from .districtio import DistrictReader
 from .metrics import MetricsService
-from .updateservice import IncrementalFeedback, UpdateParams, UpdateService, UpdateStatus
+from .updateservice import IncrementalFeedback, UpdateParams, UpdateService
 
 if TYPE_CHECKING:
     from ..models import RdsPlan
@@ -66,10 +66,10 @@ class DissolveWorker(QRunnable):
 class DistrictUpdateParams(UpdateParams):
     includeDemographics: bool
     includeGeometry: bool
-    totalPopulation: Optional[int] = None
     updateDistricts: Optional[set[int]] = None
+    totalPopulation: Optional[int] = None
     populationData: Optional[pd.DataFrame] = None
-    districtData: Optional[gpd.GeoDataFrame] = None
+    districtData: Optional[Union[pd.DataFrame, gpd.GeoDataFrame]] = None
     geometry: Optional[gpd.GeoSeries] = None
 
 
@@ -170,8 +170,8 @@ class DistrictUpdater(UpdateService):
             db.commit()
             feedback.updateProgress(1, 1)
 
-    def run(self, task: QgsTask, plan: "RdsPlan", params: DistrictUpdateParams):
-        feedback = IncrementalFeedback(task)
+    def run(self, task: Optional[QgsTask], plan: "RdsPlan", params: DistrictUpdateParams):
+        feedback = IncrementalFeedback(task or QgsFeedback())
 
         feedback.setProgressIncrement(0, 40)
         params.populationData = self._loadAssignments(
@@ -181,7 +181,9 @@ class DistrictUpdater(UpdateService):
         if params.includeDemographics:
             params.totalPopulation = int(params.populationData[DistrictColumns.POPULATION].sum())
 
-        pop_cols: list[str] = [c for c in params.populationData.columns if not plan.geoFields.has(c)]
+        pop_cols: list[str] = [
+            c for c in params.populationData.columns if not plan.geoFields.has(c) and c != "geometry"
+        ]
         params.districtData = params.populationData[pop_cols].groupby(by=plan.distField).sum()
 
         if params.includeGeometry:
@@ -206,13 +208,13 @@ class DistrictUpdater(UpdateService):
 
     def finished(
         self,
-        status: UpdateStatus,
+        status: UpdateService.UpdateStatus,
         task: Optional[QgsTask],
         plan: Optional["RdsPlan"],
         params: Optional[DistrictUpdateParams],
         exception: Optional[Exception],
     ):
-        if status == UpdateStatus.SUCCESS:
+        if status == UpdateService.UpdateStatus.SUCCESS:
             plan.distLayer.reload()
             reader = DistrictReader(plan.distLayer, plan.distField, plan.popField, plan.districtColumns)
             reader.loadDistricts(plan)
@@ -238,6 +240,7 @@ class DistrictUpdater(UpdateService):
         self,
         plan: "RdsPlan",
         force: bool = False,
+        foreground: bool = False,
         *,
         districts: Optional[Iterable[int]] = None,
         includeDemographics=False,
@@ -264,9 +267,10 @@ class DistrictUpdater(UpdateService):
         if not (includeDemographics or includeGeometry):
             return None
 
-        super().update(
+        return super().update(
             plan,
             force,
+            foreground,
             updateDistricts=districts,
             includeDemographics=includeDemographics,
             includeGeometry=includeGeometry,

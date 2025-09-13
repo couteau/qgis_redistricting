@@ -792,7 +792,7 @@ class RdsMetricsModel(QAbstractTableModel):
             if name in groups:
                 self._data[name] = None
                 for n, m in groups[name].items():
-                    self._data[n] = m
+                    self._data[f"{name}|{n}"] = m
             else:
                 self._data[name] = metric
 
@@ -814,12 +814,10 @@ class RdsMetricsModel(QAbstractTableModel):
             if m is None:
                 # it's a group or a geographic metric header
                 header = self.metricKey(section)
-
             elif m.level() == MetricLevel.GEOGRAPHIC:
                 # it's an entry in a geographic metric -- header is geoField's caption
-                g = self.metricKey(section)
+                _, g = self.metricKey(section).split("|")
                 header = f"    {self._plan.geoFields.get(g).caption}"
-
             elif m.group() is not None:
                 header = f"    {m.caption()}"
 

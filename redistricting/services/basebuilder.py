@@ -31,7 +31,7 @@ from qgis.core import QgsVectorLayer
 from qgis.PyQt.QtCore import QObject
 
 from .. import settings
-from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, consts
+from ..models import DeviationType, RdsDataField, RdsField, RdsGeoField, RdsPlan, DistrictColumns
 from ..utils import matchField, tr
 from .planvalidator import PlanValidator
 
@@ -47,7 +47,6 @@ class BasePlanBuilder(PlanValidator):
         self._cvap = None
         self._geoPackagePath: pathlib.Path = None
 
-    # pylint: disable=protected-access
     @classmethod
     def fromPlan(cls, plan: RdsPlan, parent: Optional[QObject] = None, **kwargs):
         instance = super().fromPlan(plan, parent, **kwargs)
@@ -58,8 +57,6 @@ class BasePlanBuilder(PlanValidator):
                 instance._cvap = f
         instance._geoPackagePath = plan.geoPackagePath
         return instance
-
-    # pylint: enable=protected-access
 
     def setName(self, value: str):
         if not isinstance(value, str):
@@ -79,9 +76,6 @@ class BasePlanBuilder(PlanValidator):
         if not isinstance(value, int):
             raise TypeError(tr("Number of districts must be an integer"))
 
-        if value < consts.MIN_DISTRICTS or value > consts.MAX_DISTRICTS:
-            raise ValueError(tr("Invalid number of districts for plan: {value}").format(value=value))
-
         if self._numSeats == self._numDistricts or self._numSeats < value:
             self._numSeats = value
 
@@ -91,9 +85,6 @@ class BasePlanBuilder(PlanValidator):
     def setNumSeats(self, value: int):
         if not isinstance(value, int):
             raise TypeError(tr("Number of seats must be an integer"))
-
-        if self._numDistricts is not None and value < self._numDistricts:
-            raise ValueError(tr("Number of seats must be equal to or greater than the number of districts"))
 
         self._numSeats = value
         return self
@@ -312,6 +303,8 @@ class BasePlanBuilder(PlanValidator):
     def appendDataField(self, field, caption=None, sumField=True, pctBase=None, fieldName=None) -> "Self":
         if isinstance(field, str):
             if pctBase is None:
+                if matchField(field, self._popLayer, settings.popFieldPatterns):
+                    pctBase = DistrictColumns.POPULATION
                 if self._vap and matchField(field, self._popLayer, settings.vapFieldPatterns):
                     pctBase = self._vap.field
                 elif self._cvap and matchField(field, self._popLayer, settings.cvapFieldPatterns):

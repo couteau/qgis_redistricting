@@ -648,18 +648,28 @@ def plan(qgis_parent, block_layer, assign_layer, dist_layer):
             "metrics": {
                 "metrics": {
                     "total-population": {"value": 227036},
+                    "deviation": {},
+                    "pct-deviation": {},
                     "plan-deviation": {"value": [100, -500]},
+                    "cea_proj": {},
+                    "polsbypopper": {},
                     "mean-polsbypopper": {"value": 0.4},
                     "min-polsbypopper": {"value": 0.15},
                     "max-polsbypopper": {"value": 0.8},
+                    "agg-polsbypopper": {},
+                    "reock": {},
                     "mean-reock": {"value": 0.5},
                     "min-reock": {"value": 0.1},
                     "max-reock": {"value": 0.9},
+                    "agg-reock": {},
+                    "convexhull": {},
                     "mean-convexhull": {"value": 0.5},
                     "min-convexhull": {"value": 0.1},
                     "max-convexhull": {"value": 0.9},
+                    "agg-convexhull": {},
                     "contiguity": {"value": True},
                     "complete": {"value": True},
+                    "cut-edges": {},
                     "splits": {
                         "value": [
                             {

@@ -23,7 +23,6 @@
 """
 
 import pathlib
-from collections.abc import Iterable
 from contextlib import contextmanager
 from itertools import repeat
 from math import ceil, floor
@@ -179,11 +178,6 @@ class RdsPlan(RdsBaseModel):
         private=True, notify=geoFieldsChanged, factory=KeyedList[str, RdsGeoField]
     )
 
-    @cast("Property[KeyedList[str, RdsGeoField]]", geoFields).setter(set_initializer=True)
-    def geoFields(self, geoFields: Iterable[RdsGeoField]):
-        self._geoFields.clear()  # pylint: disable=no-member
-        self._geoFields.extend(geoFields)  # pylint: disable=no-member
-
     popLayer: QgsVectorLayer = None
 
     @Property(private=True, fvalid=_validLayer)
@@ -234,10 +228,10 @@ class RdsPlan(RdsBaseModel):
             self._popField = value
 
     popFields: KeyedList[str, RdsField] = rds_property(
-        private=True, readonly=True, factory=KeyedList[str, RdsField], notify=popFieldsChanged
+        private=True, factory=KeyedList[str, RdsField], notify=popFieldsChanged
     )
     dataFields: KeyedList[str, RdsDataField] = rds_property(
-        private=True, readonly=True, factory=KeyedList[str, RdsDataField], notify=dataFieldsChanged
+        private=True, factory=KeyedList[str, RdsDataField], notify=dataFieldsChanged
     )
 
     assignLayer: QgsVectorLayer = None
@@ -252,7 +246,6 @@ class RdsPlan(RdsBaseModel):
         self._geoLayer = None
         self._popLayer = None
         self._distField = None
-        self._geoFields: KeyedList[str, RdsGeoField] = KeyedList(elem_type=RdsGeoField)
         self._numDistricts = -1
 
     def __post_init__(self, **kwargs):

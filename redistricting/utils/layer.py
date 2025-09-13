@@ -252,13 +252,15 @@ class LayerReader(SqlAccess):
                 raise ValueError("ShapeFile does not support sql query")
             return self.read_qgis(columns, order, read_geometry, chunksize, filt)
 
-        if not read_geometry:
+        if not read_geometry and self.is_sql_capable:
             with self.dbconnect(self._layer) as db:
                 result = pd.read_sql(
                     query or makeSqlQuery(), db, index_col=order, columns=columns, chunksize=chunksize, **kwargs
                 )
+
                 if isinstance(result, Iterator):
                     result = pd.concat(self.iterateWithProgress(result, total))
+
             return result
 
         if (

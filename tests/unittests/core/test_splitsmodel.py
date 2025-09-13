@@ -122,7 +122,7 @@ class TestSplitsModel:
         )
 
     def test_create(self, plan: RdsPlan, qtmodeltester):
-        s = RdsSplitsModel(plan.metrics.splits["vtdid"], (*plan.popFields, *plan.dataFields))
+        s = RdsSplitsModel(plan.metrics.splits.get("vtdid"), (*plan.popFields, *plan.dataFields))
         assert s.rowCount(QModelIndex()) == 0
         assert s.columnCount(QModelIndex()) == 2
         qtmodeltester.check(s)

@@ -55,13 +55,6 @@ if __debug__:
     from .tasks._debug import debug_thread
 
 
-class UpdateStatus(Enum):
-    PENDING = 0
-    SUCCESS = 1
-    CANCELED = 2
-    ERROR = 3
-
-
 @dataclass
 class UpdateParams: ...
 
@@ -105,6 +98,12 @@ class IncrementalFeedback(QgsFeedback):
 
 
 class UpdateService(QObject):
+    class UpdateStatus(Enum):
+        PENDING = 0
+        SUCCESS = 1
+        CANCELED = 2
+        ERROR = 3
+
     updateStarted = pyqtSignal("PyQt_PyObject")  # RdsPlan
     updateComplete = pyqtSignal("PyQt_PyObject")  # RdsPlan
     updateTerminated = pyqtSignal("PyQt_PyObject", "PyQt_PyObject")  # RdsPlan, Exception
@@ -259,11 +258,11 @@ class UpdateService(QObject):
 
         return assignments[cols]
 
-    def _createParams(self, *args, **kwargs) -> UpdateParams:
+    def _createParams(self, plan: "RdsPlan", *args, **kwargs) -> UpdateParams:
         return self.paramsCls(*args, **kwargs)
 
     def _doUpdate(
-        self, task: QgsTask, plan: "RdsPlan", params: UpdateParams
+        self, task: Optional[QgsTask], plan: "RdsPlan", params: UpdateParams
     ) -> tuple[QgsTask, "RdsPlan", UpdateParams]:
         if __debug__:
             debug_thread()
@@ -275,7 +274,9 @@ class UpdateService(QObject):
         except Exception as e:
             raise UpdateException(task, plan, params, e) from e
 
-    def _doFinished(self, exception: Exception, args: Optional[tuple[QgsTask, "RdsPlan", UpdateParams]] = None):
+    def _doFinished(
+        self, exception: Exception, args: Optional[tuple[Optional[QgsTask], "RdsPlan", UpdateParams]] = None
+    ):
         if args is None:
             if isinstance(exception, UpdateException):
                 task, plan, params, exception = exception.args
@@ -284,19 +285,23 @@ class UpdateService(QObject):
         else:
             task, plan, params = args
 
-        if args is None or task.status() == QgsTask.TaskStatus.Terminated:
+        if (
+            exception is not None
+            or args is None
+            or (task is not None and task.status() == QgsTask.TaskStatus.Terminated)
+        ):
             status = (
-                UpdateStatus.CANCELED
+                UpdateService.UpdateStatus.CANCELED
                 if (
                     exception is None
                     or isinstance(exception, CanceledError)
                     or exception.args[0] == "Task canceled"
                     or (params and params.task.isCanceled())
                 )
-                else UpdateStatus.ERROR
+                else UpdateService.UpdateStatus.ERROR
             )
         else:
-            status = UpdateStatus.SUCCESS
+            status = UpdateService.UpdateStatus.SUCCESS
 
         self.finished(status, task, plan, params, exception)
 
@@ -327,7 +332,7 @@ class UpdateService(QObject):
             self._updateTasks[plan.id].task.cancel()
             del self._updateTasks[plan.id]
 
-    def run(self, task: QgsTask, plan: "RdsPlan", params: UpdateParams) -> UpdateParams:
+    def run(self, task: Optional[QgsTask], plan: "RdsPlan", params: UpdateParams) -> UpdateParams:
         return params
 
     def finished(
@@ -338,29 +343,52 @@ class UpdateService(QObject):
         params: Optional[UpdateParams],
         exception: Optional[Exception],
     ):
-        if status == UpdateStatus.CANCELED:
+        if status == UpdateService.UpdateStatus.CANCELED:
             self.updateCanceled.emit(plan)
-        elif status == UpdateStatus.ERROR:
+        elif status == UpdateService.UpdateStatus.ERROR:
             QgsMessageLog.logMessage(f"{exception!r}", "Redistricting", Qgis.MessageLevel.Critical)
             self.updateTerminated.emit(plan, exception)
         else:
             self.updateComplete.emit(plan)
 
-    def update(self, plan: "RdsPlan", force: bool = False, *args, **kwargs) -> UpdateParams:
-        if self.planIsUpdating(plan):
+    @overload
+    def update(
+        self, plan: "RdsPlan", force: bool = False, foreground: Literal[False] = False, *args, **kwargs
+    ) -> UpdateParams: ...
+
+    @overload
+    def update(self, plan: "RdsPlan", force: bool = False, *args, foreground: Literal[True], **kwargs) -> None: ...
+
+    def update(
+        self, plan: "RdsPlan", force: bool = False, foreground: bool = False, *args, **kwargs
+    ) -> Optional[UpdateParams]:
+        if not foreground and self.planIsUpdating(plan):
             if force:
                 self.cancelUpdate(plan)
             else:
                 return self._updateTasks[plan.id]
 
-        params = self._createParams(*args, **kwargs)
+        params = self._createParams(plan, *args, **kwargs)
         if params is None:
             return None
 
-        task = QgsTask.fromFunction(
-            self._description, self._doUpdate, on_finished=self._doFinished, plan=plan, params=params
-        )
+        if foreground:
+            exception = None
+            try:
+                result = self._doUpdate(None, plan, params)
+            except UpdateException as e:
+                _1, _2, _3, exception = e.args
+                result = (None, plan, params)
+            except Exception as e:
+                exception = e
+                result = (None, plan, params)
+            finally:
+                self._doFinished(exception, result)
+        else:
+            task = QgsTask.fromFunction(
+                self._description, self._doUpdate, on_finished=self._doFinished, plan=plan, params=params
+            )
 
-        self._updateTasks[plan.id] = UpdateTask(task, params)
-        QgsApplication.taskManager().addTask(task)
-        return params
+            self._updateTasks[plan.id] = UpdateTask(task, params)
+            QgsApplication.taskManager().addTask(task)
+            return self._updateTasks[plan.id]

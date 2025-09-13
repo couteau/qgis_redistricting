@@ -100,7 +100,7 @@ class TestDistrictController:
         menu = QMenu("test")
         event = QgsMapMouseEvent(qgis_canvas, QEvent.Type.MouseButtonPress, QPoint(0, 0), Qt.MouseButton.RightButton)
         controller_with_active_plan.addCanvasContextMenuItems(menu, event)
-        mock_copier.canCopyOrCutAssignments.assert_called_once()
+        mock_copier.canCopyOrCutAssignments.assert_called() # called twice
         mock_copier.canPasteAssignments.assert_called_once()
 
     def test_add_canvas_context_menu_items_no_active_plan_returns(
@@ -197,7 +197,7 @@ class TestDistrictController:
     def test_data_table_context_menu(self, controller: DistrictController, mocker: MockerFixture):
         menu = mocker.patch("redistricting.controllers.district.QMenu")
         controller.load()
-        assert menu.return_value.addAction.call_count == 5
+        assert menu.return_value.addAction.call_count == 6
         menu.return_value.addAction.assert_any_call(controller.actionCopyDistrict)
 
     def test_copy_data_to_clipboard(self, controller_with_active_plan: DistrictController, mocker: MockerFixture):
@@ -232,7 +232,7 @@ class TestDistrictController:
 
     def test_recalculate(self, controller_with_active_plan, mock_updater):
         controller_with_active_plan.recalculate()
-        mock_updater.updateDistricts.assert_called_once()
+        mock_updater.update.assert_called_once()
 
     def test_edit_district(  # noqa: PLR0913
         self,

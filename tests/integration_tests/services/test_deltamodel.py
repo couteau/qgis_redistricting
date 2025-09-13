@@ -108,5 +108,9 @@ class TestDeltaModel:
         assert delta_model.columnCount() == 15
         e = PlanEditor.fromPlan(plan)
         e.appendDataField("vap_nh_black")
+        assert not e.errors()
+        assert e._dataFields != list(plan.dataFields)
+        assert len(e._dataFields) == 4
+        assert len(plan.dataFields) == 3
         e.updatePlan()
         assert delta_model.columnCount() == 18

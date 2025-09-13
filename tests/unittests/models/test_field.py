@@ -23,6 +23,7 @@ from qgis.core import QgsField
 from qgis.PyQt.QtCore import QVariant
 
 from redistricting.models import RdsDataField, RdsField, RdsGeoField, RdsRelatedField
+from redistricting.models.consts import FieldCategory
 from redistricting.models.serialization import deserialize, serialize
 
 # pylint: disable=comparison-with-callable, protected-access, unused-argument
@@ -139,7 +140,13 @@ class TestField:
 
     def test_serialize(self, block_layer, field: RdsField):
         data = serialize(field)
-        assert data == {"layer": block_layer.id(), "field": "vtdid", "caption": "vtdid", "category": 1}
+        assert data == {
+            "layer": block_layer.id(),
+            "field": "vtdid",
+            "caption": "vtdid",
+            "field-name": "vtdid",
+            "category": 1,
+        }
 
     def test_deserialize(self, block_layer):
         data = {"layer": block_layer.id(), "field": "vtdid"}
@@ -147,6 +154,8 @@ class TestField:
         assert field.field == "vtdid"
         assert field.layer == block_layer
         assert field.caption == "vtdid"
+        assert field.fieldName == "vtdid"
+        assert field.category == FieldCategory.Population
 
 
 class TestGeoField:
@@ -155,6 +164,9 @@ class TestGeoField:
         assert vtd_name.isValid()
         f = RdsGeoField(block_layer, "vtdid", nameField=vtd_name)
         assert f.isValid()
+        assert f.category == FieldCategory.Geography
+        assert f.fieldName == "vtdid"
+        assert f.caption == "vtdid"
 
     def test_geo_field_no_namefield_sets_default_namefield(self, block_layer, vtd_layer, related_layers):
         f = RdsGeoField(block_layer, "vtdid")
@@ -235,16 +247,35 @@ class TestDataField:
         )
 
     def test_create(self, block_layer):
-        field = RdsDataField(block_layer, "vap_ap_black", pctBase="vap_total")
+        field = RdsDataField(block_layer, "vap_ap_black", pctBase="vap_total", fieldName="ap_black_vap")
         assert field.field == "vap_ap_black"
         assert field.sumField
         assert field.pctBase == "vap_total"
+        assert field.fieldName == "ap_black_vap"
+
+        field = RdsDataField(block_layer, "vap_ap_black", sumField=False, fieldName="ap_black_vap")
+        assert field.field == "vap_ap_black"
+        assert not field.sumField
+        assert field.pctBase is None
+        assert field.fieldName == "ap_black_vap"
+
+        field = RdsDataField(block_layer, "vap_ap_black", caption="AP Black")
+        assert field.field == "vap_ap_black"
+        assert field.sumField
+        assert field.pctBase is None
+        assert field.caption == "AP Black"
 
     def test_create_expr(self, block_layer):
         field = RdsDataField(block_layer, "vap_nh_ap_black + vap_hispanic")
         assert field.field == "vap_nh_ap_black + vap_hispanic"
         assert field.sumField
         assert field.pctBase is None
+        assert field.fieldName == "vap_nh_ap_black_vap_hispanic"
+
+        field = RdsDataField(block_layer, "vap_nh_ap_black + vap_hispanic", fieldName="Black_Hispanic", sumField=False)
+        assert field.field == "vap_nh_ap_black + vap_hispanic"
+        assert not field.sumField
+        assert field.fieldName == "Black_Hispanic"
 
     def test_serialize(self, block_layer, data_field):
         data = serialize(data_field)
@@ -252,6 +283,7 @@ class TestDataField:
             "layer": block_layer.id(),
             "field": "vap_ap_black",
             "caption": "vap_ap_black",
+            "field-name": "vap_ap_black",
             "category": 3,
             "sum-field": True,
             "pct-base": "vap_total",
@@ -263,8 +295,9 @@ class TestDataField:
         assert field.field == "vap_ap_black"
         assert field.layer == block_layer
         assert field.caption == "APBVAP"
-        assert field.sumField  # pylint: disable=no-member
-        assert field.pctBase == "vap_total"  # pylint: disable=no-member
+        assert field.fieldName == "vap_ap_black"
+        assert field.sumField
+        assert field.pctBase == "vap_total"
 
     def test_makeqgsfield_field(self, data_field):
         qf = data_field.makeQgsField()
