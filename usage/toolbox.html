@@ -1,0 +1,208 @@
+
+
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Creating Your Districts &#8212; QGIS Redistricting Plugin 0.0.4-alpha documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../_static/cloud.css?v=f9ae72be" />
+    <link rel="stylesheet" type="text/css" href="../_static/help.css?v=93d7a9f1" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Noticia+Text:400,i,b,bi|Open+Sans:400,i,b,bi|Roboto+Mono:400,i,b,bi&amp;display=swap" type="text/css" />
+    
+    <script src="../_static/documentation_options.js?v=cf230d1f"></script>
+    <script src="../_static/doctools.js?v=9a2dae69"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+
+    
+    
+     
+        <script src="../_static/jquery.cookie.js"></script>
+    
+
+    
+     
+        <script src="../_static/cloud.base.js"></script>
+    
+
+    
+     
+        <script src="../_static/cloud.js"></script>
+    
+
+    <link rel="icon" href="../_static/icon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Pending Changes Window" href="preview.html" />
+    <link rel="prev" title="Create a New Redistricting Plan" href="create_plan.html" /> 
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head><body>
+    <div class="relbar-top">
+        
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="preview.html" title="Pending Changes Window"
+             accesskey="N">next</a> &nbsp; &nbsp;</li>
+        <li class="right" >
+          <a href="create_plan.html" title="Create a New Redistricting Plan"
+             accesskey="P">previous</a> &nbsp; &nbsp;</li>
+    <li><a href="../index.html">QGIS Redistricting Plugin 0.0.4-alpha documentation</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../usage.html" accesskey="U">Usage</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Creating Your Districts</a></li> 
+      </ul>
+    </div>
+    </div>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="creating-your-districts">
+<h1>Creating Your Districts<a class="headerlink" href="#creating-your-districts" title="Link to this heading">¶</a></h1>
+<p>Redistricting plans are created using the tools available in the redistricting
+Toolbox.</p>
+<img alt="../_images/toolbox.png" src="../_images/toolbox.png" />
+<p>The redistricting Toolbox offers the following district creation tools in the
+toolbar at the top of the districting toolbox window.</p>
+<table class="help-table docutils align-default">
+<colgroup>
+<col style="width: 16.7%" />
+<col style="width: 83.3%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><img alt="Paint by geography" class="align-top" src="../_images/paintpalette.svg" style="width: 32px; height: 32px;" /></p></td>
+<td><p>Activate the paint by geography function. When active,
+clicking on the map will assign units of geography to the
+selected destination district.</p></td>
+</tr>
+<tr class="row-even"><td><p><img alt="Paint rubberband" class="align-top" src="../_images/paintrubberband.svg" style="width: 32px; height: 32px;" /></p></td>
+<td><p>Activate the paint by selection function. Use the mouse to
+assign all geographic units within the selection rectangle to
+the selected destination district.</p></td>
+</tr>
+<tr class="row-odd"><td><p><img alt="Select by geography" class="align-top" src="../_images/select_geo.svg" style="width: 32px; height: 32px;" /></p></td>
+<td><p>Select features by geography. Use this tool to select, but not
+assign to a district, features corresponding the chosen unit
+of geography.</p></td>
+</tr>
+</tbody>
+</table>
+<p>Below the toolbar, the Toolbox displays the name of the currently active plan.</p>
+<p>When one of the the district painting functions is active, geographic units
+will be assigned to the district specified in the <code class="docutils literal notranslate"><span class="pre">Target</span></code> dropdown. If not
+all districts have been allocated, selecting <code class="docutils literal notranslate"><span class="pre">New</span> <span class="pre">District</span></code> will open the
+“Create New District” dialog. To remove geographic units from a district, set
+the target to <code class="docutils literal notranslate"><span class="pre">Unassigned</span></code>.</p>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">Source</span></code> dropdown to limit which units are assigned to the target
+district. When <code class="docutils literal notranslate"><span class="pre">All</span></code> is selected, all geographic units matching the
+selection criteria will be assigned to the target district, even if they are
+already assigned to another district. If <code class="docutils literal notranslate"><span class="pre">Unassigned</span></code> is selected as the
+source, only geographic units not currently assigned to another district will
+be assigned to the target. Selecting a specific district as the source will
+reassign units currently assigned to that district to the target district.</p>
+<p>Use the <code class="docutils literal notranslate"><span class="pre">Geography</span></code> dropdown to select which units of geography you wish to
+assign to the target district as you paint. The units specified during plan
+creation will appear in the list.</p>
+<p>As you paint your districts, you can see the impact of your changes in the
+<a class="reference internal" href="preview.html"><span class="doc">Pending Changes Window</span></a>. When you are happy with the changes, click Save <img alt="Save" src="../_images/save.svg" style="width: 16px; height: 16px;" /> to
+save your changes to the layer. If you wish to abandon your changes and
+revert your plan to its previous state, click Rollback <img alt="Rollback" src="../_images/rollback.svg" style="width: 16px; height: 16px;" />. The Undo
+<img alt="Undo" src="../_images/undo.svg" style="width: 16px; height: 16px;" /> and Redo <img alt="Redo" src="../_images/redo.svg" style="width: 16px; height: 16px;" /> buttons can be used to revert or reapply your changes
+while editing.</p>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+  <div class="sphinxprev">
+    <h4>Previous page</h4>
+    <p class="topless"><a href="create_plan.html"
+                          title="Previous page">&larr; Create a New Redistricting Plan</a></p>
+  </div>
+  <div class="sphinxnext">
+    <h4>Next page</h4>
+    <p class="topless"><a href="preview.html"
+                          title="Next page">&rarr; Pending Changes Window</a></p>
+  </div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/usage/toolbox.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+    
+    
+        <div class="sidebar-toggle-group no-js">
+            
+            <button class="sidebar-toggle" id="sidebar-hide" title="Hide the sidebar menu">
+                 «
+                <span class="show-for-small">hide menu</span>
+                
+            </button>
+            <button class="sidebar-toggle" id="sidebar-show" title="Show the sidebar menu">
+                
+                <span class="show-for-small">menu</span>
+                <span class="hide-for-small">sidebar</span>
+                 »
+            </button>
+        </div>
+    
+      <div class="clearer"></div>
+    </div>
+    <div class="relbar-bottom">
+        
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="preview.html" title="Pending Changes Window"
+             >next</a> &nbsp; &nbsp;</li>
+        <li class="right" >
+          <a href="create_plan.html" title="Create a New Redistricting Plan"
+             >previous</a> &nbsp; &nbsp;</li>
+    <li><a href="../index.html">QGIS Redistricting Plugin 0.0.4-alpha documentation</a> &#187;</li>
+
+          <li class="nav-item nav-item-1"><a href="../usage.html" >Usage</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Creating Your Districts</a></li> 
+      </ul>
+    </div>
+    </div>
+
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025, Stuart C. Naifeh.
+      Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 7.4.7.
+    </div>
+    <!-- cloud_sptheme 1.4 -->
+  </body>
+</html>
